@@ -1,0 +1,22 @@
+{
+    "terminal.integrated.shellArgs.windows": ["-m", "IPython", "--simple-prompt"],
+    "python.terminal.executeInFileDir": true,
+    "cSpell.words": [
+        "Aprox",
+        "Conti",
+        "dtype",
+        "figsize",
+        "hstack",
+        "linalg",
+        "linestyle",
+        "loadmat",
+        "logspace",
+        "NODA",
+        "rhog",
+        "semilogx",
+        "xlabel",
+        "xlim",
+        "ylabel",
+        "ylim"
+    ]  
+}
