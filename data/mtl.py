@@ -9,10 +9,7 @@ REFERENCES:
 
 import copy
 import numpy as np
-import matplotlib.pyplot as plt
 from scipy.constants import mu_0, epsilon_0
-from matplotlib.patches import Wedge
-from matplotlib import patches
 
 
 class MulticonductorTransmissionLine():
@@ -57,19 +54,19 @@ class MulticonductorTransmissionLine():
                 })
 
         # Conductors Permeability [np.array]
-        self.mu = np.array([mu_0 * c['relative_permeability']for c in self.mtl]) # pylint: disable=invalid-name
+        self.mu = np.array([mu_0 * c['relative_permeability']for c in self.mtl]) 
 
         # Conductors Permittivity [np.array]
-        self.epsilon = np.array([epsilon_0 * c['relative_permittivity'] for c in self.mtl]) # pylint: disable=invalid-name
+        self.epsilon = np.array([epsilon_0 * c['relative_permittivity'] for c in self.mtl]) 
 
         # Conductors conductivity [np.array]
         self.sigma = np.array([c['conductivity'] for c in self.mtl])
 
         # Free-Space Permittivity [np.array]
-        self.epsilon_out = np.array([epsilon_0 * c['relative_permittivity_out'] for c in self.mtl]) # pylint: disable=invalid-name
+        self.epsilon_out = np.array([epsilon_0 * c['relative_permittivity_out'] for c in self.mtl])
 
         # Distance matrices [np.array]
-        self.D = self.distance_matrices()  # pylint: disable=invalid-name
+        self.D_pq, self.dx_pq, self.dy_pq, self.theta_pq = self.distance_matrices()
 
     # Contour Position Vector [np.array]
     # Equation (2.2) [1]

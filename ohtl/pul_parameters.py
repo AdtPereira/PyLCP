@@ -10,10 +10,10 @@ import numpy as np
 from scipy.special import iv
 from scipy.constants import mu_0, epsilon_0
 from scipy.integrate import quad
-from data.multiconductor import MulticonductorTransmissionLine as Multiconductor
+from data.mtl import MulticonductorTransmissionLine
 
 
-class PerUnitParameters(Multiconductor):
+class PerUnitParameters(MulticonductorTransmissionLine):
     """ This class contains the basic geometry of the system. """
 
     def __init__(self, mtl, f, sigma_1, er_1=1, mur_1=1, ge=0):

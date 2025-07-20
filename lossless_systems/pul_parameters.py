@@ -12,10 +12,11 @@ import numpy as np
 from scipy.special import jv, jvp #, iv, kv
 from scipy.constants import mu_0
 import matplotlib.pyplot as plt
-from data.multiconductor import MulticonductorTransmissionLine as Multiconductor
+
+from data.mtl import MulticonductorTransmissionLine
 
 
-class Bifilar(Multiconductor):
+class Bifilar(MulticonductorTransmissionLine):
     """ This class contains the analytical formulation of the system. """
 
     def __init__(self, mtl):
@@ -62,7 +63,7 @@ class Bifilar(Multiconductor):
         ap = np.array([cp['radius'][1] for cp in self.mtl])
 
         # Matrix Distance [np.array]
-        D = self.D[0]  # pylint: disable=invalid-name
+        D = self.D_pq
 
         # High Frequency Resistance and External Inductance [np.array]
         N = len(self.mtl)-1  # pylint: disable=invalid-name

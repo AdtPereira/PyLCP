@@ -322,8 +322,7 @@ class QuasiStatic(FreeSpace, AuxiliaryGeometry):
         g_matrix = np.zeros((self.N, self.N), dtype=complex)
 
         # Create an offset array to keep track of the starting index for each block
-        offsets = np.cumsum(
-            [0] + [2 * Np['fourier_order'] + 1 for Np in self.surfaces[:-1]])
+        offsets = np.cumsum([0] + [2 * Np['fourier_order'] + 1 for Np in self.surfaces[:-1]])
 
         # Number of conductor surfaces [int]
         ns = len(self.surfaces)
@@ -352,8 +351,7 @@ class QuasiStatic(FreeSpace, AuxiliaryGeometry):
                                 g_value = np.conjugate(
                                     self.gpq_master_thesis(-n_prime, -n, p, q))
                             else:
-                                g_value = self.gpq_master_thesis(
-                                    n_prime, n, p, q)
+                                g_value = self.gpq_master_thesis(n_prime, n, p, q)
 
                         # Numeric Evaluation
                         else:

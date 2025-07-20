@@ -89,12 +89,10 @@ class HomogeneousLosslessMedium(FreeSpace, AuxiliaryGeometry):
         self.w = 2 * np.pi * frequency
 
         # Permeability of the medium [np.array]
-        self.mu = np.array([mu_0 * c['relative_permeability']
-                           for c in self.mtl])
+        self.mu = np.array([mu_0 * c['relative_permeability'] for c in self.mtl])
 
         # Permittivity of the medium [np.array]
-        epsilon = np.array([epsilon_0 * c['relative_permittivity']
-                           for c in self.mtl])
+        epsilon = np.array([epsilon_0 * c['relative_permittivity'] for c in self.mtl])
 
         # Conductors conductivity [np.array]
         sigma = np.array([c['conductivity'] for c in self.mtl])
@@ -103,8 +101,7 @@ class HomogeneousLosslessMedium(FreeSpace, AuxiliaryGeometry):
         self.k = np.sqrt(self.w * self.mu * (self.w * epsilon - 1j * sigma))
 
         # Permittivity of the outer medium [np.array]
-        epsilon_out = np.array([c['relative_permittivity_out']
-                               for c in self.mtl])
+        epsilon_out = np.array([c['relative_permittivity_out'] for c in self.mtl])
 
         # Free-space wavenumber [float]
         self.kout = self.w * np.sqrt(mu_0 * epsilon_0 * epsilon_out)
@@ -601,8 +598,7 @@ class LosslessPostProcessing(FreeSpace):
         self.line_id = [conductor['line_id'] for conductor in self.mtl]
 
         # Active lines [list] [int]
-        self.active_lines = [
-            line for line in self.mtl if line['line_type'] == 'active']
+        self.active_lines = [line for line in self.mtl if line['line_type'] == 'active']
 
     # Incident Matrix Q [np.array]
     # Equation (A.2) [1]
@@ -643,8 +639,7 @@ class LosslessPostProcessing(FreeSpace):
         numpy.ndarray: The incident matrix S.
         """
 
-        matrix_s_transpose = np.zeros(
-            (len(self.active_lines), len(set(self.line_id))))
+        matrix_s_transpose = np.zeros((len(self.active_lines), len(set(self.line_id))))
 
         for i, line in enumerate(self.active_lines):
             active_line_id = line['line_id']

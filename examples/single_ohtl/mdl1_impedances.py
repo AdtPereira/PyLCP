@@ -1,12 +1,3 @@
-"""
-This script analyzes the behavior of a two-wire transmission line using the method of moments (MoM).
-The code is structured into classes and functions, facilitating a modular approach to the problem. 
-
-REFERENCES:
-[1] 
-
-"""
-
 import os
 import sys
 import time
@@ -16,9 +7,11 @@ import matplotlib.pyplot as plt
 # Adiciona a raiz do projeto ao PYTHONPATH
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..\..')))
 
-from ohtl import PerUnitParameters
-from data import MULTICONDUCTOR_TRANSMISSION_LINE, GraphicRepresentation
-#from mom_so import green, patel
+from data.systems import MULTICONDUCTOR_TRANSMISSION_LINE
+from data.graph import GraphicRepresentation as graph
+
+from ohtl.pul_parameters import PerUnitParameters
+from mom_so import green, patel
 
 # Multiconductor Transmission Line choices
 # 1 - Xue's single overhead conductor: h1 = 10 m, r1 = 1 cm and rho_c = 1.68E-8 S/m
@@ -118,7 +111,7 @@ def main():
     print(f"End of the routine! Time spent on simulation: {elapsed_time:.2f} seconds.\n") # pylint: disable=line-too-long
 
     # Display the geometry of the transmission line
-    GraphicRepresentation(MTL).wires_and_cables(line_type='overhead')
+    graph(MTL).wires_and_cables(line_type='overhead')
 
     # Plot the series resistance as a function of frequency
     plot_impedance(frequency, pul_dict, p=0, q=0)

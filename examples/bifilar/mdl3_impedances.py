@@ -15,9 +15,9 @@ import numpy as np
 # Adiciona a raiz do projeto ao PYTHONPATH
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..\..')))
 
-from data import systems, multiconductor as mtl
+from data import mtl, systems
 from data.graph import GraphicRepresentation as graph
-from lossless_medium.pul_parameters import Bifilar
+from lossless_systems.pul_parameters import Bifilar
 from mom_so import green, patel
 
 
@@ -64,7 +64,8 @@ def main():
     graph(MTL).wires_and_cables(line_type='bifilar')
 
     # 7. Plot the series resistance as a function of frequency
-    data = [0, MTL['data'][0]['fourier_order'], mtl.MulticonductorTransmissionLine(MTL).D[0]]
+    D = mtl.MulticonductorTransmissionLine(MTL).D_pq
+    data = [0, MTL['data'][0]['fourier_order'], D]
     Bifilar(MTL).plot_series_resistance(frequency, [Zs, Zs_mom], Rhf, data)
     Bifilar(MTL).plot_series_inductance(frequency, [Zs, Zs_mom], Lext, data)
 

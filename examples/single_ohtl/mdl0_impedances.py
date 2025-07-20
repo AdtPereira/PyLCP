@@ -16,9 +16,10 @@ import matplotlib.pyplot as plt
 # Adiciona a raiz do projeto ao PYTHONPATH
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..\..')))
 
-from ohtl.pul_parameters import PerUnitParameters
 from data.systems import MULTICONDUCTOR_TRANSMISSION_LINE
 from data.graph import GraphicRepresentation as graph
+
+from ohtl.pul_parameters import PerUnitParameters
 from mom_so import green, patel
 
 # Multiconductor Transmission Line choices
@@ -285,23 +286,22 @@ def main():
 
     # Analytical Formulation
     for f in frequency['Analytically']:
-        long = PerUnitParameters(MTL, f, sigma_1=1/200, er_1=5)
+        pul = PerUnitParameters(MTL, f, sigma_1=1/200, er_1=5)
 
         # Internal and external impedance matrices
-        z_results['zi_exact'].append(
-            long.internal_impedance(type_form='bessel')[0])
-        z_results['zi_approx'].append(long.internal_impedance()[0])
-        z_results['ri_cc'].append(long.internal_impedance()[1])
-        z_results['zi_hf'].append(long.internal_impedance()[2])
-        z_results['ze'].append(long.external_impedance())
+        z_results['zi_exact'].append(pul.internal_impedance(type_form='bessel')[0])
+        z_results['zi_approx'].append(pul.internal_impedance()[0])
+        z_results['ri_cc'].append(pul.internal_impedance()[1])
+        z_results['zi_hf'].append(pul.internal_impedance()[2])
+        z_results['ze'].append(pul.external_impedance())
 
         # Store the results in the dictionary
-        zg_results['quasi_tem'].append(long.earth_return_impedance()) # pylint: disable=line-too-long
-        zg_results['sunde'].append(long.earth_return_impedance(type_form='sunde')) # pylint: disable=line-too-long
-        zg_results['carson'].append(long.earth_return_impedance(type_form='carson')) # pylint: disable=line-too-long
-        zg_results['quasitem_log'].append(long.earth_return_impedance(type_form='quasitem_log')) # pylint: disable=line-too-long
-        zg_results['sunde_log'].append(long.earth_return_impedance(type_form='approx_log')) # pylint: disable=line-too-long
-        zg_results['deri'].append(long.earth_return_impedance(type_form='deri')) # pylint: disable=line-too-long
+        zg_results['quasi_tem'].append(pul.earth_return_impedance())
+        zg_results['sunde'].append(pul.earth_return_impedance(type_form='sunde'))
+        zg_results['carson'].append(pul.earth_return_impedance(type_form='carson'))
+        zg_results['quasitem_log'].append(pul.earth_return_impedance(type_form='quasitem_log'))
+        zg_results['sunde_log'].append(pul.earth_return_impedance(type_form='approx_log'))
+        zg_results['deri'].append(pul.earth_return_impedance(type_form='deri'))
 
     # MoM-SO routine
     green_list = ['Analytically', 'Numerically']
@@ -312,7 +312,7 @@ def main():
 
     # End the timer
     elapsed_time = time.time() - start_time
-    print(f"End of the routine! Time spent on simulation: {elapsed_time:.2f} seconds.\n") # pylint: disable=line-too-long
+    print(f"End of the routine! Time spent on simulation: {elapsed_time:.2f} seconds.\n")
 
     # Display the geometry of the transmission line
     graph(MTL).wires_and_cables(line_type='overhead')
