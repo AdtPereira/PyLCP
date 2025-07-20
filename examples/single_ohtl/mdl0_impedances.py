@@ -8,12 +8,17 @@ REFERENCES:
 """
 
 import os
+import sys
 import time
 import numpy as np
 import matplotlib.pyplot as plt
+
+# Adiciona a raiz do projeto ao PYTHONPATH
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..\..')))
+
 from ohtl.pul_parameters import PerUnitParameters
 from data.systems import MULTICONDUCTOR_TRANSMISSION_LINE
-from data.multiconductor import GraphicRepresentation as graph
+from data.graph import GraphicRepresentation as graph
 from mom_so import green, patel
 
 # Multiconductor Transmission Line choices
@@ -280,7 +285,7 @@ def main():
 
     # Analytical Formulation
     for f in frequency['Analytically']:
-        long = PerUnitParameters(MTL, f, sigma_e=1/200, er_e=5)
+        long = PerUnitParameters(MTL, f, sigma_1=1/200, er_1=5)
 
         # Internal and external impedance matrices
         z_results['zi_exact'].append(
@@ -310,7 +315,7 @@ def main():
     print(f"End of the routine! Time spent on simulation: {elapsed_time:.2f} seconds.\n") # pylint: disable=line-too-long
 
     # Display the geometry of the transmission line
-    graph(MTL, sigma_1=1/200, er_1=5).wires_and_cables(line_type='overhead')
+    graph(MTL).wires_and_cables(line_type='overhead')
 
     # Plot the series resistance as a function of frequency
     plot_zi(frequency, z_results, p=0, q=0)

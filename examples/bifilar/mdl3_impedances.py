@@ -8,17 +8,22 @@ REFERENCES:
 """
 
 import os
+import sys
 import time
 import numpy as np
+
+# Adiciona a raiz do projeto ao PYTHONPATH
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..\..')))
+
 from data import systems, multiconductor as mtl
-from free_space.pul_parameters import Bifilar
-from data.multiconductor import GraphicRepresentation as graph
+from data.graph import GraphicRepresentation as graph
+from lossless_medium.pul_parameters import Bifilar
 from mom_so import green, patel
 
 
 # Multiconductor Transmission Line choices
-# 1 - Bifilar Transmission Line (TWT) with 100 mm spacing and Np=Nq=0
-MTL = systems.MULTICONDUCTOR_TRANSMISSION_LINE[1]
+# 3 - Bifilar Transmission Line (TWT) with 25 mm spacing and Np=Nq=0
+MTL = systems.MULTICONDUCTOR_TRANSMISSION_LINE[3]
 
 
 def main():
@@ -53,15 +58,13 @@ def main():
 
     # 5. End the timer
     elapsed_time = time.time() - start_time
-    print(f"End of the routine! Time spent on simulation: {
-          elapsed_time:.2f} seconds.\n")
+    print(f"End of the routine! Time spent on simulation: {elapsed_time:.2f} seconds.\n")
 
     # 6. Display the geometry of the transmission line
     graph(MTL).wires_and_cables(line_type='bifilar')
 
     # 7. Plot the series resistance as a function of frequency
-    data = [0, MTL['data'][0]['fourier_order'],
-            mtl.MulticonductorTransmissionLine(MTL).D[0]]
+    data = [0, MTL['data'][0]['fourier_order'], mtl.MulticonductorTransmissionLine(MTL).D[0]]
     Bifilar(MTL).plot_series_resistance(frequency, [Zs, Zs_mom], Rhf, data)
     Bifilar(MTL).plot_series_inductance(frequency, [Zs, Zs_mom], Lext, data)
 

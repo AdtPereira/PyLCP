@@ -44,7 +44,6 @@ class PerUnitParameters(Multiconductor):
         # Earth wave number (rad/m)
         self.ke2 = - self.jw * self.mur_1 * mu_0 * \
             (self.sigma_1 + self.jw * self.er_1 * epsilon_0)
-        
 
     def internal_impedance(self, type_form='approx'):
         """ This method calculates the internal impedance of solid wires. """

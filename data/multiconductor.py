@@ -182,8 +182,7 @@ class MulticonductorTransmissionLine():
         # Check if all elements in the list are square matrices
         for i, matrix in enumerate(matrix_list):
             if matrix.shape[0] != matrix.shape[1]:
-                raise ValueError(f"Matrix at index {
-                                 i} is not square: shape {matrix.shape}")
+                raise ValueError(f"Matrix at index {i} is not square: shape {matrix.shape}")
 
         # Determine the size of the resulting matrix Y
         size_y = sum(mat.shape[0] for mat in matrix_list)

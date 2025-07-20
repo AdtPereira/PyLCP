@@ -8,9 +8,14 @@ REFERENCES:
 """
 
 import os
+import sys
 import time
 import numpy as np
 import matplotlib.pyplot as plt
+
+# Adiciona a raiz do projeto ao PYTHONPATH
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..\..')))
+
 from ohtl import PerUnitParameters
 from data import MULTICONDUCTOR_TRANSMISSION_LINE, GraphicRepresentation
 #from mom_so import green, patel

@@ -9,11 +9,16 @@ REFERENCES:
 
 import os
 import time
+import sys
 import numpy as np
 import matplotlib.pyplot as plt
+
+# Adiciona a raiz do projeto ao PYTHONPATH
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..\..')))
+
 from ohtl.pul_parameters import PerUnitParameters
 from data.systems import MULTICONDUCTOR_TRANSMISSION_LINE
-from data.multiconductor import GraphicRepresentation as graph
+from data.graph import GraphicRepresentation as graph
 
 # Multiconductor Transmission Line choices
 # 0 - A single overhead conductor, h1 = 10 m and r1 = 1 cm
@@ -113,9 +118,9 @@ def main():
 
     # Analytical Formulation
     for f in frequency['Analytically']:
-        pul_1 = PerUnitParameters(MTL, f, sigma_e=1/1E-6, er_e=5)
-        pul_2 = PerUnitParameters(MTL, f, sigma_e=1/2E+2, er_e=5)
-        pul_3 = PerUnitParameters(MTL, f, sigma_e=1/5E+3, er_e=5)
+        pul_1 = PerUnitParameters(MTL, f, sigma_1=1/1E-6, er_1=5)
+        pul_2 = PerUnitParameters(MTL, f, sigma_1=1/2E+2, er_1=5)
+        pul_3 = PerUnitParameters(MTL, f, sigma_1=1/5E+3, er_1=5)
 
         # Internal and external impedance matrices
         pul_parameters['rho_1u']['nakagawa'].append(pul_1.pul_extended_theory(type_form='nakagawa')) # pylint: disable=line-too-long
@@ -127,11 +132,10 @@ def main():
 
     # End the timer
     elapsed_time = time.time() - start_time
-    print(f"End of the routine! Time spent on simulation: {
-          elapsed_time:.2f} seconds.\n")
+    print(f"End of the routine! Time spent on simulation: {elapsed_time:.2f} seconds.\n")
 
     # Display the geometry of the transmission line
-    graph(MTL, sigma_1=1/1E-6, er_1=5).wires_and_cables(line_type='overhead')
+    graph(MTL).wires_and_cables(line_type='overhead')
 
     # Plot the series resistance as a function of frequency
     plot_gamma(frequency, pul_parameters, p=0, q=0)
