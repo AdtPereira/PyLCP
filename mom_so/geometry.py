@@ -102,7 +102,7 @@ class FreeSpace(MTL):
                 
         # Dimension N
         # Equation (2.36) [1]
-        self.N = sum([2*Np['fourier_order']+1 for Np in self.surfaces]) # pylint: disable=invalid-name
+        self.N = sum([2*Np['fourier_order']+1 for Np in self.surfaces])
 
 
 class UndergroundSystem(MTL):
@@ -163,11 +163,11 @@ class UndergroundSystem(MTL):
 
         # Dimension N
         # Equation (2.36) - PAG. 32 [1]
-        self.N = sum([2*Np['fourier_order']+1 for Np in self.conductor_surfaces]) # pylint: disable=invalid-name
+        self.N = sum([2*Np['fourier_order']+1 for Np in self.conductor_surfaces])
 
         # Dimension N_hat
         # Equation (3.3) - PAG. 59 [1]
-        self.Nhat = sum([2*Nh['fourier_order']+1 for Nh in self.hole_surfaces]) # pylint: disable=invalid-name
+        self.Nhat = sum([2*Nh['fourier_order']+1 for Nh in self.hole_surfaces])
 
 
 class AuxiliaryGeometry():

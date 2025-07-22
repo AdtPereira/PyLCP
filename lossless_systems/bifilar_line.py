@@ -40,29 +40,27 @@ class Bifilar(MulticonductorTransmissionLine):
         tuple: A tuple containing the high frequency resistance, external inductance, 
         and matrix impedance.
         """
-        # Angular frequency, rad/s [float]
-        w = 2 * np.pi * f
-
         # Skin Depth [np.array]
+        w = 2 * np.pi * f
         delta = np.sqrt(1 / (w / 2 * mu_0 * self.sigma))
 
         # Surface Resistance [np.array]
-        Rs = 1 / (self.sigma * delta) # pylint: disable=invalid-name
+        Rs = 1 / (self.sigma * delta) 
 
         # Outer Radii of the conductors [np.array]
         ap = np.array([cp['radius'][1] for cp in self.mtl])
 
         # Matrix Distance [np.array]
-        D = self.D_pq  # pylint: disable=invalid-name
+        D = self.D_pq
 
         # High Frequency Resistance and External Inductance [np.array]
-        N = len(self.mtl)-1  # pylint: disable=invalid-name
-        Rhf = np.zeros((N, N))  # pylint: disable=invalid-name
-        Lext = np.zeros_like(Rhf)  # pylint: disable=invalid-name
-        Zi = np.zeros_like(Rhf, dtype=complex)  # pylint: disable=invalid-name
+        N = len(self.mtl) - 1
+        Rhf = np.zeros((N, N))
+        Lext = np.zeros_like(Rhf)
+        Zi = np.zeros_like(Rhf, dtype=complex)
 
         # Constant Term and Bessel argument
-        Xi = np.sqrt(2) * ap / delta # pylint: disable=invalid-name
+        Xi = np.sqrt(2) * ap / delta
         constant_term = 1 / (np.sqrt(2) * np.pi * ap * self.sigma * delta)
 
         for p in range(N):
@@ -73,18 +71,19 @@ class Bifilar(MulticonductorTransmissionLine):
             # frequencies.
 
             # Common fraction term
-            D_2a = D[p][p+1] / 2 / ap[p] # pylint: disable=invalid-name
+            s_2rw = D[p][p+1] / 2 / ap[p]
 
             # Surface resistance
-            Rs_pia = Rs[p] / np.pi / ap[p] # pylint: disable=invalid-name
+            Rs_pia = Rs[p] / np.pi / ap[p]
 
             # High Frequency Resistance (Ω/m)
             # Equation (2.64) [1]
-            Rhf[p] = Rs_pia * D_2a / np.sqrt(D_2a ** 2 - 1)
+            Rhf[p] = Rs_pia * s_2rw / np.sqrt(s_2rw ** 2 - 1)
 
             # External Inductance (H/m)
             # Equation (2.65) [1]
-            Lext[p] = mu_0 / np.pi * np.arccosh(D_2a)
+            # Equation (4.41) [2]
+            Lext[p] = mu_0 / np.pi * np.arccosh(s_2rw)
 
             # 2nd solution: Internal Impedance Matrix, z_int (Ω/m)
             # These formulas captures skin effect, but proximity
@@ -98,7 +97,7 @@ class Bifilar(MulticonductorTransmissionLine):
 
         # Matrix Impedance, Zs (Ω/m)
         # Equation (2.68) [1]
-        Zs = 2 * Zi + 1j * w * Lext  # pylint: disable=invalid-name
+        Zs = 2 * Zi + 1j * w * Lext
 
         return Zs, Rhf, Lext
 
@@ -126,26 +125,23 @@ class Bifilar(MulticonductorTransmissionLine):
 
         # s: distância entre os centros dos condutores.
         # Da classe pai, D é a matriz de distância d_pq.
-        # Para uma linha bifilar (condutores 0 e 1), s é D[0, 1].
         s = self.D_pq[0, 1]
 
         # r_w1, r_w2: raios dos dois condutores.
         radii = np.array([conductor['radius'][1] for conductor in self.mtl])
         if len(radii) != 2:
             raise ValueError("Esta fórmula de capacitância é válida apenas para uma linha de dois condutores (bifilar).")
-        r_w1 = radii[0]
-        r_w2 = radii[1]
-
-        two_pi_epsilon = 2 * np.pi * epsilon
+        r_w1, r_w2 = radii
         
         # --- Cálculo da Capacitância Aproximada (Eq. 4.21) ---
+        pi2_epsilon = 2 * np.pi * epsilon
         den_approx = np.log((s**2) / (r_w1 * r_w2))
-        capacitance_approx = two_pi_epsilon / den_approx
+        capacitance_approx = pi2_epsilon / den_approx
 
         # --- Cálculo da Capacitância Exata (Eq. 4.39) ---
         arg_arccosh = (s**2 - r_w1**2 - r_w2**2) / (2 * r_w1 * r_w2) #
         den_exact = np.arccosh(arg_arccosh) #
-        capacitance_exact = two_pi_epsilon / den_exact #
+        capacitance_exact = pi2_epsilon / den_exact #
 
         # Retorna um dicionário com ambos os resultados
         return {

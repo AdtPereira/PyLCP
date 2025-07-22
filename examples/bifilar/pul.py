@@ -25,17 +25,16 @@ import matplotlib.pyplot as plt
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..\..')))
 
 from lossless_systems.bifilar_line import Bifilar
-
 from data.systems import MTL_MODELS
-from data.mtl import MulticonductorTransmissionLine
 from data.graph import GraphicRepresentation as graph
-
 from mom_so.green import QuasiStatic
 from mom_so.patel import HomogeneousLosslessMedium, LosslessPostProcessing
 from mom_so.utils import clear_screen
 
 # --- Configurações da Simulação ---
-# MTL_MODELS['bifilar'][separation(mm)][fourier_order]
+#[separation(mm)][fourier_order]
+MTL = MTL_MODELS['bifilar'][100][4] 
+MTL = MTL_MODELS['bifilar'][25][0]
 MTL = MTL_MODELS['bifilar'][25][4]
 FREQUENCY_RANGE = {
     'ana': np.logspace(0, 6, num=200),
@@ -197,87 +196,6 @@ def plot_results(freqs, analytical, mom_so):
     plt.show()
 
 
-def run_capacitance_simulation(s_rw_ratios, wire_radius):
-    """
-    Executa a simulação de capacitância para diferentes geometrias.
-
-    Args:
-        s_rw_ratios (np.ndarray): Array com as razões s/r_w a serem analisadas.
-        wire_radius (float): O raio fixo do condutor a ser usado na simulação.
-
-    Returns:
-        tuple: Uma tupla contendo duas listas com os valores de capacitância
-               exata e aproximada em F/m.
-    """
-    print("Iniciando simulação de capacitância...")
-    capacitances_exact = []
-    capacitances_approx = []
-
-    for ratio in s_rw_ratios:
-        separation = ratio * wire_radius
-
-        # Cria a configuração da linha bifilar dinamicamente para cada razão.
-        # Os condutores são posicionados em (0, 0) e (separation, 0).
-        mtl_config = {
-            'type': 'bifilar_line',
-            'data': [
-                {
-                    'center_point': (0.0, 0.0),
-                    'radius': [0, wire_radius],
-                    'conductivity': 5.8E7, 'relative_permeability': 1,
-                    'relative_permittivity': 1, 'relative_permittivity_out': 1,
-                    'fourier_order': 4
-                },
-                {
-                    'center_point': (separation, 0.0),
-                    'radius': [0, wire_radius],
-                    'conductivity': 5.8E7, 'relative_permeability': 1,
-                    'relative_permittivity': 1, 'relative_permittivity_out': 1,
-                    'fourier_order': 4
-                }
-            ]
-        }
-
-        # Instancia a classe e calcula as capacitâncias
-        capacitance_data = Bifilar(mtl_config).capacitance()
-
-        capacitances_exact.append(capacitance_data['exact'])
-        capacitances_approx.append(capacitance_data['approximate'])
-
-    print("Simulação finalizada.")
-    return (capacitances_exact, capacitances_approx)
-
-
-def plot_capacitance_comparison(s_rw_ratios, sim_results):
-    """
-    Gera o gráfico comparativo das capacitâncias, similar à Figura 4.9.
-
-    Args:
-        s_rw_ratios (np.ndarray): Array com as razões s/r_w (eixo X).
-        sim_results (tuple): Tupla com as listas de resultados de capacitância.
-    """
-    print("Gerando gráfico da capacitância...")
-    exact_caps, approx_caps = sim_results
-
-    # Converte de F/m para pF/m para corresponder ao eixo Y da figura
-    exact_caps_pF = np.array(exact_caps) * 1e12
-    approx_caps_pF = np.array(approx_caps) * 1e12
-
-    # Configuração da plotagem para imitar a Figura 4.9
-    plt.figure(figsize=(8, 6))
-    plt.plot(s_rw_ratios, exact_caps_pF, 'k-', label='Exact')
-    plt.plot(s_rw_ratios, approx_caps_pF, 'k--', label='Approximate')
-
-    plt.xlabel('Ratio of separation to wire radius, s/r$_w$')
-    plt.ylabel('Per-unit-length capacitance (pF/m)')
-    plt.title('Figure 4.9: A comparison of the exact and approximate formulas \n for the per-unit-length capacitance of two wires [1].')
-    plt.xlim(2, 8)
-    plt.ylim(10, 90)
-    plt.legend()
-    plt.grid(True, linestyle='--', linewidth=0.5)
-    plt.show()
-
-
 def main():
     """ Função principal para orquestrar a análise, cálculo e visualização dos resultados. """
     clear_screen()
@@ -300,12 +218,6 @@ def main():
 
         # 5. Geração e exibição dos resultados com a função revisada
         plot_results(FREQUENCY_RANGE, analytical_data, momso_data)
-
-        # 6. Simulação de Capacitância
-        WIRE_RADIUS = 0.010
-        S_RW_RATIOS = np.linspace(2, 8, num=100)
-        capacitance_results = run_capacitance_simulation(S_RW_RATIOS, WIRE_RADIUS)
-        plot_capacitance_comparison(S_RW_RATIOS, capacitance_results)
 
     except Exception as e:
         print(f"\nOcorreu um erro durante a execução do script: {e}")

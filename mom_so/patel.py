@@ -98,13 +98,13 @@ class HomogeneousLosslessMedium(FreeSpace, AuxiliaryGeometry):
         # Conductors conductivity [np.array]
         sigma = np.array([c['conductivity'] for c in self.mtl])
 
-        # Conductors wavenumber [float]
+        # Conductors wave-number [float]
         self.k = np.sqrt(self.w * self.mu * (self.w * self.epsilon - 1j * sigma))
 
         # Permittivity of the outer medium [np.array]
         epsilon_out = np.array([c['relative_permittivity_out'] for c in self.mtl])
 
-        # Free-space wavenumber [float]
+        # Free-space wave-number [float]
         self.kout = self.w * np.sqrt(mu_0 * epsilon_0 * epsilon_out)
 
     # Surface admittance operator [np.array]
@@ -321,29 +321,72 @@ class HomogeneousLosslessMedium(FreeSpace, AuxiliaryGeometry):
 
         return u.T @ solution
     
-    # Matrix Z [np.array]
-    # Equation (2.61) [1]
-    def vacuum_capacitance_co(self, green_matrix):
+    # Matrix C [np.array]
+    def capacitance_matrix(self, green_matrix):
         """
-        This function calculates the matrix C0.
+        Calcula a matriz de capacitância física (n x n) a partir da matriz de
+        capacitância generalizada ((n+1) x (n+1)), seguindo a Eq. 5.21 de Clayton Paul.
 
-        The matrix C0 is the vacuum capacitance matrix of the system.
+        A fórmula implementada é:
+        C_ij = c_ij - ( (soma da linha i de c) * (soma da coluna j de c) ) / (soma total de c)
+
+        Onde 'c' é a matriz generalizada e 'C' é a matriz física resultante.
+        Assume-se que o condutor de índice 0 da matriz generalizada é o de referência
+        e está sendo eliminado.
+
+        Args:
+            matriz_generalizada (np.ndarray): A matriz de capacitância generalizada
+                                            simétrica de ordem (n+1) x (n+1).
 
         Returns:
-        numpy.ndarray: The matrix C0.
+            np.ndarray: A matriz de capacitância física de ordem n x n.
+            
+        Raises:
+            ValueError: Se a matriz de entrada não for quadrada ou se a soma de
+                        seus elementos for zero.
         """
 
         u = self.u_matrix()
         e0 = self.epsilon[0]
 
-        # Perform LU factorization of the Z matrix
-        lu, piv = lu_factor(green_matrix)
+        # Solve the linear system Gx = U and calculate U^T*G^{-1}*U
+        uT_gInv_u = u.T @ lu_solve(lu_factor(green_matrix), u)
 
-        # Solve the linear system Zx = b for Q^T
-        # Calculate the matrix QZ^{-1}Q^T
-        uT_gInv_u = u.T @ lu_solve((lu, piv), u)
+        # Generalized Capacitance Matrix [1]
+        general_c = - e0 * uT_gInv_u
 
-        return - e0 * uT_gInv_u
+        # --- Validação da entrada com assert ---
+        assert isinstance(general_c, np.ndarray), "A entrada deve ser um array NumPy."
+        assert np.sum(general_c) != 0, "A soma total dos elementos da matriz generalizada não pode ser zero."
+        assert general_c.ndim == 2, "A entrada deve ser uma matriz 2D (array de 2 dimensões)."
+        assert general_c.shape[0] == general_c.shape[1], "A entrada deve ser uma matriz quadrada."
+        assert general_c.shape[0] >= 2, "A matriz generalizada deve ser de ordem mínima 2x2."
+
+        # Ordem da matriz generalizada (N = n+1)
+        N = general_c.shape[0]
+
+        # 2. Numerador: Soma de cada linha e de cada coluna
+        # Para uma matriz simétrica, as somas das linhas e colunas são iguais.
+        row_sum = np.sum(general_c, axis=1)     # axis=1 soma ao longo das colunas
+        column_sum = np.sum(general_c, axis=0)  # axis=0 soma ao longo das linhas
+
+        # assert np.equal(row_sum, column_sum).all(), "As somas das linhas e colunas devem ser iguais."
+
+        # Inicializa a matriz de capacitância física n x n com zeros
+        matrix_c = np.zeros((N - 1, N - 1), dtype=general_c.dtype)
+
+        # Itera sobre os índices da matriz física (de 1 a n na matriz original)
+        # Condutor de índice 0 é o de referência e não é incluído na matriz física
+        for i in range(1, N):
+            for j in range(1, N):
+                c_ij = general_c[i, j]
+                row_i_sum = row_sum[i]
+                column_j_sum = column_sum[j]
+                
+                # Eq. 5.21 [2]
+                matrix_c[i - 1, j - 1] = c_ij - (row_i_sum * column_j_sum) / np.sum(general_c)
+
+        return matrix_c
 
 
 class MultilayeredLossyMedium(UndergroundSystem, AuxiliaryGeometry):
