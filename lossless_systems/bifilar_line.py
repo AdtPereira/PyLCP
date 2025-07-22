@@ -204,27 +204,21 @@ class Bifilar(MulticonductorTransmissionLine):
 
         # Extracting the data from the list_data
         p = data[0]
-        Np = data[1]  # pylint: disable=invalid-name
-        D = data[2][0, 1]  # pylint: disable=invalid-name
+        Np = data[1]
+        D = data[2][0, 1]
 
         # Extracting the impedance elements
         zs = np.array([item[p] for item in z[0]])
         lext = np.array([np.imag(zs) / (2 * np.pi * f) for zs, f in zip(zs, f[0])])
         lext_hf = np.array([item[p] for item in lext_hf])
-        lext_mom = np.array([np.imag(z) / (2 * np.pi * f)
-                            for z, f in zip(z[1], f[1])])
+        lext_mom = np.array([np.imag(z) / (2 * np.pi * f) for z, f in zip(z[1], f[1])])
 
         # Closed-Form Approximation Series Inductance
-        plt.plot(f[0], 1E6 * lext, label='Analytical (Skin Effect Only)',
-                color='black', linestyle='-')
-
+        plt.plot(f[0], 1E6 * lext, label='Analytical (Skin Effect Only)', color='black', linestyle='-')
         # Asymptotic Series Inductance
-        plt.plot(f[0], 1E6 * lext_hf, label='Analytical (Asymptotic)',
-                color='red', linestyle='--')
-
+        plt.plot(f[0], 1E6 * lext_hf, label='Analytical (Asymptotic)', color='red', linestyle='--')
         # MoM Series Inductance
-        plt.scatter(f[1], 1E6 * lext_mom, label=fr'MoM-SO ($Np=Nq={Np}$) [1]',
-                    color='blue', marker='x', s=40)
+        plt.scatter(f[1], 1E6 * lext_mom, label=fr'MoM-SO ($Np=Nq={Np}$) [1]', color='blue', marker='x', s=40)
 
         plt.xscale('log')
         plt.legend()
@@ -236,5 +230,4 @@ class Bifilar(MulticonductorTransmissionLine):
                 r'\sigma = 5.952 \times 10^7\,\mathrm{S/m}$ [1]')
         plt.grid(False)
         plt.show()
-
 

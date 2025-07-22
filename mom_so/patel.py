@@ -77,6 +77,7 @@ import numpy as np
 from scipy.constants import mu_0, epsilon_0
 from scipy.special import jv, jvp, h1vp, h2vp
 from scipy.linalg import lu_factor, lu_solve, inv
+
 from .geometry import FreeSpace, UndergroundSystem, AuxiliaryGeometry
 
 class HomogeneousLosslessMedium(FreeSpace, AuxiliaryGeometry):
@@ -92,13 +93,13 @@ class HomogeneousLosslessMedium(FreeSpace, AuxiliaryGeometry):
         self.mu = np.array([mu_0 * c['relative_permeability'] for c in self.mtl])
 
         # Permittivity of the medium [np.array]
-        epsilon = np.array([epsilon_0 * c['relative_permittivity'] for c in self.mtl])
+        self.epsilon = np.array([epsilon_0 * c['relative_permittivity'] for c in self.mtl])
 
         # Conductors conductivity [np.array]
         sigma = np.array([c['conductivity'] for c in self.mtl])
 
         # Conductors wavenumber [float]
-        self.k = np.sqrt(self.w * self.mu * (self.w * epsilon - 1j * sigma))
+        self.k = np.sqrt(self.w * self.mu * (self.w * self.epsilon - 1j * sigma))
 
         # Permittivity of the outer medium [np.array]
         epsilon_out = np.array([c['relative_permittivity_out'] for c in self.mtl])
@@ -319,6 +320,30 @@ class HomogeneousLosslessMedium(FreeSpace, AuxiliaryGeometry):
         solution = lu_solve((lu, piv), ys @ u)
 
         return u.T @ solution
+    
+    # Matrix Z [np.array]
+    # Equation (2.61) [1]
+    def vacuum_capacitance_co(self, green_matrix):
+        """
+        This function calculates the matrix C0.
+
+        The matrix C0 is the vacuum capacitance matrix of the system.
+
+        Returns:
+        numpy.ndarray: The matrix C0.
+        """
+
+        u = self.u_matrix()
+        e0 = self.epsilon[0]
+
+        # Perform LU factorization of the Z matrix
+        lu, piv = lu_factor(green_matrix)
+
+        # Solve the linear system Zx = b for Q^T
+        # Calculate the matrix QZ^{-1}Q^T
+        uT_gInv_u = u.T @ lu_solve((lu, piv), u)
+
+        return - e0 * uT_gInv_u
 
 
 class MultilayeredLossyMedium(UndergroundSystem, AuxiliaryGeometry):
@@ -697,3 +722,25 @@ class LosslessPostProcessing(FreeSpace):
         qz_inv_qt = q @ lu_solve((lu, piv), q.T)
 
         return s.T @ qz_inv_qt @ s
+    
+    # Matriz Rs [np.array]
+    def rs_matrix(self, z_total):
+        """
+        This function calculates the series resistance matrix Rs.
+        The series resistance matrix Rs is the real part of the total series impedance matrix.
+
+        Returns:
+        numpy.ndarray: The series resistance matrix Rs.
+        """
+        return np.real(z_total)
+    
+    # Matriz Ls [np.array]
+    def ls_matrix(self, z_total, frequency):
+        """
+        This function calculates the series inductance matrix Ls.
+        The series inductance matrix Ls is the imaginary part of the total series impedance matrix.
+
+        Returns:
+        numpy.ndarray: The series inductance matrix Ls.
+        """
+        return np.imag(z_total) / (2 * np.pi * frequency)

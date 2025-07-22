@@ -26,7 +26,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..\..')
 
 from lossless_systems.bifilar_line import Bifilar
 
-from data.systems import MULTICONDUCTOR_TRANSMISSION_LINE
+from data.systems import MTL_MODELS
 from data.mtl import MulticonductorTransmissionLine
 from data.graph import GraphicRepresentation as graph
 
@@ -35,10 +35,12 @@ from mom_so.patel import HomogeneousLosslessMedium, LosslessPostProcessing
 from mom_so.utils import clear_screen
 
 # --- Configurações da Simulação ---
-BIFILAR_LINE_INDEX = 2
-FREQUENCY_RANGE_ANA = np.logspace(0, 7, num=200)
-FREQUENCY_RANGE_MOM = np.logspace(0, 7, num=30)
-MTL_CONFIG = MULTICONDUCTOR_TRANSMISSION_LINE[BIFILAR_LINE_INDEX]
+# MTL_MODELS['bifilar'][separation(mm)][fourier_order]
+MTL = MTL_MODELS['bifilar'][25][4]
+FREQUENCY_RANGE = {
+    'ana': np.logspace(0, 6, num=200),
+    'mom': np.logspace(0, 6, num=30)
+}
 
 class GreenFunctionMode(Enum):
     """Define o modo de cálculo para a função de Green."""
@@ -46,7 +48,7 @@ class GreenFunctionMode(Enum):
     NUMERICAL = 'Numerically'
 
 
-def run_analytical_simulation(mtl_config, frequencies):
+def run_analytical_simulation(mtl, frequencies):
     """
     Executa a simulação analítica da impedância da linha de transmissão.
 
@@ -59,21 +61,23 @@ def run_analytical_simulation(mtl_config, frequencies):
                resistências de alta frequência e indutâncias externas.
     """
     print("Iniciando rotina analítica...")
-    bifilar_analytical = Bifilar(mtl_config)
-    series_impedances = []
-    hf_resistances = []
-    external_inductances = []
+    bifilar_analytical = Bifilar(mtl)
+    analytical_data = {}
     
     for freq in frequencies:
         z_s, r_hf, l_ext = bifilar_analytical.series_impedance(freq)
-        series_impedances.append(z_s)
-        hf_resistances.append(r_hf)
-        external_inductances.append(l_ext)
-        
-    return series_impedances, hf_resistances, external_inductances
+        analytical_data[freq] = {
+            'zs': z_s,
+            'rs': np.real(z_s),
+            'ls': np.imag(z_s) / (2 * np.pi * freq),
+            'rhf': r_hf,
+            'le': l_ext
+        }
+
+    return analytical_data
 
 
-def run_momso_simulation(mtl_config, frequencies, green_mode=GreenFunctionMode.ANALYTICAL):
+def run_momso_simulation(mtl, frequencies, green_mode=GreenFunctionMode.ANALYTICAL):
     """
     Executa a simulação da impedância usando o Método dos Momentos (MoM-SO).
 
@@ -86,45 +90,111 @@ def run_momso_simulation(mtl_config, frequencies, green_mode=GreenFunctionMode.A
         list: Uma lista contendo as impedâncias série totais calculadas via MoM.
     """
     print("Iniciando rotina numérica (MoM-SO)...")
-    green_matrix = QuasiStatic(mtl_config).g_tanaka(mode=green_mode.value)
-    post_processor = LosslessPostProcessing(mtl_config)
-    series_impedances_mom = []
+    green_matrix = QuasiStatic(mtl).g_tanaka(mode=green_mode.value)
+    post_processor = LosslessPostProcessing(mtl)
+    momso_data = {}
 
     for freq in frequencies:
-        mom_so = HomogeneousLosslessMedium(mtl_config, freq)
+        mom_so = HomogeneousLosslessMedium(mtl, freq)
         z_partial = mom_so.z_partial(green_matrix)
-        series_impedances_mom.append(post_processor.z_total(z_partial))
-        
-    return series_impedances_mom
+        zs = post_processor.z_total(z_partial)
+        momso_data[freq] = {
+            'zs': zs,
+            'rs': post_processor.rs_matrix(zs),
+            'ls': post_processor.ls_matrix(zs, freq)
+        }
+
+    return momso_data
 
 
-def plot_results(mtl_config, frequencies, analytical_results, mom_results):
+def plot_results(freqs, analytical, mom_so):
     """
-    Gera e exibe os gráficos dos resultados da simulação.
+    Gera e exibe os gráficos dos resultados da simulação de forma flexível,
+    organizados em subplots.
 
     Args:
-        mtl_config (dict): Dicionário de configuração da linha de transmissão.
-        frequencies (tuple): Tupla com os arrays de frequência para cada método.
-        analytical_results (tuple): Resultados da simulação analítica.
-        mom_results (list): Resultados da simulação MoM.
+        mtl (dict): Dicionário de configuração da linha de transmissão.
+        freqs (dict): Dicionário contendo os arrays de frequência para cada simulação.
+        analytical (dict): Dicionário com os resultados da simulação analítica.
+        mom_so (dict): Dicionário com os resultados da simulação MoM-SO.
     """
     print("Gerando gráficos...")
-    freq_analytical, freq_mom = frequencies
-    impedance_analytical, hf_resistance, external_inductance = analytical_results
 
-    # Exibe a geometria da linha
-    graph(mtl_config).wires_and_cables(line_type='bifilar')
+    def _configure_subplot(ax, ylabel, data_to_plot, ref_data=None, yscale='log'):
+        """
+        Função auxiliar para configurar um único subplot.
 
-    # Parâmetros para os gráficos
-    plot_data = [0, mtl_config['data'][0]['fourier_order'], MulticonductorTransmissionLine(mtl_config).distance_matrices[0]]
+        Args:
+            ax (matplotlib.axes.Axes): O eixo do subplot a ser configurado.
+            title (str): Título do subplot.
+            ylabel (str): Rótulo do eixo Y.
+            data_to_plot (dict): Dados principais para plotagem.
+            ref_data (tuple, optional): Dados de referência para plotagem.
+        """
+        # Itera sobre os dados para plotagem
+        for label, (frequencies, values) in data_to_plot.items():
+            if frequencies is not None and values is not None:
+                if label == 'MoM-SO':
+                    ax.scatter(frequencies, values, label=label, facecolors='none', edgecolors='k', marker='o')
+                else:
+                    ax.plot(frequencies, values, label=label, color='k', linestyle='-')
+
+        # Plota os dados de referência, se existirem
+        if ref_data:
+            frequencies, values, label = ref_data
+            if frequencies is not None and values is not None:
+                ax.plot(frequencies, values, 'k--', label=label)
+
+        # Configurações do subplot
+        ax.set_xscale('log')
+        ax.set_yscale(yscale)
+        ax.set_xlim(1E0, 1E6)
+        ax.set_xlabel('Frequency (Hz)')
+        ax.set_ylabel(ylabel)
+        ax.legend()
+        ax.grid(False)
+
+    # Fatores de conversão de unidade
+    R_FACTOR = 1000  # de Ohm/m para Ohm/km
+    L_FACTOR = 1e6   # de H/m para mH/km
+
+    # Extrai as frequências
+    ana_freqs = freqs.get('ana')
+    mom_freqs = freqs.get('mom')
+
+    # 1. Inicialize listas vazias para armazenar os resultados
+    ana_r, r_hf, ana_l, l_ext = [], [], [], []
+    mom_r, mom_l = [], []
+
+    # 2. Processe os dados analíticos em um único laço
+    for data in analytical.values():
+        ana_r.append(data['rs'][0, 0] * R_FACTOR)
+        r_hf.append(data['rhf'][0, 0] * R_FACTOR)
+        ana_l.append(data['ls'][0, 0] * L_FACTOR)
+        l_ext.append(data['le'][0, 0] * L_FACTOR)
+
+    # 3. Processe os dados do MoM-SO em um laço separado
+    for data in mom_so.values():
+        mom_r.append(data['rs'][0, 0] * R_FACTOR)
+        mom_l.append(data['ls'][0, 0] * L_FACTOR)
+
+    resistance_data = {'Analytical': (ana_freqs, ana_r), 'MoM-SO': (mom_freqs, mom_r)}
+    inductance_data = {'Analytical': (ana_freqs, ana_l), 'MoM-SO': (mom_freqs, mom_l)}
+    hf_resistance_ref = (ana_freqs, r_hf, 'Resistência HF (Analítica)')
+    external_inductance_ref = (ana_freqs, l_ext, 'Indutância Externa (Analítica)')
+
+    # Cria a figura com subplots
+    fig, axes = plt.subplots(1, 2, figsize=(12, 5))
+
+    # Configura cada subplot
+    _configure_subplot(axes[0], r'Series Resistance p.u.l. ($\Omega$/km)',
+                       resistance_data, hf_resistance_ref)
     
-    simulation_results = [impedance_analytical, mom_results]
+    _configure_subplot(axes[1], 'Series Inductance p.u.l. (mH/km)',
+                       inductance_data, external_inductance_ref, yscale='linear')
     
-    # Plota a resistência série
-    Bifilar(mtl_config).plot_series_resistance((freq_analytical, freq_mom), simulation_results, hf_resistance, plot_data)
-    
-    # Plota a indutância série
-    Bifilar(mtl_config).plot_series_inductance((freq_analytical, freq_mom), simulation_results, external_inductance, plot_data)
+    plt.tight_layout()
+    plt.show()
 
 
 def run_capacitance_simulation(s_rw_ratios, wire_radius):
@@ -215,31 +285,25 @@ def main():
     start_time = time.time()
 
     try:
-        # # 1. Rotina Analítica
-        # zi_ana, res_hf, ind_externa = run_analytical_simulation(
-        #     MTL_CONFIG, FREQUENCY_RANGE_ANA
-        # )
+        # 1. Exibe a geometria da linha (em uma figura separada)
+        graph(MTL).wires_and_cables(line_type='bifilar')
 
-        # # 2. Rotina MoM-SO
-        # zi_momso = run_momso_simulation(
-        #     MTL_CONFIG, FREQUENCY_RANGE_MOM, GreenFunctionMode.ANALYTICAL
-        # )
+        # 1. Rotina Analítica
+        analytical_data = run_analytical_simulation(MTL, FREQUENCY_RANGE['ana'])
 
-        # # 3. Medição de tempo
-        # elapsed_time = time.time() - start_time
-        # print(f"\nRotinas de cálculo finalizadas! Tempo de simulação: {elapsed_time:.2f} segundos.")
+        # 2. Rotina MoM-SO
+        momso_data = run_momso_simulation(MTL, FREQUENCY_RANGE['mom'], GreenFunctionMode.ANALYTICAL)
 
-        # # 4. Geração e exibição dos resultados
-        # plot_results(
-        #     MTL_CONFIG,
-        #     (FREQUENCY_RANGE_ANA, FREQUENCY_RANGE_MOM),
-        #     (zi_ana, res_hf, ind_externa),
-        #     zi_momso
-        # )
+        # 3. Medição de tempo
+        elapsed_time = time.time() - start_time
+        print(f"\nRotinas de cálculo finalizadas! Tempo de simulação: {elapsed_time:.2f} segundos.")
 
-        # 5. Simulação de Capacitância
+        # 5. Geração e exibição dos resultados com a função revisada
+        plot_results(FREQUENCY_RANGE, analytical_data, momso_data)
+
+        # 6. Simulação de Capacitância
+        WIRE_RADIUS = 0.010
         S_RW_RATIOS = np.linspace(2, 8, num=100)
-        WIRE_RADIUS = 0.01  # Raio do fio em metros
         capacitance_results = run_capacitance_simulation(S_RW_RATIOS, WIRE_RADIUS)
         plot_capacitance_comparison(S_RW_RATIOS, capacitance_results)
 

@@ -75,8 +75,8 @@ from .multiconductor import MulticonductorTransmissionLine as MTL
 class FreeSpace(MTL):
     """ This class contains the basic geometry of the system. """
 
-    def __init__(self, mtl_dict):
-        super().__init__(mtl_dict)
+    def __init__(self, mtl):
+        super().__init__(mtl)
 
         # Conductor surfaces dictionary
         self.surfaces = []
@@ -99,6 +99,7 @@ class FreeSpace(MTL):
                     'fourier_order': conductor['fourier_order'],
                     'radius': conductor['radius'][1]
                 })
+                
         # Dimension N
         # Equation (2.36) [1]
         self.N = sum([2*Np['fourier_order']+1 for Np in self.surfaces]) # pylint: disable=invalid-name
@@ -107,8 +108,8 @@ class FreeSpace(MTL):
 class UndergroundSystem(MTL):
     """ This class contains the basic geometry of the system. """
 
-    def __init__(self, mtl_dict):
-        super().__init__(mtl_dict)
+    def __init__(self, mtl):
+        super().__init__(mtl)
 
         # Conductor surfaces dictionary
         self.conductor_surfaces = []

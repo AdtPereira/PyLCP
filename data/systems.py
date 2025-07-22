@@ -117,7 +117,7 @@ TL_138kV_OVERHEAD = [
     }
 ]
 
-BIFILAR_S100 = [
+BIFILAR_S100_NP4 = [
     {
         'line_id': 0,
         'conductor_name': 'p',
@@ -150,7 +150,7 @@ BIFILAR_S100 = [
     }
 ]
 
-BIFILAR_S25_NP = [
+BIFILAR_S25_NP0 = [
     {
         'line_id': 0,
         'conductor_name': 'p',
@@ -183,7 +183,7 @@ BIFILAR_S25_NP = [
     }
 ]
 
-BIFILAR_S25 = [
+BIFILAR_S25_NP4 = [
     {
         'line_id': 0,
         'conductor_name': 'p',
@@ -216,25 +216,18 @@ BIFILAR_S25 = [
     }
 ]
 
-MULTICONDUCTOR_TRANSMISSION_LINE = [
-    {'file_name': 'mdl0_single_overhead.py',
-     'type': 'overhead_conductor',
-     'data': SINGLE_OVERHEAD_DECONTI,
-     },
-    {'file_name': 'mdl1_single_overhead.py',
-     'type': 'overhead_conductor',
-     'data': SINGLE_OVERHEAD_XUE,
-     },
-    {'file_name': 'mdl2_bifilar_free_space.py',
-     'type': 'bifilar_wires',
-     'data': BIFILAR_S100,
+MTL_MODELS = {
+    'overhead': {
+        'deConti': {'type': 'overhead_conductor', 'data': SINGLE_OVERHEAD_DECONTI},
+        'xue': {'type': 'overhead_conductor', 'data': SINGLE_OVERHEAD_XUE},
     },
-    {'file_name': 'mdl3_bifilar_free_space.py',
-     'type': 'bifilar_wires',
-     'data': BIFILAR_S25_NP,
-    },
-    {'file_name': 'mdl4_bifilar_free_space.py',
-     'type': 'bifilar_wires',
-     'data': BIFILAR_S25,
-    },
-]
+    'bifilar': {
+        25: {
+            0: {'type': 'bifilar_wires', 'data': BIFILAR_S25_NP0},
+            4: {'type': 'bifilar_wires', 'data': BIFILAR_S25_NP4},
+        },
+        100: {
+            4: {'type': 'bifilar_wires', 'data': BIFILAR_S100_NP4},
+        },
+    }
+}

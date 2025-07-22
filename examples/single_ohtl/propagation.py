@@ -17,12 +17,12 @@ import matplotlib.pyplot as plt
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..\..')))
 
 from ohtl.pul_parameters import PerUnitParameters
-from data.systems import MULTICONDUCTOR_TRANSMISSION_LINE
+from data.systems import MTL_MODELS
 from data.graph import GraphicRepresentation as graph
 
 # Multiconductor Transmission Line choices
-# 0 - A single overhead conductor, h1 = 10 m and r1 = 1 cm
-MTL = MULTICONDUCTOR_TRANSMISSION_LINE[0]
+MTL = MTL_MODELS['overhead']['xue']
+MTL = MTL_MODELS['overhead']['deConti']
 
 
 def plot_gamma(freq, pul_dict, p, q):

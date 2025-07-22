@@ -7,15 +7,13 @@ import matplotlib.pyplot as plt
 # Adiciona a raiz do projeto ao PYTHONPATH
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..\..')))
 
-from data.systems import MULTICONDUCTOR_TRANSMISSION_LINE
-from data.graph import GraphicRepresentation as graph
-
 from ohtl.pul_parameters import PerUnitParameters
-from mom_so import green, patel
+from data.systems import MTL_MODELS
+from data.graph import GraphicRepresentation as graph
+#from mom_so import green, patel
 
 # Multiconductor Transmission Line choices
-# 1 - Xue's single overhead conductor: h1 = 10 m, r1 = 1 cm and rho_c = 1.68E-8 S/m
-MTL = MULTICONDUCTOR_TRANSMISSION_LINE[1]
+MTL = MTL_MODELS['overhead']['xue']
 
 
 def plot_impedance(freq, pul_dict, p, q):
