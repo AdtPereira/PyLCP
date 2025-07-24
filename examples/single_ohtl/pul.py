@@ -7,8 +7,8 @@ import matplotlib.pyplot as plt
 # Adiciona a raiz do projeto ao PYTHONPATH
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..\..')))
 
-from data.systems import MTL_MODELS
-from data.graph import GraphicRepresentation as graph
+from data.models import MTL_MODELS
+from mom_so.mtl_graphics import MTLRepresentation as graph
 
 from ohtl.pul_parameters import PerUnitParameters
 from mom_so import green, patel
@@ -39,7 +39,7 @@ def plot_zi(freq, z_dict, p, q):
     plt.plot(freq['Analytically'], np.real(1E3 * approx), label=fr'$R_{{{p+1}}}$ (Closed-Form)', color=( 1, 0, 0, 0.5), linestyle='--')  # pylint: disable=line-too-long
     plt.plot(freq['Analytically'], np.real(1E3 * ri_cc), label=fr'$R_{{cc({p+1})}}$', color=(0, 1, 0, 0.5), linestyle='--')  # pylint: disable=line-too-long
     plt.plot(freq['Analytically'], np.real(1E3 * zi_hf), label=fr'$Z_{{hf({p+1})}}$', color=(0, 0, 1, 0.5), linestyle='--')  # pylint: disable=line-too-long
-    plt.scatter(freq['Numerically'], np.real(1E3 * zi_mom), label=fr'$R_{{{p+1}}}$ (MoM-SO [1])', color='blue', marker='x', s=40)  # pylint: disable=line-too-long
+    # plt.scatter(freq['Numerically'], np.real(1E3 * zi_mom), label=fr'$R_{{{p+1}}}$ (MoM-SO [1])', color='blue', marker='x', s=40)  # pylint: disable=line-too-long
 
     # Optional: Additional plotting configurations like labels, grid, etc.
     plt.xscale('log')
@@ -295,7 +295,7 @@ def main():
 
     # MoM-SO routine
     green_list = ['Analytically', 'Numerically']
-    green_matrix = green.QuasiStatic(MTL).g_tanaka(mode=green_list[0])
+    green_matrix = green.QuasiStatic(MTL).g_tanaka(green_mode=green_list[0])
     for f in frequency['Numerically']:
         mom_so = patel.HomogeneousLosslessMedium(MTL, f)
         z_results['zi_momso'].append(mom_so.z_partial(green_matrix))
@@ -305,7 +305,7 @@ def main():
     print(f"End of the routine! Time spent on simulation: {elapsed_time:.2f} seconds.\n")
 
     # Display the geometry of the transmission line
-    graph(MTL).wires_and_cables(line_type='overhead')
+    graph(MTL).wires_and_cables()
 
     # Plot the series resistance as a function of frequency
     plot_zi(frequency, z_results, p=0, q=0)

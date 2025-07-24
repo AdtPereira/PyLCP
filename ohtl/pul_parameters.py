@@ -10,7 +10,7 @@ import numpy as np
 from scipy.special import iv
 from scipy.constants import mu_0, epsilon_0
 from scipy.integrate import quad
-from data.mtl import MulticonductorTransmissionLine
+from mom_so.mtl import MulticonductorTransmissionLine
 
 
 class PerUnitParameters(MulticonductorTransmissionLine):

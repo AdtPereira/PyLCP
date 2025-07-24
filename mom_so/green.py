@@ -19,11 +19,13 @@ from scipy.constants import mu_0
 from scipy.integrate import quad, dblquad
 from scipy.special import jv, hankel2
 from scipy.linalg import lu_solve, lu_factor
-from .geometry import FreeSpace, AuxiliaryGeometry
+
+# from .geometry import FreeSpace
 from .patel import MultilayeredLossyMedium
+from .mtl import MulticonductorTransmissionLine as MTL
 
 
-class QuasiStatic(FreeSpace, AuxiliaryGeometry):
+class QuasiStatic(MTL):
     """ This class contains the Quasi-Static Green's matrix G of the system. """
 
     # Equation (41) [2]
@@ -93,13 +95,7 @@ class QuasiStatic(FreeSpace, AuxiliaryGeometry):
 
         # Auxiliary vector of distances and angles [np.array]
         # PAG. 125 [1]
-        dqp_dict = AuxiliaryGeometry().distance_vector_dqp(
-            self.surfaces, p, self.surfaces, q)
-
-        dqp = dqp_dict['norm']
-        theta_qp = dqp_dict['angle']
-        x_pq = dqp_dict['u_x']
-        y_pq = dqp_dict['u_y']
+        dqp, x_pq, y_pq, theta_qp = self.distance_vector_dqp(self.surfaces, p, self.surfaces, q)
 
         # Auxiliary variable alfa [int]
         # PAG. 126 [1]
@@ -263,12 +259,7 @@ class QuasiStatic(FreeSpace, AuxiliaryGeometry):
 
         # Auxiliary vector of distances and angles [np.array]
         # PAG. 125 [1]
-        dqp_dict = AuxiliaryGeometry().distance_vector_dqp(
-            self.surfaces, p, self.surfaces, q)
-
-        dqp = dqp_dict['norm']
-        xqp = dqp_dict['u_x']
-        yqp = dqp_dict['u_y']
+        dqp, xqp, yqp, theta_qp = self.distance_vector_dqp(self.surfaces, p, self.surfaces, q)
 
         # Green's function G_{n',0}^{p,q} [float]
         if p != q and n == 0:
@@ -315,7 +306,7 @@ class QuasiStatic(FreeSpace, AuxiliaryGeometry):
 
     # Green's Matrix G [np.array]
     # Equation (2.54) [1]
-    def g_tanaka(self, mode):
+    def g_tanaka(self, green_mode='Analytically'):
         """ Computes the full Green's matrix for the given set of conductors """
 
         # Define the full Green's matrix
@@ -346,7 +337,7 @@ class QuasiStatic(FreeSpace, AuxiliaryGeometry):
                     for n in range(-Nq, Nq + 1):
 
                         # Analytical Evaluation
-                        if mode == 'Analytically':
+                        if green_mode == 'Analytically':
                             if n < 0:
                                 g_value = np.conjugate(
                                     self.gpq_master_thesis(-n_prime, -n, p, q))
@@ -380,13 +371,10 @@ class FullWaveAnalytically(MultilayeredLossyMedium):
         """ Computes the full Green's matrix for the given set of conductors """
 
         # Auxiliary vector of distances and angles [np.array]
-        dqp_dict = AuxiliaryGeometry().distance_vector_dqp(
-            self.conductor_surfaces, p, self.conductor_surfaces, q)
+        dqp, x_qp, y_qp, theta_qp = self.distance_vector_dqp(self.conductor_surfaces, p, self.conductor_surfaces, q)
 
         ap = self.conductor_surfaces[p]['radius']
         aq = self.conductor_surfaces[q]['radius']
-        dqp = dqp_dict['norm']
-        theta_qp = dqp_dict['angle']
         khat = self.khat[0]
 
         # 1st case: |a_q| < |a_p - d_qp|
@@ -512,13 +500,10 @@ class FullWaveAnalytically(MultilayeredLossyMedium):
 
         # Auxiliary vector of distances [np.array]
         # Equation (B.39) - PAG. 135 [1]
-        dqp_dict = AuxiliaryGeometry().distance_vector_dqp(
-            self.hole_surfaces, 0, self.conductor_surfaces, q)
-
+        dqp, x_pq, y_pq, theta_qp = self.distance_vector_dqp(self.hole_surfaces, 0, self.conductor_surfaces, q)
+        
         a_hat = self.hole_surfaces[0]['radius']
         aq = self.conductor_surfaces[q]['radius']
-        dqp = dqp_dict['norm']
-        theta_qp = dqp_dict['angle']
         khat = self.khat[0]
 
         # Bessel and Hankel functions [np.array]
@@ -659,7 +644,7 @@ class FullWaveAnalytically(MultilayeredLossyMedium):
         return 1 / mu_0 * (h_d1 @ bracket + mu_gc)
 
 
-class FullWaveNumerically(MultilayeredLossyMedium, AuxiliaryGeometry):
+class FullWaveNumerically(MultilayeredLossyMedium):
     """ This class contains the Numerically Green's matrices of the Multilayered Lossy system """
 
     # Equation (41) [2]

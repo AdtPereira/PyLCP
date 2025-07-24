@@ -8,8 +8,8 @@ import matplotlib.pyplot as plt
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..\..')))
 
 from ohtl.pul_parameters import PerUnitParameters
-from data.systems import MTL_MODELS
-from data.graph import GraphicRepresentation as graph
+from data.models import MTL_MODELS
+from mom_so.mtl_graphics import MTLRepresentation as graph
 #from mom_so import green, patel
 
 # Multiconductor Transmission Line choices
@@ -31,16 +31,16 @@ def plot_impedance(freq, pul_dict, p, q):
     f = np.array(freq['Analytically'])
 
     # Extracting the impedance elements from zi_matrix
-    z_a = np.array([item['Zs'][p, q] for item in pul_dict['a']]) # pylint: disable=line-too-long # Np/km
-    z_b = np.array([item['Zs'][p, q] for item in pul_dict['b']]) # pylint: disable=line-too-long # Np/km
-    z_c = np.array([item['Zs'][p, q] for item in pul_dict['c']]) # pylint: disable=line-too-long # Np/km
+    z_a = np.array([item['Zs'][p, q] for item in pul_dict['a']])
+    z_b = np.array([item['Zs'][p, q] for item in pul_dict['b']])
+    z_c = np.array([item['Zs'][p, q] for item in pul_dict['c']])
     l_a = np.imag(z_a) / (2 * np.pi * f)  # H/m
     l_b = np.imag(z_b) / (2 * np.pi * f)  # H/m
     l_c = np.imag(z_c) / (2 * np.pi * f)  # H/m
 
-    plt.plot(f, 1E3 * np.real(z_a), label=r'$\rho_e = 100 \;\Omega m, \epsilon_r=1$', color='black', linestyle='-')  # pylint: disable=line-too-long
-    plt.plot(f, 1E3 * np.real(z_b), label=r'$\rho_e = 100 \;\Omega m, \epsilon_r=20$', color='black', linestyle='--')  # pylint: disable=line-too-long
-    plt.plot(f, 1E3 * np.real(z_c), label=r'$\rho_e = 2000 \;\Omega m, \epsilon_r=1$', color='black', linestyle='-.')  # pylint: disable=line-too-long
+    plt.plot(f, 1E3 * np.real(z_a), label=r'$\rho_e = 100 \;\Omega m, \epsilon_r=1$', color='black', linestyle='-')
+    plt.plot(f, 1E3 * np.real(z_b), label=r'$\rho_e = 100 \;\Omega m, \epsilon_r=20$', color='black', linestyle='--')
+    plt.plot(f, 1E3 * np.real(z_c), label=r'$\rho_e = 2000 \;\Omega m, \epsilon_r=1$', color='black', linestyle='-.')
 
     # Additional plotting configurations
     plt.xscale('log')
@@ -54,14 +54,14 @@ def plot_impedance(freq, pul_dict, p, q):
 
     # Adjust the layout of the plots
     plt.suptitle('P.u.l. series resistance of the single overhead line\n'
-                 r'$r_1 = 0.01\,\mathrm{m}, h_1 = 10\,\mathrm{m}, \rho = 1.68 \times 10^{-8} \, \mathrm{\Omega m}$ [1]') # pylint: disable=line-too-long
+                 r'$r_1 = 0.01\,\mathrm{m}, h_1 = 10\,\mathrm{m}, \rho = 1.68 \times 10^{-8} \, \mathrm{\Omega m}$ [1]')
     plt.tight_layout()
     plt.show()
 
     # Extracting the impedance elements from zi_matrix
-    plt.plot(f, 1E6 * l_a, label=r'$\rho_e = 100 \;\Omega m, \epsilon_r=1$', color='black', linestyle='-')  # pylint: disable=line-too-long
-    plt.plot(f, 1E6 * l_b, label=r'$\rho_e = 100 \;\Omega m, \epsilon_r=20$', color='black', linestyle='--')  # pylint: disable=line-too-long
-    plt.plot(f, 1E6 * l_c, label=r'$\rho_e = 2000 \;\Omega m, \epsilon_r=1$', color='black', linestyle='-.')  # pylint: disable=line-too-long
+    plt.plot(f, 1E6 * l_a, label=r'$\rho_e = 100 \;\Omega m, \epsilon_r=1$', color='black', linestyle='-')
+    plt.plot(f, 1E6 * l_b, label=r'$\rho_e = 100 \;\Omega m, \epsilon_r=20$', color='black', linestyle='--')
+    plt.plot(f, 1E6 * l_c, label=r'$\rho_e = 2000 \;\Omega m, \epsilon_r=1$', color='black', linestyle='-.')
 
     # Additional plotting configurations
     plt.xscale('log')
@@ -88,7 +88,7 @@ def main():
     start_time = time.time()
 
     # Calculate the series impedance for each frequency
-    frequency = {'Analytically': np.logspace(3, 9, num=200), 'Numerically': np.logspace(0, 7, num=30)} # pylint: disable=line-too-long
+    frequency = {'Analytically': np.logspace(3, 9, num=200), 'Numerically': np.logspace(0, 7, num=30)}
 
     # Dictionary to hold the series impedance calculations
     pul_dict = {'a': [], 'b': [], 'c': []}
@@ -106,10 +106,10 @@ def main():
 
     # End the timer
     elapsed_time = time.time() - start_time
-    print(f"End of the routine! Time spent on simulation: {elapsed_time:.2f} seconds.\n") # pylint: disable=line-too-long
+    print(f"End of the routine! Time spent on simulation: {elapsed_time:.2f} seconds.\n")
 
     # Display the geometry of the transmission line
-    graph(MTL).wires_and_cables(line_type='overhead')
+    graph(MTL).wires_and_cables()
 
     # Plot the series resistance as a function of frequency
     plot_impedance(frequency, pul_dict, p=0, q=0)

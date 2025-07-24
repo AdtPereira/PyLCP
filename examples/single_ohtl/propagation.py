@@ -17,8 +17,8 @@ import matplotlib.pyplot as plt
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..\..')))
 
 from ohtl.pul_parameters import PerUnitParameters
-from data.systems import MTL_MODELS
-from data.graph import GraphicRepresentation as graph
+from data.models import MTL_MODELS
+from mom_so.mtl_graphics import MTLRepresentation as graph
 
 # Multiconductor Transmission Line choices
 MTL = MTL_MODELS['overhead']['xue']
@@ -107,7 +107,7 @@ def main():
     print(f"End of the routine! Time spent on simulation: {elapsed_time:.2f} seconds.\n")  # pylint: disable=line-too-long
 
     # Display the geometry of the transmission line
-    graph(MTL).wires_and_cables(line_type='overhead')
+    graph(MTL).wires_and_cables()
 
     # Plot the series resistance as a function of frequency
     plot_gamma(frequency, pul_parameters, p=0, q=0)

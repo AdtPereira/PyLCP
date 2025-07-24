@@ -1,200 +1,9 @@
-"""
-This script analyzes the behavior of a two-wire transmission line using the method of moments (MoM).
-The code is structured into classes and functions, facilitating a modular approach to the problem. 
-
-REFERENCES:
-[1] 
-
-"""
-
-
 import numpy as np
 from scipy.special import jv, jvp #, iv, kv
 from scipy.constants import mu_0
 import matplotlib.pyplot as plt
 
-from data.mtl import MulticonductorTransmissionLine
-
-
-class Bifilar(MulticonductorTransmissionLine):
-    """ This class contains the analytical formulation of the system. """
-
-    def __init__(self, mtl):
-        super().__init__(mtl)
-
-        # Kelvin Functions
-        self.kelvin_exp = np.exp(1j * 3 * np.pi / 4)
-
-    def ber(self, xi):
-        """ Kelvin ber(xi) function """
-        return np.real(jv(0, xi * self.kelvin_exp))
-
-    def bei(self, xi):
-        """ Kelvin bei(xi) function """
-        return np.imag(jv(0, xi * self.kelvin_exp))
-
-    def ber_prime(self, xi):
-        """ Kelvin ber'(xi) derivative function """
-        return np.real(self.kelvin_exp * jvp(0, xi * self.kelvin_exp, 1))
-
-    def bei_prime(self, xi):
-        """ Kelvin bei'(xi) derivative function """
-        return np.imag(self.kelvin_exp * jvp(0, xi * self.kelvin_exp, 1))
-
-    def series_impedance(self, f):
-        """
-        This function calculates the series resistance of the system using 
-        the high frequency approximation.
-
-        Returns:
-        tuple: A tuple containing the high frequency resistance, external inductance, 
-        and matrix impedance.
-        """
-        # Angular frequency, rad/s [float]
-        w = 2 * np.pi * f
-
-        # Skin Depth [np.array]
-        delta = np.sqrt(1 / (w / 2 * mu_0 * self.sigma))
-
-        # Surface Resistance [np.array]
-        Rs = 1 / (self.sigma * delta) # pylint: disable=invalid-name
-
-        # Outer Radii of the conductors [np.array]
-        ap = np.array([cp['radius'][1] for cp in self.mtl])
-
-        # Matrix Distance [np.array]
-        D = self.D_pq
-
-        # High Frequency Resistance and External Inductance [np.array]
-        N = len(self.mtl)-1  # pylint: disable=invalid-name
-        Rhf = np.zeros((N, N))  # pylint: disable=invalid-name
-        Lext = np.zeros_like(Rhf)  # pylint: disable=invalid-name
-        Zi = np.zeros_like(Rhf, dtype=complex)  # pylint: disable=invalid-name
-
-        # Constant Term and Bessel argument
-        Xi = np.sqrt(2) * ap / delta # pylint: disable=invalid-name
-        constant_term = 1 / (np.sqrt(2) * np.pi * ap * self.sigma * delta)
-
-        for p in range(N):
-            # 1st solution: High Frequency Approximation
-            # These formulas account for proximity effect
-            # only at high frequencies.These formulas
-            # account for proximity effect only at high
-            # frequencies.
-
-            # Common fraction term
-            D_2a = D[p][p+1] / 2 / ap[p] # pylint: disable=invalid-name
-
-            # Surface resistance
-            Rs_pia = Rs[p] / np.pi / ap[p] # pylint: disable=invalid-name
-
-            # High Frequency Resistance (Ω/m)
-            # Equation (2.64) [1]
-            Rhf[p] = Rs_pia * D_2a / np.sqrt(D_2a ** 2 - 1)
-
-            # External Inductance (H/m)
-            # Equation (2.65) [1]
-            Lext[p] = mu_0 / np.pi * np.arccosh(D_2a)
-
-            # 2nd solution: Internal Impedance Matrix, z_int (Ω/m)
-            # These formulas captures skin effect, but proximity
-            # effect is neglected
-            # Equation (2.67) [1]
-            ber_bei = self.ber(Xi[p]) + 1j * self.bei(Xi[p])
-            beip_berp = self.bei_prime(Xi[p]) - 1j * self.ber_prime(Xi[p])
-
-            # Internal Impedance Matrix, Zi (Ω/m)
-            Zi[p] = constant_term[p] * ber_bei / beip_berp
-
-        # Matrix Impedance, Zs (Ω/m)
-        # Equation (2.68) [1]
-        Zs = 2 * Zi + 1j * w * Lext  # pylint: disable=invalid-name
-
-        return Zs, Rhf, Lext
-
-    def plot_series_resistance(self, f, z, rhf, data):
-        """
-        This function plots the series resistance as a function of frequency.
-
-        Parameters:
-        freq (array): Frequency array.
-        zi_matrix (list of matrices): Matrix containing impedance values.
-        p (int): Row index in the impedance matrix.
-        q (int): Column index in the impedance matrix.
-        """
-
-        # Extracting the data from the list_data
-        p = data[0]
-        Np = data[1] # pylint: disable=invalid-name
-        D = data[2][0,1] # pylint: disable=invalid-name
-
-        # Extracting the impedance elements
-        zs = np.array([item[p] for item in z[0]])
-        rhf = np.array([item[p] for item in rhf])
-
-        # Asymptotic Series Resistance
-        plt.plot(f[0], 1E3 * rhf, label='Asymptotic',
-                color='red', linestyle='--')
-
-        # Closed-Form Approximation Series Resistance
-        plt.plot(f[0], 1E3 * np.real(zs), label='Skin Effect Only',
-                color='black', linestyle='-')
-
-        # MoM Series Resistance
-        plt.scatter(f[1], 1E3 * np.real(z[1]),
-                    label=fr'MoM-SO: $Np=Nq={Np}$ [1]',
-                    color='blue', marker='x', s=50)
-
-        # Optional: Additional plotting configurations like labels, grid, etc.
-        plt.xscale('log')
-        plt.yscale('log')
-        plt.xlim(1E0, 1E7)
-        plt.legend()
-        plt.xlabel('Frequency (Hz)')
-        plt.ylabel('Series Resistance p.u.l. (Ω/km)')
-        plt.title('Figure 2.4: P.u.l. series resistance, $R_{int}$, of the bifilar overhead line\n'
-                r'$r_1=r_2=0.01\,\mathrm{m}, h_1 = 10\,\mathrm{m},' fr'D={D}\,m,'
-                r'\sigma = 5.952 \times 10^7\,\mathrm{S/m}$ [1]')
-        plt.grid(True)
-        plt.show()
-
-    def plot_series_inductance(self, f, z, lext_hf, data):
-        """ This function plots the series inductance as a function of frequency. """
-
-        # Extracting the data from the list_data
-        p = data[0]
-        Np = data[1]  # pylint: disable=invalid-name
-        D = data[2][0, 1]  # pylint: disable=invalid-name
-
-        # Extracting the impedance elements
-        zs = np.array([item[p] for item in z[0]])
-        lext = np.array([np.imag(zs) / (2 * np.pi * f) for zs, f in zip(zs, f[0])])
-        lext_hf = np.array([item[p] for item in lext_hf])
-        lext_mom = np.array([np.imag(z) / (2 * np.pi * f)
-                            for z, f in zip(z[1], f[1])])
-
-        # Closed-Form Approximation Series Inductance
-        plt.plot(f[0], 1E6 * lext, label='Analytical (Skin Effect Only)',
-                color='black', linestyle='-')
-
-        # Asymptotic Series Inductance
-        plt.plot(f[0], 1E6 * lext_hf, label='Analytical (Asymptotic)',
-                color='red', linestyle='--')
-
-        # MoM Series Inductance
-        plt.scatter(f[1], 1E6 * lext_mom, label=fr'MoM-SO ($Np=Nq={Np}$) [1]',
-                    color='blue', marker='x', s=40)
-
-        plt.xscale('log')
-        plt.legend()
-        plt.xlim(1E0, 1E7)
-        plt.xlabel('Frequency (Hz)')
-        plt.ylabel('Series Inductance p.u.l. (mH/km)')
-        plt.title('Figure 2.5: P.u.l. inductance of the bifilar overhead line\n'
-                r'$r_1=r_2=0.01\,\mathrm{m}, h_1 = 10\,\mathrm{m},' fr'D={D}\,m,'
-                r'\sigma = 5.952 \times 10^7\,\mathrm{S/m}$ [1]')
-        plt.grid(False)
-        plt.show()
+from mom_so.mtl import MulticonductorTransmissionLine
 
 
 # class SingleCoreCable(FreeSpace):
@@ -387,3 +196,331 @@ class Bifilar(MulticonductorTransmissionLine):
 #         zz11 = z10 + z12 + z2i - z2m + zz12
 
 #         return zz11, zz12, zz22
+
+# class CoaxialCable(FreeSpace):
+#     """ 
+#     This class contains the plotting functions for the system.
+
+#     Args:
+#         mtl (str): The MTL (Multi-Terminal Line) object.
+#         f_analytic (list): A list of frequencies for analytical formulation.
+#         f_mom (list): A list of frequencies for numerical formulation.
+
+#     Attributes:
+#         d (float): Distance between the conductors [m].
+#     """
+
+#     def __init__(self, mtl_dict, f, f_mom, green_evaluation='Analytically'):
+#         super().__init__(mtl_dict)
+#         self.f = f
+#         self.f_mom = f_mom
+#         self.green = green_evaluation
+#         self.analytical = None
+#         self.numerical = None
+#         self.comsol = None
+#         self._perform_calculations(mtl_dict)
+#         self._comsol_data()
+
+#     def _perform_calculations(self, mtl_dict):
+#         """ Performs analytical and numerical formulation calculations and stores the results. """
+
+#         self.analytical = self._analytical_formulation(mtl_dict)
+#         self.numerical = self._numerical_formulation(mtl_dict)
+
+#     def _analytical_formulation(self, mtl_dict):
+#         """ Performs analytical formulation for the given MTL and frequencies. """
+#         series_impedance = []
+#         ametani_impedances = []
+
+#         for f in self.f:
+#             # Patel's Formulation
+#             z = analytic.SingleCoreCable(mtl_dict, f).pul_parameters()
+
+#             # Ametani's Formulation
+#             zz11, zz12, zz22 = analytic.Ametani(
+#                 mtl_dict, f).impedance_two_layered_conductor()
+
+#             series_impedance.append(z)
+#             ametani_impedances.append([zz11, zz12, zz22])
+
+#         return series_impedance, ametani_impedances
+
+#     def _numerical_formulation(self, mtl_dict):
+#         """ Calculates the series impedance given frequencies using numerical formulation. """
+
+#         series_impedance = []
+
+#         # Green's matrix
+#         green = QuasiStatic(mtl_dict).g_tanaka(green_evaluation=self.green)
+
+#         # Post-processing parameters
+#         post_processing = mom_so.HomogeneousLosslessMediumPostProcessing(mtl_dict)
+
+#         # Calculate the series impedance for each frequency
+#         for f in self.f_mom:
+#             mom_so_patel = mom_so.HomogeneousLosslessMedium(mtl_dict, f)
+#             z_partial = mom_so_patel.z_partial(green)
+#             zs = post_processing.z_matrix(z_partial)
+#             series_impedance.append(zs[0][0])
+#         return series_impedance
+
+#     def _comsol_data(self):
+#         # Read the data from the file
+#         file_path = 'C:\\Users\\adilt\\OneDrive\\01 ACADEMIA\\06 MODELOS\\7.MoM-SO\\data'
+#         resistance = pd.read_csv(
+#             file_path+'\\comsol_resistance_coax.txt', sep=r'\s+', comment='%')
+#         inductance = pd.read_csv(
+#             file_path+r'\\comsol_inductance_coax.txt', sep=r'\s+', comment='%')
+
+#         # Rename the columns
+#         resistance.columns = [
+#             'freq (Hz)', 'Analytic (DC)', 'Analytic (HF)', 'COMSOL (mf/ec)']
+#         inductance.columns = [
+#             'freq (Hz)', 'Analytic (DC)', 'Analytic (HF)', 'COMSOL (mf/ec)']
+
+#         self.comsol = [
+#             resistance['freq (Hz)'], resistance['COMSOL (mf/ec)'], inductance['COMSOL (mf/ec)']]
+
+#     def plot_series_resistance(self):
+#         """
+#         This function plots the series resistance as a function of frequency.
+#         """
+
+#         # Analytical Series Resistance
+#         plt.plot(self.f, np.real(self.analytical[0]),
+#                  label='Analytic', color='black', linestyle='-')
+
+#         plt.plot(self.comsol[0], self.comsol[1],
+#                  label='COMSOL', color='red', marker='o', linestyle='None', markersize=2)
+
+#         # MoM Series Resistance
+#         plt.scatter(self.f_mom, np.real(self.numerical),
+#                     label='MoM-SO [1]', color='blue', marker='x', s=55)
+
+#         plt.xscale('log')
+#         plt.yscale('log')
+#         plt.xlim(1E0, 1E6)
+#         plt.ylim(1E-5, 1E-2)
+#         plt.legend()
+#         plt.xlabel('Frequency (Hz)')
+#         plt.ylabel('Series Resistance p.u.l. (Ω/m)')
+#         plt.title('Figure 2.6: P.u.l. resistance of a coaxial cable of Sec. 2.6.2\n'
+#                   'a = 22 mm, b = 39.5 mm, c = 44 mm [1]')
+#         plt.grid(False)
+#         plt.show()
+
+#     def plot_series_resistance_ametani(self):
+#         """This function plots the series resistance as a function of frequency."""
+#         zz11 = np.array([data[0] for data in self.analytical[1]])
+#         zz12 = np.array([data[1] for data in self.analytical[1]])
+#         zz22 = np.array([data[2] for data in self.analytical[1]])
+
+#         # Analytical Series Resistance
+#         plt.plot(self.f, np.real(self.analytical[0]),
+#                  label='Analytic', color='black', linestyle='-')
+
+#         plt.plot(self.f, np.real(zz11 - 2*zz12 + zz22),
+#                  label=r'Re($Z_{11}$ - $2*Z_{12}$ + $Z_{22}$)/$\omega$',
+#                  color='red', linestyle='--')
+
+#         plt.plot(self.f, np.real(zz11),
+#                  label=r'Re($Z_{11}$)/$\omega$',
+#                  color='black', linestyle=':')
+
+#         plt.plot(self.f, np.real(zz12),
+#                  label=r'Re($Z_{12}$)/$\omega$',
+#                  color='blue', linestyle=':')
+
+#         plt.plot(self.f, np.real(zz22),
+#                  label=r'Re($Z_{22}$)/$\omega$',
+#                  color='green', linestyle=':')
+
+#         plt.xscale('log')
+#         plt.yscale('log')
+#         plt.xlim(1E0, 1E6)
+#         plt.ylim(1E-5, 1E-2)
+#         plt.legend()
+#         plt.xlabel('Frequency (Hz)')
+#         plt.ylabel('Series Resistance p.u.l. (Ω/m)')
+#         plt.title('Figure 2.6: P.u.l. resistance of a coaxial cable of Sec. 2.6.2\n'
+#                   'a = 22 mm, b = 39.5 mm, c = 44 mm [1]')
+#         plt.grid(False)
+#         plt.show()
+
+#     def plot_series_inductance(self):
+#         """
+#         This function plots the series inductance as a function of frequency.
+#         """
+
+#         # Analytical Series Inductance
+#         plt.plot(self.f, 1E6 * np.imag(self.analytical[0]) / (2 * np.pi * self.f),
+#                  label='Analytic', color='black', linestyle='-')
+
+#         plt.plot(self.comsol[0], self.comsol[2],
+#                  label='COMSOL', color='red', marker='o', linestyle='None', markersize=2)
+
+#         # MoM Series Inductance
+#         plt.scatter(self.f_mom, 1E6 * np.imag(self.numerical) / (2 * np.pi * self.f_mom),
+#                     label='MoM-SO [1]', color='blue', marker='x', s=55)
+
+#         plt.xscale('log')
+#         plt.legend()
+#         plt.xlim(1E0, 1E6)
+#         plt.ylim(0.11, 0.19)
+#         plt.xlabel('Frequency (Hz)')
+#         plt.ylabel('Series Inductance p.u.l. (uH/m)')
+#         plt.title('Figure 2.6: P.u.l. inductance of a coaxial cable of Sec. 2.6.2\n'
+#                   'a = 22 mm, b = 39.5 mm, c = 44 mm [1]')
+#         plt.grid(False)
+#         plt.show()
+
+#     def plot_series_inductance_ametani(self):
+#         """
+#         This function plots the series inductance as a function of frequency.
+#         """
+#         zz11 = np.array([data[0] for data in self.analytical[1]])
+#         zz12 = np.array([data[1] for data in self.analytical[1]])
+#         zz22 = np.array([data[2] for data in self.analytical[1]])
+
+#         # Analytical Series Inductance
+#         plt.plot(self.f, 1E6 * np.imag(self.analytical[0]) / (2 * np.pi * self.f),
+#                  label='Analytic', color='black', linestyle='-')
+
+#         plt.plot(self.f, 1E6 * np.imag(zz11 - 2*zz12 + zz22) / (2 * np.pi * self.f),
+#                  label=r'Im($Z_{11}$ - $2*Z_{12}$ + $Z_{22}$)/$\omega$',
+#                  color='red', linestyle='--')
+
+#         plt.plot(self.f, 1E6 * np.imag(zz11) / (2 * np.pi * self.f),
+#                  label=r'($Z_{11}$)/$\omega$', color='black', linestyle=':')
+
+#         plt.plot(self.f, 1E6 * np.imag(zz12) / (2 * np.pi * self.f),
+#                  label=r'($Z_{12}$)/$\omega$', color='blue', linestyle=':')
+
+#         plt.plot(self.f, 1E6 * np.imag(zz22) / (2 * np.pi * self.f),
+#                  label=r'Im($Z_{22}$)/$\omega$', color='green', linestyle=':')
+
+#         plt.xscale('log')
+#         plt.legend()
+#         plt.xlim(1E0, 1E6)
+#         plt.ylim(0, 0.19)
+#         plt.xlabel('Frequency (Hz)')
+#         plt.ylabel('Series Inductance p.u.l. (uH/m)')
+#         plt.title('Figure 2.6: P.u.l. inductance of a coaxial cable of Sec. 2.6.2\n'
+#                   'a = 22 mm, b = 39.5 mm, c = 44 mm [1]')
+#         plt.grid(False)
+#         plt.show()
+
+
+# class EnclosureGIB(FreeSpace, AuxiliaryGeometry):
+    # """ This class contains the plotting functions for the system. """
+
+    # def __init__(self, mtl_dict, f, f_mom, green_evaluation='Analytically'):
+    #     super().__init__(mtl_dict)
+    #     self.f = f
+    #     self.f_mom = f_mom
+    #     self.green = green_evaluation
+    #     self.analytical_results = None
+    #     self.numerical_results = None
+    #     self._perform_calculations(mtl_dict)
+
+    #     # Distance between the conductors for graphical representation
+    #     self.d = self.distance_matrices(self.mtl)[0][0][1]
+
+    # def _perform_calculations(self, mtl_dict):
+    #     """ Performs analytical and numerical formulation calculations and stores the results. """
+
+    #     #self.analytical_results = self._analytical_formulation(mtl_dict)
+    #     self.numerical_results = self._numerical_formulation(mtl_dict)
+
+    # def _analytical_formulation(self, mtl_dict):
+    #     """ Performs analytical formulation for the given MTL and frequencies. """
+
+    #     resistance_hf = []
+    #     external_inductance = []
+    #     series_impedance = []
+    #     for f in self.f:
+    #         parameters = analytic.TwoWire(mtl_dict, f).pul_parameters()
+    #         resistance_hf.append(parameters[0][0, 1])
+    #         external_inductance.append(parameters[1][0, 1])
+    #         series_impedance.append(parameters[2][0, 1])
+
+    #     return resistance_hf, external_inductance, series_impedance
+
+    # def _numerical_formulation(self, mtl_dict):
+    #     """ Calculates the series impedance given frequencies using numerical formulation. """
+
+    #     series_impedance = []
+
+    #     # Green's matrix
+    #     green = QuasiStatic(mtl_dict).g_tanaka(green_evaluation=self.green)
+
+    #     # Print the Green's matrix
+    #     # print("Greens' Matrix: \n", green)
+
+    #     # Post-processing parameters
+    #     post_processing = mom_so.HomogeneousLosslessMediumPostProcessing(mtl_dict)
+
+    #     # Calculate the series impedance for each frequency
+    #     for f in self.f_mom:
+    #         mom_so_patel = mom_so.HomogeneousLosslessMedium(mtl_dict, f)
+    #         z_partial = mom_so_patel.z_partial(green)
+    #         zs = post_processing.z_matrix(z_partial)
+    #         series_impedance.append(zs[0][0])
+    #     return series_impedance
+
+    # def plot_series_resistance(self):
+    #     """ This function plots the series resistance as a function of frequency. """
+
+    #     # Analytical Series Resistance
+    #     # plt.plot(self.f, np.real(self.analytical_results[2]),
+    #     #          label='Analytical (no proximity)', color='black', linestyle='-')
+
+    #     # Asymptotic Series Resistance
+    #     # plt.plot(self.f, self.analytical_results[0],
+    #     #          label='Analytical (high-freq)', color='red', linestyle='--')
+
+    #     # MoM Series Resistance
+    #     plt.scatter(self.f_mom, np.real(self.numerical_results),
+    #                 label='MoM-SO [1]', color='blue', marker='x', s=40)
+
+    #     plt.xscale('log')
+    #     plt.yscale('log')
+    #     plt.xlim(1, 1E6)
+    #     # plt.ylim(1E-5, 2E-2)
+    #     plt.legend()
+    #     plt.xlabel('Frequency (Hz)')
+    #     plt.ylabel('Series Resistance p.u.l. (Ω/m)')
+    #     plt.title('Figure 2.4: P.u.l. resistance of the two-wire line of Sec. 2.6.1\n'
+    #               f'for D = {self.d} m, a = 0.01 m, and σ = 5.8E7 S/m [1]')
+    #     plt.grid(False)
+    #     plt.show()
+
+    # def plot_series_inductance(self):
+    #     """ This function plots the series inductance as a function of frequency. """
+
+    #     # Analytical Series Inductance
+    #     # plt.plot(self.f, 1E6 * np.imag(self.analytical_results[2]) / (2 * np.pi * self.f),
+    #     #          label='Analytical (no proximity)', color='black', linestyle='-')
+
+    #     # Asymptotic Series Inductance
+    #     # plt.plot(self.f, 1E6 * np.array(self.analytical_results[1]),
+    #     #          label='Analytical (high-freq)', color='red', linestyle='--')
+
+    #     # MoM Series Inductance
+    #     plt.scatter(self.f_mom, 1E6 * np.imag(self.numerical_results) / (2 * np.pi * self.f_mom),
+    #                 label='MoM-SO [1]', color='blue', marker='x', s=40)
+
+    #     plt.xscale('log')
+    #     plt.legend()
+    #     plt.xlim(1, 1E6)
+    #     # if self.d == 0.1:
+    #     #     plt.ylim(0.90, 1.06)
+    #     # elif self.d == 0.025:
+    #     #     plt.ylim(0.25, 0.55)
+    #     plt.xlabel('Frequency (Hz)')
+    #     plt.ylabel('Series Inductance p.u.l. (uH/m)')
+    #     plt.title('Figure 2.5: P.u.l. inductance of the two-wire line of Sec. 2.6.1\n'
+    #               f'for D = {self.d} m, a = 0.01 m, and σ = 5.8E7 S/m [1]')
+    #     plt.grid(False)
+    #     plt.show()
+

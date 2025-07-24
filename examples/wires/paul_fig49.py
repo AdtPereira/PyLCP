@@ -17,25 +17,16 @@ import os
 import sys
 import time
 import numpy as np
-from enum import Enum
 import matplotlib.pyplot as plt
 
 # Adiciona a raiz do projeto ao PYTHONPATH para importação de módulos.
 # ATENÇÃO: Esta é uma solução frágil. O ideal é instalar o projeto como um pacote.
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..\..')))
 
-from lossless_systems.bifilar_line import Bifilar
-from data.systems import MTL_MODELS
-from data.graph import GraphicRepresentation as graph
+from lossless_systems.wires_homogeneous_media import WiresHomogeneousMedia
+from mom_so.utils import *
 from mom_so.green import QuasiStatic
-from mom_so.patel import HomogeneousLosslessMedium, LosslessPostProcessing
-from mom_so.utils import clear_screen
-
-
-class GreenFunctionMode(Enum):
-    """Define o modo de cálculo para a função de Green."""
-    ANALYTICAL = 'Analytically'
-    NUMERICAL = 'Numerically'
+from mom_so.patel import HomogeneousLosslessMedium
 
 
 def run_simulation(s_rw_ratios, wire_radius):
@@ -51,11 +42,7 @@ def run_simulation(s_rw_ratios, wire_radius):
                exata e aproximada em F/m.
     """
     print("Iniciando simulação de capacitância...")
-    results = {
-        'exact': [],
-        'approximate': [],
-        'mom-so': []
-    }
+    results = {'exact': [], 'approximate': [], 'mom-so': []}
 
     for ratio in s_rw_ratios:
         separation = ratio * wire_radius
@@ -100,13 +87,13 @@ def run_simulation(s_rw_ratios, wire_radius):
         }
 
         # Instancia analítica
-        analytical = Bifilar(mtl).capacitance()
-        results['exact'].append(analytical['exact'])
-        results['approximate'].append(analytical['approximate'])
+        wires = WiresHomogeneousMedia(mtl)
+        pul_bifilar = wires.bifilar_pul_inductance_capacitance()
+        results['exact'].append(pul_bifilar['capacitante']['exact'])
+        results['approximate'].append(pul_bifilar['capacitante']['approximate'])
 
         # Instancia MoM-SO
-        green_mode = GreenFunctionMode.ANALYTICAL
-        green_matrix = QuasiStatic(mtl).g_tanaka(mode=green_mode.value)
+        green_matrix = QuasiStatic(mtl).g_tanaka()
         mom_so = HomogeneousLosslessMedium(mtl, frequency)
         c = mom_so.capacitance_matrix(green_matrix)
         # post_processor = LosslessPostProcessing(mtl)
@@ -155,21 +142,16 @@ def main():
     print("Iniciando cálculos da impedância p.u.l. ...")
     start_time = time.time()
 
-    try:
-        WIRE_RADIUS = 0.010
-        S_RW_RATIOS = np.linspace(2.1, 8, num=120)
-        capacitance_results = run_simulation(S_RW_RATIOS, WIRE_RADIUS)
-        
-        # 3. Medição de tempo
-        elapsed_time = time.time() - start_time
-        print(f"\nRotinas de cálculo finalizadas! Tempo de simulação: {elapsed_time:.2f} segundos.")
-        
-        # 7. Geração e exibição do gráfico comparativo
-        plot_comparison(S_RW_RATIOS, capacitance_results)
-
-    except Exception as e:
-        print(f"\nOcorreu um erro durante a execução do script: {e}")
-        print("Verifique as configurações de entrada e as dependências do projeto.")
+    WIRE_RADIUS = 0.010
+    S_RW_RATIOS = np.linspace(2.1, 8, num=120)
+    capacitance_results = run_simulation(S_RW_RATIOS, WIRE_RADIUS)
+    
+    # 3. Medição de tempo
+    elapsed_time = time.time() - start_time
+    print(f"\nRotinas de cálculo finalizadas! Tempo de simulação: {elapsed_time:.2f} segundos.")
+    
+    # 7. Geração e exibição do gráfico comparativo
+    plot_comparison(S_RW_RATIOS, capacitance_results)
 
 
 if __name__ == "__main__":

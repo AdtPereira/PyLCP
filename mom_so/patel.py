@@ -78,9 +78,12 @@ from scipy.constants import mu_0, epsilon_0
 from scipy.special import jv, jvp, h1vp, h2vp
 from scipy.linalg import lu_factor, lu_solve, inv
 
-from .geometry import FreeSpace, UndergroundSystem, AuxiliaryGeometry
+# from .geometry import FreeSpace, UndergroundSystem
+from .geometry import UndergroundSystem
+from .mtl import MulticonductorTransmissionLine as MTL
 
-class HomogeneousLosslessMedium(FreeSpace, AuxiliaryGeometry):
+
+class HomogeneousLosslessMedium(MTL):
     """ This class contains the frequency-dependent parameters of the system. """
 
     def __init__(self, mtl, frequency):
@@ -389,7 +392,7 @@ class HomogeneousLosslessMedium(FreeSpace, AuxiliaryGeometry):
         return matrix_c
 
 
-class MultilayeredLossyMedium(UndergroundSystem, AuxiliaryGeometry):
+class MultilayeredLossyMedium(UndergroundSystem):
     """ This class contains the frequency-dependent parameters of the system. """
 
     def __init__(self, conductors_list, frequency):
@@ -501,20 +504,17 @@ class MultilayeredLossyMedium(UndergroundSystem, AuxiliaryGeometry):
 
         # Auxiliary vector of distances [np.array]
         # Equation (B.45) - PAG. 137 [1]
-        d_dict = AuxiliaryGeometry().distance_vector_dqp(
-            self.conductor_surfaces, p, self.hole_surfaces, 0)
+        dqp, xqp, yqp, theta_qp = self.distance_vector_dqp(self.conductor_surfaces, p, self.hole_surfaces, 0)
 
         ap = self.conductor_surfaces[p]['radius']
-        d = d_dict['norm']
-        theta_d = d_dict['angle']
         khat = self.khat[0]
 
         # Bessel and Hankel functions [np.array]
-        bessel_1st = jv(n_prime - n, khat * d)
+        bessel_1st = jv(n_prime - n, khat * dqp)
         bessel_2nd = jv(n_prime, khat * ap)
 
         # Exponential term [np.array]
-        exp_term = np.exp(1j * (n - n_prime) * theta_d)
+        exp_term = np.exp(1j * (n - n_prime) * theta_qp)
 
         # Equation (B.47) [1]
         hhat_p = bessel_1st * bessel_2nd * exp_term
@@ -656,7 +656,7 @@ class MultilayeredLossyMedium(UndergroundSystem, AuxiliaryGeometry):
         return u.T @ solution
 
 
-class LosslessPostProcessing(FreeSpace):
+class LosslessPostProcessing(MTL):
     """ This class contains the post-processing parameters for the system. """
 
     def __init__(self, mtl):

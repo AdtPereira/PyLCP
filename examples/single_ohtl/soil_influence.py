@@ -17,8 +17,8 @@ import matplotlib.pyplot as plt
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..\..')))
 
 from ohtl.pul_parameters import PerUnitParameters
-from data.systems import MTL_MODELS
-from data.graph import GraphicRepresentation as graph
+from data.models import MTL_MODELS
+from mom_so.mtl_graphics import MTLRepresentation as graph
 
 # Multiconductor Transmission Line choices
 MTL = MTL_MODELS['overhead']['deConti']
@@ -122,19 +122,19 @@ def main():
         pul_3 = PerUnitParameters(MTL, f, sigma_1=1/5E+3, er_1=5)
 
         # Internal and external impedance matrices
-        pul_parameters['rho_1u']['nakagawa'].append(pul_1.pul_extended_theory(type_form='nakagawa')) # pylint: disable=line-too-long
-        pul_parameters['rho_200']['nakagawa'].append(pul_2.pul_extended_theory(type_form='nakagawa')) # pylint: disable=line-too-long
-        pul_parameters['rho_5k']['nakagawa'].append(pul_3.pul_extended_theory(type_form='nakagawa')) # pylint: disable=line-too-long
-        pul_parameters['rho_1u']['quasi_tem'].append(pul_1.pul_extended_theory()) # pylint: disable=line-too-long
-        pul_parameters['rho_200']['quasi_tem'].append(pul_2.pul_extended_theory()) # pylint: disable=line-too-long
-        pul_parameters['rho_5k']['quasi_tem'].append(pul_3.pul_extended_theory()) # pylint: disable=line-too-long
+        pul_parameters['rho_1u']['nakagawa'].append(pul_1.pul_extended_theory(type_form='nakagawa'))
+        pul_parameters['rho_200']['nakagawa'].append(pul_2.pul_extended_theory(type_form='nakagawa'))
+        pul_parameters['rho_5k']['nakagawa'].append(pul_3.pul_extended_theory(type_form='nakagawa'))
+        pul_parameters['rho_1u']['quasi_tem'].append(pul_1.pul_extended_theory())
+        pul_parameters['rho_200']['quasi_tem'].append(pul_2.pul_extended_theory())
+        pul_parameters['rho_5k']['quasi_tem'].append(pul_3.pul_extended_theory())
 
     # End the timer
     elapsed_time = time.time() - start_time
     print(f"End of the routine! Time spent on simulation: {elapsed_time:.2f} seconds.\n")
 
     # Display the geometry of the transmission line
-    graph(MTL).wires_and_cables(line_type='overhead')
+    graph(MTL).wires_and_cables()
 
     # Plot the series resistance as a function of frequency
     plot_gamma(frequency, pul_parameters, p=0, q=0)

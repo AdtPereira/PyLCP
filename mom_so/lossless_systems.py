@@ -5,10 +5,9 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from .patel import HomogeneousLosslessMedium, LosslessPostProcessing
 from .green import QuasiStatic
-from .geometry import FreeSpace, AuxiliaryGeometry
 
 
-class TwoWire(FreeSpace, AuxiliaryGeometry):
+class TwoWire():
     """ This class contains the plotting functions for the system. """
 
     def __init__(self, mtl_dict, f, f_mom, green_evaluation='Analytically'):
@@ -54,7 +53,7 @@ class TwoWire(FreeSpace, AuxiliaryGeometry):
         series_impedance = []
 
         # Green's matrix
-        green = QuasiStatic(mtl_dict).g_tanaka(mode=self.green)
+        green = QuasiStatic(mtl_dict).g_tanaka(green_mode=self.green)
 
         # Print the Green's matrix
         # print("Greens' Matrix: \n", green)
@@ -127,7 +126,7 @@ class TwoWire(FreeSpace, AuxiliaryGeometry):
         plt.show()
 
 
-class CoaxialCable(FreeSpace):
+class CoaxialCable():
     """ 
     This class contains the plotting functions for the system.
 
@@ -181,7 +180,7 @@ class CoaxialCable(FreeSpace):
         series_impedance = []
 
         # Green's matrix
-        green = QuasiStatic(mtl_dict).g_tanaka(mode=self.green)
+        green = QuasiStatic(mtl_dict).g_tanaka(green_mode=self.green)
 
         # Post-processing parameters
         post_processing = mom_so.HomogeneousLosslessMediumPostProcessing(
@@ -342,7 +341,7 @@ class CoaxialCable(FreeSpace):
         plt.show()
 
 
-class EnclosureGIB(FreeSpace, AuxiliaryGeometry):
+class EnclosureGIB():
     """ This class contains the plotting functions for the system. """
 
     def __init__(self, mtl_dict, f, f_mom, green_evaluation='Analytically'):
@@ -383,7 +382,7 @@ class EnclosureGIB(FreeSpace, AuxiliaryGeometry):
         series_impedance = []
 
         # Green's matrix
-        green = QuasiStatic(mtl_dict).g_tanaka(mode=self.green)
+        green = QuasiStatic(mtl_dict).g_tanaka(green_mode=self.green)
 
         # Print the Green's matrix
         # print("Greens' Matrix: \n", green)

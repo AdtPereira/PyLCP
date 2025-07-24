@@ -131,7 +131,7 @@ BIFILAR_S100_NP4 = [
         'relative_permeability': 1,
         'relative_permittivity': 1,
         'relative_permittivity_out': 1,
-        'fourier_order': 0,
+        'fourier_order': 4,
     },
     {
         'line_id': 1,
@@ -146,7 +146,7 @@ BIFILAR_S100_NP4 = [
         'relative_permeability': 1,
         'relative_permittivity': 1,
         'relative_permittivity_out': 1,
-        'fourier_order': 0,
+        'fourier_order': 4,
     }
 ]
 
@@ -216,18 +216,173 @@ BIFILAR_S25_NP4 = [
     }
 ]
 
+THREE_WIRE_RIBBON_S100_NP0 = [
+    {
+        'line_id': 0,
+        'conductor_name': 'p',
+        'line_type': 'active',
+        'line_return': 1,
+        'center_point': (-0.100, 10),
+        'radius': [0, 0.01],
+        'conductivity': 1/1.68E-8,
+        'subconductors': None,
+        'insulation': None,
+        'relative_permeability': 1,
+        'relative_permittivity': 1,
+        'relative_permittivity_out': 1,
+        'fourier_order': 0,
+    },
+    {
+        'line_id': 1,
+        'conductor_name': 'q',
+        'line_type': 'active',
+        'line_return': 1,
+        'center_point': (0.100, 10),
+        'radius': [0, 0.01],
+        'conductivity': 1/1.68E-8,
+        'subconductors': None,
+        'insulation': None,
+        'relative_permeability': 1,
+        'relative_permittivity': 1,
+        'relative_permittivity_out': 1,
+        'fourier_order': 0,
+    },
+    {
+        'line_id': 2,
+        'conductor_name': 'r',
+        'line_type': 'return',
+        'line_return': None,
+        'center_point': (0.0, 10),
+        'radius': [0, 0.01],
+        'conductivity': 1/1.68E-8,
+        'subconductors': None,
+        'insulation': None,
+        'relative_permeability': 1,
+        'relative_permittivity': 1,
+        'relative_permittivity_out': 1,
+        'fourier_order': 0,
+    }
+]
+
+THREE_WIRE_RIBBON_S100_NP4 = [
+    {
+        'line_id': 0,
+        'conductor_name': 'p',
+        'line_type': 'active',
+        'line_return': 1,
+        'center_point': (-0.100, 10),
+        'radius': [0, 0.01],
+        'conductivity': 1/1.68E-8,
+        'subconductors': None,
+        'insulation': None,
+        'relative_permeability': 1,
+        'relative_permittivity': 1,
+        'relative_permittivity_out': 1,
+        'fourier_order': 4,
+    },
+    {
+        'line_id': 1,
+        'conductor_name': 'q',
+        'line_type': 'active',
+        'line_return': 1,
+        'center_point': (0.100, 10),
+        'radius': [0, 0.01],
+        'conductivity': 1/1.68E-8,
+        'subconductors': None,
+        'insulation': None,
+        'relative_permeability': 1,
+        'relative_permittivity': 1,
+        'relative_permittivity_out': 1,
+        'fourier_order': 4,
+    },
+    {
+        'line_id': 2,
+        'conductor_name': 'r',
+        'line_type': 'return',
+        'line_return': None,
+        'center_point': (0.0, 10),
+        'radius': [0, 0.01],
+        'conductivity': 1/1.68E-8,
+        'subconductors': None,
+        'insulation': None,
+        'relative_permeability': 1,
+        'relative_permittivity': 1,
+        'relative_permittivity_out': 1,
+        'fourier_order': 4,
+    }
+]
+
+THREE_WIRE_RIBBON_S300_NP0 = [
+    {
+        'line_id': 0,
+        'conductor_name': 'p',
+        'line_type': 'active',
+        'line_return': 1,
+        'center_point': (-0.300, 10),
+        'radius': [0, 0.01],
+        'conductivity': 1/1.68E-8,
+        'subconductors': None,
+        'insulation': None,
+        'relative_permeability': 1,
+        'relative_permittivity': 1,
+        'relative_permittivity_out': 1,
+        'fourier_order': 0,
+    },
+    {
+        'line_id': 1,
+        'conductor_name': 'q',
+        'line_type': 'active',
+        'line_return': 1,
+        'center_point': (0.300, 10),
+        'radius': [0, 0.01],
+        'conductivity': 1/1.68E-8,
+        'subconductors': None,
+        'insulation': None,
+        'relative_permeability': 1,
+        'relative_permittivity': 1,
+        'relative_permittivity_out': 1,
+        'fourier_order': 0,
+    },
+    {
+        'line_id': 2,
+        'conductor_name': 'r',
+        'line_type': 'return',
+        'line_return': None,
+        'center_point': (0.0, 10),
+        'radius': [0, 0.01],
+        'conductivity': 1/1.68E-8,
+        'subconductors': None,
+        'insulation': None,
+        'relative_permeability': 1,
+        'relative_permittivity': 1,
+        'relative_permittivity_out': 1,
+        'fourier_order': 0,
+    }
+]
+
 MTL_MODELS = {
     'overhead': {
         'deConti': {'type': 'overhead_conductor', 'data': SINGLE_OVERHEAD_DECONTI},
         'xue': {'type': 'overhead_conductor', 'data': SINGLE_OVERHEAD_XUE},
     },
-    'bifilar': {
-        25: {
-            0: {'type': 'bifilar_wires', 'data': BIFILAR_S25_NP0},
-            4: {'type': 'bifilar_wires', 'data': BIFILAR_S25_NP4},
+    'wires': {
+        2: {
+            25: {
+                0: {'type': 'bifilar_wires', 'data': BIFILAR_S25_NP0},
+                4: {'type': 'bifilar_wires', 'data': BIFILAR_S25_NP4},
+            },
+            100: {
+                4: {'type': 'bifilar_wires', 'data': BIFILAR_S100_NP4},
+            },
         },
-        100: {
-            4: {'type': 'bifilar_wires', 'data': BIFILAR_S100_NP4},
+        3: {
+            100: {
+                0: {'type': 'ribbon_wires', 'data': THREE_WIRE_RIBBON_S100_NP0},
+                4: {'type': 'ribbon_wires', 'data': THREE_WIRE_RIBBON_S100_NP4},
+            },
+            300: {
+                0: {'type': 'ribbon_wires', 'data': THREE_WIRE_RIBBON_S300_NP0},
+            },
         },
     }
 }

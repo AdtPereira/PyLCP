@@ -1,50 +1,28 @@
-"""
-Reprodução da Figura 4.9 do livro "Introduction to Electromagnetic Compatibility".
-
-Este script calcula e plota a capacitância por unidade de comprimento de uma
-linha de transmissão bifilar usando as fórmulas exata e aproximada. O objetivo
-é recriar a Figura 4.9, que compara essas duas formulações em função da razão
-entre a separação dos condutores e seu raio (s/r_w).
-
-Estrutura:
-- Define-se uma faixa de valores para a razão s/r_w.
-- Para cada valor, uma geometria de linha bifilar é criada.
-- A classe Bifilar é usada para calcular as capacitâncias.
-- Os resultados são plotados usando Matplotlib.
-"""
-
 import os
 import sys
 import time
 import numpy as np
-from enum import Enum
 import matplotlib.pyplot as plt
 
 # Adiciona a raiz do projeto ao PYTHONPATH para importação de módulos.
 # ATENÇÃO: Esta é uma solução frágil. O ideal é instalar o projeto como um pacote.
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..\..')))
 
-from lossless_systems.bifilar_line import Bifilar
-from data.systems import MTL_MODELS
-from data.graph import GraphicRepresentation as graph
+from data.models import MTL_MODELS
+from lossless_systems.wires_homogeneous_media import WiresHomogeneousMedia
+
+from mom_so.utils import *
 from mom_so.green import QuasiStatic
+from mom_so.mtl_graphics import MTLRepresentation
 from mom_so.patel import HomogeneousLosslessMedium, LosslessPostProcessing
-from mom_so.utils import clear_screen
+
 
 # --- Configurações da Simulação ---
-#[separation(mm)][fourier_order]
-MTL = MTL_MODELS['bifilar'][100][4] 
-MTL = MTL_MODELS['bifilar'][25][0]
-MTL = MTL_MODELS['bifilar'][25][4]
-FREQUENCY_RANGE = {
-    'ana': np.logspace(0, 6, num=200),
-    'mom': np.logspace(0, 6, num=30)
-}
-
-class GreenFunctionMode(Enum):
-    """Define o modo de cálculo para a função de Green."""
-    ANALYTICAL = 'Analytically'
-    NUMERICAL = 'Numerically'
+#[num_conductor][separation(mm)][fourier_order]
+MTL = MTL_MODELS['wires'][2][100][4]
+MTL = MTL_MODELS['wires'][2][25][0]
+MTL = MTL_MODELS['wires'][2][25][4]
+FREQUENCY_RANGE = {'ana': np.logspace(0, 6, num=200), 'mom': np.logspace(0, 6, num=30)}
 
 
 def run_analytical_simulation(mtl, frequencies):
@@ -60,23 +38,24 @@ def run_analytical_simulation(mtl, frequencies):
                resistências de alta frequência e indutâncias externas.
     """
     print("Iniciando rotina analítica...")
-    bifilar_analytical = Bifilar(mtl)
     analytical_data = {}
+    wires = WiresHomogeneousMedia(mtl)
+    pul_bifilar = wires.bifilar_pul_inductance_capacitance()
     
     for freq in frequencies:
-        z_s, r_hf, l_ext = bifilar_analytical.series_impedance(freq)
+        z_s, r_hf = wires.bifilar_pul_series_impedance(freq)
         analytical_data[freq] = {
-            'zs': z_s,
             'rs': np.real(z_s),
             'ls': np.imag(z_s) / (2 * np.pi * freq),
             'rhf': r_hf,
-            'le': l_ext
+            'le_exact': pul_bifilar['indutância']['exact'],
+            'le_approx': pul_bifilar['indutância']['approximate'],
         }
 
     return analytical_data
 
 
-def run_momso_simulation(mtl, frequencies, green_mode=GreenFunctionMode.ANALYTICAL):
+def run_momso_simulation(mtl, frequencies):
     """
     Executa a simulação da impedância usando o Método dos Momentos (MoM-SO).
 
@@ -89,7 +68,7 @@ def run_momso_simulation(mtl, frequencies, green_mode=GreenFunctionMode.ANALYTIC
         list: Uma lista contendo as impedâncias série totais calculadas via MoM.
     """
     print("Iniciando rotina numérica (MoM-SO)...")
-    green_matrix = QuasiStatic(mtl).g_tanaka(mode=green_mode.value)
+    green_matrix = QuasiStatic(mtl).g_tanaka()
     post_processor = LosslessPostProcessing(mtl)
     momso_data = {}
 
@@ -98,7 +77,6 @@ def run_momso_simulation(mtl, frequencies, green_mode=GreenFunctionMode.ANALYTIC
         z_partial = mom_so.z_partial(green_matrix)
         zs = post_processor.z_total(z_partial)
         momso_data[freq] = {
-            'zs': zs,
             'rs': post_processor.rs_matrix(zs),
             'ls': post_processor.ls_matrix(zs, freq)
         }
@@ -106,7 +84,7 @@ def run_momso_simulation(mtl, frequencies, green_mode=GreenFunctionMode.ANALYTIC
     return momso_data
 
 
-def plot_results(freqs, analytical, mom_so):
+def plot_results(freqs, analytical_data, mom_so_data):
     """
     Gera e exibe os gráficos dos resultados da simulação de forma flexível,
     organizados em subplots.
@@ -119,7 +97,7 @@ def plot_results(freqs, analytical, mom_so):
     """
     print("Gerando gráficos...")
 
-    def _configure_subplot(ax, ylabel, data_to_plot, ref_data=None, yscale='log'):
+    def _configure_subplot(ax, ylabel, data_to_plot, yscale='log'):
         """
         Função auxiliar para configurar um único subplot.
 
@@ -131,18 +109,20 @@ def plot_results(freqs, analytical, mom_so):
             ref_data (tuple, optional): Dados de referência para plotagem.
         """
         # Itera sobre os dados para plotagem
-        for label, (frequencies, values) in data_to_plot.items():
-            if frequencies is not None and values is not None:
-                if label == 'MoM-SO':
-                    ax.scatter(frequencies, values, label=label, facecolors='none', edgecolors='k', marker='o')
-                else:
-                    ax.plot(frequencies, values, label=label, color='k', linestyle='-')
+        for key, data in data_to_plot.items():
+            frequencies, values = data['data']
+            label = data['label']
 
-        # Plota os dados de referência, se existirem
-        if ref_data:
-            frequencies, values, label = ref_data
+            # Verifica se as frequências e valores estão disponíveis
             if frequencies is not None and values is not None:
-                ax.plot(frequencies, values, 'k--', label=label)
+                if key == 'MoM-SO':
+                    ax.scatter(frequencies, values, label=label, facecolors='none', edgecolors='k', marker='o')
+                elif key == 'Analytical':
+                    ax.plot(frequencies, values, label=label, color='k', linestyle='--')
+                elif key == 'Approximate':
+                    ax.plot(frequencies, values, label=label, color='k', linestyle=':')
+                elif key == 'Exactly':
+                    ax.plot(frequencies, values, label=label, color='k', linestyle='-')
 
         # Configurações do subplot
         ax.set_xscale('log')
@@ -157,41 +137,42 @@ def plot_results(freqs, analytical, mom_so):
     R_FACTOR = 1000  # de Ohm/m para Ohm/km
     L_FACTOR = 1e6   # de H/m para mH/km
 
-    # Extrai as frequências
-    ana_freqs = freqs.get('ana')
-    mom_freqs = freqs.get('mom')
-
     # 1. Inicialize listas vazias para armazenar os resultados
-    ana_r, r_hf, ana_l, l_ext = [], [], [], []
-    mom_r, mom_l = [], []
+    rs, r_hf, ls, le_exact, le_approx = [], [], [], [], []
+    rs_mom, ls_mom = [], []
 
     # 2. Processe os dados analíticos em um único laço
-    for data in analytical.values():
-        ana_r.append(data['rs'][0, 0] * R_FACTOR)
+    for data in analytical_data.values():
+        rs.append(data['rs'][0, 0] * R_FACTOR)
+        ls.append(data['ls'][0, 0] * L_FACTOR)
         r_hf.append(data['rhf'][0, 0] * R_FACTOR)
-        ana_l.append(data['ls'][0, 0] * L_FACTOR)
-        l_ext.append(data['le'][0, 0] * L_FACTOR)
+        le_exact.append(data['le_exact'] * L_FACTOR)
+        le_approx.append(data['le_approx'] * L_FACTOR)
 
     # 3. Processe os dados do MoM-SO em um laço separado
-    for data in mom_so.values():
-        mom_r.append(data['rs'][0, 0] * R_FACTOR)
-        mom_l.append(data['ls'][0, 0] * L_FACTOR)
+    for data in mom_so_data.values():
+        rs_mom.append(data['rs'][0, 0] * R_FACTOR)
+        ls_mom.append(data['ls'][0, 0] * L_FACTOR)
 
-    resistance_data = {'Analytical': (ana_freqs, ana_r), 'MoM-SO': (mom_freqs, mom_r)}
-    inductance_data = {'Analytical': (ana_freqs, ana_l), 'MoM-SO': (mom_freqs, mom_l)}
-    hf_resistance_ref = (ana_freqs, r_hf, 'Resistência HF (Analítica)')
-    external_inductance_ref = (ana_freqs, l_ext, 'Indutância Externa (Analítica)')
+    resistance_data = {
+        'MoM-SO': {'data': (freqs.get('mom'), rs_mom), 'label': 'MoM-SO'},
+        'Analytical': {'data': (freqs.get('ana'), rs), 'label':'$R_i$'},
+        'Approximate': {'data': (freqs.get('ana'), r_hf), 'label': '$R_{HF}$'},
+    }
+
+    inductance_data = {
+        'MoM-SO': {'data': (freqs.get('mom'), ls_mom), 'label': 'MoM-SO'},
+        'Analytical': {'data': (freqs.get('ana'), ls), 'label': '$\ell_s$'},
+        'Approximate': {'data': (freqs.get('ana'), le_approx), 'label': '$\ell_{e}$ (Approx.)'},
+        'Exactly': {'data': (freqs.get('ana'), le_exact), 'label': '$\ell_{e,bifilar}$ (Exactly)'},
+    }
 
     # Cria a figura com subplots
     fig, axes = plt.subplots(1, 2, figsize=(12, 5))
 
     # Configura cada subplot
-    _configure_subplot(axes[0], r'Series Resistance p.u.l. ($\Omega$/km)',
-                       resistance_data, hf_resistance_ref)
-    
-    _configure_subplot(axes[1], 'Series Inductance p.u.l. (mH/km)',
-                       inductance_data, external_inductance_ref, yscale='linear')
-    
+    _configure_subplot(axes[0], r'Series Resistance p.u.l. ($\Omega$/km)', resistance_data)    
+    _configure_subplot(axes[1], 'Series Inductance p.u.l. (mH/km)', inductance_data, yscale='linear')    
     plt.tight_layout()
     plt.show()
 
@@ -204,13 +185,13 @@ def main():
 
     try:
         # 1. Exibe a geometria da linha (em uma figura separada)
-        graph(MTL).wires_and_cables(line_type='bifilar')
+        MTLRepresentation(MTL).wires_and_cables()
 
         # 1. Rotina Analítica
         analytical_data = run_analytical_simulation(MTL, FREQUENCY_RANGE['ana'])
 
         # 2. Rotina MoM-SO
-        momso_data = run_momso_simulation(MTL, FREQUENCY_RANGE['mom'], GreenFunctionMode.ANALYTICAL)
+        momso_data = run_momso_simulation(MTL, FREQUENCY_RANGE['mom'])
 
         # 3. Medição de tempo
         elapsed_time = time.time() - start_time
