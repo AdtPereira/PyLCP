@@ -2,6 +2,8 @@ import numpy as np
 from scipy.special import jv, jvp
 from scipy.constants import mu_0
 from scipy.linalg import lu_factor, lu_solve
+import matplotlib.pyplot as plt
+
 
 from mom_so.mtl import MulticonductorTransmissionLine
 
@@ -20,8 +22,9 @@ class WiresHomogeneousMedia(MulticonductorTransmissionLine):
     def __init__(self, mtl):
         super().__init__(mtl)
 
-        # Kelvin Functions
         self.kelvin_exp = np.exp(1j * 3 * np.pi / 4)
+        self.radii = np.array([conductor['radius'][1] for conductor in self.mtl])
+        self.s = self.D_pq[0, 1]
 
     def ber(self, xi):
         """ Kelvin ber(xi) function """
@@ -109,7 +112,7 @@ class WiresHomogeneousMedia(MulticonductorTransmissionLine):
 
         return Zs, Rhf
 
-    def bifilar_pul_inductance_capacitance(self):
+    def bifilar_pul_inductance_and_capacitance(self):
         """
         Calcula a capacitância por unidade de comprimento para a linha bifilar.
 
@@ -168,6 +171,62 @@ class WiresHomogeneousMedia(MulticonductorTransmissionLine):
             }
         }
 
+    # def bifilar_charge_density(self, conductor_index=0, plot_data=False):
+    #     """
+    #     Calculates and optionally plots the charge distribution on the surface of a bifilar line.
+        
+    #     NOTE: The formula used in this implementation has been revised to match the one
+    #     provided in the user's reference script (mom.py), under the assumption that it
+    #     is the correct formulation. This formula assumes conductors of identical radii.
+    #     """
+    #     # Garante que é uma linha bifilar
+    #     assert len(self.mtl) == 2, "Charge distribution is calculated for a bifilar line."
+
+    #     # s: distância entre os centros dos condutores.
+    #     s = self.s
+
+    #     # A fórmula de referência assume raios idênticos.
+    #     r_w1, r_w2 = self.radii
+    #     assert r_w1 == r_w2, "A fórmula de densidade de carga assume raios idênticos."
+    #     r_w = self.radii[conductor_index]
+
+    #     # Calcula a carga total por unidade de comprimento (q). Esta parte não muda.
+    #     voltage = np.array([conductor['potential_to_infinity'] for conductor in self.mtl])
+    #     pul_bifilar = self.bifilar_pul_inductance_and_capacitance()
+    #     q = (voltage[0] - voltage[1]) * pul_bifilar['capacitante']['exact']
+
+    #     # Define o array de ângulos para o cálculo.
+    #     phi = np.linspace(0, 2 * np.pi, 360)
+
+    #     # --- SEÇÃO REVISADA ---
+    #     # Implementação da fórmula exata conforme o arquivo mom.py.
+    #     # Acredita-se que esta seja a formulação correta conforme a referência do usuário.        
+    #     s_over_rw = s / r_w        
+    #     numerator = (s_over_rw**2 / 4) - 1
+    #     denominator = s_over_rw - 2 * np.cos(phi)
+        
+    #     # A fórmula calcula a distribuição para o condutor com carga +q.
+    #     # Se estivermos calculando para o condutor 1 (índice 1), assumimos que ele tem carga -q.
+    #     # No entanto, para simplicidade e para espelhar mom.py, calculamos a magnitude da distribuição.
+    #     # O sinal de q já reflete a diferença V1 - V2.
+    #     charge_density = (q / r_w) * (numerator / denominator)
+
+    #     if plot_data:
+    #         print(f"Valor de pico calculado (em theta=0): {charge_density[0]:.4e} C/m²")       
+    #         print("Gerando gráfico Cartesiano da densidade de carga...")
+    #         fig, ax = plt.subplots(figsize=(8, 6))
+    #         ax.plot(np.rad2deg(phi), charge_density, 'k-', lw=1, label='Solução Exata')            
+    #         ax.set_xlim(0, 360)
+    #         ax.set_xticks(np.arange(0, 361, 90))
+    #         ax.set_xlabel('Ângulo (Graus)')
+    #         ax.set_ylabel('Densidade de Carga (C/m²)')
+    #         ax.set_title(f'Distribuição de Carga (Analítica)\nD/R = {s/r_w1:.1f}')
+    #         ax.grid(True, linestyle='--')
+    #         ax.legend()
+    #         plt.tight_layout()            
+
+    #     return charge_density, phi
+    
     def n_wires_inductance_matrix(self):
         """
         This function calculates the series resistance of the system using 

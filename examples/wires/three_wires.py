@@ -19,8 +19,8 @@ from mom_so.patel import HomogeneousLosslessMedium, LosslessPostProcessing
 
 # --- Configurações da Simulação ---
 #[num_conductor][separation(mm)][fourier_order]
-MTL = MTL_MODELS['wires'][3][300][0]
 MTL = MTL_MODELS['wires'][3][100][4]
+MTL = MTL_MODELS['wires'][3][300][0]
 FREQUENCY_RANGE = {'ana': np.logspace(0, 6, num=200), 'mom': np.logspace(0, 6, num=30)}
 
 
@@ -67,13 +67,14 @@ def run_momso_simulation(mtl, frequencies):
 
     for freq in frequencies:
         mom_so = HomogeneousLosslessMedium(mtl, freq)
+        gc = mom_so.generalized_capacitance_matrix(green_matrix)
         z_partial = mom_so.z_partial(green_matrix)
         zs = post_processor.z_total(z_partial)
         momso_data[freq] = {
             'zs': zs,
             'rs': post_processor.rs_matrix(zs),
             'ls': post_processor.ls_matrix(zs, freq),
-            'c': np.real(mom_so.capacitance_matrix(green_matrix)),
+            'c': np.real(mom_so.maxwellian_capacitance_matrix(gc)),
         }
 
     return momso_data

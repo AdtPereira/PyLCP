@@ -1,3 +1,35 @@
+""" 
+Este script executa simulações de impedância de linhas de transmissão coaxiais
+usando tanto uma abordagem analítica (formulação de Patel) quanto uma abordagem numérica
+(Método dos Momentos - MoM-SO). Ele gera gráficos comparativos dos resultados
+obtidos por ambas as metodologias.
+
+Este arquivo é parte do projeto PyLCP, que é um pacote Python para análise de linhas de transmissão.
+
+REFERENCES:
+[1] PATEL, Utkarsh R. A Surface Admittance Approach For Fast Calculation of the 
+    Series Impedance of Cables Including Skin, Proximity, and Ground Return Effects.
+    2014. University of Toronto, Graduate Department of The Edward S. Rogers Sr. 
+    Department of Electrical & Computer Engineering. 
+
+[2] U. R. Patel, B. Gustavsen and P. Triverio, "An Equivalent Surface Current Approach
+    for the Computation of the Series Impedance of Power Cables with Inclusion of Skin
+    and Proximity Effects," in IEEE Transactions on Power Delivery, vol. 28, no. 4, pp.
+    2474-2482, Oct. 2013, doi: 10.1109/TPWRD.2013.2267098.
+
+[3] U. R. Patel, B. Gustavsen and P. Triverio, "Application of the MoM-SO Method for 
+    Accurate Impedance Calculation of Single-Core Cables Enclosed by a Conducting Pipe," 
+    Proc. International Conference on Power Systems Transients (IPST 2013), Vancouver, 
+    Canada July 18-20, 2013. https://www.ipstconf.org/Proc_IPST2013.php
+
+[4] A. Ametani, "A General Formulation of Impedance and Admittance of Cables," in IEEE
+    Transactions on Power Apparatus and Systems, vol. PAS-99, no. 3, pp. 902-910, May
+    1980, doi: 10.1109/TPAS.1980.319718.
+
+[5] A. Ametani, "Wave Propagation Characteristics of Cables," in IEEE Transactions on
+    Power Apparatus and Systems, vol. PAS-99, no. 2, pp. 499-505, March 1980, 
+    doi: 10.1109/TPAS.1980.319685.
+"""
 import os
 import sys
 import time
@@ -9,7 +41,7 @@ import matplotlib.pyplot as plt
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..\..')))
 
 from data.models import MTL_MODELS
-from lossless_systems.wires_homogeneous_media import WiresHomogeneousMedia
+from lossless_systems.single_core_cable import *
 
 from mom_so.utils import *
 from mom_so.green import QuasiStatic
@@ -18,9 +50,9 @@ from mom_so.patel import HomogeneousLosslessMedium, LosslessPostProcessing
 
 
 # --- Configurações da Simulação ---
-#[separation(mm)][fourier_order]
-MTL = MTL_MODELS['bifilar'][25][4]
-FREQUENCY_RANGE = {'ana': np.logspace(0, 6, num=200), 'mom': np.logspace(0, 6, num=30)}
+#MTL = MTL_MODELS['coaxial']['model']
+MTL = MTL_MODELS['coaxial']['patel']
+FREQUENCY_RANGE = {'ana': np.logspace(0, 5, num=200), 'mom': np.logspace(0, 5, num=30)}
 
 
 def run_analytical_simulation(mtl, frequencies):
@@ -37,17 +69,27 @@ def run_analytical_simulation(mtl, frequencies):
     """
     print("Iniciando rotina analítica...")
     analytical_data = {}
-    wires = WiresHomogeneousMedia(mtl)
-    pul_bifilar = wires.bifilar_pul_inductance_capacitance()
     
     for freq in frequencies:
-        z_s, r_hf = wires.bifilar_pul_series_impedance(freq)
+        # Patel's Formulation
+        coaxial = SingleCoreCable(mtl, freq)
+        zs = coaxial.pul_parameters()
+        l_ext = coaxial.external_inductance()
+
+        # Ametani's Formulation
+        z11, z12, z22 = Ametani(mtl, freq).impedance_two_layered_conductor()
+
         analytical_data[freq] = {
-            'rs': np.real(z_s),
-            'ls': np.imag(z_s) / (2 * np.pi * freq),
-            'rhf': r_hf,
-            'le_exact': pul_bifilar['indutância']['exact'],
-            'le_approx': pul_bifilar['indutância']['approximate'],
+            'zs': zs,
+            'le': l_ext,
+            'rs': np.real(zs),
+            'ls': np.imag(zs) / (2 * np.pi * freq),
+            'r11': np.real(z11),
+            'r12': np.real(z12),
+            'r22': np.real(z22),
+            'l11': np.imag(z11) / (2 * np.pi * freq),
+            'l12': np.imag(z12) / (2 * np.pi * freq),
+            'l22': np.imag(z22) / (2 * np.pi * freq),
         }
 
     return analytical_data
@@ -75,6 +117,7 @@ def run_momso_simulation(mtl, frequencies):
         z_partial = mom_so.z_partial(green_matrix)
         zs = post_processor.z_total(z_partial)
         momso_data[freq] = {
+            'zs': zs,
             'rs': post_processor.rs_matrix(zs),
             'ls': post_processor.ls_matrix(zs, freq)
         }
@@ -85,94 +128,102 @@ def run_momso_simulation(mtl, frequencies):
 def plot_results(freqs, analytical_data, mom_so_data):
     """
     Gera e exibe os gráficos dos resultados da simulação de forma flexível,
-    organizados em subplots.
+    organizados em subplots. Esta versão é refatorada para maior clareza e
+    manutenibilidade.
 
     Args:
-        mtl (dict): Dicionário de configuração da linha de transmissão.
         freqs (dict): Dicionário contendo os arrays de frequência para cada simulação.
-        analytical (dict): Dicionário com os resultados da simulação analítica.
-        mom_so (dict): Dicionário com os resultados da simulação MoM-SO.
+        analytical_data (dict): Dicionário com os resultados da simulação analítica.
+        mom_so_data (dict): Dicionário com os resultados da simulação MoM-SO.
     """
     print("Gerando gráficos...")
 
-    def _configure_subplot(ax, ylabel, data_to_plot, yscale='log'):
-        """
-        Função auxiliar para configurar um único subplot.
+    # A função interna _configure_subplot permanece a mesma.
+    def _configure_subplot(ax, ylabel, data_to_plot, y_lim, yscale='log'):
+        for plot_params in data_to_plot:
+            frequencies, values = plot_params['data']
+            plot_type = plot_params.get('type', 'plot')
+            label = plot_params.get('label')
 
-        Args:
-            ax (matplotlib.axes.Axes): O eixo do subplot a ser configurado.
-            title (str): Título do subplot.
-            ylabel (str): Rótulo do eixo Y.
-            data_to_plot (dict): Dados principais para plotagem.
-            ref_data (tuple, optional): Dados de referência para plotagem.
-        """
-        # Itera sobre os dados para plotagem
-        for key, data in data_to_plot.items():
-            frequencies, values = data['data']
-            label = data['label']
+            if plot_type == 'scatter':
+                ax.scatter(frequencies, values, label=label, facecolors='none', edgecolors='k', marker='o')
+            else:
+                ax.plot(
+                    frequencies, values, label=label,
+                    color=plot_params.get('color', 'k'),
+                    linestyle=plot_params.get('linestyle', '-')
+                )
 
-            # Verifica se as frequências e valores estão disponíveis
-            if frequencies is not None and values is not None:
-                if key == 'MoM-SO':
-                    ax.scatter(frequencies, values, label=label, facecolors='none', edgecolors='k', marker='o')
-                elif key == 'Analytical':
-                    ax.plot(frequencies, values, label=label, color='k', linestyle='--')
-                elif key == 'Approximate':
-                    ax.plot(frequencies, values, label=label, color='k', linestyle=':')
-                elif key == 'Exactly':
-                    ax.plot(frequencies, values, label=label, color='k', linestyle='-')
-
-        # Configurações do subplot
         ax.set_xscale('log')
         ax.set_yscale(yscale)
-        ax.set_xlim(1E0, 1E6)
+        ax.set_xlim(1E0, 1E5)
+        ax.set_ylim(y_lim)
         ax.set_xlabel('Frequency (Hz)')
         ax.set_ylabel(ylabel)
         ax.legend()
         ax.grid(False)
 
-    # Fatores de conversão de unidade
-    R_FACTOR = 1000  # de Ohm/m para Ohm/km
-    L_FACTOR = 1e6   # de H/m para mH/km
+    # --- 1. Processamento de Dados com List Comprehensions ---
+    R_FACTOR = 1E3
+    L_FACTOR = 1e6
+    analytical_values = analytical_data.values()
+    mom_so_values = mom_so_data.values()
 
-    # 1. Inicialize listas vazias para armazenar os resultados
-    rs, r_hf, ls, le_exact, le_approx = [], [], [], [], []
-    rs_mom, ls_mom = [], []
-
-    # 2. Processe os dados analíticos em um único laço
-    for data in analytical_data.values():
-        rs.append(data['rs'][0, 0] * R_FACTOR)
-        ls.append(data['ls'][0, 0] * L_FACTOR)
-        r_hf.append(data['rhf'][0, 0] * R_FACTOR)
-        le_exact.append(data['le_exact'] * L_FACTOR)
-        le_approx.append(data['le_approx'] * L_FACTOR)
-
-    # 3. Processe os dados do MoM-SO em um laço separado
-    for data in mom_so_data.values():
-        rs_mom.append(data['rs'][0, 0] * R_FACTOR)
-        ls_mom.append(data['ls'][0, 0] * L_FACTOR)
-
-    resistance_data = {
-        'MoM-SO': {'data': (freqs.get('mom'), rs_mom), 'label': 'MoM-SO'},
-        'Analytical': {'data': (freqs.get('ana'), rs), 'label':'$R_i$'},
-        'Approximate': {'data': (freqs.get('ana'), r_hf), 'label': '$R_{HF}$'},
+    processed_data = {
+        'rs':     [d['rs'] * R_FACTOR for d in analytical_values],
+        'ls':     [d['ls'] * L_FACTOR for d in analytical_values],
+        'le':     [d['le'] * L_FACTOR for d in analytical_values],
+        'r11':    [d['r11'] * R_FACTOR for d in analytical_values],
+        'l11':    [d['l11'] * L_FACTOR for d in analytical_values],
+        'r12':    [d['r12'] * R_FACTOR for d in analytical_values],
+        'l12':    [d['l12'] * L_FACTOR for d in analytical_values],
+        'r22':    [d['r22'] * R_FACTOR for d in analytical_values],
+        'l22':    [d['l22'] * L_FACTOR for d in analytical_values],
+        'rs_mom': [d['rs'][0, 0] * R_FACTOR for d in mom_so_values],
+        'ls_mom': [d['ls'][0, 0] * L_FACTOR for d in mom_so_values],
+        'req':    [(d['r11']-2*d['r12']+d['r22']) * R_FACTOR for d in analytical_values],
+        'leq':    [(d['l11']-2*d['l12']+d['l22']) * L_FACTOR for d in analytical_values],
     }
 
-    inductance_data = {
-        'MoM-SO': {'data': (freqs.get('mom'), ls_mom), 'label': 'MoM-SO'},
-        'Analytical': {'data': (freqs.get('ana'), ls), 'label': '$\ell_s$'},
-        'Approximate': {'data': (freqs.get('ana'), le_approx), 'label': '$\ell_{e}$ (Approx.)'},
-        'Exactly': {'data': (freqs.get('ana'), le_exact), 'label': '$\ell_{e,bifilar}$ (Exactly)'},
-    }
+    # --- 2. Configuração Centralizada e Explícita das Curvas ---
+    # As chaves 'r_key' e 'l_key' agora correspondem EXATAMENTE às chaves em processed_data.
+    plot_definitions = [
+        {'r_key': 'rs_mom', 'l_key': 'ls_mom', 'freq_key': 'mom', 'type': 'scatter', 'label': 'MoM-SO'},
+        {'r_key': 'rs',     'l_key': 'ls',     'freq_key': 'ana', 'type': 'plot',    'label': 'Analytical [1]'},
+        {'r_key': None,     'l_key': 'le',     'freq_key': 'ana', 'type': 'plot',    'label': 'Asymptotic',            'style': {'color': 'k', 'linestyle': '-.'}},
+        {'r_key': 'r11',    'l_key': 'l11',    'freq_key': 'ana', 'type': 'plot',    'label_template': '${P}_{{11}}$', 'style': {'color': 'k', 'linestyle': ':'}},
+        {'r_key': 'r12',    'l_key': 'l12',    'freq_key': 'ana', 'type': 'plot',    'label_template': '${P}_{{12}}$', 'style': {'color': 'g', 'linestyle': ':'}},
+        {'r_key': 'r22',    'l_key': 'l22',    'freq_key': 'ana', 'type': 'plot',    'label_template': '${P}_{{22}}$', 'style': {'color': 'b', 'linestyle': ':'}},
+        {'r_key': 'req',    'l_key': 'leq',    'freq_key': 'ana', 'type': 'plot',    'label_template': '${P}_{{11}}-2{P}_{{12}}+{P}_{{22}}$', 'style': {'color': 'r', 'linestyle': ':'}},
+    ]
 
-    # Cria a figura com subplots
+    def _build_plot_data(param_prefix):
+        """Função auxiliar que usa a configuração explícita para construir os dados."""
+        data_list = []
+        param_prefix_upper = param_prefix.upper()
+
+        for p_def in plot_definitions:
+            data_key = p_def[f'{param_prefix}_key'] # Acessa a chave correta: 'r_key' ou 'l_key'
+            if data_key is None:
+                continue
+            plot_frequencies = freqs.get(p_def['freq_key'])            
+            label = p_def.get('label') or p_def.get('label_template', '').format(P=param_prefix_upper)
+            plot_dict = {
+                'type': p_def['type'],
+                'data': (plot_frequencies, processed_data[data_key]),
+                'label': label
+            }
+            plot_dict.update(p_def.get('style', {}))
+            data_list.append(plot_dict)
+        return data_list
+
+    # --- 3. Criação da Figura ---
     fig, axes = plt.subplots(1, 2, figsize=(12, 5))
-
-    # Configura cada subplot
-    _configure_subplot(axes[0], r'Series Resistance p.u.l. ($\Omega$/km)', resistance_data)    
-    _configure_subplot(axes[1], 'Series Inductance p.u.l. (mH/km)', inductance_data, yscale='linear')    
+    resistance_data = _build_plot_data('r')
+    inductance_data = _build_plot_data('l')    
+    _configure_subplot(axes[0], r'Series Resistance p.u.l. ($\Omega$/km)', resistance_data, y_lim=(1E-2, 1E1))
+    _configure_subplot(axes[1], 'Series Inductance p.u.l. (mH/km)', inductance_data, y_lim=(0.0, 0.2), yscale='linear')
     plt.tight_layout()
-    plt.show()
 
 
 def main():
@@ -181,27 +232,23 @@ def main():
     print("Iniciando cálculos da impedância p.u.l. ...")
     start_time = time.time()
 
-    try:
-        # 1. Exibe a geometria da linha (em uma figura separada)
-        MTLRepresentation(MTL).wires_and_cables(line_type='bifilar')
+    # 1. Exibe a geometria da linha (em uma figura separada)
+    MTLRepresentation(MTL).wires_and_cables()
 
-        # # 1. Rotina Analítica
-        # analytical_data = run_analytical_simulation(MTL, FREQUENCY_RANGE['ana'])
+    # 1. Rotina Analítica
+    analytical_data = run_analytical_simulation(MTL, FREQUENCY_RANGE['ana'])
 
-        # # 2. Rotina MoM-SO
-        # momso_data = run_momso_simulation(MTL, FREQUENCY_RANGE['mom'])
+    # 2. Rotina MoM-SO
+    momso_data = run_momso_simulation(MTL, FREQUENCY_RANGE['mom'])
 
-        # # 3. Medição de tempo
-        # elapsed_time = time.time() - start_time
-        # print(f"\nRotinas de cálculo finalizadas! Tempo de simulação: {elapsed_time:.2f} segundos.")
+    # 3. Medição de tempo
+    elapsed_time = time.time() - start_time
+    print(f"\nRotinas de cálculo finalizadas! Tempo de simulação: {elapsed_time:.2f} segundos.")
 
-        # # 5. Geração e exibição dos resultados com a função revisada
-        # plot_results(FREQUENCY_RANGE, analytical_data, momso_data)
-
-    except Exception as e:
-        print(f"\nOcorreu um erro durante a execução do script: {e}")
-        print("Verifique as configurações de entrada e as dependências do projeto.")
+    # 5. Geração e exibição dos resultados com a função revisada
+    plot_results(FREQUENCY_RANGE, analytical_data, momso_data)
 
 
 if __name__ == "__main__":
     main()
+    plt.show()

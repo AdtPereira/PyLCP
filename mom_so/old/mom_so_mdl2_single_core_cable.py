@@ -104,13 +104,11 @@ def main():
 
     # Perform the calculations
     green_type = ['Analytically', 'Numerically']
-    coaxial = mom_so_lossless_systems.CoaxialCable(
-        MTL_DICT, frequency, frequency_mom, green_type[0])
+    coaxial = mom_so_lossless_systems.CoaxialCable(MTL_DICT, frequency, frequency_mom, green_type[0])
 
     # End the timer
     elapsed_time = time.time() - start_time
-    print(f"End of the routine! Time spent on simulation: {
-          elapsed_time:.2f} seconds.\n")
+    print(f"End of the routine! Time spent on simulation: {elapsed_time:.2f} seconds.\n")
 
     # Display the geometry of the coaxial cable
     graph(MTL_DICT).wires_and_cables(line_type='scc')

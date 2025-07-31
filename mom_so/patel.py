@@ -323,9 +323,20 @@ class HomogeneousLosslessMedium(MTL):
         solution = lu_solve((lu, piv), ys @ u)
 
         return u.T @ solution
-    
-    # Matrix C [np.array]
-    def capacitance_matrix(self, green_matrix):
+
+    def charge_distribution(self, green_matrix):
+        e0 = self.epsilon[0]
+        u = self.u_matrix()
+        v = np.array(([1], [-1]))
+
+        # Solve the linear system Gx = U and calculate U^T * G^{-1} * U
+        GInv_uv = lu_solve(lu_factor(green_matrix), u @ v)
+
+        # Generalized Capacitance Matrix [1]
+        return - e0 * GInv_uv
+
+    # Generalized Capacitance Matrix [np.array]
+    def generalized_capacitance_matrix(self, green_matrix):
         """
         Calcula a matriz de capacitância física (n x n) a partir da matriz de
         capacitância generalizada ((n+1) x (n+1)), seguindo a Eq. 5.21 de Clayton Paul.
@@ -352,42 +363,69 @@ class HomogeneousLosslessMedium(MTL):
         u = self.u_matrix()
         e0 = self.epsilon[0]
 
-        # Solve the linear system Gx = U and calculate U^T*G^{-1}*U
+        # Solve the linear system Gx = U and calculate U^T * G^{-1} * U
         uT_gInv_u = u.T @ lu_solve(lu_factor(green_matrix), u)
 
         # Generalized Capacitance Matrix [1]
-        general_c = - e0 * uT_gInv_u
+        return - e0 * uT_gInv_u
+
+    # Maxwellian Capacitance Matrix [np.array]
+    def maxwellian_capacitance_matrix(self, generalized_capacitance_matrix):
+        """
+        Calcula a matriz de capacitância física (n x n) a partir da matriz de
+        capacitância generalizada ((n+1) x (n+1)), seguindo a Eq. 5.21 de Clayton Paul.
+
+        A fórmula implementada é:
+        C_ij = c_ij - ( (soma da linha i de c) * (soma da coluna j de c) ) / (soma total de c)
+
+        Onde 'c' é a matriz generalizada e 'C' é a matriz física resultante.
+        Assume-se que o condutor de índice 0 da matriz generalizada é o de referência
+        e está sendo eliminado.
+
+        Args:
+            matriz_generalizada (np.ndarray): A matriz de capacitância generalizada
+                                            simétrica de ordem (n+1) x (n+1).
+
+        Returns:
+            np.ndarray: A matriz de capacitância física de ordem n x n.
+            
+        Raises:
+            ValueError: Se a matriz de entrada não for quadrada ou se a soma de
+                        seus elementos for zero.
+        """
+
+        gc = generalized_capacitance_matrix
 
         # --- Validação da entrada com assert ---
-        assert isinstance(general_c, np.ndarray), "A entrada deve ser um array NumPy."
-        assert np.sum(general_c) != 0, "A soma total dos elementos da matriz generalizada não pode ser zero."
-        assert general_c.ndim == 2, "A entrada deve ser uma matriz 2D (array de 2 dimensões)."
-        assert general_c.shape[0] == general_c.shape[1], "A entrada deve ser uma matriz quadrada."
-        assert general_c.shape[0] >= 2, "A matriz generalizada deve ser de ordem mínima 2x2."
+        assert isinstance(gc, np.ndarray), "A entrada deve ser um array NumPy."
+        assert np.sum(gc) != 0, "A soma total dos elementos da matriz generalizada não pode ser zero."
+        assert gc.ndim == 2, "A entrada deve ser uma matriz 2D (array de 2 dimensões)."
+        assert gc.shape[0] == gc.shape[1], "A entrada deve ser uma matriz quadrada."
+        assert gc.shape[0] >= 2, "A matriz generalizada deve ser de ordem mínima 2x2."
 
         # Ordem da matriz generalizada (N = n+1)
-        N = general_c.shape[0]
+        N = gc.shape[0]
 
         # 2. Numerador: Soma de cada linha e de cada coluna
         # Para uma matriz simétrica, as somas das linhas e colunas são iguais.
-        row_sum = np.sum(general_c, axis=1)     # axis=1 soma ao longo das colunas
-        column_sum = np.sum(general_c, axis=0)  # axis=0 soma ao longo das linhas
+        row_sum = np.sum(gc, axis=1)     # axis=1 soma ao longo das colunas
+        column_sum = np.sum(gc, axis=0)  # axis=0 soma ao longo das linhas
 
         # assert np.equal(row_sum, column_sum).all(), "As somas das linhas e colunas devem ser iguais."
 
         # Inicializa a matriz de capacitância física n x n com zeros
-        matrix_c = np.zeros((N - 1, N - 1), dtype=general_c.dtype)
+        matrix_c = np.zeros((N - 1, N - 1), dtype=gc.dtype)
 
         # Itera sobre os índices da matriz física (de 1 a n na matriz original)
         # Condutor de índice 0 é o de referência e não é incluído na matriz física
         for i in range(1, N):
             for j in range(1, N):
-                c_ij = general_c[i, j]
+                c_ij = gc[i, j]
                 row_i_sum = row_sum[i]
                 column_j_sum = column_sum[j]
                 
                 # Eq. 5.21 [2]
-                matrix_c[i - 1, j - 1] = c_ij - (row_i_sum * column_j_sum) / np.sum(general_c)
+                matrix_c[i - 1, j - 1] = c_ij - (row_i_sum * column_j_sum) / np.sum(gc)
 
         return matrix_c
 
@@ -689,6 +727,7 @@ class LosslessPostProcessing(MTL):
         # print("Incident Matrix Q: \n", matrix_q)
         return matrix_q
 
+
     # Incident Matrix S [np.array]
     # Equation (A.10) [1]
     def s_incident_matrix(self):
@@ -720,6 +759,7 @@ class LosslessPostProcessing(MTL):
         # print("Incident Matrix S.T: \n", matrix_s_transpose)
         return matrix_s_transpose.T
 
+
     # Matrix Z_line [np.array]
     def z_line_matrix(self, z_partial):
         """
@@ -741,6 +781,7 @@ class LosslessPostProcessing(MTL):
         qz_inv_qt = np.dot(q, lu_solve((lu, piv), q.T))
 
         return inv(qz_inv_qt)
+
 
     # Matrix Z_full [np.array]
     # Equation (A.12) [1]
@@ -766,6 +807,7 @@ class LosslessPostProcessing(MTL):
 
         return s.T @ qz_inv_qt @ s
     
+
     # Matriz Rs [np.array]
     def rs_matrix(self, z_total):
         """
@@ -776,7 +818,8 @@ class LosslessPostProcessing(MTL):
         numpy.ndarray: The series resistance matrix Rs.
         """
         return np.real(z_total)
-    
+
+
     # Matriz Ls [np.array]
     def ls_matrix(self, z_total, frequency):
         """

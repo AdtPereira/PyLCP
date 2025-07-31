@@ -88,14 +88,15 @@ def run_simulation(s_rw_ratios, wire_radius):
 
         # Instancia analítica
         wires = WiresHomogeneousMedia(mtl)
-        pul_bifilar = wires.bifilar_pul_inductance_capacitance()
+        pul_bifilar = wires.bifilar_pul_inductance_and_capacitance()
         results['exact'].append(pul_bifilar['capacitante']['exact'])
         results['approximate'].append(pul_bifilar['capacitante']['approximate'])
 
         # Instancia MoM-SO
         green_matrix = QuasiStatic(mtl).g_tanaka()
         mom_so = HomogeneousLosslessMedium(mtl, frequency)
-        c = mom_so.capacitance_matrix(green_matrix)
+        gc = mom_so.generalized_capacitance_matrix(green_matrix)
+        c = mom_so.maxwellian_capacitance_matrix(gc)
         # post_processor = LosslessPostProcessing(mtl)
         # z_partial = mom_so.z_partial(green_matrix)
         # zs = post_processor.z_total(z_partial)

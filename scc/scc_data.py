@@ -1,6 +1,5 @@
 scc_models_list = [
-    {"name": {
-        "value": "PRY_M01_1SCC_1C", 
+    {"name": {"value": "PRY_M01_1SCC_1C", 
         "description": "An Prysmian 138 kV SCC Cable"
     },
     "ra": {
@@ -61,8 +60,7 @@ scc_models_list = [
     }         
     },
     
-    {"name": {
-        "value": "DC_M02_3SCC_1C", 
+    {"name": {"value": "DC_M02_3SCC_1C", 
         "description": "Horizontal arrangement. 3SCC_1C: 3 x (Core + External Insulation). \nRef.: Fig. 2a [1]"
     },
     "ra": {
@@ -123,10 +121,8 @@ scc_models_list = [
     }         
     },
     
-    {"name": {
-        "value": "DC_M03_3SCC_1C", 
-        "description": "Vertical arrangement. 3SCC_1C: 3 x (Core + External Insulation). \
-            \nRef.: Fig. 2b [1]"
+    {"name": {"value": "DC_M03_3SCC_1C", 
+        "description": "Vertical arrangement. 3SCC_1C: 3 x (Core + External Insulation). Ref.: Fig. 2b [1]"
     },
     "ra": {
         "value": 0.0178, 
@@ -186,10 +182,8 @@ scc_models_list = [
     }  
     },
 
-    {"name": {
-        "value": "DC_M04_3SCC_1C", 
-        "description": "Trefoil arrangement. 3SCC_1C: 3 x (Core + External Insulation). \
-            \nRef.: Fig. 2c [1]"
+    {"name": {"value": "DC_M04_3SCC_1C", 
+        "description": "Trefoil arrangement. 3SCC_1C: 3 x (Core + External Insulation). Ref.: Fig. 2c [1]"
     },
     "ra": {
         "value": 0.02075, 

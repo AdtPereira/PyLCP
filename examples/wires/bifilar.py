@@ -40,7 +40,7 @@ def run_analytical_simulation(mtl, frequencies):
     print("Iniciando rotina analítica...")
     analytical_data = {}
     wires = WiresHomogeneousMedia(mtl)
-    pul_bifilar = wires.bifilar_pul_inductance_capacitance()
+    pul_bifilar = wires.bifilar_pul_inductance_and_capacitance()
     
     for freq in frequencies:
         z_s, r_hf = wires.bifilar_pul_series_impedance(freq)

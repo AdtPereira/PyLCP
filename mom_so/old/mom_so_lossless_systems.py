@@ -140,55 +140,54 @@ class CoaxialCable(FreeSpace):
         d (float): Distance between the conductors [m].
     """
 
-    def __init__(self, mtl_dict, f, f_mom, green_evaluation='Analytically'):
-        super().__init__(mtl_dict)
+    def __init__(self, mtl, f, f_mom, green_evaluation='Analytically'):
+        super().__init__(mtl)
         self.f = f
         self.f_mom = f_mom
         self.green = green_evaluation
         self.analytical = None
         self.numerical = None
         self.comsol = None
-        self._perform_calculations(mtl_dict)
+        self._perform_calculations(mtl)
         self._comsol_data()
 
-    def _perform_calculations(self, mtl_dict):
+    def _perform_calculations(self, mtl):
         """ Performs analytical and numerical formulation calculations and stores the results. """
 
-        self.analytical = self._analytical_formulation(mtl_dict)
-        self.numerical = self._numerical_formulation(mtl_dict)
+        self.analytical = self._analytical_formulation(mtl)
+        self.numerical = self._numerical_formulation(mtl)
 
-    def _analytical_formulation(self, mtl_dict):
+    def _analytical_formulation(self, mtl):
         """ Performs analytical formulation for the given MTL and frequencies. """
         series_impedance = []
         ametani_impedances = []
 
         for f in self.f:
             # Patel's Formulation
-            z = analytic.SingleCoreCable(mtl_dict, f).pul_parameters()
+            z = analytic.SingleCoreCable(mtl, f).pul_parameters()
 
             # Ametani's Formulation
-            zz11, zz12, zz22 = analytic.Ametani(
-                mtl_dict, f).impedance_two_layered_conductor()
+            zz11, zz12, zz22 = analytic.Ametani(mtl, f).impedance_two_layered_conductor()
 
             series_impedance.append(z)
             ametani_impedances.append([zz11, zz12, zz22])
 
         return series_impedance, ametani_impedances
 
-    def _numerical_formulation(self, mtl_dict):
+    def _numerical_formulation(self, mtl):
         """ Calculates the series impedance given frequencies using numerical formulation. """
 
         series_impedance = []
 
         # Green's matrix
-        green = QuasiStatic(mtl_dict).g_tanaka(green_evaluation=self.green)
+        green = QuasiStatic(mtl).g_tanaka(green_evaluation=self.green)
 
         # Post-processing parameters
-        post_processing = mom_so.HomogeneousLosslessMediumPostProcessing(mtl_dict)
+        post_processing = mom_so.HomogeneousLosslessMediumPostProcessing(mtl)
 
         # Calculate the series impedance for each frequency
         for f in self.f_mom:
-            mom_so_patel = mom_so.HomogeneousLosslessMedium(mtl_dict, f)
+            mom_so_patel = mom_so.HomogeneousLosslessMedium(mtl, f)
             z_partial = mom_so_patel.z_partial(green)
             zs = post_processing.z_matrix(z_partial)
             series_impedance.append(zs[0][0])
@@ -197,19 +196,13 @@ class CoaxialCable(FreeSpace):
     def _comsol_data(self):
         # Read the data from the file
         file_path = 'C:\\Users\\adilt\\OneDrive\\01 ACADEMIA\\06 MODELOS\\7.MoM-SO\\data'
-        resistance = pd.read_csv(
-            file_path+'\\comsol_resistance_coax.txt', sep=r'\s+', comment='%')
-        inductance = pd.read_csv(
-            file_path+r'\\comsol_inductance_coax.txt', sep=r'\s+', comment='%')
+        resistance = pd.read_csv(file_path+'\\comsol_resistance_coax.txt', sep=r'\s+', comment='%')
+        inductance = pd.read_csv(file_path+r'\\comsol_inductance_coax.txt', sep=r'\s+', comment='%')
 
         # Rename the columns
-        resistance.columns = [
-            'freq (Hz)', 'Analytic (DC)', 'Analytic (HF)', 'COMSOL (mf/ec)']
-        inductance.columns = [
-            'freq (Hz)', 'Analytic (DC)', 'Analytic (HF)', 'COMSOL (mf/ec)']
-
-        self.comsol = [
-            resistance['freq (Hz)'], resistance['COMSOL (mf/ec)'], inductance['COMSOL (mf/ec)']]
+        resistance.columns = ['freq (Hz)', 'Analytic (DC)', 'Analytic (HF)', 'COMSOL (mf/ec)']
+        inductance.columns = ['freq (Hz)', 'Analytic (DC)', 'Analytic (HF)', 'COMSOL (mf/ec)']
+        self.comsol = [resistance['freq (Hz)'], resistance['COMSOL (mf/ec)'], inductance['COMSOL (mf/ec)']]
 
     def plot_series_resistance(self):
         """
