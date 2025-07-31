@@ -13,6 +13,7 @@ from lossless_systems.wires_homogeneous_media import WiresHomogeneousMedia
 
 from mom_so.utils import *
 from mom_so.mom import TwoBareWireSystem
+from mom_so.mom import MulticonductorBareWireSystems
 from mom_so.green import QuasiStatic
 from mom_so.mtl_graphics import MTLRepresentation
 from mom_so.patel import HomogeneousLosslessMedium, LosslessPostProcessing
@@ -21,22 +22,23 @@ from mom_so.patel import HomogeneousLosslessMedium, LosslessPostProcessing
 MTL = MTL_MODELS['wires'][2][21][8]
 FREQUENCY_RANGE = {'ana': np.logspace(0, 6, num=200), 'mom': np.logspace(0, 6, num=30)}
 
-def run_classic_mom():
+def run_n_wires_mom():
     """
     Executa a simulação clássica do Método dos Momentos (MoM) para a linha de transmissão bifilar.
 
     Returns:
         BifilarMoM: Instância do objeto BifilarMoM configurado.
     """
-    print("\n=== Rotina numérica MoM (Collocation Method) ===")
-    mom = TwoBareWireSystem(MTL)
-    mom.run_simulation()
-    mom.print_results()
-    mom.plot_charge_density()
-    # mom.plot_collocation_points(coord_mode='Cartesian')
-    # BifilarMoM.plot_convergence_rates(MTL, nf_max=20)
-    return mom
-    
+    print("\n=== Rotina numérica MoM MulticonductorBareWireSystems (Collocation Method) ===")
+    mom_wires = MulticonductorBareWireSystems(MTL)
+    mom_wires.run_simulation()
+    mom_wires.print_results()
+    mom_wires.plot_charge_density()
+    mom_wires.plot_collocation_points()
+    mom_wires.plot_harmonic_coefficients()
+    MulticonductorBareWireSystems.plot_convergence_rates(MTL, nf_max=20)
+    return mom_wires
+
 
 def run_analytical(mtl, frequencies):
     """
@@ -217,12 +219,13 @@ def main():
     start_time = time.time()
 
     MTLRepresentation(MTL).wires_and_cables()
-    mom_data = run_classic_mom()
+    wires_mom_data = run_n_wires_mom()
     analytical_data = run_analytical(MTL, FREQUENCY_RANGE['ana'])
     momso_data = run_momso_simulation(MTL, FREQUENCY_RANGE['mom'])
     
     print(f"\nRotinas de cálculo finalizadas em {(time.time()-start_time):.2f} segundos.")
-    plot_results(FREQUENCY_RANGE, analytical_data, momso_data, mom_data)
+    plot_results(FREQUENCY_RANGE, analytical_data, momso_data, wires_mom_data)
+
 
 if __name__ == "__main__":
     main()

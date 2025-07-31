@@ -123,7 +123,7 @@ BIFILAR_S21_NP8 = [
         'conductor_name': 'p',
         'line_type': 'active',
         'line_return': 0,
-        'center_point': (-0.0105, 10),
+        'center_point': (-0.0105, 0.0),
         'radius': [0, 0.010],
         'conductivity': 1/1.68E-8,
         'subconductors': None,
@@ -132,14 +132,14 @@ BIFILAR_S21_NP8 = [
         'relative_permittivity': 1,
         'relative_permittivity_out': 1,
         'potential_to_infinity': +1.0,
-        'fourier_order': 3,
+        'fourier_order': 8,
     },
     {
         'line_id': 0,
         'conductor_name': 'q',
         'line_type': 'return',
         'line_return': None,
-        'center_point': (0.0105, 10),
+        'center_point': (0.0105, 0.0),
         'radius': [0, 0.010],
         'conductivity': 1/1.68E-8,
         'subconductors': None,
@@ -148,7 +148,7 @@ BIFILAR_S21_NP8 = [
         'relative_permittivity': 1,
         'relative_permittivity_out': 1,
         'potential_to_infinity': -1.0,
-        'fourier_order': 3,
+        'fourier_order': 8,
     }
 ]
 
