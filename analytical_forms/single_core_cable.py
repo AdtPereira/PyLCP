@@ -77,7 +77,7 @@ import numpy as np
 from scipy.special import iv, kv
 from scipy.constants import mu_0
 
-from mom_so.mtl import MulticonductorTransmissionLine
+from mtl_data.mtl import MulticonductorTransmissionLine
 
 
 class SingleCoreCable(MulticonductorTransmissionLine):

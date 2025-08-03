@@ -7,11 +7,11 @@ import matplotlib.pyplot as plt
 # Adiciona a raiz do projeto ao PYTHONPATH
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..\..')))
 
-from data.models import MTL_MODELS
-from mom_so.mtl_graphics import MTLRepresentation as graph
+from mtl_data.models import MTL_MODELS
+from mtl_data.graphics import MTLRepresentation as graph
 
 from ohtl.pul_parameters import PerUnitParameters
-from mom_so import green, patel
+from mom_so import lossless_medium, quasi_static_green
 
 # Multiconductor Transmission Line choices
 MTL = MTL_MODELS['overhead']['xue']
@@ -295,9 +295,9 @@ def main():
 
     # MoM-SO routine
     green_list = ['Analytically', 'Numerically']
-    green_matrix = green.QuasiStatic(MTL).g_tanaka(green_mode=green_list[0])
+    green_matrix = quasi_static_green.QuasiStatic(MTL).green_matrix(green_mode=green_list[0])
     for f in frequency['Numerically']:
-        mom_so = patel.HomogeneousLosslessMedium(MTL, f)
+        mom_so = lossless_medium.HomogeneousLosslessMedium(MTL, f)
         z_results['zi_momso'].append(mom_so.z_partial(green_matrix))
 
     # End the timer

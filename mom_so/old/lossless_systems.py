@@ -3,128 +3,8 @@
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-from .patel import HomogeneousLosslessMedium, LosslessPostProcessing
-from .green import QuasiStatic
-
-
-class TwoWire():
-    """ This class contains the plotting functions for the system. """
-
-    def __init__(self, mtl_dict, f, f_mom, green_evaluation='Analytically'):
-        super().__init__(mtl_dict)
-        self.f = f
-        self.f_mom = f_mom
-        self.green = green_evaluation
-        self.analytical_results = None
-        self.numerical_results = None
-        self._perform_calculations(mtl_dict)
-
-        # Distance between the conductors for graphical representation
-        # self.d = self.distance_matrices(self.mtl)[0][0][1]
-        self.d = 0
-
-    def _perform_calculations(self, mtl_dict):
-        """
-        Performs analytical and numerical formulation calculations and stores the results.
-        """
-
-        # self.analytical_results = self._analytical_formulation(mtl_dict)
-        self.numerical_results = self._numerical_formulation(mtl_dict)
-
-    def _analytical_formulation(self, mtl_dict):
-        """
-        Performs analytical formulation for the given MTL and frequencies.
-        """
-
-        resistance_hf = []
-        external_inductance = []
-        series_impedance = []
-        for f in self.f:
-            parameters = analytic.TwoWire(mtl_dict, f).pul_parameters()
-            resistance_hf.append(parameters[0][0, 1])
-            external_inductance.append(parameters[1][0, 1])
-            series_impedance.append(parameters[2][0, 1])
-
-        return resistance_hf, external_inductance, series_impedance
-
-    def _numerical_formulation(self, mtl_dict):
-        """ Calculates the series impedance given frequencies using numerical formulation. """
-
-        series_impedance = []
-
-        # Green's matrix
-        green = QuasiStatic(mtl_dict).g_tanaka(green_mode=self.green)
-
-        # Print the Green's matrix
-        # print("Greens' Matrix: \n", green)
-
-        # Post-processing parameters
-        post_processing = LosslessPostProcessing(mtl_dict)
-
-        # Calculate the series impedance for each frequency
-        for f in self.f_mom:
-            mom_so_patel = HomogeneousLosslessMedium(mtl_dict, f)
-            z_partial = mom_so_patel.z_partial(green)
-            zs = post_processing.z_total(z_partial)
-            series_impedance.append(zs[0][0])
-        return series_impedance
-
-    def plot_series_resistance(self):
-        """ This function plots the series resistance as a function of frequency. """
-
-        # Analytical Series Resistance
-        plt.plot(self.f, np.real(self.analytical_results[2]),
-                 label='Analytical (no proximity)', color='black', linestyle='-')
-
-        # Asymptotic Series Resistance
-        plt.plot(self.f, self.analytical_results[0],
-                 label='Analytical (high-freq)', color='red', linestyle='--')
-
-        # MoM Series Resistance
-        plt.scatter(self.f_mom, np.real(self.numerical_results),
-                    label='MoM-SO [1]', color='blue', marker='x', s=40)
-
-        plt.xscale('log')
-        plt.yscale('log')
-        plt.xlim(1, 1E6)
-        plt.ylim(1E-5, 2E-2)
-        plt.legend()
-        plt.xlabel('Frequency (Hz)')
-        plt.ylabel('Series Resistance p.u.l. (Ω/m)')
-        plt.title('Figure 2.4: P.u.l. resistance of the two-wire line of Sec. 2.6.1\n'
-                  f'for D = {self.d} m, a = 0.01 m, and σ = 5.8E7 S/m [1]')
-        plt.grid(False)
-        plt.show()
-
-    def plot_series_inductance(self):
-        """ This function plots the series inductance as a function of frequency. """
-
-        # Analytical Series Inductance
-        plt.plot(self.f, 1E6 * np.imag(self.analytical_results[2]) / (2 * np.pi * self.f),
-                 label='Analytical (no proximity)', color='black', linestyle='-')
-
-        # Asymptotic Series Inductance
-        plt.plot(self.f, 1E6 * np.array(self.analytical_results[1]),
-                 label='Analytical (high-freq)', color='red', linestyle='--')
-
-        # MoM Series Inductance
-        plt.scatter(self.f_mom, 1E6 * np.imag(self.numerical_results) / (2 * np.pi * self.f_mom),
-                    label='MoM-SO [1]', color='blue', marker='x', s=40)
-
-        plt.xscale('log')
-        plt.legend()
-        plt.xlim(1, 1E6)
-        if self.d == 0.1:
-            plt.ylim(0.90, 1.06)
-        elif self.d == 0.025:
-            plt.ylim(0.25, 0.55)
-        plt.xlabel('Frequency (Hz)')
-        plt.ylabel('Series Inductance p.u.l. (uH/m)')
-        plt.title('Figure 2.5: P.u.l. inductance of the two-wire line of Sec. 2.6.1\n'
-                  f'for D = {self.d} m, a = 0.01 m, and σ = 5.8E7 S/m [1]')
-        plt.grid(False)
-        plt.show()
-
+from ..lossless_medium import HomogeneousLosslessMedium, LosslessPostProcessing
+from ..quasi_static_green import QuasiStatic
 
 class CoaxialCable():
     """ 
@@ -180,7 +60,7 @@ class CoaxialCable():
         series_impedance = []
 
         # Green's matrix
-        green = QuasiStatic(mtl_dict).g_tanaka(green_mode=self.green)
+        green = QuasiStatic(mtl_dict).green_matrix(green_mode=self.green)
 
         # Post-processing parameters
         post_processing = mom_so.HomogeneousLosslessMediumPostProcessing(
@@ -382,7 +262,7 @@ class EnclosureGIB():
         series_impedance = []
 
         # Green's matrix
-        green = QuasiStatic(mtl_dict).g_tanaka(green_mode=self.green)
+        green = QuasiStatic(mtl_dict).green_matrix(green_mode=self.green)
 
         # Print the Green's matrix
         # print("Greens' Matrix: \n", green)

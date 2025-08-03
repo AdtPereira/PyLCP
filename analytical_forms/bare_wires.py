@@ -1,0 +1,225 @@
+import numpy as np
+from scipy.special import jv, jvp
+from scipy.constants import mu_0, epsilon_0
+from scipy.linalg import lu_factor, lu_solve
+from mtl_data.mtl import MulticonductorTransmissionLine
+
+
+class WiresHomogeneousMedia(MulticonductorTransmissionLine):
+    """
+    This class contains the analytical formulation of the system. 
+
+    References:
+    [1] Clayton R. Paul, "Introduction to Electromagnetic Compatibility", 2nd Edition, Wiley, 2007.
+        4.2.2 Per-Unit-Length Inductance and Capacitance for Wire-Type Lines
+        5.2.1 Wide-Separation Approximations for Wires in Homogeneous Media 
+    
+    """
+
+    def __init__(self, mtl):
+        super().__init__(mtl)
+        self.kelvin_exp = np.exp(1j * 3 * np.pi / 4)
+        self.s = self.D_pq[0, 1]
+
+    def ber(self, xi):
+        """ Kelvin ber(xi) function """
+        return np.real(jv(0, xi * self.kelvin_exp))
+
+    def bei(self, xi):
+        """ Kelvin bei(xi) function """
+        return np.imag(jv(0, xi * self.kelvin_exp))
+
+    def ber_prime(self, xi):
+        """ Kelvin ber'(xi) derivative function """
+        return np.real(self.kelvin_exp * jvp(0, xi * self.kelvin_exp, 1))
+
+    def bei_prime(self, xi):
+        """ Kelvin bei'(xi) derivative function """
+        return np.imag(self.kelvin_exp * jvp(0, xi * self.kelvin_exp, 1))
+
+    def bifilar_pul_series_impedance(self, f):
+        """
+        Calcula a impedância série do sistema bifilar usando a
+        aproximação de alta frequência e funções de Bessel para a impedância interna.
+        Assume um sistema com um condutor ativo (tag=1) e um de retorno (tag=0).
+
+        Args:
+            f (float): Frequência em Hertz.
+
+        Returns:
+            tuple: Uma tupla contendo a impedância série total (complexa, Zs) e
+                a resistência de alta frequência (Rhf).
+        """
+        # 1. Obter dados dos condutores diretamente pelo seu tag
+        cond_active = self.mtl[1]
+        cond_ref = self.mtl[0]
+
+        # 2. Calcular distância dinamicamente, eliminando self.D_pq
+        center_active = np.array(cond_active['center_point'])
+        center_ref = np.array(cond_ref['center_point'])
+        D10 = np.linalg.norm(center_active - center_ref)
+
+        # 3. Extrair parâmetros e calcular valores intermediários
+        w = 2 * np.pi * f
+        ap = cond_active['radius'][1]
+        sigma = cond_active['conductivity']
+
+        # Profundidade pelicular e Resistência superficial
+        delta = np.sqrt(2 / (w * mu_0 * sigma))
+        Rs = 1 / (sigma * delta)
+
+        # 4. Calcular Resistência de Alta Frequência (Rhf) e Indutância Externa (Lext)
+        # Termo comum para as equações
+        s_2rw = D10 / (2 * ap)
+
+        # Resistência de Alta Frequência (Ω/m) - Equação (2.64)
+        Rs_pia = Rs / (np.pi * ap)
+        Rhf_loop = Rs_pia * s_2rw / np.sqrt(s_2rw**2 - 1)
+
+        # Indutância Externa (H/m) - Equação (2.65)
+        Lext_loop = mu_0 / np.pi * np.arccosh(s_2rw)
+
+        # 5. Calcular Impedância Interna (Zi) com Funções de Bessel
+        # Equação (2.67)
+        Xi = np.sqrt(2) * ap / delta
+        constant_term = 1 / (np.sqrt(2) * np.pi * ap * sigma * delta)
+        
+        # As funções self.ber, self.bei, etc. devem estar definidas na classe
+        ber_bei = self.ber(Xi) + 1j * self.bei(Xi)
+        beip_berp = self.bei_prime(Xi) - 1j * self.ber_prime(Xi)
+        Zi = constant_term * ber_bei / beip_berp
+
+        # 6. Calcular a Impedância Série Total do Laço (Zs)
+        # Equação (2.68)
+        # O fator 2 em Zi assume que os condutores ativo e de retorno são idênticos.
+        Zs_loop = 2 * Zi + 1j * w * Lext_loop
+
+        return Zs_loop, Rhf_loop
+
+    def bifilar_pul_inductance_and_capacitance(self):
+        """
+        Calcula a capacitância e indutância por unidade de comprimento para a
+        linha bifilar, usando as fórmulas exata e aproximada.
+
+        Returns:
+            dict: Um dicionário contendo a capacitância e indutância
+                ('exact', 'approximate').
+        """
+        # 1. Validação da estrutura de dados para o caso bifilar
+        assert len(self.mtl) == 2, "Este método é específico para sistemas bifilares (2 condutores)."
+
+        # 2. Acesso direto e explícito aos dados dos condutores
+        cond_0 = self.mtl[0]
+        cond_1 = self.mtl[1]
+
+        # Extrai raios
+        r_w0 = cond_0['radius'][1]
+        r_w1 = cond_1['radius'][1]
+
+        # 3. Validação do meio externo e definição de epsilon
+        # A fórmula assume um meio dielétrico externo único e homogêneo.
+        eps_out_0 = epsilon_0 * cond_0['relative_permittivity_out']
+        eps_out_1 = epsilon_0 * cond_1['relative_permittivity_out']
+        assert np.isclose(eps_out_0, eps_out_1), "O meio externo deve ser homogêneo (permissividade externa igual para ambos os condutores)."
+        epsilon = eps_out_0  # Usa o valor validado
+
+        # 4. Cálculo dinâmico da distância 's'
+        center_0 = np.array(cond_0['center_point'])
+        center_1 = np.array(cond_1['center_point'])
+        s = np.linalg.norm(center_1 - center_0)
+
+        # --- 5. Cálculo da Capacitância ---
+        pi2_epsilon = 2 * np.pi * epsilon
+
+        # Aproximada
+        den_approx = np.log((s**2) / (r_w0 * r_w1))
+        capacitance_approx = pi2_epsilon / den_approx
+
+        # Exata
+        arg_arccosh = (s**2 - r_w0**2 - r_w1**2) / (2 * r_w0 * r_w1)
+        den_exact = np.arccosh(arg_arccosh)
+        capacitance_exact = pi2_epsilon / den_exact
+
+        # --- 6. Cálculo da Indutância (válido para meio não magnético) ---
+        inductance_approx = mu_0 * epsilon / capacitance_approx
+        inductance_exact = mu_0 * epsilon / capacitance_exact
+
+        # 7. Retorno dos resultados em um dicionário estruturado
+        return {
+            'capacitance': {
+                'exact': capacitance_exact,
+                'approximate': capacitance_approx,
+            },
+            'inductance': {
+                'exact': inductance_exact,
+                'approximate': inductance_approx,
+            }
+        }
+
+    def n_wires_inductance_matrix(self):
+        """
+        Calcula a matriz de indutância externa, retornando uma matriz NumPy.
+        Aproveita a garantia de que as tags são sequenciais (0, 1, 2, ...).
+
+        Returns:
+            np.ndarray: A matriz de indutância (N-1 x N-1).
+        """
+        # O tamanho da matriz de indutância é para os condutores ativos.
+        n_plus_1 = len(self.mtl)
+        Lext = np.zeros((n_plus_1-1, n_plus_1-1), dtype=float)
+
+        # Dados do condutor de referência.
+        ref_center = np.array(self.mtl[0]['center_point'])
+        rw0 = self.mtl[0]['radius'][1]
+        mu_2pi = self.mu[0] / (2 * np.pi)
+
+        # As tags ativas vão de 1 a n_active.
+        for i in range(1, n_plus_1):
+            center_i = np.array(self.mtl[i]['center_point'])
+            rw_i = self.mtl[i]['radius'][1]
+            di0 = np.linalg.norm(center_i - ref_center)
+
+            for j in range(1, n_plus_1):
+                if i == j:  # Autoindutância
+                    Lext[i - 1, j - 1] = mu_2pi * np.log(di0 ** 2 / (rw0 * rw_i))
+                
+                else:  # Indutância Mútua
+                    center_j = np.array(self.mtl[j]['center_point'])
+                    dj0 = np.linalg.norm(center_j - ref_center)
+                    dij = np.linalg.norm(center_i - center_j)
+                    Lext[i - 1, j - 1] = mu_2pi * np.log(di0 * dj0 / (rw0 * dij))
+
+        return Lext
+
+    def n_wires_capacitance_matrix(self, L):
+        """
+        Calcula a matriz de capacitância por unidade de comprimento (C) a partir da
+        matriz de indutância (L) para um meio homogêneo, seguindo a Eq. 5.24a.
+
+        A fórmula implementada é: C = μ * ε * L⁻¹
+
+        A inversa de L (L⁻¹) é calculada de forma numericamente estável
+        resolvendo o sistema L @ X = I, onde I é a matriz identidade.
+
+        Args:
+            inductance_matrix (np.ndarray): A matriz de indutância L (n x n).
+            permeability (float): A permeabilidade magnética do meio (μ).
+            permittivity (float): A permissividade elétrica do meio (ε).
+
+        Returns:
+            np.ndarray: A matriz de capacitância C (n x n) resultante.
+            
+        Raises:
+            ValueError: Se a matriz de indutância não for quadrada.
+        """
+        assert L.shape[0] == L.shape[1], "A matriz de indutância deve ser quadrada."
+        
+        # Identity matrix for the number of conductors    
+        I = np.eye(L.shape[0])
+        
+        # Assuming a homogeneous medium, use the first value 
+        mu = self.mu[0]  
+        epsilon = self.epsilon_out[0]
+
+        return mu * epsilon * lu_solve(lu_factor(L), I)
+

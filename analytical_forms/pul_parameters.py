@@ -3,7 +3,7 @@ from scipy.special import jv, jvp #, iv, kv
 from scipy.constants import mu_0
 import matplotlib.pyplot as plt
 
-from mom_so.mtl import MulticonductorTransmissionLine
+from mtl_data.mtl import MulticonductorTransmissionLine
 
 
 # class SingleCoreCable(FreeSpace):

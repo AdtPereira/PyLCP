@@ -40,13 +40,13 @@ import matplotlib.pyplot as plt
 # ATENÇÃO: Esta é uma solução frágil. O ideal é instalar o projeto como um pacote.
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..\..')))
 
-from data.models import MTL_MODELS
-from lossless_systems.single_core_cable import *
+from mtl_data.models import MTL_MODELS
+from mtl_data.graphics import MTLRepresentation
+from analytical_forms.single_core_cable import *
 
 from mom_so.utils import *
-from mom_so.green import QuasiStatic
-from mom_so.mtl_graphics import MTLRepresentation
-from mom_so.patel import HomogeneousLosslessMedium, LosslessPostProcessing
+from mom_so.quasi_static_green import QuasiStatic
+from mom_so.lossless_medium import HomogeneousLosslessMedium, LosslessPostProcessing
 
 
 # --- Configurações da Simulação ---
@@ -108,7 +108,7 @@ def run_momso_simulation(mtl, frequencies):
         list: Uma lista contendo as impedâncias série totais calculadas via MoM.
     """
     print("Iniciando rotina numérica (MoM-SO)...")
-    green_matrix = QuasiStatic(mtl).g_tanaka()
+    green_matrix = QuasiStatic(mtl).green_matrix()
     post_processor = LosslessPostProcessing(mtl)
     momso_data = {}
 

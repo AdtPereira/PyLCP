@@ -77,10 +77,7 @@ import numpy as np
 from scipy.constants import mu_0, epsilon_0
 from scipy.special import jv, jvp, h1vp, h2vp
 from scipy.linalg import lu_factor, lu_solve, inv
-
-# from .geometry import FreeSpace, UndergroundSystem
-from .geometry import UndergroundSystem
-from .mtl import MulticonductorTransmissionLine as MTL
+from mtl_data.mtl import MulticonductorTransmissionLine as MTL
 
 
 class HomogeneousLosslessMedium(MTL):
@@ -93,19 +90,19 @@ class HomogeneousLosslessMedium(MTL):
         self.w = 2 * np.pi * frequency
 
         # Permeability of the medium [np.array]
-        self.mu = np.array([mu_0 * c['relative_permeability'] for c in self.mtl])
+        self.mu = np.array([mu_0 * c['relative_permeability'] for c in self.mtl.values()])
 
         # Permittivity of the medium [np.array]
-        self.epsilon = np.array([epsilon_0 * c['relative_permittivity'] for c in self.mtl])
+        self.epsilon = np.array([epsilon_0 * c['relative_permittivity'] for c in self.mtl.values()])
 
         # Conductors conductivity [np.array]
-        sigma = np.array([c['conductivity'] for c in self.mtl])
+        sigma = np.array([c['conductivity'] for c in self.mtl.values()])
 
         # Conductors wave-number [float]
         self.k = np.sqrt(self.w * self.mu * (self.w * self.epsilon - 1j * sigma))
 
         # Permittivity of the outer medium [np.array]
-        epsilon_out = np.array([c['relative_permittivity_out'] for c in self.mtl])
+        epsilon_out = np.array([c['relative_permittivity_out'] for c in self.mtl.values()])
 
         # Free-space wave-number [float]
         self.kout = self.w * np.sqrt(mu_0 * epsilon_0 * epsilon_out)
@@ -123,7 +120,7 @@ class HomogeneousLosslessMedium(MTL):
         Returns:
             list: The surface admittance operator Yn_p.
         """
-        outer_radius = np.array([c['radius'][1] for c in self.mtl])
+        outer_radius = np.array([c['radius'][1] for c in self.mtl.values()])
 
         k_ap = self.k[p] * outer_radius[p]
         k0_ap = self.kout[p] * outer_radius[p]
@@ -191,8 +188,8 @@ class HomogeneousLosslessMedium(MTL):
         """
 
         # inner and outer radii [float]
-        inner_radius = np.array([c['radius'][0] for c in self.mtl])
-        outer_radius = np.array([c['radius'][1] for c in self.mtl])
+        inner_radius = np.array([c['radius'][0] for c in self.mtl.values()])
+        outer_radius = np.array([c['radius'][1] for c in self.mtl.values()])
         ap = outer_radius[cp]
         bp = inner_radius[cp]
 
@@ -229,12 +226,12 @@ class HomogeneousLosslessMedium(MTL):
         """ This function calculates the matrix U."""
 
         # Initialize U matrix with zeros
-        u_mtx = np.zeros((self.N, len(self.mtl)))
+        u_mtx = np.zeros((self.N, len(self.mtl.values())))
 
         # Initialize row index
         row_index = 0
 
-        for p, conductor in enumerate(self.mtl):
+        for p, conductor in enumerate(self.mtl.values()):
 
             # Number of surface points for the p-conductor
             surf_points = conductor['fourier_order']
@@ -280,7 +277,7 @@ class HomogeneousLosslessMedium(MTL):
 
         blocks = []
 
-        for p, conductor in enumerate(self.mtl):
+        for p, conductor in enumerate(self.mtl.values()):
             Np = conductor['fourier_order'] # pylint: disable=invalid-name
 
             if conductor['radius'][0] == 0:
@@ -323,17 +320,6 @@ class HomogeneousLosslessMedium(MTL):
         solution = lu_solve((lu, piv), ys @ u)
 
         return u.T @ solution
-
-    def charge_distribution(self, green_matrix):
-        e0 = self.epsilon[0]
-        u = self.u_matrix()
-        v = np.array(([1], [-1]))
-
-        # Solve the linear system Gx = U and calculate U^T * G^{-1} * U
-        GInv_uv = lu_solve(lu_factor(green_matrix), u @ v)
-
-        # Generalized Capacitance Matrix [1]
-        return - e0 * GInv_uv
 
     # Generalized Capacitance Matrix [np.array]
     def generalized_capacitance_matrix(self, green_matrix):
@@ -430,281 +416,23 @@ class HomogeneousLosslessMedium(MTL):
         return matrix_c
 
 
-class MultilayeredLossyMedium(UndergroundSystem):
-    """ This class contains the frequency-dependent parameters of the system. """
-
-    def __init__(self, conductors_list, frequency):
-        super().__init__(conductors_list)
-
-        # Angular frequency [float]
-        self.w = 2 * np.pi * frequency
-
-        ### CONDUCTORS PARAMETERS ###
-
-        # Permeability [np.array]
-        self.mu = np.array([mu_0 * c['relative_permeability']
-                            for c in self.subconductors])
-
-        # Permittivity [np.array]
-        epsilon = np.array([epsilon_0 * c['relative_permittivity']
-                            for c in self.subconductors])
-
-        # Conductivity [np.array]
-        sigma = np.array([c['conductivity'] for c in self.subconductors])
-
-        # Wavenumber [float]
-        self.k = np.sqrt(self.w * self.mu * (self.w * epsilon - 1j * sigma))
-
-        ### HOLES PARAMETERS ###
-
-        # Medium permeability [np.array]
-        self.mu_hat = np.array([mu_0 * c['relative_permeability']
-                                for c in self.holes])
-
-        # Permittivity [np.array]
-        epsilon_hat = np.array([epsilon_0 * c['relative_permittivity']
-                                for c in self.holes])
-
-        # Wavenumber [float]
-        self.khat = self.w * np.sqrt(self.mu_hat * epsilon_hat)
-
-        ### GROUND PARAMETERS ###
-
-        # Ground conductivity [float]
-        sigma_g = np.array([c['conductivity'] for c in self.ground])
-
-        # Ground permittivity [float]
-        epsilon_g = np.array([c['permittivity'] for c in self.ground])
-
-        # Ground wavenumber [float]
-        self.kg = np.sqrt(self.w * mu_0 * (self.w * epsilon_g - 1j * sigma_g))
-
-    # Conductor Surface admittance operator [np.array]
-    # Equation (2.20) [1]
-    def ys_entries(self, n, p):
-        """ Calculates the surface admittance operator for a solid conductor, Yn(p). """
-
-        # Conductor Surface radius [float]
-        ap = self.conductor_surfaces[p]['radius']
-
-        # Conductor permeability [float]
-        mu = self.mu[p]
-
-        # Conductor wave number \times Conductor radius [float]
-        kap = self.k[p] * ap
-
-        # Hole wave number \times Conductor radius [float]
-        khat_ap = self.khat[0] * ap
-
-        # Hole permeability [float]
-        muhat = self.mu_hat[0]
-
-        # Bessel and Bessel derivative functions [np.array]
-        n = np.abs(n)
-        jn_kap = jv(n, kap)
-        jnp_kap = jvp(n, kap)
-        jn_khatap = jv(n, khat_ap)
-        jnp_khatap = jvp(n, khat_ap)
-
-        frac_1 = kap * jnp_kap / jn_kap / mu
-        frac_2 = khat_ap * jnp_khatap / jn_khatap / muhat
-
-        return 2 * np.pi / 1j / self.w * (frac_1 - frac_2)
-
-    # Ys Matrix [np.array]
-    # Equation (3.1) [1]
-    def ys(self):
-        """ Computes the full Green's matrix for the given set of conductors.
-         
-        The surface admittance operator Ys was derived in Chapter 2, and its
-        diagonal entries are given by (2.20) with k0 replaced by 
-        k_hat = ω√(µ_hat . ε_hat), which is the wavenumber inside the hole. 
-        
-        """
-
-        blocks = []
-
-        for p, conductor in enumerate(self.conductor_surfaces):
-
-            # Number of surface points for the p-th surface [int]
-            Np = conductor['fourier_order'] # pylint: disable=invalid-name
-
-            for n in range(-Np, Np + 1):
-                ynp = np.array([[self.ys_entries(n, p)]])
-                blocks.append(ynp)
-
-        return self.create_diagonal_matrix(blocks)
-
-    # Green's function G0hat^{q}_{n',n} [np.array]
-    # Equation (B.47) [1]
-    def hhat_p(self, n_prime, n, p):
-        """ Computes the full Green's matrix for the given set of conductors """
-
-        # Auxiliary vector of distances [np.array]
-        # Equation (B.45) - PAG. 137 [1]
-        dqp, xqp, yqp, theta_qp = self.distance_vector_dqp(self.conductor_surfaces, p, self.hole_surfaces, 0)
-
-        ap = self.conductor_surfaces[p]['radius']
-        khat = self.khat[0]
-
-        # Bessel and Hankel functions [np.array]
-        bessel_1st = jv(n_prime - n, khat * dqp)
-        bessel_2nd = jv(n_prime, khat * ap)
-
-        # Exponential term [np.array]
-        exp_term = np.exp(1j * (n - n_prime) * theta_qp)
-
-        # Equation (B.47) [1]
-        hhat_p = bessel_1st * bessel_2nd * exp_term
-
-        if n < 0:
-            hhat_p = hhat_p * (-1)**n
-
-        return hhat_p
-
-    # H_hat Matrix [np.array]
-    # Equation (3.38) [1]
-    def hhat(self):
-        """ Computes the full Green's matrix for the given set of conductors """
-
-        # Define the full Green's matrix
-        hhat_t_list = []
-
-        # Number of surface points for the p-th surface hole [int]
-        Nh = self.hole_surfaces[0]['fourier_order'] # pylint: disable=invalid-name
-
-        # Number of conductor surfaces [int]
-        for p, conductor in enumerate(self.conductor_surfaces):
-
-            # Number of surface points for the p-th surface [int]
-            Np = conductor['fourier_order'] # pylint: disable=invalid-name
-
-            # Green's matrix H_hat [np.array]
-            hhat_p = np.zeros((2*Nh+1, 2*Np+1), dtype=complex)
-
-            for n in range(-Nh, Nh + 1):
-                for n_prime in range(-Np, Np + 1):
-
-                    # Assign the Green's value to the Full Green's matrix G
-                    hhat_p[n + Nh, n_prime + Np] = self.hhat_p(n_prime, n, p)
-
-            # Append Green's matrices H_hat [np.array]
-            hhat_t_list.append(hhat_p)
-
-        return np.block([hhat_t_list]).T
-
-    # D1 Matrix [np.array]
-    # Equation (3.15) [1]
-    def d_matrices(self):
-        """ Computes the full Green's matrix for the given set of conductors """
-
-        # Green's matrix H_hat [np.array]
-        d1 = np.zeros((self.Nhat, self.Nhat), dtype=complex)
-        d2 = np.zeros_like(d1)
-
-        # Number of surface points for the p-th surface hole [int]
-        Nh = self.hole_surfaces[0]['fourier_order'] # pylint: disable=invalid-name
-
-        # Wave number \times Hole radius [float]
-        ka_hat = self.khat[0] * self.hole_surfaces[0]['radius']
-
-        for n in range(-Nh, Nh + 1):
-
-            # Bessel and Bessel derivative functions [np.array]
-            bessel = jv(np.abs(n), ka_hat)
-            bessel_prime = jvp(np.abs(n), ka_hat)
-
-            # Assign the Green's value to the Full Green's matrix G
-            d1[n+Nh, n+Nh] = 1 / bessel
-
-            # Assign the Green's value to the Full Green's matrix G
-            d2[n+Nh, n+Nh] = self.khat[0] * bessel_prime / bessel
-
-        return d1, d2
-
-    # Hole Surface admittance operator [np.array]
-    # Equation (2.20) [1]
-    def yhats_entries(self, n):
-        """ Calculates the surface admittance operator for a solid conductor, Yn(p). """
-
-        # Hole Surface radius [float]
-        a_hat = self.hole_surfaces[0]['radius']
-
-        # Hole permeability [float]
-        mu_hat = self.mu_hat[0]
-
-        # Hole wave number \times Hole radius [float]
-        k_ahat = self.khat[0] * a_hat
-
-        # Ground wave number \times Hole radius [float]
-        kg_ahat = self.kg[0] * a_hat
-
-        # Bessel and Bessel derivative functions [np.array]
-        n = np.abs(n)
-        jn_kga = jv(n, kg_ahat)
-        jnp_kga = jvp(n, kg_ahat)
-        jn_ka = jv(n, k_ahat)
-        jnp_ka = jvp(n, k_ahat)
-
-        frac_1 = self.kg[0] * jnp_kga / jn_kga / mu_0
-        frac_2 = self.khat[0] * jnp_ka / jn_ka / mu_hat
-
-        return 2 * np.pi * a_hat * (frac_1 - frac_2)
-
-    # Yhat_s Matrix [np.array]
-    # Equation (3.23) [1]
-    def yhats(self):
-        """ Computes the full Green's matrix for the given set of conductors """
-
-        yhat_s = np.zeros((self.Nhat, self.Nhat), dtype=complex)
-
-        # Number of surface points for the p-th surface hole [int]
-        Nh = self.hole_surfaces[0]['fourier_order'] # pylint: disable=invalid-name
-
-        for n in range(-Nh, Nh + 1):
-
-            # Assign the Green's value to the Full Green's matrix G
-            yhat_s[n+Nh, n+Nh] = self.yhats_entries(n)
-
-        return yhat_s
-
-    # Matrix Z [np.array]
-    # Equation (3.43 | 3.44) [1]
-    def z_partial(self, psi):
-        """
-        This function calculates the matrix Z.
-
-        The matrix Z is the impedance matrix of the system.
-
-        Returns:
-        numpy.ndarray: The matrix Z.
-        """
-
-        jw_u0 = 1j * self.w * mu_0
-        ys = self.ys()
-        u = np.array([[1]])
-
-        # Perform LU factorization of the matrix M
-        matrix = np.eye(self.N) - jw_u0 * np.dot(ys, psi)
-        lu, piv = lu_factor(matrix)
-
-        # Solve the linear system Mx = b for Ys
-        solution = lu_solve((lu, piv), ys @ u)
-
-        return u.T @ solution
-
-
 class LosslessPostProcessing(MTL):
     """ This class contains the post-processing parameters for the system. """
 
     def __init__(self, mtl):
         super().__init__(mtl)
 
-        # Line ID [list] [int]
-        self.line_id = [conductor['line_id'] for conductor in self.mtl]
+        # # Line ID [list] [int]
+        # self.line_id = [conductor['line_id'] for conductor in self.mtl]
 
-        # Active lines [list] [int]
-        self.active_lines = [line for line in self.mtl if line['line_type'] == 'active']
+        # # Active lines [list] [int]
+        # self.active_lines = [line for line in self.mtl if line['line_type'] == 'active']
+
+        # Lista de todos os line_id's presentes no sistema.
+        self.line_id = [conductor['line_id'] for conductor in self.mtl.values()]
+
+        # Lista de dicionários dos condutores que são do tipo 'active'.
+        self.active_lines = [line for line in self.mtl.values() if line['line_type'] == 'active']
 
     # Incident Matrix Q [np.array]
     # Equation (A.2) [1]
@@ -726,6 +454,43 @@ class LosslessPostProcessing(MTL):
 
         # print("Incident Matrix Q: \n", matrix_q)
         return matrix_q
+
+    # def q_incident_matrix(self):
+    #     """
+    #     On the i-th row of Q, '1's are present in the columns
+    #     corresponding to the conductors which are part of the
+    #     i-th line, and all other columns are zero.
+
+    #     Reference: PAG. 122 [1]
+    #     """
+    #     # 1. Identificar as linhas e colunas da matriz Q
+    #     # As linhas correspondem aos IDs únicos de linha (ex: 0, 1, 2...).
+    #     unique_line_ids = sorted(list(set(self.line_id)))
+    #     num_lines = len(unique_line_ids)
+
+    #     # As colunas correspondem ao número total de condutores.
+    #     num_conductors = len(self.mtl)
+
+    #     # Mapear cada line_id a um índice de linha (0, 1, 2...).
+    #     line_to_row_map = {line_id: i for i, line_id in enumerate(unique_line_ids)}
+
+    #     # 2. Inicializar a matriz com zeros
+    #     matrix_q = np.zeros((num_lines, num_conductors), dtype=int)
+
+    #     # 3. Preencher a matriz
+    #     # Iterar sobre cada condutor no dicionário mtl.
+    #     for tag, conductor_data in self.mtl.items():
+    #         # A tag do condutor (0, 1, 2...) é o nosso índice de coluna.
+    #         col_idx = tag
+
+    #         # O 'line_id' do condutor nos dá o índice da linha através do mapa.
+    #         conductor_line_id = conductor_data['line_id']
+    #         row_idx = line_to_row_map[conductor_line_id]
+
+    #         # Marcar a incidência
+    #         matrix_q[row_idx, col_idx] = 1
+
+    #     return matrix_q
 
 
     # Incident Matrix S [np.array]

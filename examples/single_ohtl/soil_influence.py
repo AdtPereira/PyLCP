@@ -17,8 +17,8 @@ import matplotlib.pyplot as plt
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..\..')))
 
 from ohtl.pul_parameters import PerUnitParameters
-from data.models import MTL_MODELS
-from mom_so.mtl_graphics import MTLRepresentation as graph
+from mtl_data.models import MTL_MODELS
+from mtl_data.graphics import MTLRepresentation as graph
 
 # Multiconductor Transmission Line choices
 MTL = MTL_MODELS['overhead']['deConti']

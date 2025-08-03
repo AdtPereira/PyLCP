@@ -8,35 +8,41 @@ from scipy.constants import epsilon_0
 # Adiciona a raiz do projeto ao PYTHONPATH para importação de módulos.
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..\..')))
 
-from data.models import MTL_MODELS
-from lossless_systems.wires_homogeneous_media import WiresHomogeneousMedia
+from mtl_data.models import *
+from mtl_data.graphics import MTLRepresentation
+from analytical_forms.bare_wires import WiresHomogeneousMedia
+from mom.coated_wire_systems import TwoCoatedWireSystem
 
 from mom_so.utils import *
-from mom_so.mom import TwoBareWireSystem
-from mom_so.green import QuasiStatic
-from mom_so.mtl_graphics import MTLRepresentation
-from mom_so.patel import HomogeneousLosslessMedium, LosslessPostProcessing
+from mom_so.quasi_static_green import QuasiStatic
+from mom_so.lossless_medium import HomogeneousLosslessMedium, LosslessPostProcessing
 
-# --- Configurações da Simulação ---
-MTL = MTL_MODELS['wires'][2][21][8]
+# --- Configurações da Linha Bifilar ---
+MTL = BIFILAR_COATED_WIRE_S40
+MTL = BIFILAR_BARE_WIRE_S21
 FREQUENCY_RANGE = {'ana': np.logspace(0, 6, num=200), 'mom': np.logspace(0, 6, num=30)}
 
-def run_classic_mom():
+def run_mom():
     """
     Executa a simulação clássica do Método dos Momentos (MoM) para a linha de transmissão bifilar.
 
     Returns:
         BifilarMoM: Instância do objeto BifilarMoM configurado.
     """
-    print("\n=== Rotina numérica MoM (Collocation Method) ===")
-    mom = TwoBareWireSystem(MTL)
-    mom.run_simulation()
-    mom.print_results()
-    mom.plot_charge_density()
-    # mom.plot_collocation_points(coord_mode='Cartesian')
-    # BifilarMoM.plot_convergence_rates(MTL, nf_max=20)
-    return mom
+    print("\n==============================================================")
+    print("=== MoM MulticonductorBareWireSystems (Collocation Method) ===")
+    print("==============================================================")
     
+    mom_wires = TwoCoatedWireSystem(MTL)
+    mom_wires.run_simulation()
+    mom_wires.print_results()
+    mom_wires.plot_charge_density()
+    # mom_wires.plot_collocation_points()
+    # mom_wires.plot_harmonic_coefficients()
+    # MulticonductorBareWireSystems.plot_convergence_rates(MTL, nf_max=20)
+    # print(f"\nColocation Data Points: \n{mom_wires.collocation_data}")
+    return mom_wires
+
 
 def run_analytical(mtl, frequencies):
     """
@@ -50,28 +56,30 @@ def run_analytical(mtl, frequencies):
         tuple: Uma tupla contendo três listas: impedâncias série,
                resistências de alta frequência e indutâncias externas.
     """
-    print("\n=== Rotina Analítica ===")
+    print("\n=============================")
+    print("=== Analytical Processing ===")
+    print("=============================")
+    
     analytical_data = {}
-    wires = WiresHomogeneousMedia(mtl)
-    le_wires = wires.n_wires_inductance_matrix()
-    pul_bifilar = wires.bifilar_pul_inductance_and_capacitance()
+    bifilar_wires = WiresHomogeneousMedia(mtl)
+    le_wires = bifilar_wires.n_wires_inductance_matrix()
+    pul_bifilar = bifilar_wires.bifilar_pul_inductance_and_capacitance()
     
     for freq in frequencies:
-        z_s, r_hf = wires.bifilar_pul_series_impedance(freq)
+        z_s, r_hf = bifilar_wires.bifilar_pul_series_impedance(freq)
         analytical_data[freq] = {
             'ls': np.imag(z_s) / (2 * np.pi * freq),
             'le_wires': le_wires,
-            'cap_wires': wires.n_wires_capacitance_matrix(le_wires),
+            'cap_wires': bifilar_wires.n_wires_capacitance_matrix(le_wires),
             'le_exact': pul_bifilar['indutância']['exact'],
             'le_bifilar': pul_bifilar['indutância']['approximate'],
             'cap_exact': pul_bifilar['capacitante']['exact'],
             'cap_approx': pul_bifilar['capacitante']['approximate'],
         }
-
     return analytical_data
 
 
-def run_momso_simulation(mtl, frequencies):
+def run_mom_so(mtl, frequencies):
     """
     Executa a simulação da impedância usando o Método dos Momentos (MoM-SO).
 
@@ -83,8 +91,11 @@ def run_momso_simulation(mtl, frequencies):
     Returns:
         list: Uma lista contendo as impedâncias série totais calculadas via MoM.
     """
-    print("\n=== Rotina numérica MoM-SO ===")
-    green_matrix = QuasiStatic(mtl).g_tanaka()
+    print("\n========================================")
+    print("=== MoM-SO HomogeneousLosslessMedium ===")
+    print("========================================")
+
+    green_matrix = QuasiStatic(mtl).green_matrix()
     post_processor = LosslessPostProcessing(mtl)
     momso_data = {}
 
@@ -104,7 +115,7 @@ def run_momso_simulation(mtl, frequencies):
         print(f"\nGreen's Matrix (Dim: {green_matrix.shape}):\n{green_matrix}")
         print(f"\n2*pi*e0*G:\n{- 2 * np.pi * epsilon_0 * np.real(green_matrix)}")
     
-    print(f"\nMoM-SO Generalized Capacitance Matrix (Dim: {general_cap.shape}):\n{np.real(general_cap)}")
+    print(f"\nMoM-SO Generalized Capacitance Matrix (F/m):\n{np.real(general_cap)}")
     print(f"\nMoM-SO Bifilar Capacitance: {np.real(maxwell_cap.item()) * 1E12:.4f} pF/m")
     
     return momso_data
@@ -142,9 +153,9 @@ def plot_results(freqs, analytical_data, mom_so_data, mom_data):
             # Verifica se as frequências e valores estão disponíveis
             if frequencies is not None and values is not None:
                 if key == 'MoM-SO':
-                    ax.scatter(frequencies, values, label=label, facecolors='k', edgecolors='k', marker='o', s=12)
+                    ax.scatter(frequencies, values, label=label, facecolors='b', marker='o', s=12)
                 elif key == 'MoM':
-                    ax.scatter(frequencies, values, label=label, facecolors='g', marker='x', s=12)
+                    ax.plot(frequencies, values, label=label, linestyle='none', marker='d', markersize=8, fillstyle='none', markeredgecolor='black')
                 elif key == 'Analytical':
                     ax.plot(frequencies, values, label=label, color='k', linestyle='--')
                 elif key == 'Wires':
@@ -152,7 +163,7 @@ def plot_results(freqs, analytical_data, mom_so_data, mom_data):
                 elif key == 'Bifilar':
                     ax.plot(frequencies, values, label=label, color='r', linestyle=':')
                 elif key == 'Exact':
-                    ax.plot(frequencies, values, label=label, color='b', linestyle='-')
+                    ax.plot(frequencies, values, label=label, color='g', linestyle='-', linewidth=1.0)
 
         # Configurações do subplot
         ax.set_xscale('log')
@@ -168,7 +179,7 @@ def plot_results(freqs, analytical_data, mom_so_data, mom_data):
     L_FACTOR = 1e6   # de H/m para mH/km
 
     # 1. Inicialize listas vazias para armazenar os resultados
-    ls, le, le_approx, le_wires, ls_mom = [], [], [], [], []
+    ls, le, le_approx, le_wires, ls_mom_so = [], [], [], [], []
     cap_approx, cap_exact, cap_mom_so, cap_mom, cap_wires = [], [], [], [], []
 
     # 2. Processe os dados analíticos em um único laço
@@ -183,24 +194,24 @@ def plot_results(freqs, analytical_data, mom_so_data, mom_data):
 
     # 3. Processe os dados do MoM-SO em um laço separado
     for data in mom_so_data.values():
-        ls_mom.append(data['ls'][0, 0] * L_FACTOR)
+        ls_mom_so.append(data['ls'][0, 0] * L_FACTOR)
         cap_mom_so.append(np.real(data['c'][0, 0]) * C_FACTOR)
         cap_mom.append(mom_data.C_maxwellian * C_FACTOR)
 
     inductance_data = {
-        'MoM-SO': {'data': (freqs.get('mom'), ls_mom), 'label': 'MoM-SO'},
-        'Analytical': {'data': (freqs.get('ana'), ls), 'label': '$\ell_s$'},
-        'Exact': {'data': (freqs.get('ana'), le), 'label': '$\ell_{e,bifilar}$ (Exact)'},
-        'Wires': {'data': (freqs.get('ana'), le_wires), 'label': r'$\ell_{e,n+1 \; wires}$'},
-        'Bifilar': {'data': (freqs.get('ana'), le_approx), 'label': '$\ell_{e,bifilar}$ (Approx.)'},
+        'MoM-SO':       {'data': (freqs.get('mom'), ls_mom_so), 'label': 'MoM-SO'},
+        'Analytical':   {'data': (freqs.get('ana'), ls), 'label': '$\ell_s$'},
+        'Exact':        {'data': (freqs.get('ana'), le), 'label': '$\ell_{e,bifilar}$ (Exact)'},
+        'Wires':        {'data': (freqs.get('ana'), le_wires), 'label': r'$\ell_{e,n+1 \; wires}$'},
+        'Bifilar':      {'data': (freqs.get('ana'), le_approx), 'label': '$\ell_{e,bifilar}$ (Approx.)'},
     }
 
     capacitante_data = {
-        'MoM-SO': {'data': (freqs.get('mom'), cap_mom_so), 'label': 'MoM-SO'},
-        'MoM': {'data': (freqs.get('mom'), cap_mom), 'label': 'MoM (Collocation Method)'},
-        'Exact': {'data': (freqs.get('ana'), cap_exact), 'label': r'$c_{bifilar}$ (Exact)'},
-        'Wires': {'data': (freqs.get('ana'), cap_wires), 'label': r'$c_{n+1 \; wires}$'},
-        'Bifilar': {'data': (freqs.get('ana'), cap_approx), 'label': r'$c_{bifilar}$ (Approx.)'},
+        'MoM-SO':   {'data': (freqs.get('mom'), cap_mom_so), 'label': 'MoM-SO'},
+        'MoM':      {'data': (freqs.get('mom'), cap_mom), 'label': 'MoM (Collocation Method)'},
+        'Exact':    {'data': (freqs.get('ana'), cap_exact), 'label': r'$c_{bifilar}$ (Exact)'},
+        'Wires':    {'data': (freqs.get('ana'), cap_wires), 'label': r'$c_{n+1 \; wires}$'},
+        'Bifilar':  {'data': (freqs.get('ana'), cap_approx), 'label': r'$c_{bifilar}$ (Approx.)'},
     }
 
     # Cria a figura com subplots
@@ -213,16 +224,16 @@ def plot_results(freqs, analytical_data, mom_so_data, mom_data):
 def main():
     """ Função principal para orquestrar a análise, cálculo e visualização dos resultados. """
     clear_screen()
-    print("Iniciando cálculos da impedância p.u.l. ...")
     start_time = time.time()
 
-    MTLRepresentation(MTL).wires_and_cables()
-    mom_data = run_classic_mom()
-    analytical_data = run_analytical(MTL, FREQUENCY_RANGE['ana'])
-    momso_data = run_momso_simulation(MTL, FREQUENCY_RANGE['mom'])
+    MTLRepresentation(MTL).bare_and_coated_wires()
+    mom_data = run_mom()
+    # analytical_data = run_analytical(MTL, FREQUENCY_RANGE['ana'])
+    # mom_so_data = run_mom_so(MTL, FREQUENCY_RANGE['mom'])
     
-    print(f"\nRotinas de cálculo finalizadas em {(time.time()-start_time):.2f} segundos.")
-    plot_results(FREQUENCY_RANGE, analytical_data, momso_data, mom_data)
+    # print(f"\nRotinas de cálculo finalizadas em {(time.time()-start_time):.2f} segundos.")
+    # plot_results(FREQUENCY_RANGE, analytical_data, mom_so_data, mom_n_wires_data)
+
 
 if __name__ == "__main__":
     main()

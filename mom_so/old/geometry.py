@@ -69,103 +69,68 @@ REFERENCES:
 
 import numpy as np
 from scipy.constants import epsilon_0
+from mtl_data.mtl import MulticonductorTransmissionLine as MTL
 
-from .mtl import MulticonductorTransmissionLine as MTL
-
-
-# class FreeSpace(MTL):
+# class UndergroundSystem(MTL):
 #     """ This class contains the basic geometry of the system. """
 
 #     def __init__(self, mtl):
 #         super().__init__(mtl)
 
 #         # Conductor surfaces dictionary
-#         self.surfaces = []
+#         self.conductor_surfaces = []
 
-#         # Check if the conductor is hollow or solid
-#         for conductor in self.mtl:
-#             # Check if the conductor is hollow
-#             if conductor['radius'][0] != 0:
-#                 for radius in conductor['radius']:
-#                     self.surfaces.append({
-#                         'center': conductor['center_point'],
-#                         'fourier_order': conductor['fourier_order'],
-#                         'radius': radius
+#         # Hole surfaces dictionary
+#         self.hole_surfaces = []
+
+#         # Ground dictionary
+#         self.ground = []
+
+#         # Number of conductor and hole surfaces
+#         self.surfaces_type = []
+
+#         # Verify the items in the dictionary
+#         for item in self.mtl:
+#             # Check if the item is conductor
+#             if item['line_type'] == 'active':
+#                 self.surfaces_type.append(1)
+#                 # Check if the conductor is hollow
+#                 if item['radius'][0] != 0:
+#                     for radius in item['radius']:
+#                         self.conductor_surfaces.append({
+#                             'center': item['center_point'],
+#                             'fourier_order': item['surface_points'],
+#                             'radius': radius
+#                         })
+
+#                 # Then, the conductor is solid
+#                 else:
+#                     self.conductor_surfaces.append({
+#                         'center': item['center_point'],
+#                         'fourier_order': item['surface_points'],
+#                         'radius': item['radius'][1]
 #                     })
 
-#             # Then, the conductor is solid
-#             else:
-#                 self.surfaces.append({
-#                     'center': conductor['center_point'],
-#                     'fourier_order': conductor['fourier_order'],
-#                     'radius': conductor['radius'][1]
+#             # Check if the item is a hole
+#             elif item['line_type'] == 'hole':
+#                 self.surfaces_type.append(0)
+#                 self.hole_surfaces.append({
+#                     'center': item['center_point'],
+#                     'fourier_order': item['surface_points'],
+#                     'radius': item['radius'][1]
 #                 })
-                
+
+#             # Check if the item is ground
+#             elif item['line_type'] == 'return':
+#                 self.ground.append({
+#                     'conductivity': item['conductivity'],
+#                     'permittivity': item['relative_permittivity'] * epsilon_0
+#                 })
+
 #         # Dimension N
-#         # Equation (2.36) [1]
-#         self.N = sum([2*Np['fourier_order']+1 for Np in self.surfaces])
+#         # Equation (2.36) - PAG. 32 [1]
+#         self.N = sum([2*Np['fourier_order']+1 for Np in self.conductor_surfaces])
 
-
-class UndergroundSystem(MTL):
-    """ This class contains the basic geometry of the system. """
-
-    def __init__(self, mtl):
-        super().__init__(mtl)
-
-        # Conductor surfaces dictionary
-        self.conductor_surfaces = []
-
-        # Hole surfaces dictionary
-        self.hole_surfaces = []
-
-        # Ground dictionary
-        self.ground = []
-
-        # Number of conductor and hole surfaces
-        self.surfaces_type = []
-
-        # Verify the items in the dictionary
-        for item in self.mtl:
-            # Check if the item is conductor
-            if item['line_type'] == 'active':
-                self.surfaces_type.append(1)
-                # Check if the conductor is hollow
-                if item['radius'][0] != 0:
-                    for radius in item['radius']:
-                        self.conductor_surfaces.append({
-                            'center': item['center_point'],
-                            'fourier_order': item['surface_points'],
-                            'radius': radius
-                        })
-
-                # Then, the conductor is solid
-                else:
-                    self.conductor_surfaces.append({
-                        'center': item['center_point'],
-                        'fourier_order': item['surface_points'],
-                        'radius': item['radius'][1]
-                    })
-
-            # Check if the item is a hole
-            elif item['line_type'] == 'hole':
-                self.surfaces_type.append(0)
-                self.hole_surfaces.append({
-                    'center': item['center_point'],
-                    'fourier_order': item['surface_points'],
-                    'radius': item['radius'][1]
-                })
-
-            # Check if the item is ground
-            elif item['line_type'] == 'return':
-                self.ground.append({
-                    'conductivity': item['conductivity'],
-                    'permittivity': item['relative_permittivity'] * epsilon_0
-                })
-
-        # Dimension N
-        # Equation (2.36) - PAG. 32 [1]
-        self.N = sum([2*Np['fourier_order']+1 for Np in self.conductor_surfaces])
-
-        # Dimension N_hat
-        # Equation (3.3) - PAG. 59 [1]
-        self.Nhat = sum([2*Nh['fourier_order']+1 for Nh in self.hole_surfaces])
+#         # Dimension N_hat
+#         # Equation (3.3) - PAG. 59 [1]
+#         self.Nhat = sum([2*Nh['fourier_order']+1 for Nh in self.hole_surfaces])
