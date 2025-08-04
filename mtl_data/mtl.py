@@ -82,6 +82,7 @@ class MulticonductorTransmissionLine():
                     'radius': conductor['radius'][1] + conductor['sheath']['thickness'],
                     'center_point': conductor['sheath']['center_point'],
                     'fourier_order': conductor['sheath']['fourier_order'],
+                    'relative_permittivity': conductor['sheath']['relative_permittivity'],
                 })
 
         # Dimension N

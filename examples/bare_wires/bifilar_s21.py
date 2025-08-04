@@ -29,7 +29,7 @@ def run_mom(autoPlots=False):
         BifilarMoM: Instância do objeto BifilarMoM configurado.
     """
     print("\n==============================================================")
-    print("=== MoM MulticonductorBareWireSystems (Collocation Method) ===")
+    print("============== MoM MulticonductorBareWireSystems =============")
     print("==============================================================")
     
     mom_wires = MulticonductorBareWireSystems(MTL)
@@ -284,7 +284,6 @@ def main():
     clear_screen()
     print("Iniciando cálculos da impedância p.u.l. ...")
     start_time = time.time()
-
     MTLRepresentation(MTL).bare_and_coated_wires()
     mom_data = run_mom(autoPlots=False)
     analytical_data = run_analytical(MTL, FREQUENCY_RANGE['ana'])

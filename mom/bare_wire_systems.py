@@ -2,11 +2,11 @@ import copy
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-
-from scipy.constants import epsilon_0
 import plotly.graph_objects as go
+from scipy.constants import epsilon_0
 
 from mtl_data.mtl import MulticonductorTransmissionLine as MTL
+
 
 class MulticonductorBareWireSystems(MTL):
     """
@@ -48,7 +48,7 @@ class MulticonductorBareWireSystems(MTL):
         self.sigma_coeffs = None
         self.C_generalized = None
         self.C_maxwellian = None
-        self.C_exact = None
+        self.C_exact_bare_wires = None
 
     def _calculate_collocation_points(self):
         """
@@ -59,7 +59,7 @@ class MulticonductorBareWireSystems(MTL):
         self.collocation_data = {}
 
         # Os ângulos são os mesmos para todas as superfícies, pois NF é constante.
-        source_angles = np.linspace(0, 2 * np.pi, self.NF, endpoint=False)
+        source_angles = np.linspace(0, 2 * np.pi, self.NF, endpoint=False) + (np.pi / 2)
         field_angles = source_angles + np.pi / self.NF
 
         # Itera sobre cada superfície definida na classe base MTL.
@@ -145,6 +145,7 @@ class MulticonductorBareWireSystems(MTL):
         for p, obs_surface in enumerate(self.surfaces):
             tag_p = obs_surface['tag']
             type_p = obs_surface['type']
+            radius_p = obs_surface['radius']
             center_p = np.array(obs_surface['center_point'])
             nf_p = nfs_per_surface[p]
             offset_p = offsets[p]
@@ -190,7 +191,7 @@ class MulticonductorBareWireSystems(MTL):
 
                         if source_harmonic_idx == 0:  # Termo constante (k=0)
                             if p == q: # Auto-interação
-                                self.D_matrix[global_row_idx, global_col_idx] = (-radius_q / epsilon_0) * np.log(radius_q)
+                                self.D_matrix[global_row_idx, global_col_idx] = (-radius_q / epsilon_0) * np.log(radius_p)
                             else: # Interação mútua
                                 self.D_matrix[global_row_idx, global_col_idx] = (-radius_q / epsilon_0) * np.log(source2field_norm)
                         
@@ -211,12 +212,13 @@ class MulticonductorBareWireSystems(MTL):
 
         # 3. Resolver o sistema e obter os resultados
         self.sigma_coeffs = np.linalg.solve(self.D_matrix, self.V_vector)
-        self.C_exact = (np.pi * epsilon_0) / np.arccosh(self.DR_ratio / 2.0)
+        self.C_exact_bare_wires = (np.pi * epsilon_0) / np.arccosh(self.DR_ratio / 2.0)
         self._calculate_generalized_capacitance()
         self._calculate_maxwellian_capacitance()
 
     def print_results(self):
         """Imprime um resumo dos resultados da simulação."""
+        print(f"\n--- Results for D/R = {self.DR_ratio}. k = {self.surfaces[0]['fourier_order']} and NF={self.NF} per conductor ---")
         if self.C_maxwellian is None:
             print("Executando simulação primeiro...")
             self.run_simulation()
@@ -224,11 +226,11 @@ class MulticonductorBareWireSystems(MTL):
         if self.NF < 3: 
             print(f"\nD Matrix (Shape: {self.D_matrix.shape}):\n{self.D_matrix}")
             print(f"\nT Matrix (Inverse of D) (Shape: {self.T_matrix.shape}):\n{self.T_matrix}")
-        
-        print(f"\n--- Results for D/R = {self.DR_ratio} and NF={self.NF} ---")
+
+        print(f"\nD Matrix Shape: {self.D_matrix.shape}.")
         print(f"\nSigma Coefficients (Shape: {self.sigma_coeffs.shape}):\n{self.sigma_coeffs}")
         print(f"\nMoM Generalized Capacitance Matrix (F/m): \n{self.C_generalized}")
-        print(f"\nExact Capacitance: {self.C_exact * 1E12:.4f} pF/m")
+        print(f"\nExact Bifilar Bare Wire Capacitance: {self.C_exact_bare_wires * 1E12:.4f} pF/m")
         print(f"\nMaxwellian Bifilar Capacitance (MoM): {self.C_maxwellian * 1E12:.4f} pF/m.")
 
     def plot_collocation_points(self):
@@ -274,8 +276,6 @@ class MulticonductorBareWireSystems(MTL):
                     })
 
         df = pd.DataFrame(plot_data)
-
-        # 2. Criar a figura Plotly
         fig = go.Figure()
 
         # 3. Adicionar as formas dos círculos (esta parte não muda, pois já itera sobre self.surfaces)

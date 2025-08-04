@@ -2,10 +2,8 @@ import copy
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-
-from scipy.constants import epsilon_0
 import plotly.graph_objects as go
-from matplotlib.patches import Circle
+from scipy.constants import epsilon_0
 
 from mtl_data.mtl import MulticonductorTransmissionLine as MTL
 
@@ -50,7 +48,7 @@ class TwoCoatedWireSystem(MTL):
         self.sigma_coeffs = None
         self.C_generalized = None
         self.C_maxwellian = None
-        self.C_exact = None
+        self.C_exact_bare_wires = None
 
     def _calculate_collocation_points(self):
         """
@@ -61,7 +59,7 @@ class TwoCoatedWireSystem(MTL):
         self.collocation_data = {}
 
         # Os ângulos são os mesmos para todas as superfícies, pois NF é constante.
-        source_angles = np.linspace(0, 2 * np.pi, self.NF, endpoint=False)
+        source_angles = np.linspace(0, 2 * np.pi, self.NF, endpoint=False) + (np.pi / 2)
         field_angles = source_angles + np.pi / self.NF
 
         # Itera sobre cada superfície definida na classe base MTL.
@@ -125,18 +123,26 @@ class TwoCoatedWireSystem(MTL):
 
     def run_simulation(self):
         """
-        Executa a simulação completa do MoM, montando o sistema de equações para
-        todas as superfícies (condutoras e dielétricas) com base nas novas
-        estruturas de dados.
+        Executa a simulação completa do MoM, implementando a física para
+        as fronteiras condutoras e dielétricas.
 
-        NOTA: Esta versão estrutura os loops corretamente, mas a física para as
-        fronteiras dielétricas ('sheath') ainda precisa ser implementada.
+        Esta versão revisada distingue entre pontos de observação internos e
+        externos a uma fronteira de fonte, implementando as fórmulas de potencial
+        das Tabelas II.a e II.b de Clements (1975).
+
+        NOTA: A condição de contorno do vetor deslocamento elétrico na
+        superfície da bainha ainda precisa ser implementada. Esta versão calcula
+        o potencial em todas as fronteiras.
         """
         self._calculate_collocation_points()
 
+        # 1. Separar as superfícies por tipo para garantir a ordem de bloco correta.
+        conductor_surfaces = [s for s in self.surfaces if s['type'] == 'conductor']
+        sheath_surfaces = [s for s in self.surfaces if s['type'] == 'sheath']
+        ordered_surfaces = conductor_surfaces + sheath_surfaces
+
         # 1. Preparar os índices e vetores do sistema
-        # Pré-calcula o número de coeficientes (NF) para cada superfície
-        nfs_per_surface = [2 * surface['fourier_order'] + 1 for surface in self.surfaces]
+        nfs_per_surface = [2 * surface['fourier_order'] + 1 for surface in ordered_surfaces]
         offsets = np.cumsum([0] + nfs_per_surface)
 
         self.D_matrix = np.zeros((self.N, self.N))
@@ -144,10 +150,9 @@ class TwoCoatedWireSystem(MTL):
 
         # 2. Montar a Matriz [D] e o Vetor [V]
         # Loop sobre as superfícies de OBSERVAÇÃO p (linhas da matriz)
-        for p, obs_surface in enumerate(self.surfaces):
+        for p, obs_surface in enumerate(ordered_surfaces):
             tag_p = obs_surface['tag']
             type_p = obs_surface['type']
-            center_p = np.array(obs_surface['center_point'])
             nf_p = nfs_per_surface[p]
             offset_p = offsets[p]
 
@@ -156,69 +161,99 @@ class TwoCoatedWireSystem(MTL):
 
             # Preenche o vetor de potencial V para o bloco de linhas da superfície p
             if type_p == 'conductor':
-                # A fonte de potencial é o potencial do condutor
                 self.V_vector[offset_p : offset_p + nf_p] = self.mtl[tag_p]['potential_to_infinity']
             elif type_p == 'sheath':
-                # A condição de fronteira na bainha dielétrica resulta em 0 no lado direito da equação
+                # A condição de fronteira na bainha dielétrica resulta em 0 no lado direito [cite: 222]
                 self.V_vector[offset_p : offset_p + nf_p] = 0.0
 
             # Loop sobre as superfícies de FONTE q (colunas da matriz)
-            for q, source_surface in enumerate(self.surfaces):
+            for q, source_surface in enumerate(ordered_surfaces):
+                tag_q = source_surface['tag']
+                type_q = source_surface['type']
                 center_q = np.array(source_surface['center_point'])
                 radius_q = source_surface['radius']
                 nf_q = nfs_per_surface[q]
                 offset_q = offsets[q]
 
-                # Loop sobre cada ponto de observação m na superfície p
+                # Obtém os pontos de fonte para a superfície q
+                source_points_q = self.collocation_data[tag_q][type_q]['source']['cartesian']
+                angle_points_q = self.collocation_data[tag_q][type_q]['source']['angles_rad']
+
+                # Loop sobre cada ponto de observação 'm' na superfície 'p'
                 for m in range(nf_p):
-                    global_row_idx = offset_p + m
-                    field_point = obs_points_p[m]
+                    row_idx = offset_p + m
                     
-                    # Ângulo do ponto de observação relativo ao centro da sua PRÓPRIA superfície
-                    field2field_vec = field_point - center_p
-                    field_angle = np.arctan2(field2field_vec[1], field2field_vec[0])
+                    # Ângulo e vetor de observação 'i' relativo ao centro da superfície FONTE 'q'
+                    rho_i_vector = obs_points_p[m] - center_q
+                    rho_i = np.linalg.norm(rho_i_vector)
+                    theta_i = np.arctan2(rho_i_vector[1], rho_i_vector[0])
 
-                    # Loop sobre cada função de base n na superfície q
+                    # Loop sobre cada função de base 'n' na superfície 'q'
                     for n in range(nf_q):
-                        global_col_idx = offset_q + n
+                        col_idx = offset_q + n
+                        source_harmonic_idx = n
                         
-                        # --- Início da Lógica de Cálculo do Elemento da Matriz ---
-                        # Esta seção implementa a física. Por enquanto, calcula o potencial.
-                        # TODO: Adicionar a lógica do vetor deslocamento para type_p == 'sheath'
+                        # Ângulo e vetor fonte 'b' relativo ao centro da superfície FONTE 'q'
+                        rho_b_vector = source_points_q[n] - center_q
+                        rho_b = np.linalg.norm(rho_b_vector)
+                        theta_b = np.arctan2(rho_b_vector[1], rho_b_vector[0])
 
-                        source2field_vec = field_point - center_q
-                        source2field_norm = np.linalg.norm(source2field_vec)                        
-                        source_harmonic_idx = n  # Índice harmônico local da fonte
+                        # =====================================
+                        # ==== INÍCIO da Lógica de Cálculo ====
 
-                        if source_harmonic_idx == 0:  # Termo constante (k=0)
-                            if p == q: # Auto-interação
-                                self.D_matrix[global_row_idx, global_col_idx] = (-radius_q / epsilon_0) * np.log(radius_q)
-                            else: # Interação mútua
-                                self.D_matrix[global_row_idx, global_col_idx] = (-radius_q / epsilon_0) * np.log(source2field_norm)
-                        
-                        else:  # Termos harmônicos (k>0)
-                            is_cosine_term = (source_harmonic_idx % 2 != 0)
-                            k = (source_harmonic_idx + 1) // 2 if is_cosine_term else source_harmonic_idx // 2
-
-                            if p == q:  # Auto-interação
-                                term = np.cos(k * field_angle) if is_cosine_term else np.sin(k * field_angle)
-                                self.D_matrix[global_row_idx, global_col_idx] = (radius_q / (2 * k * epsilon_0)) * term
+                        if p == q:  # Auto-interação (Observador NA fronteira da fonte)
+                            if source_harmonic_idx == 0:  # Termo Constante
+                                self.D_matrix[row_idx, col_idx] = -rho_b * np.log(rho_i) / epsilon_0
                             
-                            else:  # Interação mútua
-                                source_angle = np.arctan2(source2field_vec[1], source2field_vec[0])
-                                term = np.cos(k * source_angle) if is_cosine_term else np.sin(k * source_angle)
-                                self.D_matrix[global_row_idx, global_col_idx] = (radius_q / (2 * k * epsilon_0)) * ((radius_q / source2field_norm)**k) * term
+                            else:  # Termos Harmônicos
+                                is_cosine_term = (source_harmonic_idx % 2 != 0)
+                                k = (source_harmonic_idx + 1) // 2 if is_cosine_term else source_harmonic_idx // 2
+                                term = np.cos(k * theta_i) if is_cosine_term else np.sin(k * theta_i)
+                                self.D_matrix[row_idx, col_idx] = term / (2 * k * epsilon_0)
                         
-                        # --- Fim da Lógica de Cálculo ---
+                        else:  # Interação Mútua (p != q)
+                            is_observer_inside = rho_i < rho_b
+
+                            if is_observer_inside:
+                                # --- IMPLEMENTAÇÃO DA TABELA II.b (Observador DENTRO da fronteira da fonte) --- 
+                                if source_harmonic_idx == 0:  # Termo Constante
+                                    # O potencial é constante e depende apenas do raio da fonte 
+                                    self.D_matrix[row_idx, col_idx] = -rho_b * np.log(rho_b) / epsilon_0
+                                
+                                else:  # Termos Harmônicos
+                                    is_cosine_term = (source_harmonic_idx % 2 != 0)
+                                    k = (source_harmonic_idx + 1) // 2 if is_cosine_term else source_harmonic_idx // 2
+                                    term = np.cos(k * theta_b) if is_cosine_term else np.sin(k * theta_b)
+                                    
+                                    # Fórmula de potencial da Tabela II.b 
+                                    numerator = (rho_b**k) * term
+                                    denominator = 2 * epsilon_0 * k * (radius_q**(k-1))
+                                    self.D_matrix[row_idx, col_idx] = numerator / denominator
+
+                            else: # --- IMPLEMENTAÇÃO DA TABELA II.a (Observador FORA da fronteira da fonte) --- 
+                                if source_harmonic_idx == 0: # Termo Constante
+                                    self.D_matrix[row_idx, col_idx] = -rho_b * np.log(rho_i) / epsilon_0
+                                
+                                else: # Termos Harmônicos
+                                    is_cosine_term = (source_harmonic_idx % 2 != 0)
+                                    k = (source_harmonic_idx + 1) // 2 if is_cosine_term else source_harmonic_idx // 2
+                                    term = np.cos(k * theta_b) if is_cosine_term else np.sin(k * theta_b)
+                                    
+                                    # Fórmula de potencial da Tabela II.a, equivalente a (20b)/(20c) [cite: 342, 349, 523]
+                                    self.D_matrix[row_idx, col_idx] = (term / (2 * k * epsilon_0)) * ((radius_q / rho_b)**k)
+                        
+                        # ==================================
+                        # ==== FIM da Lógica de Cálculo ====
 
         # 3. Resolver o sistema e obter os resultados
         self.sigma_coeffs = np.linalg.solve(self.D_matrix, self.V_vector)
-        self.C_exact = (np.pi * epsilon_0) / np.arccosh(self.DR_ratio / 2.0)
+        self.C_exact_bare_wires = (np.pi * epsilon_0) / np.arccosh(self.DR_ratio / 2.0)
         self._calculate_generalized_capacitance()
         self._calculate_maxwellian_capacitance()
 
     def print_results(self):
         """Imprime um resumo dos resultados da simulação."""
+        print(f"\n--- Results for D/R = {self.DR_ratio}. k = {self.surfaces[0]['fourier_order']} and NF={self.NF} per conductor ---")
         if self.C_maxwellian is None:
             print("Executando simulação primeiro...")
             self.run_simulation()
@@ -227,11 +262,10 @@ class TwoCoatedWireSystem(MTL):
             print(f"\nD Matrix (Shape: {self.D_matrix.shape}):\n{self.D_matrix}")
             print(f"\nT Matrix (Inverse of D) (Shape: {self.T_matrix.shape}):\n{self.T_matrix}")
         
-        print(f"\n--- Results for D/R = {self.DR_ratio} and NF={self.NF} ---")
         print(f"\nSurfaces (len: {len(self.surfaces)}): \n{self.surfaces}")
         print(f"\nSigma Coefficients (Shape: {self.sigma_coeffs.shape}):\n{self.sigma_coeffs}")
         print(f"\nMoM Generalized Capacitance Matrix (F/m): \n{self.C_generalized}")
-        print(f"\nExact Capacitance: {self.C_exact * 1E12:.4f} pF/m")
+        print(f"\nExact Bifilar Bare Wire Capacitance: {self.C_exact_bare_wires * 1E12:.4f} pF/m")
         print(f"\nMaxwellian Bifilar Capacitance (MoM): {self.C_maxwellian * 1E12:.4f} pF/m.")
 
     def plot_collocation_points(self):
@@ -277,8 +311,6 @@ class TwoCoatedWireSystem(MTL):
                     })
 
         df = pd.DataFrame(plot_data)
-
-        # 2. Criar a figura Plotly
         fig = go.Figure()
 
         # 3. Adicionar as formas dos círculos (esta parte não muda, pois já itera sobre self.surfaces)
@@ -323,56 +355,77 @@ class TwoCoatedWireSystem(MTL):
         )
         fig.show()
 
-    def plot_charge_density(self):
+    def plot_charge_density(self, tag_to_plot=1):
         """
-        Plota o gráfico de comparação da densidade de carga, reconstruindo a partir da série completa.
-        Esta versão corrige a plotagem da solução exata para geometrias assimétricas.
+        Plota a densidade de carga para um condutor específico, alinhando
+        dinamicamente a solução exata com a geometria real do sistema.
+
+        Args:
+            tag_to_plot (int): A 'tag' do condutor para o qual a densidade de
+                            carga será plotada.
         """
         if self.sigma_coeffs is None:
             self.run_simulation()
 
-        # Para fins de comparação com a fórmula exata, usamos D e R do caso bifilar
-        D = self.D_pq[0, 1]
-        R = self.surfaces[0]['radius']
+        # 1. Obter dados do condutor a ser plotado e de seu par
+        all_tags = list(self.mtl.keys())
+        if len(all_tags) != 2:
+            print("Erro: plot_charge_density foi projetado para sistemas de 2 condutores.")
+            return
+        other_tag = next(tag for tag in all_tags if tag != tag_to_plot)
+
+        center_plot = np.array(self.mtl[tag_to_plot]['center_point'])
+        center_other = np.array(self.mtl[other_tag]['center_point'])
+
+        conductor_surface = next(s for s in self.surfaces if s['tag'] == tag_to_plot and s['type'] == 'conductor')
+        R = conductor_surface['radius']
+        D = np.linalg.norm(center_plot - center_other)
         DR_ratio = D / R
-        
-        # A fórmula exata só é válida para o caso bifilar
+
+        # 2. Calcular a Solução Analítica com Alinhamento e Sinal Corretos
         C_exact = (np.pi * epsilon_0) / np.arccosh(DR_ratio / 2.0)
-        
         theta_plot = np.linspace(0, 2 * np.pi, 360)
-        
-        # --- Solução Exata Corrigida ---
-        delta_v = self.mtl[0]['potential_to_infinity'] - self.mtl[1]['potential_to_infinity']
+
+        vec_to_other = center_other - center_plot
+        angle_of_max_charge = np.arctan2(vec_to_other[1], vec_to_other[0])
+        denominator = DR_ratio - 2 * np.cos(theta_plot - angle_of_max_charge)
+
+        delta_v = self.mtl[tag_to_plot]['potential_to_infinity'] - self.mtl[other_tag]['potential_to_infinity']
         numerator = (DR_ratio**2 / 4) - 1
         
-        # CORREÇÃO: Invertemos o sinal do cosseno para rotacionar a curva em 180 graus,
-        # alinhando a solução exata com a geometria do condutor 'p'.
-        denominator = DR_ratio + 2 * np.cos(theta_plot) # O sinal de '-' virou '+'
-        
+        # CORREÇÃO FINAL: Remover o abs() para preservar o sinal da carga
         charge_density_exact = (C_exact * delta_v / R) * (numerator / denominator)
 
-        # Reconstrução da solução MoM com a série completa (esta parte já estava correta)
+        # 3. Reconstruir a Solução MoM para o Condutor Correto
+        nfs_per_surface = [2 * s['fourier_order'] + 1 for s in self.surfaces]
+        offsets = np.cumsum([0] + nfs_per_surface)
+        
+        surface_index = next(i for i, s in enumerate(self.surfaces) if s['tag'] == tag_to_plot and s['type'] == 'conductor')
+        
+        offset = offsets[surface_index]
+        nf = nfs_per_surface[surface_index]
+        coeffs_to_plot = self.sigma_coeffs[offset : offset + nf]
+
         charge_density_mom = np.zeros_like(theta_plot)
-        coeffs_condutor1 = self.sigma_coeffs[:self.NF]
-        charge_density_mom += coeffs_condutor1[0]
-        max_k = (self.NF - 1) // 2
+        charge_density_mom += coeffs_to_plot[0]
+        max_k = (nf - 1) // 2
         for k in range(1, max_k + 1):
-            cos_coeff = coeffs_condutor1[2 * k - 1]
-            sin_coeff = coeffs_condutor1[2 * k]
+            cos_coeff = coeffs_to_plot[2 * k - 1]
+            sin_coeff = coeffs_to_plot[2 * k]
             charge_density_mom += cos_coeff * np.cos(k * theta_plot) + sin_coeff * np.sin(k * theta_plot)
 
-        # Geração do gráfico
+        # 4. Geração do Gráfico
         plt.style.use('default')
-        fig, ax = plt.subplots(figsize=(8, 6))
-        ax.plot(np.rad2deg(theta_plot), charge_density_exact, color='r', linestyle='-', label='Solução Exata')
-        ax.plot(np.rad2deg(theta_plot), charge_density_mom, color='k', linestyle='-.', label=f'MoM (k={max_k})')
-        ax.set_title(f'Distribuição de Carga com D/R = {DR_ratio:.2f}')
+        fig, ax = plt.subplots(figsize=(8, 5))
+        ax.plot(np.rad2deg(theta_plot), charge_density_exact, 'r-', label='Solução Exata')
+        ax.plot(np.rad2deg(theta_plot), charge_density_mom, 'k-.', label=f'MoM (tag={tag_to_plot})')
+        ax.set_title(f'Distribuição de Carga (Condutor {tag_to_plot}) com D/R = {DR_ratio:.2f}')
         ax.set_xlabel('Ângulo (Graus)'); ax.set_ylabel('Densidade de Carga (C/m²)')
         ax.grid(True, linestyle='--', alpha=0.6)
         ax.set_xticks(np.arange(0, 361, 90)); ax.set_xlim(0, 360)
-        plt.tight_layout()
         ax.legend()
-        
+        plt.tight_layout()
+             
     def plot_harmonic_coefficients(self):
         """
         Reproduz e expande a Figura 4(c) de Clements (1975), mostrando a magnitude
