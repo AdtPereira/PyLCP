@@ -87,9 +87,9 @@ def run_TwoCoatedWireSystem(mtl):
     coated_wires = TwoCoatedWireSystem(mtl)
     coated_wires.run_simulation()
     coated_wires.print_results()
+    # coated_wires.plot_collocation_points()
     # coated_wires.plot_charge_density()
     # coated_wires.plot_harmonic_coefficients()
-    # coated_wires.plot_collocation_points()
     # print(f"\nColocation Data Points: \n{coated_wires.collocation_data}")
     return coated_wires
 

@@ -150,9 +150,9 @@ class TwoCoatedWireSystem(MTL):
 
         # 2. Montar a Matriz [D] e o Vetor [V]
         # Loop sobre as superfícies de OBSERVAÇÃO p (linhas da matriz)
-        for p, obs_surface in enumerate(ordered_surfaces):
-            tag_p = obs_surface['tag']
-            type_p = obs_surface['type']
+        for p, field_surface in enumerate(ordered_surfaces):
+            tag_p = field_surface['tag']
+            type_p = field_surface['type']
             nf_p = nfs_per_surface[p]
             offset_p = offsets[p]
 
@@ -162,8 +162,9 @@ class TwoCoatedWireSystem(MTL):
             # Preenche o vetor de potencial V para o bloco de linhas da superfície p
             if type_p == 'conductor':
                 self.V_vector[offset_p : offset_p + nf_p] = self.mtl[tag_p]['potential_to_infinity']
+            
+            # A condição de fronteira na bainha dielétrica resulta em 0 no lado direito [cite: 222]
             elif type_p == 'sheath':
-                # A condição de fronteira na bainha dielétrica resulta em 0 no lado direito [cite: 222]
                 self.V_vector[offset_p : offset_p + nf_p] = 0.0
 
             # Loop sobre as superfícies de FONTE q (colunas da matriz)
@@ -198,28 +199,30 @@ class TwoCoatedWireSystem(MTL):
                         rho_b = np.linalg.norm(rho_b_vector)
                         theta_b = np.arctan2(rho_b_vector[1], rho_b_vector[0])
 
-                        # =====================================
-                        # ==== INÍCIO da Lógica de Cálculo ====
-
-                        if p == q:  # Auto-interação (Observador NA fronteira da fonte)
-                            if source_harmonic_idx == 0:  # Termo Constante
-                                self.D_matrix[row_idx, col_idx] = -rho_b * np.log(rho_i) / epsilon_0
-                            
-                            else:  # Termos Harmônicos
-                                is_cosine_term = (source_harmonic_idx % 2 != 0)
-                                k = (source_harmonic_idx + 1) // 2 if is_cosine_term else source_harmonic_idx // 2
-                                term = np.cos(k * theta_i) if is_cosine_term else np.sin(k * theta_i)
-                                self.D_matrix[row_idx, col_idx] = term / (2 * k * epsilon_0)
+                        # =================================================================
+                        # ==== INÍCIO DA LÓGICA DE CÁLCULO DO ELEMENTO DA MATRIZ D ========
+                        # =================================================================
+                        is_observer_inside = rho_i < rho_b
                         
-                        else:  # Interação Mútua (p != q)
-                            is_observer_inside = rho_i < rho_b
+                        # === BLOCO 1: CÁLCULO DE POTENCIAL (φ) ==================================
+                        # === Aplica a condição de contorno V = Vm nas superfícies condutoras. ===
+                        if type_p == 'conductor':
+                            # Auto-interação (Observador NA fronteira da fonte)
+                            if p == q:  
+                                if source_harmonic_idx == 0:  # Termo Constante
+                                    self.D_matrix[row_idx, col_idx] = -rho_b * np.log(rho_i) / epsilon_0
+                                else:  # Termos Harmônicos
+                                    is_cosine_term = (source_harmonic_idx % 2 != 0)
+                                    k = (source_harmonic_idx + 1) // 2 if is_cosine_term else source_harmonic_idx // 2
+                                    term = np.cos(k * theta_i) if is_cosine_term else np.sin(k * theta_i)
+                                    self.D_matrix[row_idx, col_idx] = term / (2 * k * epsilon_0)
+                            
 
-                            if is_observer_inside:
-                                # --- IMPLEMENTAÇÃO DA TABELA II.b (Observador DENTRO da fronteira da fonte) --- 
+                            # --- IMPLEMENTAÇÃO DA TABELA II.b (Interação Mútua (p != q) e Observador DENTRO da fronteira da fonte) --- 
+                            elif is_observer_inside:
                                 if source_harmonic_idx == 0:  # Termo Constante
                                     # O potencial é constante e depende apenas do raio da fonte 
                                     self.D_matrix[row_idx, col_idx] = -rho_b * np.log(rho_b) / epsilon_0
-                                
                                 else:  # Termos Harmônicos
                                     is_cosine_term = (source_harmonic_idx % 2 != 0)
                                     k = (source_harmonic_idx + 1) // 2 if is_cosine_term else source_harmonic_idx // 2
@@ -230,10 +233,11 @@ class TwoCoatedWireSystem(MTL):
                                     denominator = 2 * epsilon_0 * k * (radius_q**(k-1))
                                     self.D_matrix[row_idx, col_idx] = numerator / denominator
 
-                            else: # --- IMPLEMENTAÇÃO DA TABELA II.a (Observador FORA da fronteira da fonte) --- 
+
+                            # --- IMPLEMENTAÇÃO DA TABELA II.a (Interação Mútua (p != q) e Observador FORA da fronteira da fonte) --- 
+                            else: 
                                 if source_harmonic_idx == 0: # Termo Constante
                                     self.D_matrix[row_idx, col_idx] = -rho_b * np.log(rho_i) / epsilon_0
-                                
                                 else: # Termos Harmônicos
                                     is_cosine_term = (source_harmonic_idx % 2 != 0)
                                     k = (source_harmonic_idx + 1) // 2 if is_cosine_term else source_harmonic_idx // 2
@@ -242,8 +246,32 @@ class TwoCoatedWireSystem(MTL):
                                     # Fórmula de potencial da Tabela II.a, equivalente a (20b)/(20c) [cite: 342, 349, 523]
                                     self.D_matrix[row_idx, col_idx] = (term / (2 * k * epsilon_0)) * ((radius_q / rho_b)**k)
                         
-                        # ==================================
-                        # ==== FIM da Lógica de Cálculo ====
+
+                        # === BLOCO 2: CONDIÇÃO DE CONTORNO DO VETOR DESLOCAMENTO (εE) =======================
+                        # === Aplica (1 - εr) * Er = 0 nas superfícies da bainha. ============================
+                        elif type_p == 'sheath':
+                            er = field_surface['relative_permittivity']
+
+                            if source_harmonic_idx == 0: # Termo Constante
+                                self.D_matrix[row_idx, col_idx] = (1 - er) * (rho_b / rho_i)
+
+                            else: # Termos Harmônicos (k>0)
+                                # Determina o índice k e se o termo é cossenoidal ou senoidal
+                                is_cosine_term = (source_harmonic_idx % 2 != 0)
+                                k = (source_harmonic_idx + 1) // 2 if is_cosine_term else source_harmonic_idx // 2
+                                
+                                # Termo trigonométrico avaliado no ponto de observação
+                                trig_term = np.cos(k * theta_i) if is_cosine_term else np.sin(k * theta_i)
+                                
+                                # Fator geométrico (r'/r)^(k+1) do campo elétrico radial
+                                geometric_factor = (rho_b / rho_i)**(k + 1)
+                                
+                                # Combina os termos para formar o elemento da matriz D
+                                self.D_matrix[row_idx, col_idx] = 0.5 * (1 - er) * geometric_factor * trig_term
+
+                        # ===============================================================
+                        # ==== FIM DA LÓGICA DE CÁLCULO DO ELEMENTO DA MATRIZ D =========
+                        # ===============================================================
 
         # 3. Resolver o sistema e obter os resultados
         self.sigma_coeffs = np.linalg.solve(self.D_matrix, self.V_vector)
@@ -258,9 +286,9 @@ class TwoCoatedWireSystem(MTL):
             print("Executando simulação primeiro...")
             self.run_simulation()
 
-        if self.NF < 3: 
+        if self.NF < 4: 
             print(f"\nD Matrix (Shape: {self.D_matrix.shape}):\n{self.D_matrix}")
-            print(f"\nT Matrix (Inverse of D) (Shape: {self.T_matrix.shape}):\n{self.T_matrix}")
+            # print(f"\nT Matrix (Inverse of D) (Shape: {self.T_matrix.shape}):\n{self.T_matrix}")
         
         print(f"\nSurfaces (len: {len(self.surfaces)}): \n{self.surfaces}")
         print(f"\nSigma Coefficients (Shape: {self.sigma_coeffs.shape}):\n{self.sigma_coeffs}")

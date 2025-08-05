@@ -223,9 +223,9 @@ class MulticonductorBareWireSystems(MTL):
             print("Executando simulação primeiro...")
             self.run_simulation()
 
-        if self.NF < 3: 
+        if self.NF < 4: 
             print(f"\nD Matrix (Shape: {self.D_matrix.shape}):\n{self.D_matrix}")
-            print(f"\nT Matrix (Inverse of D) (Shape: {self.T_matrix.shape}):\n{self.T_matrix}")
+            # print(f"\nT Matrix (Inverse of D) (Shape: {self.T_matrix.shape}):\n{self.T_matrix}")
 
         print(f"\nD Matrix Shape: {self.D_matrix.shape}.")
         print(f"\nSigma Coefficients (Shape: {self.sigma_coeffs.shape}):\n{self.sigma_coeffs}")
