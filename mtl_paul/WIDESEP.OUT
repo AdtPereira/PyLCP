@@ -1,0 +1,16 @@
+  1    1   7.58848E-07        =L(  1,  1)
+  1    2   5.18053E-07        =L(  1,  2)
+  2    2   1.03611E-06        =L(  2,  2)
+  1    1   2.22610E-11        =C(  1,  1)
+  1    2  -1.11305E-11        =C(  1,  2)
+  2    2   1.63040E-11        =C(  2,  2)
+
+
+NUMBER OF WIRES=  2
+RELATIVE PERMITTIVITY OF HOMOGENEOUS MEDIUM=  1.0
+RELATIVE PERMEABILITY OF HOMOGENEOUS MEDIUM=  1.0
+REFERENCE CONDUCTOR IS A WIRE WITH RADIUS (mils)= 7.500E+00
+
+WIRE #  WIRE RADIUS (mils)  X COORDINATE (meters)  Y COORDINATE (meters)
+  1        7.500E+00            0.000E+00              1.270E-03
+  2        7.500E+00            0.000E+00              2.540E-03

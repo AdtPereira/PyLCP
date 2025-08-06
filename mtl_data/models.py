@@ -152,6 +152,51 @@
 #     }
 # ]
 
+CLEMENTS_BIFILAR_COATED_WIRE_S40 = {
+    'type': 'coated_wires',
+    'ref': 'Clements (1974)',
+    0: {
+        'line_id': 0,
+        'conductor_name': 'q',
+        'line_type': 'return',
+        'line_return': None,
+        'center_point': (0.0, 0.0),
+        'radius': [0, 1.0E0],
+        'conductivity': 1/1.68E-8,
+        'subconductors': None,
+        'sheath': {'name': 'coated',
+                    'center_point': (0.0, 0.0),
+                    'thickness': 1.0E0,
+                    'fourier_order': 1,
+                    'relative_permittivity': 3.0},
+        'relative_permeability': 1.0,
+        'relative_permittivity': 1.0,
+        'relative_permittivity_out': 1.0,
+        'potential_to_infinity': -1.0,
+        'fourier_order': 10,
+    },
+    1: {
+        'line_id': 1,
+        'conductor_name': 'p',
+        'line_type': 'active',
+        'line_return': 0,
+        'center_point': (4.0E0, 0.0),
+        'radius': [0, 1.0E0],
+        'conductivity': 1/1.68E-8,
+        'subconductors': None,
+        'sheath': {'name': 'coated',
+                    'center_point': (4.0E0, 0.0),
+                    'thickness': 1.0E0,
+                    'fourier_order': 1,
+                    'relative_permittivity': 3.0},
+        'relative_permeability': 1.0,
+        'relative_permittivity': 1.0,
+        'relative_permittivity_out': 1.0,
+        'potential_to_infinity': 1.0,
+        'fourier_order': 10,
+    },    
+}
+
 BIFILAR_BARE_WIRE_S21 = {
     'type': 'bare_wires',
     'ref': 'Clements (1974)',

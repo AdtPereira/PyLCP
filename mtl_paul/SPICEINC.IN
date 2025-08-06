@@ -1,0 +1,9 @@
+3                  =TOTAL NUMBER OF CONDUCTORS (N+1)
+2.0                =LINE LENGTH (meters)
+1                  =LINE TYPE(1=NO GND PLANE, 2=GND PLANE)
+90.                =THETAE
+90.                =THETAP
+-90.               =PHIP
+1  -1.27E-3    0.0           =I,X(I),Y(I)
+2   1.27E-3    0.0           =I,X(I),Y(I)
+

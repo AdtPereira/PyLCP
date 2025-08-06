@@ -1,0 +1,13 @@
+3                            =Total Number of Conductors (N+1)
+5.0                          =Total Line Length (m)
+10                           =NDZ
+360                          =NDT  Must Have NDT>>NDZ*FINAL*V0/LEN
+300.E-9                      =Final Solution Time
+1                            =Print Solution Time Step Index
+1                            =Conductor Having Source Voltage (at near end)
+1                            =Conductor Having Load Voltage (at far end)
+2                            =Output Conductor for Terminal Voltages
+1   1    50.0       1.E3          =I,J,RS(I,J),RL(I,J)     (ohms)
+1   2    0.0       0.0            =I,J,RS(I,J),RL(I,J)     (ohms)
+2   2     1.E4    100.0           =I,J,RS(I,J),RL(I,J)     (ohms)
+

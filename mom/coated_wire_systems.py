@@ -34,7 +34,6 @@ class TwoCoatedWireSystem(MTL):
         
         # Raio do condutor 'p' (primeiro condutor)
         self.R = self.surfaces[0]['radius']
-
         self.D = self.D_pq[0, 1]
         self.DR_ratio = self.D / self.R
 

@@ -1,0 +1,19 @@
+3                            =Total Number of Conductors (N+1)
+.254                         =Total Line Length (m)
+2                            =NDZ
+60                           =NDT  Must Have NDT>>NDZ*FINAL*V0/LEN
+30.E-9                       =Final Solution Time
+1                            =Print Solution Time Step Index
+2                            =Conductor Having Source Voltage (at near end)
+2                            =Conductor Having Load Voltage (at far end)
+1                            =Output Conductor for Terminal Voltages
+1.291                        =Ref Conductor dc Resistance (ohms/m)
+14.218E6                     =Ref Conductor Break Frequency (Hz)
+1  1.291                     =Conductor I dc Resistance (ohms/m)
+1  14.218E6                  =Conductor I Break Frequency (Hz)
+2  1.291                     =Conductor I dc Resistance (ohms/m)
+2  14.218E6                  =Conductor I Break Frequency (Hz)
+1   1    50.0       50.0     =I,J,RS(I,J),RL(I,J)     (ohms)
+1   2     0.0       0.0      =I,J,RS(I,J),RL(I,J)     (ohms)
+2   2    50.0       50.0     =I,J,RS(I,J),RL(I,J)     (ohms)
+

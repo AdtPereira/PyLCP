@@ -9,7 +9,7 @@ from scipy.constants import epsilon_0
 # Adiciona a raiz do projeto ao PYTHONPATH para importação de módulos.
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..\..')))
 
-from mtl_data.models import *
+from mtl_data.models import BIFILAR_COATED_WIRE_S40 as MTL
 from mtl_data.graphics import MTLRepresentation
 from analytical_forms.bare_wires import WiresHomogeneousMedia
 from mom.bare_wire_systems import MulticonductorBareWireSystems
@@ -20,7 +20,6 @@ from mom_so.quasi_static_green import QuasiStatic
 from mom_so.lossless_medium import HomogeneousLosslessMedium, LosslessPostProcessing
 
 # --- Configurações da Linha Bifilar ---
-MTL = BIFILAR_COATED_WIRE_S40
 FREQUENCY_RANGE = {'ana': np.logspace(0, 6, num=200), 'mom': np.logspace(0, 6, num=30)}
 
 # Modifica o tipo de linha para 'bare_wires' e remove a capa
@@ -171,6 +170,69 @@ def run_mom_so(mtl, frequencies):
     return momso_data
 
 
+def run_convergence_study(mtl, bare_mtl):
+        """ Plota a convergência da capacitância em função de NF, usando um modelo base. """        
+        C_FACTOR = 1e12  # Fator de conversão para pF/m
+        NF_MAX = 20
+        nf_odd, nf_even = [], []
+        bare_wire_cap_odd, bare_wire_cap_even = [], []
+        coated_wire_cap_odd, coated_wire_cap_even = [], []
+
+        for nf in range(1, NF_MAX + 1):
+            # Cria uma cópia temporária do modelo para modificar NF sem alterar o original.
+            bare_nf = copy.deepcopy(bare_mtl)
+            bare_nf[0]['fourier_order'] = nf
+            bare_nf[1]['fourier_order'] = nf
+
+            coated_nf = copy.deepcopy(mtl)
+            coated_nf[0]['fourier_order'] = nf
+            coated_nf[1]['fourier_order'] = nf
+            coated_nf[0]['sheath']['fourier_order'] = nf
+            coated_nf[1]['sheath']['fourier_order'] = nf
+
+            # bare_wire = MulticonductorBareWireSystems(bare_nf)
+            bare_wire = TwoCoatedWireSystem(bare_nf)
+            coated_wires = TwoCoatedWireSystem(coated_nf)
+            bare_wire.run_simulation()
+            coated_wires.run_simulation()
+
+            if nf % 2 != 0:
+                nf_odd.append(nf)
+                bare_wire_cap_odd.append(bare_wire.C_maxwellian * C_FACTOR)
+                coated_wire_cap_odd.append(coated_wires.C_maxwellian * C_FACTOR)
+            else:
+                nf_even.append(nf)
+                bare_wire_cap_even.append(bare_wire.C_maxwellian * C_FACTOR)
+                coated_wire_cap_even.append(coated_wires.C_maxwellian * C_FACTOR)        
+
+        plt.style.use('default')
+        fig, ax = plt.subplots(figsize=(8, 5))        
+        c_exact = bare_wire.C_exact_bare_wires * C_FACTOR
+        ax.axhline(y=c_exact, color='k', linestyle=':', label=f'Exactly Bifilar Bare Wire: {c_exact:.2f} pF/m')
+        
+        ax.plot(nf_odd, bare_wire_cap_odd, linestyle='none', marker='^', markersize=7,
+                fillstyle='none', markeredgecolor='k', label='Bare Wire (NF Odd)')
+        
+        ax.plot(nf_even, bare_wire_cap_even, linestyle='none', marker='*', markersize=7,
+                fillstyle='none', markeredgecolor='k', label='Bare Wire (NF Even)')
+
+        ax.plot(nf_odd, coated_wire_cap_odd, linestyle='none', marker='^', markersize=7,
+                color='b', label='Coated Wire (NF Odd)')
+
+        ax.plot(nf_even, coated_wire_cap_even, linestyle='none', marker='*', markersize=7,
+                color='b', label='Coated Wire (NF Even)')
+
+        ax.set_title(f'D/R = {bare_wire.DR_ratio:.2f}')
+        ax.set_xlabel('NF - Número de Coeficientes de Fourier por Conductor')
+        ax.set_ylabel('Capacitância (pF/m)')
+        ax.set_xticks(np.arange(0, NF_MAX+1, 2))
+        ax.set_xlim(0, NF_MAX+1)
+        ax.set_ylim(0, 50)
+        ax.grid(False)
+        ax.legend()
+        plt.tight_layout()
+
+
 def plot_results(freqs, analytical_data, mom_so_data, mom_data):
     """
     Gera e exibe os gráficos dos resultados da simulação de forma flexível,
@@ -276,9 +338,10 @@ def main():
     clear_screen()
     start_time = time.time()
     # MTLRepresentation(MTL).bare_and_coated_wires()
-    bare_data = run_MulticonductorBareWireSystems(bare_mtl)
-    bare_coated_data = run_TwoCoatedWireSystem_for_bare(bare_mtl)
-    coated_data = run_TwoCoatedWireSystem(MTL)
+    # bare_data = run_MulticonductorBareWireSystems(bare_mtl)
+    # bare_coated_data = run_TwoCoatedWireSystem_for_bare(bare_mtl)
+    # coated_data = run_TwoCoatedWireSystem(MTL)
+    run_convergence_study(MTL, bare_mtl)
     # analytical_data = run_analytical(MTL, FREQUENCY_RANGE['ana'])
     # mom_so_data = run_mom_so(MTL, FREQUENCY_RANGE['mom'])
     

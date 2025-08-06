@@ -1,0 +1,5 @@
+3                                      =Number of Time Points
+0.           00.        0.             =Time1,VS1,VL1
+6.25E-9       1.0       0.             =Time2,VS2,VL2
+100.E-9       1.0       0.             =Time3,VS3,VL3
+
