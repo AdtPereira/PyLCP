@@ -36,8 +36,7 @@ project_root = setup_project_paths()
 
 try:
     from mom.coated_wire_systems import TwoCoatedWireSystem
-    from mom.run_fortran import FortranRunner
-    from mtl_data import utils
+    from mtl_paul.py_fortran import FortranRunner
     from mtl_data.models import CLEMENTS_BIFILAR_COATED_WIRE_S40 as MTL
     print("Módulos e modelo de dados importados com sucesso.")
 except ImportError as e:
@@ -51,7 +50,7 @@ class ConvergenceAnalyzer:
     """
     C_FACTOR = 1e12  # Fator de conversão para pF/m
 
-    def __init__(self, mtl_config: Dict[str, Any], nf_max: int = 10):
+    def __init__(self, mtl_config: Dict[str, Any], NF_MAX: int = 10):
         """
         Inicializa o analisador de convergência.
 
@@ -60,8 +59,8 @@ class ConvergenceAnalyzer:
             nf_max (int): Número máximo de coeficientes/ordem harmônica para testar.
         """
         self.mtl_config = mtl_config
-        self.nf_max = nf_max
-        self.k_range = range(1, nf_max + 1)
+        self.nf_max = NF_MAX
+        self.k_range = range(1, NF_MAX + 1)
         self.results_df = None
 
         # Extrai parâmetros e prepara o executor do Fortran
@@ -92,7 +91,7 @@ class ConvergenceAnalyzer:
         D = self.fortran_base_params['S']
         self.analytical_bare_capacitance = (np.pi * epsilon_0) / np.arccosh(D / (2 * R))
 
-    def _run_all_simulations(self):
+    def run_simulations(self):
         """Executa o laço de convergência para ambas as simulações e armazena os resultados."""
         print(f"\nIniciando estudo de convergência até k={self.nf_max}...")
         
@@ -113,7 +112,7 @@ class ConvergenceAnalyzer:
             # Simulação Fortran
             temp_fortran_params = self.fortran_base_params.copy()
             temp_fortran_params['NF'] = k
-            self.fortran_runner.run_simulation(temp_fortran_params)
+            self.fortran_runner.run_fortran(temp_fortran_params)
             
             # Coleta de resultados
             results.append({
@@ -179,17 +178,9 @@ class ConvergenceAnalyzer:
         print(self.results_df)
         print("="*DIST1)
 
-    def run_study(self):
-        """Executa o estudo completo: simula, plota e exibe a tabela."""
-        self._run_all_simulations()
-        self.plot_results()
-        self.display_results_table()
-
 if __name__ == '__main__':
-    # 1. Cria uma instância do analisador com o modelo de dados e o NF máximo
-    utils.clear_screen()
-    analyzer = ConvergenceAnalyzer(mtl_config=MTL, nf_max=15)
-    
-    # 2. Executa o estudo completo
-    analyzer.run_study()
-    # plt.show()
+    analyzer = ConvergenceAnalyzer(mtl_config=MTL, NF_MAX=15)
+    analyzer.run_simulations()
+    analyzer.plot_results()
+    analyzer.display_results_table()
+    plt.show()

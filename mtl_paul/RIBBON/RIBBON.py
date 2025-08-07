@@ -22,9 +22,36 @@ def clear_screen():
     """Clears the console screen."""
     os.system('cls' if os.name == 'nt' else 'clear')
 
+# def parse_pul_file(filename):
+#     """Helper function to parse a PUL file and extract L, C, and C0 values."""
+#     results = {'L': {}, 'C': {}, 'C0': {}, 'CGEN': {}}
+#     try:
+#         with open(filename, 'r') as f:
+#             for line in f:
+#                 line = line.strip()
+#                 if not line:
+#                     continue
+                
+#                 # Use regex to find the matrix type and values
+#                 match = re.match(r"(\d+)\s+(\d+)\s+([0-9.E+-]+)\s+=\s*([A-Z0-9]+)\(", line)
+#                 if match:
+#                     i, j, value, key = match.groups()
+#                     i, j, value = int(i), int(j), float(value)
+                    
+#                     # Ensure keys are sorted for consistent comparison, e.g. (1,2) not (2,1)
+#                     if i > j:
+#                         i, j = j, i
+
+#                     if key in results:
+#                         results[key][(i, j)] = value
+#     except FileNotFoundError:
+#         print(f"\nWarning: Could not find file {filename} for parsing.")
+#         return None
+#     return results
+
 def parse_pul_file(filename):
-    """Helper function to parse a PUL file and extract L, C, and C0 values."""
-    results = {'L': {}, 'C': {}, 'C0': {}}
+    """Helper function to parse a PUL file and extract L, C, CGEN and C0 values."""
+    results = {'L': {}, 'C': {}, 'C0': {}, 'CGEN': {}}
     try:
         with open(filename, 'r') as f:
             for line in f:
@@ -32,8 +59,10 @@ def parse_pul_file(filename):
                 if not line:
                     continue
                 
-                # Use regex to find the matrix type and values
-                match = re.match(r"(\d+)\s+(\d+)\s+([0-9.E+-]+)\s+=\s*([LC0]+)\(", line)
+                # CORREÇÃO DEFINITIVA APLICADA AQUI:
+                # Trocado re.match() por re.search() para encontrar o padrão
+                # em qualquer lugar da linha, ignorando espaços no início.
+                match = re.search(r"(\d+)\s+(\d+)\s+([0-9.E+-]+)\s+=\s*([A-Z0-9]+)\(", line)
                 if match:
                     i, j, value, key = match.groups()
                     i, j, value = int(i), int(j), float(value)
@@ -337,6 +366,11 @@ def ribbon_analysis():
         for i in range(NM1):
             for j in range(i, NM1):
                 f.write(f"{i+1:3d}  {j+1:3d}  {CAP0[i, j]:12.5E}        =C0({i+1:3d},{j+1:3d})\n")
+        # f.write("\n")
+        for i in range(N):
+            for j in range(i, N):
+                f.write(f"{i+1:3d}  {j+1:3d}  {CGEN[i, j]:12.5E}        =CGEN({i+1:3d},{j+1:3d})\n")
+
         f.write("\n\n\n")
         f.write(f"NUMBER OF WIRES= {N:3d}\n")
         f.write(f"NUMBER OF FOURIER COEFFICIENTS= {NF:3d}\n")

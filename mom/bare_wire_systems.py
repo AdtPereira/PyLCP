@@ -218,19 +218,17 @@ class MulticonductorBareWireSystems(MTL):
 
     def print_results(self):
         """Imprime um resumo dos resultados da simulação."""
-        print(f"\n--- Results for D/R = {self.DR_ratio}. k = {self.surfaces[0]['fourier_order']} and NF={self.NF} per conductor ---")
+        print(f"\n--- Results for D/R = {self.DR_ratio}. k = {self.surfaces[self.idx_ref]['fourier_order']} and NF={self.NF} per conductor ---")
         if self.C_maxwellian is None:
             print("Executando simulação primeiro...")
             self.run_simulation()
 
         if self.NF < 4: 
             print(f"\nD Matrix (Shape: {self.D_matrix.shape}):\n{self.D_matrix}")
+            print(f"\nSigma Coefficients (Shape: {self.sigma_coeffs.shape}):\n{self.sigma_coeffs}")
             # print(f"\nT Matrix (Inverse of D) (Shape: {self.T_matrix.shape}):\n{self.T_matrix}")
 
-        print(f"\nD Matrix Shape: {self.D_matrix.shape}.")
-        print(f"\nSigma Coefficients (Shape: {self.sigma_coeffs.shape}):\n{self.sigma_coeffs}")
         print(f"\nMoM Generalized Capacitance Matrix (F/m): \n{self.C_generalized}")
-        print(f"\nExact Bifilar Bare Wire Capacitance: {self.C_exact_bare_wires * 1E12:.4f} pF/m")
         print(f"\nMaxwellian Bifilar Capacitance (MoM): {self.C_maxwellian * 1E12:.4f} pF/m.")
 
     def plot_collocation_points(self):

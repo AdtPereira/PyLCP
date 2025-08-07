@@ -25,12 +25,7 @@ class TwoCoatedWireSystem(MTL):
     """
     def __init__(self, mtl: dict):
         super().__init__(mtl)
-
         assert isinstance(mtl, dict), "O parâmetro mtl deve ser um dicionário com a configuração da linha."
-        assert len(self.surfaces) > 1, "A classe MulticonductorBareWireSystems foi projetada para modelos com mais de 1 superfície."
-        
-        # Número de coeficientes harmônicos de Fourier por condutor
-        self.NF = [2*surface['fourier_order']+1 for surface in self.surfaces][0]
         
         # Raio do condutor 'p' (primeiro condutor)
         self.R = self.surfaces[0]['radius']

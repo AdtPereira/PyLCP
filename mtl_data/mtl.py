@@ -39,14 +39,20 @@ class MulticonductorTransmissionLine():
         # Deep copy of the conductors list
         self.mtl = {key: value for key, value in mtl.items() if isinstance(key, int)}
 
+        # MTL Type
+        self.mtl_type = mtl.get('type', 'unknown')
+
+        # MTL Conductor Reference Index
+        self.idx_ref = mtl.get('idx_ref_conductor', 0)
+
         conductor_tags = sorted(self.mtl.keys())
         expected_tags = list(range(len(conductor_tags)))
+        
         assert conductor_tags == expected_tags, "As tags dos condutores devem ser uma sequência de inteiros começando em 0 (ex: 0, 1, 2, ...)."
         assert len(self.mtl) > 1, "The MulticonductorTransmissionLine must have at least two conductors."
         assert self.mtl[0]['line_type'] == 'return', "The conductor index '0' must be the return path."
-
-        # MTL Type
-        self.mtl_type = mtl.get('type', 'unknown')
+        assert self.idx_ref is not None, "The reference conductor index must be defined."
+        assert self.idx_ref in self.mtl, f"The reference conductor index {self.idx_ref} must be in the MTL dictionary."
 
         # Conductor surfaces dictionary
         self.surfaces = []
@@ -87,7 +93,11 @@ class MulticonductorTransmissionLine():
 
         # Dimension N
         # Equation (2.36) [1]
-        self.N = sum([2*surface['fourier_order']+1 for surface in self.surfaces])
+        self.NF_List = [2 * surface['fourier_order'] + 1 for surface in self.surfaces]
+        self.N = sum(self.NF_List)
+
+        # Número de coeficientes harmônicos de Fourier por condutor
+        self.NF = self.NF_List[self.idx_ref]
 
         # Conductors Permeability [np.array]
         self.mu = np.array([mu_0 * cond['relative_permeability'] for cond in self.mtl.values()]) 

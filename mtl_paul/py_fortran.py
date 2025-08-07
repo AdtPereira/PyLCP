@@ -82,7 +82,7 @@ class FortranRunner:
             print(f"Erro: Arquivo de saída '{self.output_filename}' não foi gerado.")
             return
 
-        results = {'L': {}, 'C': {}, 'C0': {}}
+        results = {'L': {}, 'C': {}, 'C0': {}, 'CGEN': {}}
         max_index = 0
 
         with open(self.output_filename, 'r') as f:
@@ -91,7 +91,7 @@ class FortranRunner:
                 if not line_stripped:
                     continue
 
-                match = re.match(r"(\d+)\s+(\d+)\s+([0-9.E+-]+)\s+=\s*([LC0]+)\(", line_stripped)
+                match = re.match(r"(\d+)\s+(\d+)\s+([0-9.E+-]+)\s+=\s*([LC0CGEN]+)\(", line_stripped)
                 if match:
                     i, j, value, key = match.groups()
                     i, j, value = int(i), int(j), float(value)
@@ -104,6 +104,7 @@ class FortranRunner:
             self.L_matrix = np.zeros((matrix_size, matrix_size))
             self.C_matrix = np.zeros((matrix_size, matrix_size))
             self.C0_matrix = np.zeros((matrix_size, matrix_size))
+            self.CGEN_matrix = np.zeros((matrix_size, matrix_size))
             
             for (i, j), val in results.get('L', {}).items():
                 self.L_matrix[i-1, j-1] = self.L_matrix[j-1, i-1] = val
@@ -111,11 +112,13 @@ class FortranRunner:
                 self.C_matrix[i-1, j-1] = self.C_matrix[j-1, i-1] = val
             for (i, j), val in results.get('C0', {}).items():
                 self.C0_matrix[i-1, j-1] = self.C0_matrix[j-1, i-1] = val
-        
+            for (i, j), val in results.get('CGEN', {}).items():
+                self.CGEN_matrix[i-1, j-1] = self.CGEN_matrix[j-1, i-1] = val
+
         if not self.silent:
             print("Análise do arquivo de saída concluída.")
 
-    def run_simulation(self, params: dict):
+    def run_fortran(self, params: dict):
         """
         Orquestra o processo completo: escreve o input, executa e analisa o output.
         """
@@ -129,41 +132,3 @@ class FortranRunner:
         except Exception as e:
             print(f"Ocorreu um erro inesperado durante a simulação: {e}")
 
-
-# Exemplo de uso da classe FortranRunner
-# if __name__ == '__main__':
-#     import os
-#     os.system('cls' if os.name == 'nt' else 'clear')
-#     simulation_params = {
-#         'N': 2,
-#         'NF': 10,
-#         'IREF': 1,
-#         'RW': 1.000E-02,
-#         'TD': 1.000E-02,
-#         'ER': 3.0,
-#         'S': 4.000E-02
-#     }
-
-#     print("Iniciando simulação controlada por Python a partir da raiz do projeto...")
-    
-#     script_dir = Path(__file__).resolve().parent
-#     project_root = script_dir.parent
-#     fortran_exe_path = project_root / 'mtl_paul' / 'RIBBON' / 'RIBBON.EXE'
-    
-#     runner = FortranRunner(exe_path=fortran_exe_path)
-#     runner.run_simulation(simulation_params)
-
-#     print("\n" + "="*40)
-#     print("      Resultados da Simulação Fortran")
-#     print("="*40)
-#     if runner.L_matrix is not None:
-#         print("\nMatriz de Indutância (L):")
-#         print(runner.L_matrix)
-        
-#         print("\nMatriz de Capacitância (C):")
-#         print(runner.C_matrix)
-        
-#         print("\nMatriz de Capacitância no Vácuo (C0):")
-#         print(runner.C0_matrix)
-#     else:
-#         print("\nNenhum resultado foi analisado. Verifique os logs de erro.")
