@@ -45,10 +45,10 @@ class MulticonductorTransmissionLine():
         # MTL Conductor Reference Index
         self.idx_ref = mtl.get('idx_ref_conductor', 0)
 
-        conductor_tags = sorted(self.mtl.keys())
-        expected_tags = list(range(len(conductor_tags)))
+        key_conductors = sorted(self.mtl.keys())
+        key_expected = list(range(len(key_conductors)))
         
-        assert conductor_tags == expected_tags, "As tags dos condutores devem ser uma sequência de inteiros começando em 0 (ex: 0, 1, 2, ...)."
+        assert key_conductors == key_expected, "As tags dos condutores devem ser uma sequência de inteiros começando em 0 (ex: 0, 1, 2, ...)."
         assert len(self.mtl) > 1, "The MulticonductorTransmissionLine must have at least two conductors."
         assert self.mtl[0]['line_type'] == 'return', "The conductor index '0' must be the return path."
         assert self.idx_ref is not None, "The reference conductor index must be defined."

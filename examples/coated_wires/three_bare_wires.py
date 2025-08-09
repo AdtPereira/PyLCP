@@ -8,8 +8,7 @@ os.system('cls' if os.name == 'nt' else 'clear')
 try:
     script_dir = Path(__file__).resolve().parent
     project_root = script_dir.parents[1]
-    sys.path.append(str(project_root))        
-    
+    sys.path.append(str(project_root))            
     print("Caminhos do projeto configurados com sucesso.")
 except IndexError:
     raise FileNotFoundError(
@@ -21,8 +20,6 @@ except IndexError:
 try:
     from analyzer.convergence import ConvergenceAnalyzer
     from mtl_data.models import PAUL_RIBBON_CABLE
-    from mom.coated_wire_systems import TwoCoatedWireSystem
-    
     print("Módulos e modelo de dados importados com sucesso.")
 except ImportError as e:
     print(f"Erro ao importar módulos: {e}")
@@ -30,7 +27,7 @@ except ImportError as e:
 
 if __name__ == '__main__':
     analyzer = ConvergenceAnalyzer(project_root, PAUL_RIBBON_CABLE, NF_MAX=10)
-    analyzer.run_single_simulation()
-    analyzer.run_simulations()
-    analyzer.plot_results()
+    analyzer.run_single_fortran_simulation()
+    analyzer.run_convergence()
+    analyzer.plot_free_space_capacitance()
     plt.show()

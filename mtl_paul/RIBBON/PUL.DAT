@@ -1,14 +1,14 @@
-  1    1   1.25975E-07        =L(  1,  1)
-  1    1   8.83231E-11        =C(  1,  1)
-  1    1   8.83231E-11        =C0(  1,  1)
-  1    1   9.16849E-11        =CGEN(  1,  1)
-  1    2  -8.49613E-11        =CGEN(  1,  2)
-  2    2   9.16849E-11        =CGEN(  2,  2)
+  1    1   1.26390E-07        =L(  1,  1)
+  1    1   8.80329E-11        =C(  1,  1)
+  1    1   8.80329E-11        =C0(  1,  1)
+  1    1   9.13948E-11        =CGEN(  1,  1)
+  1    2  -8.46711E-11        =CGEN(  1,  2)
+  2    2   9.13947E-11        =CGEN(  2,  2)
 
 
 
 NUMBER OF WIRES=  2
-NUMBER OF FOURIER COEFFICIENTS= 17
+NUMBER OF FOURIER COEFFICIENTS= 10
 REFERENCE WIRE=  0
 WIRE RADIUS (m)= 1.000E-02
 DIELECTRIC INSULATION THICKNESS (m)= 0.000E+00

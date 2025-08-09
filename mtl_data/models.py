@@ -2,9 +2,10 @@
 CMTM = 2.54E-5 # 1 mil in meters
 
 PAUL_RIBBON_CABLE = {
+    'name': 'PAUL_RIBBON_CABLE',
     'type': 'coated_wires',
     'ref': 'Paul (2008)',
-    'idx_ref_conductor': 1,
+    'idx_ref_conductor': 0,
     0: {
         'line_id': 0,
         'conductor_name': 'p',
@@ -30,12 +31,12 @@ PAUL_RIBBON_CABLE = {
         'conductor_name': 'q',
         'line_type': 'active',
         'line_return': 0,
-        'center_point': (1*50*CMTM, 0.0),
+        'center_point': (50*CMTM, 0.0),
         'radius': [0, 7.5*CMTM],
         'conductivity': 1/1.68E-8,
         'subconductors': None,
         'sheath': {'name': 'coated',
-                    'center_point': (1*50*CMTM, 0.0),
+                    'center_point': (50*CMTM, 0.0),
                     'thickness': 10.0*CMTM,
                     'fourier_order': 4,
                     'relative_permittivity': 3.5},
@@ -50,12 +51,12 @@ PAUL_RIBBON_CABLE = {
         'conductor_name': 'r',
         'line_type': 'active',
         'line_return': 0,
-        'center_point': (2*50*CMTM, 0.0),
+        'center_point': (100*CMTM, 0.0),
         'radius': [0, 7.5*CMTM],
         'conductivity': 1/1.68E-8,
         'subconductors': None,
         'sheath': {'name': 'coated',
-                    'center_point': (2*50*CMTM, 0.0),
+                    'center_point': (100*CMTM, 0.0),
                     'thickness': 10.0*CMTM,
                     'fourier_order': 4,
                     'relative_permittivity': 3.5},
@@ -68,6 +69,7 @@ PAUL_RIBBON_CABLE = {
 }
 
 CLEMENTS_BIFILAR_COATED_WIRE_S40 = {
+    'name': 'CLEMENTS_BIFILAR_COATED_WIRE_S40',
     'type': 'coated_wires',
     'ref': 'Clements (1974)',
     'idx_ref_conductor': 0,
@@ -114,6 +116,7 @@ CLEMENTS_BIFILAR_COATED_WIRE_S40 = {
 }
 
 BIFILAR_BARE_WIRE_S21 = {
+    'name': 'BIFILAR_BARE_WIRE_S21',
     'type': 'bare_wires',
     'ref': 'Clements (1974)',
     'idx_ref_conductor': 0,
@@ -131,7 +134,7 @@ BIFILAR_BARE_WIRE_S21 = {
         'relative_permittivity': 1.0,
         'relative_permittivity_out': 1.0,
         'potential_to_infinity': -1.0,
-        'fourier_order': 8,
+        'fourier_order': 12,
     },
     1: {
         'line_id': 1,
@@ -147,11 +150,12 @@ BIFILAR_BARE_WIRE_S21 = {
         'relative_permittivity': 1.0,
         'relative_permittivity_out': 1.0,
         'potential_to_infinity': 1.0,
-        'fourier_order': 8,
+        'fourier_order': 12,
     },
 }
 
 BIFILAR_COATED_WIRE_S40 = {
+    'name': 'BIFILAR_COATED_WIRE_S40',
     'type': 'coated_wires',
     'ref': 'Clements (1974)',
     'idx_ref_conductor': 0,
