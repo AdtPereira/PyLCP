@@ -35,7 +35,7 @@ except IndexError:
 # IMPORTAÇÕES DOS MÓDULOS E MODELO DE DADOS
 try:
     from mtl_data.models import BIFILAR_BARE_WIRE_S21
-    from analyzer.bifilar_wires import BifilarPULParameters
+    from analyzer.bifilar_bare_wires import BifilarBareWirePULParameters
     print("Módulos e modelo de dados importados com sucesso.")
 except ImportError as e:
     print(f"Erro ao importar módulos: {e}")
@@ -45,7 +45,7 @@ except ImportError as e:
 if __name__ == "__main__":
     """ Função principal para orquestrar a análise, cálculo e visualização dos resultados. """
     start_time = time.time()
-    analyzer = BifilarPULParameters(project_root, BIFILAR_BARE_WIRE_S21)
+    analyzer = BifilarBareWirePULParameters(project_root, BIFILAR_BARE_WIRE_S21)
     analyzer.srw_rates_analytical()
     analyzer.srw_rates_py_mom()
     

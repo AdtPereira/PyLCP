@@ -4,7 +4,7 @@ CMTM = 2.54E-5 # 1 mil in meters
 PAUL_RIBBON_CABLE = {
     'name': 'PAUL_RIBBON_CABLE',
     'type': 'coated_wires',
-    'ref': 'Paul (2008)',
+    'note': 'Original Paul (2008) problem',
     'idx_ref_conductor': 0,
     0: {
         'line_id': 0,
@@ -68,10 +68,10 @@ PAUL_RIBBON_CABLE = {
     },    
 }
 
-CLEMENTS_BIFILAR_COATED_WIRE_S40 = {
+BIFILAR_COATED_WIRE_S4000 = {
     'name': 'CLEMENTS_BIFILAR_COATED_WIRE_S40',
     'type': 'coated_wires',
-    'ref': 'Clements (1974)',
+    'note': 'Original Clements (1974) problem',
     'idx_ref_conductor': 0,
     0: {
         'line_id': 0,
@@ -115,49 +115,10 @@ CLEMENTS_BIFILAR_COATED_WIRE_S40 = {
     },    
 }
 
-BIFILAR_BARE_WIRE_S21 = {
-    'name': 'BIFILAR_BARE_WIRE_S21',
-    'type': 'bare_wires',
-    'ref': 'Clements (1974)',
-    'idx_ref_conductor': 0,
-    0: {
-        'line_id': 0,
-        'conductor_name': 'q',
-        'line_type': 'return',
-        'line_return': None,
-        'center_point': (0.0, 0.0),
-        'radius': [0, 0.010],
-        'conductivity': 1/1.68E-8,
-        'subconductors': None,
-        'sheath': None,
-        'relative_permeability': 1.0,
-        'relative_permittivity': 1.0,
-        'relative_permittivity_out': 1.0,
-        'potential_to_infinity': -1.0,
-        'fourier_order': 9,
-    },
-    1: {
-        'line_id': 1,
-        'conductor_name': 'p',
-        'line_type': 'active',
-        'line_return': 0,
-        'center_point': (0.021, 0.0),
-        'radius': [0, 0.010],
-        'conductivity': 1/1.68E-8,
-        'subconductors': None,
-        'sheath': None,
-        'relative_permeability': 1.0,
-        'relative_permittivity': 1.0,
-        'relative_permittivity_out': 1.0,
-        'potential_to_infinity': 1.0,
-        'fourier_order': 9,
-    },
-}
-
 BIFILAR_COATED_WIRE_S40 = {
     'name': 'BIFILAR_COATED_WIRE_S40',
     'type': 'coated_wires',
-    'ref': 'Clements (1974)',
+    'note': 'Modified Clements (1974) problem with conductor radii rw=10mm',
     'idx_ref_conductor': 0,
     0: {
         'line_id': 0,
@@ -201,6 +162,44 @@ BIFILAR_COATED_WIRE_S40 = {
     },    
 }
 
+BIFILAR_BARE_WIRE_S21 = {
+    'name': 'BIFILAR_BARE_WIRE_S21',
+    'type': 'bare_wires',
+    'note': 'Modified Clements (1974) problem with conductor radii rw=10mm',
+    'idx_ref_conductor': 0,
+    0: {
+        'line_id': 0,
+        'conductor_name': 'q',
+        'line_type': 'return',
+        'line_return': None,
+        'center_point': (0.0, 0.0),
+        'radius': [0, 0.010],
+        'conductivity': 1/1.68E-8,
+        'subconductors': None,
+        'sheath': None,
+        'relative_permeability': 1.0,
+        'relative_permittivity': 1.0,
+        'relative_permittivity_out': 1.0,
+        'potential_to_infinity': -1.0,
+        'fourier_order': 9,
+    },
+    1: {
+        'line_id': 1,
+        'conductor_name': 'p',
+        'line_type': 'active',
+        'line_return': 0,
+        'center_point': (0.021, 0.0),
+        'radius': [0, 0.010],
+        'conductivity': 1/1.68E-8,
+        'subconductors': None,
+        'sheath': None,
+        'relative_permeability': 1.0,
+        'relative_permittivity': 1.0,
+        'relative_permittivity_out': 1.0,
+        'potential_to_infinity': 1.0,
+        'fourier_order': 9,
+    },
+}
 
 # SINGLE_OVERHEAD_DECONTI = [
 #     {

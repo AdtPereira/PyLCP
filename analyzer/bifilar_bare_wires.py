@@ -12,7 +12,7 @@ from mom_so.quasi_static_green import QuasiStatic
 from mom_so.lossless_medium import HomogeneousLosslessMedium, LosslessPostProcessing
 
 
-class BifilarPULParameters():
+class BifilarBareWirePULParameters():
     """
     Encapsula a lógica para executar e analisar o estudo de convergência
     de capacitância, comparando MoM Python e Fortran.
@@ -442,7 +442,7 @@ class BifilarPULParameters():
         plt.tight_layout()
 
 
-class BifilarConvergenceAnalyzer():
+class BifilarBareWireConvergence():
     """
     The ConvergenceAnalyzer class is a tool designed to perform and visualize a convergence analysis 
     for the electrical parameters of multiconductor transmission lines (MTLs). 
@@ -854,7 +854,76 @@ class BifilarConvergenceAnalyzer():
         plt.tight_layout()
 
 
-    def plot_capacitance_matrix(self):
+    def plot_generalized_capacitance_matrix(self):
+        """
+        Gera o gráfico de convergência da capacitância generalizada, com subplots
+        separados para os termos CGEN_00 e CGEN_01.
+        """
+        if self.results_df is None:
+            print("Execute as simulações primeiro com 'run_convergence()'.")
+            return
+
+        assert self.results_df.index.max() == self.sum_max - 1, \
+            f"A simulação não rodou até o valor máximo esperado de k={self.sum_max - 1}"
+
+        # Extração de dados de forma programática.
+        # Esta parte permanece flexível para extrair todos os elementos,
+        # mesmo que apenas alguns sejam plotados.
+        ribbon, mom, mom_so = {}, {}, {}
+        try:
+            for i in range(self.N):
+                for j in range(self.N):
+                    ribbon[f'c_{i}{j}'] =   self._extract_matrix_element('CGEN (RIBBON.FOR)', row=i, col=j)
+                    mom_so[f'c_{i}{j}'] =   self._extract_matrix_element('CGEN (MOM-SO.PY)', row=i, col=j)
+                    mom[f'c_{i}{j}'] =      self._extract_matrix_element('CGEN (BARE-WIRE.PY)', row=i, col=j)
+        except (TypeError, IndexError, ValueError, KeyError) as e:
+            print(f"Erro ao extrair elementos da matriz de capacitância: {e}")
+            print("Verifique se as simulações foram executadas e se as matrizes 'CGEN' foram populadas com as dimensões corretas.")
+            return
+
+        plt.style.use('default')
+        # Cria uma figura com dois subplots (1 linha, 2 colunas)
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5), sharey=True)
+        # fig.suptitle('')
+
+        fortran_nf_axis = self.results_df.index + 1
+        python_nf_axis = 2 * self.results_df.index + 1
+        max_nf_fortran = fortran_nf_axis.max()
+        mask_py = python_nf_axis <= max_nf_fortran
+        
+        # --- Subplot 1: CGEN_00 ---
+        ax1.plot(fortran_nf_axis, ribbon['c_00'], label='RIBBON.FOR',
+                color=self.plot_params['colors'][0], marker=self.plot_params['markers'][0], linestyle=self.plot_params['linestyles'][0])
+        ax1.plot(python_nf_axis[mask_py], mom['c_00'][mask_py], label='MoM.PY',
+                color=self.plot_params['colors'][1], marker=self.plot_params['markers'][1], linestyle=self.plot_params['linestyles'][1], fillstyle='none')
+        ax1.plot(python_nf_axis[mask_py], mom_so['c_00'][mask_py], label='MoM-SO.PY',
+                color=self.plot_params['colors'][2], marker=self.plot_params['markers'][2], linestyle=self.plot_params['linestyles'][2], fillstyle='none')
+
+        # --- Subplot 2: CGEN_12 ---
+        ax2.plot(fortran_nf_axis, ribbon['c_01'], label='RIBBON.FOR',
+                color=self.plot_params['colors'][0], marker=self.plot_params['markers'][0], linestyle=self.plot_params['linestyles'][0])
+        ax2.plot(python_nf_axis[mask_py], mom['c_01'][mask_py], label='MoM.PY',
+                color=self.plot_params['colors'][1], marker=self.plot_params['markers'][1], linestyle=self.plot_params['linestyles'][1], fillstyle='none')
+        ax2.plot(python_nf_axis[mask_py], mom_so['c_01'][mask_py], label='MoM-SO.PY',
+                color=self.plot_params['colors'][2], marker=self.plot_params['markers'][2], linestyle=self.plot_params['linestyles'][2], fillstyle='none')
+
+        # Configuração dos eixos para ambos os subplots
+        for ax in [ax1, ax2]:
+            ax.set_xlabel('Number of Fourier Coefficients (NF)', fontsize=11)
+            ax.set_xlim(0.8, max_nf_fortran + 0.2)
+            ax.set_xticks(np.arange(1, max_nf_fortran + 1, 1))
+            ax.tick_params(top=True, right=True, direction='in', which='both')
+            ax.legend(loc='lower right', fontsize=10)
+            ax.grid(False)
+
+        # Configurações específicas por subplot
+        ax1.set_ylabel('Generalized Capacitance Matrix, $CGEN$ (pF/m)', fontsize=11)
+        ax1.set_title('Auto-Capacitance Term $CGEN_{00}$')
+        ax2.set_title('Mutual Capacitance Term $CGEN_{01}$')
+        plt.tight_layout(rect=[0, 0, 1, 0.96])
+
+
+    def plot_free_space_capacitance_matrix(self):
         """ Gera o gráfico de convergência da capacitância do espaço livro, adaptando-se ao número de condutores do sistema. """
         if self.results_df is None:
             print("Execute as simulações primeiro com 'run_study()'.")
@@ -867,13 +936,7 @@ class BifilarConvergenceAnalyzer():
         ribbon, mom, mom_so = {}, {}, {}
         try:
             for i in range(self.N-1):
-                # Elementos da diagonal principal (auto-capacitâncias C_ii)
-                ribbon[f'c_{i}{i}'] =   self._extract_matrix_element('C0 (RIBBON.FOR)', row=i, col=i)
-                mom_so[f'c_{i}{i}'] =   self._extract_matrix_element('C0 (MOM-SO.PY)', row=i, col=i)
-                mom[f'c_{i}{i}'] =      self._extract_matrix_element('C0 (BARE-WIRE.PY)', row=i, col=i)
-
-                # Elementos fora da diagonal (capacitâncias mútuas C_ij)
-                for j in range(i + 1, self.N-1):
+                for j in range(self.N-1):
                     ribbon[f'c_{i}{j}'] =   self._extract_matrix_element('C0 (RIBBON.FOR)', row=i, col=j)
                     mom_so[f'c_{i}{j}'] =   self._extract_matrix_element('C0 (MOM-SO.PY)', row=i, col=j)
                     mom[f'c_{i}{j}'] =      self._extract_matrix_element('C0 (BARE-WIRE.PY)', row=i, col=j)
@@ -896,13 +959,13 @@ class BifilarConvergenceAnalyzer():
             idx = i % len(self.plot_params['markers'])
             
             # Plot da diagonal principal
-            ax.plot(fortran_nf_axis, ribbon[f'c_{i}{i}'], label=f'$C_{{{i+1}{i+1}}} (RIBBON.FOR)$',
+            ax.plot(fortran_nf_axis, ribbon[f'c_{i}{i}'], label='RIBBON.FOR',
                     color=self.plot_params['colors'][0], marker=self.plot_params['markers'][idx], linestyle=self.plot_params['linestyles'][0])
 
-            ax.plot(python_nf_axis[mask_py], mom[f'c_{i}{i}'][mask_py], label=f'$C_{{{i+1}{i+1}}} (MoM.PY)$',
+            ax.plot(python_nf_axis[mask_py], mom[f'c_{i}{i}'][mask_py], label='MoM.PY',
                     color=self.plot_params['colors'][1], marker=self.plot_params['markers'][idx], linestyle=self.plot_params['linestyles'][1], fillstyle='none')
 
-            ax.plot(python_nf_axis[mask_py], mom_so[f'c_{i}{i}'][mask_py], label=f'$C_{{{i+1}{i+1}}} (MoM-SO.PY)$',
+            ax.plot(python_nf_axis[mask_py], mom_so[f'c_{i}{i}'][mask_py], label='MoM-SO.PY',
                     color=self.plot_params['colors'][2], marker=self.plot_params['markers'][idx], linestyle=self.plot_params['linestyles'][2], fillstyle='none')
 
             # Plot dos elementos fora da diagonal
@@ -918,10 +981,13 @@ class BifilarConvergenceAnalyzer():
                 ax.plot(python_nf_axis[mask_py], mom_so[f'c_{i}{j}'][mask_py], label=f'$C_{{{i+1}{j+1}}} (MoM-SO.PY)$',
                         color=self.plot_params['colors'][5], marker=self.plot_params['markers'][ijdx], linestyle=self.plot_params['linestyles'][2], fillstyle='none')
 
+        ax.set_title('Auto-Capacitance Term $C0_{11}$')
         ax.set_xlabel('Number of Fourier Coefficients (NF)', fontsize=12)
-        ax.set_ylabel('Capacitance Matrix (pF/m)', fontsize=12)
+        ax.set_ylabel('Free-Space Capacitance Matrix, $C0$ (pF/m)', fontsize=12)
         ax.set_xlim(0.8, max_nf_fortran + 0.2)
         ax.set_xticks(np.arange(1, max_nf_fortran + 1, 1))
-        ax.legend(loc='upper center', fontsize=9, ncol=legend_items_count, bbox_to_anchor=(0.5, 1.1), fancybox=True)
+        ax.tick_params(top=True, right=True, direction='in', which='both')
+        # ax.legend(loc='upper center', fontsize=9, ncol=legend_items_count, bbox_to_anchor=(0.5, 1.1), fancybox=True)
+        ax.legend(loc='lower right', fontsize=10)
         ax.grid(False)
         plt.tight_layout()

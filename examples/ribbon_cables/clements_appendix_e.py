@@ -37,7 +37,7 @@ project_root = setup_project_paths()
 try:
     from mom.coated_wire_systems import TwoCoatedWireSystem
     from mtl_paul.py_fortran import FortranRunner
-    from mtl_data.models import CLEMENTS_BIFILAR_COATED_WIRE_S40 as MTL
+    from mtl_data.models import BIFILAR_COATED_WIRE_S4000 as MTL
     print("Módulos e modelo de dados importados com sucesso.")
 except ImportError as e:
     print(f"Erro ao importar módulos: {e}")

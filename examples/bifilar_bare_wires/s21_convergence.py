@@ -21,7 +21,7 @@ except IndexError:
 try:
     from mtl_data.models import BIFILAR_BARE_WIRE_S21
     from mtl_data.graphics import MTLRepresentation
-    from analyzer.bifilar_wires import BifilarConvergenceAnalyzer
+    from analyzer.bifilar_bare_wires import BifilarBareWireConvergence
     print("Módulos e modelo de dados importados com sucesso.")
 except ImportError as e:
     print(f"Erro ao importar módulos: {e}")
@@ -29,10 +29,11 @@ except ImportError as e:
 
 if __name__ == "__main__":
     st = time.time()
-    analyzer = BifilarConvergenceAnalyzer(project_root, BIFILAR_BARE_WIRE_S21, SUM_MAX=15)
+    analyzer = BifilarBareWireConvergence(project_root, BIFILAR_BARE_WIRE_S21, SUM_MAX=15)
     analyzer.run_single_fortran_simulation()
     analyzer.run_convergence()
-    analyzer.plot_capacitance_matrix()    
+    analyzer.plot_generalized_capacitance_matrix()    
+    analyzer.plot_free_space_capacitance_matrix()    
 
     print(f"\nRotinas de cálculo finalizadas em {(time.time()-st):.2f} segundos.")
     MTLRepresentation(BIFILAR_BARE_WIRE_S21).bare_and_coated_wires()
