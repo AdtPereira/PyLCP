@@ -26,8 +26,8 @@ except ImportError as e:
     sys.exit(1)
 
 if __name__ == '__main__':
-    analyzer = ConvergenceAnalyzer(project_root, PAUL_RIBBON_CABLE, NF_MAX=10)
+    analyzer = ConvergenceAnalyzer(project_root, PAUL_RIBBON_CABLE, SUM_MAX=10)
     analyzer.run_single_fortran_simulation()
     analyzer.run_convergence()
-    analyzer.plot_free_space_capacitance()
+    analyzer.plot_free_space_capacitance_matrix()
     plt.show()

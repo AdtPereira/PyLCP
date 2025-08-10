@@ -28,6 +28,7 @@ class FortranRunner:
         self.L_matrix = None
         self.C_matrix = None
         self.C0_matrix = None
+        self.NF = None
 
     def _write_input_file(self, params: dict):
         """

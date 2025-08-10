@@ -17,7 +17,7 @@ C                     University of Kentucky
 C                     Lexington, KY 40506
 C
 C**********************************************************************
-      PARAMETER(MSIZE=100)
+      PARAMETER(MSIZE=200)
       REAL A(MSIZE,MSIZE),B(MSIZE,MSIZE),C(MSIZE,MSIZE),D(MSIZE,MSIZE)
       REAL CGEN(MSIZE,MSIZE),CAP(MSIZE,MSIZE),INDUCT,IDENT(MSIZE,MSIZE)
       REAL CAP0(MSIZE,MSIZE)

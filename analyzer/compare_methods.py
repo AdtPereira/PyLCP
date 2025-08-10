@@ -58,7 +58,7 @@ class CompareBifilarPULParameters():
 
         self.fortran_base_params = {
             'N':    2,
-            'NF':   mtl[refIdx]['fourier_order'],
+            'NF':   mtl[refIdx]['fourier_order'] + 1,
             'IREF': refIdx,
             'RW':   mtl[refIdx]['radius'][1],
             'TD':   sheath_dict.get('thickness', 0.0),
@@ -127,7 +127,9 @@ class CompareBifilarPULParameters():
         print("="*self.pt2 + " BIFILAR BARE-WIRE RIBBON CABLE SIMULATION " + "="*self.pt2)
         print(f"Project: {self.project_root}")
         print(f"Model: {self.mtl_copy['name']}")
-        print(f"D/R = {self.DR_ratio} --- NF = {self.mtl_copy[0]['fourier_order']} per conductor.")
+        print(f"D/R = {self.DR_ratio}. Fourier Order (k) = {self.mtl_copy[0]['fourier_order']}.")
+        print(f"RIBBON Fourier Coef./cond. (NF) = {self.mtl_copy[0]['fourier_order']+1}.")
+        print(f"PYTHON Fourier Coef./cond. (NF) = {2*self.mtl_copy[0]['fourier_order']+1}.")
         print(f"Exact Bifilar Bare Wire Capacitance: {self.analytical_bifilar_capacitance * 1E12:.4f} pF/m")
         print("="*self.pt1)
 
@@ -173,7 +175,7 @@ class CompareBifilarPULParameters():
         mom_wires.run_simulation()
         mom_wires.print_results()
 
-        self.mom_data = {freq: {'c': self.c_factor * mom_wires.C_maxwellian} for freq in self.freq_range['mom']}
+        self.mom_data = {freq: {'c': self.c_factor * mom_wires.C_maxwellian.item()} for freq in self.freq_range['mom']}
 
         if autoPlots:
             mom_wires.plot_charge_density()
@@ -251,6 +253,7 @@ class CompareBifilarPULParameters():
             print(f"\nGreen's Matrix (Dim: {green_matrix.shape}):\n{green_matrix}")
             print(f"\n2*pi*e0*G:\n{- 2 * np.pi * epsilon_0 * np.real(green_matrix)}")
 
+        print(f"\nGreen's Matrix Shape: {green_matrix.shape}.")
         print(f"\nMoM-SO Generalized Capacitance Matrix (F/m): \n{np.real(general_cap)}")
         print(f"\nMoM-SO Bifilar Capacitance: \n{np.real(maxwell_cap.item()) * 1E12:.4f} pF/m")
 
@@ -316,8 +319,8 @@ class CompareBifilarPULParameters():
             capacitance = mom_so.maxwellian_capacitance_matrix(gen_cap)
 
             self.mom_so_data[ratio] = {'c': self.c_factor * np.real(capacitance.item())}
-            self.ribbon_data[ratio] = {'c': self.c_factor * self.runner.C0_matrix[0,0]} 
-            self.mom_data[ratio]    = {'c': self.c_factor * mom_wires.C_maxwellian}
+            self.ribbon_data[ratio] = {'c': self.c_factor * self.runner.C0_matrix[0, 0]} 
+            self.mom_data[ratio]    = {'c': self.c_factor * mom_wires.C_maxwellian.item()}
 
 
     def plot_resistance_results(self):

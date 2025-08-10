@@ -134,7 +134,7 @@ BIFILAR_BARE_WIRE_S21 = {
         'relative_permittivity': 1.0,
         'relative_permittivity_out': 1.0,
         'potential_to_infinity': -1.0,
-        'fourier_order': 12,
+        'fourier_order': 9,
     },
     1: {
         'line_id': 1,
@@ -150,7 +150,7 @@ BIFILAR_BARE_WIRE_S21 = {
         'relative_permittivity': 1.0,
         'relative_permittivity_out': 1.0,
         'potential_to_infinity': 1.0,
-        'fourier_order': 12,
+        'fourier_order': 9,
     },
 }
 

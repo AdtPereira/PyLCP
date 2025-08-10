@@ -105,21 +105,44 @@ class MulticonductorBareWireSystems(MTL):
 
     def _calculate_maxwellian_capacitance(self):
         """
-        Calcula a matriz de capacitância física (Maxwelliana) a partir da generalizada.
+        Calcula a matriz de capacitância física (Maxwelliana) de dimensão (N-1)x(N-1)
+        a partir da matriz de capacitância generalizada de dimensão NxN.
+
+        Este processo ocorre em duas etapas:
+        1.  Primeiro, uma matriz Maxwelliana completa (NxN) é calculada usando a
+            Equação 5.21, que é dada por:
+            C_completa_ij = c_ij - (soma_linha_i * soma_coluna_j) / soma_total
+        2.  Em seguida, a matriz é reduzida para (N-1)x(N-1) ao remover a linha e a
+            coluna correspondentes ao condutor de referência, cujo índice é
+            especificado pelo atributo da classe `self.idx_ref`.
         """
         gc = self.C_generalized
-        assert isinstance(gc, np.ndarray) and np.sum(gc) != 0 and gc.shape == (2, 2)
 
-        row_sum = np.sum(gc, axis=1)
-        column_sum = np.sum(gc, axis=0)
-        
-        # Para um sistema de 2 condutores, a matriz maxwelliana é 1x1
-        # C11 = c11 - (sum(row1) * sum(col1)) / sum(total)
-        c11 = gc[1, 1]
-        row_1_sum = row_sum[1]
-        column_1_sum = column_sum[1]
-        
-        self.C_maxwellian = c11 - (row_1_sum * column_1_sum) / np.sum(gc)
+        # --- Validações ---
+        assert isinstance(gc, np.ndarray), "A matriz de capacitância generalizada deve ser um array NumPy."
+        assert gc.ndim == 2 and gc.shape[0] == gc.shape[1], "A matriz de capacitância generalizada deve ser quadrada."
+        num_conductors = gc.shape[0]
+        assert num_conductors > 1, "O cálculo da capacitância Maxwelliana requer pelo menos 2 condutores."
+        assert hasattr(self, 'idx_ref'), "O atributo 'idx_ref' (índice do condutor de referência) não foi encontrado."
+        assert 0 <= self.idx_ref < num_conductors, f"O índice de referência self.idx_ref ({self.idx_ref}) está fora do intervalo válido [0, {num_conductors-1}]."
+
+        # --- Etapa 1: Calcular a matriz Maxwelliana completa (NxN) ---
+        total_sum = np.sum(gc)
+
+        # Evita a divisão por zero
+        if np.abs(total_sum) < 1e-15:
+            raise ValueError("A soma dos elementos da matriz de capacitância generalizada é zero, resultando em divisão por zero.")
+
+        row_sums = np.sum(gc, axis=1)
+        col_sums = np.sum(gc, axis=0)
+
+        correction_matrix = np.outer(row_sums, col_sums) / total_sum
+        C_full = gc - correction_matrix
+
+        # --- Etapa 2: Reduzir a matriz para (N-1)x(N-1) ---
+        # Usa np.delete para remover a linha (axis=0) e a coluna (axis=1)
+        # correspondentes ao índice do condutor de referência `self.idx_ref`.
+        self.C_maxwellian = np.delete(np.delete(C_full, self.idx_ref, axis=0), self.idx_ref, axis=1)
 
     def run_simulation(self):
         """
@@ -227,8 +250,9 @@ class MulticonductorBareWireSystems(MTL):
             print(f"\nSigma Coefficients (Shape: {self.sigma_coeffs.shape}):\n{self.sigma_coeffs}")
             # print(f"\nT Matrix (Inverse of D) (Shape: {self.T_matrix.shape}):\n{self.T_matrix}")
 
+        print(f"\nD Matrix Shape: {self.D_matrix.shape}.")
         print(f"\nMoM Generalized Capacitance Matrix (F/m): \n{self.C_generalized}")
-        print(f"\nMaxwellian Bifilar Capacitance (MoM): \n{self.C_maxwellian * 1E12:.4f} pF/m.")
+        print(f"\nMaxwellian Bifilar Capacitance (MoM): \n{self.C_maxwellian.item() * 1E12:.4f} pF/m.")
 
     def plot_collocation_points(self):
         """

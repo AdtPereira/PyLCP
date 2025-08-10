@@ -29,7 +29,7 @@ except ImportError as e:
 
 if __name__ == '__main__':
     st = time.time()
-    analyzer = ConvergenceAnalyzer(project_root, PAUL_RIBBON_CABLE, NF_MAX=10)
+    analyzer = ConvergenceAnalyzer(project_root, PAUL_RIBBON_CABLE, SUM_MAX=10)
     analyzer.run_single_fortran_simulation()
     analyzer.run_convergence()
     
