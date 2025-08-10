@@ -19,7 +19,7 @@ except IndexError:
 
 # IMPORTAÇÕES DOS MÓDULOS E MODELO DE DADOS
 try:
-    from analyzer.convergence import ConvergenceAnalyzer
+    from analyzer.convergence import BifilarConvergenceAnalyzer
     from mtl_data.graphics import MTLRepresentation
     from mtl_data.models import PAUL_RIBBON_CABLE
     print("Módulos e modelo de dados importados com sucesso.")
@@ -29,7 +29,7 @@ except ImportError as e:
 
 if __name__ == '__main__':
     st = time.time()
-    analyzer = ConvergenceAnalyzer(project_root, PAUL_RIBBON_CABLE, SUM_MAX=10)
+    analyzer = BifilarConvergenceAnalyzer(project_root, PAUL_RIBBON_CABLE, SUM_MAX=10)
     analyzer.run_single_fortran_simulation()
     analyzer.run_convergence()
     

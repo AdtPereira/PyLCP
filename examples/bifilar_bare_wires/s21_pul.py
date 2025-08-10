@@ -21,20 +21,25 @@ except IndexError:
 try:
     from mtl_data.models import BIFILAR_BARE_WIRE_S21
     from mtl_data.graphics import MTLRepresentation
-    from analyzer.convergence import ConvergenceAnalyzer
+    from analyzer.bifilar_wires import BifilarPULParameters
     print("Módulos e modelo de dados importados com sucesso.")
 except ImportError as e:
     print(f"Erro ao importar módulos: {e}")
     sys.exit(1)
 
 if __name__ == "__main__":
-    st = time.time()
-    analyzer = ConvergenceAnalyzer(project_root, BIFILAR_BARE_WIRE_S21, SUM_MAX=15)
-    analyzer.run_single_fortran_simulation()
-    analyzer.run_convergence()
-    analyzer.plot_free_space_capacitance_matrix()    
-    analyzer.plot_generalized_capacitance_matrix()    
+    """ Função principal para orquestrar a análise, cálculo e visualização dos resultados. """
+    start_time = time.time()
+    analyzer = BifilarPULParameters(project_root, BIFILAR_BARE_WIRE_S21)
+    analyzer.run_analytical()
+    analyzer.run_fortran()
+    analyzer.run_mom_so()
+    analyzer.run_py_mom()
 
-    print(f"\nRotinas de cálculo finalizadas em {(time.time()-st):.2f} segundos.")
+    print(f"\nRotinas de cálculo finalizadas em {(time.time()-start_time):.2f} segundos.")
+    analyzer.show_header()
+    analyzer.plot_resistance_results()
+    analyzer.plot_inductance_results()
+    analyzer.plot_capacitance_results()
     MTLRepresentation(BIFILAR_BARE_WIRE_S21).bare_and_coated_wires()
     plt.show()
