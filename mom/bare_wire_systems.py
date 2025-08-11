@@ -6,7 +6,7 @@ import plotly.graph_objects as go
 from scipy.constants import epsilon_0
 
 from mtl_data.mtl import MulticonductorTransmissionLine as MTL
-
+from mtl_data.utils import *
 
 class MulticonductorBareWireSystems(MTL):
     """
@@ -165,23 +165,24 @@ class MulticonductorBareWireSystems(MTL):
 
         # 2. Montar a Matriz [D] e o Vetor [V]
         # Loop sobre as superfícies de OBSERVAÇÃO p (linhas da matriz)
-        for p, obs_surface in enumerate(self.surfaces):
-            tag_p = obs_surface['tag']
-            type_p = obs_surface['type']
-            radius_p = obs_surface['radius']
-            center_p = np.array(obs_surface['center_point'])
+        for p, field_surface in enumerate(self.surfaces):
+            tag_p = field_surface['tag']
+            type_p = field_surface['type']
+            radius_p = field_surface['radius']
+            center_p = np.array(field_surface['center_point'])
             nf_p = nfs_per_surface[p]
             offset_p = offsets[p]
 
             # Obtém os pontos de observação para a superfície p
-            obs_points_p = self.collocation_data[tag_p][type_p]['observation']['cartesian']
+            field_collocated_points = self.collocation_data[tag_p][type_p]['observation']['cartesian']
 
             # Preenche o vetor de potencial V para o bloco de linhas da superfície p
             if type_p == 'conductor':
                 # A fonte de potencial é o potencial do condutor
                 self.V_vector[offset_p : offset_p + nf_p] = self.mtl[tag_p]['potential_to_infinity']
+            
+            # A condição de fronteira na bainha dielétrica resulta em 0 no lado direito da equação
             elif type_p == 'sheath':
-                # A condição de fronteira na bainha dielétrica resulta em 0 no lado direito da equação
                 self.V_vector[offset_p : offset_p + nf_p] = 0.0
 
             # Loop sobre as superfícies de FONTE q (colunas da matriz)
@@ -193,45 +194,61 @@ class MulticonductorBareWireSystems(MTL):
 
                 # Loop sobre cada ponto de observação m na superfície p
                 for m in range(nf_p):
-                    global_row_idx = offset_p + m
-                    field_point = obs_points_p[m]
+                    row_idx = offset_p + m
                     
                     # Ângulo do ponto de observação relativo ao centro da sua PRÓPRIA superfície
-                    field2field_vec = field_point - center_p
-                    field_angle = np.arctan2(field2field_vec[1], field2field_vec[0])
+                    rho_i_vector = field_collocated_points[m] - center_p
+                    rho_i = np.linalg.norm(rho_i_vector)
+                    theta_i = np.arctan2(rho_i_vector[1], rho_i_vector[0])
 
                     # Loop sobre cada função de base n na superfície q
                     for n in range(nf_q):
-                        global_col_idx = offset_q + n
+                        col_idx = offset_q + n
+                        source_harmonic_idx = n  # Índice harmônico local da fonte
+                        is_cosine_term = (source_harmonic_idx % 2 != 0)
+                        k = (source_harmonic_idx + 1) // 2 if is_cosine_term else source_harmonic_idx // 2
                         
                         # --- Início da Lógica de Cálculo do Elemento da Matriz ---
                         # Esta seção implementa a física. Por enquanto, calcula o potencial.
                         # TODO: Adicionar a lógica do vetor deslocamento para type_p == 'sheath'
 
-                        source2field_vec = field_point - center_q
-                        source2field_norm = np.linalg.norm(source2field_vec)                        
-                        source_harmonic_idx = n  # Índice harmônico local da fonte
+                        # Ângulo e vetor fonte 'b' relativo ao centro da superfície FONTE 'q'
+                        rho_b_vector = field_collocated_points[m] - center_q
+                        rho_b = np.linalg.norm(rho_b_vector)
+                        theta_b = np.arctan2(rho_b_vector[1], rho_b_vector[0])
 
-                        if source_harmonic_idx == 0:  # Termo constante (k=0)
-                            if p == q: # Auto-interação
-                                self.D_matrix[global_row_idx, global_col_idx] = (-radius_q / epsilon_0) * np.log(radius_p)
-                            else: # Interação mútua
-                                self.D_matrix[global_row_idx, global_col_idx] = (-radius_q / epsilon_0) * np.log(source2field_norm)
-                        
-                        else:  # Termos harmônicos (k>0)
-                            is_cosine_term = (source_harmonic_idx % 2 != 0)
-                            k = (source_harmonic_idx + 1) // 2 if is_cosine_term else source_harmonic_idx // 2
+                        # ========================================================================
+                        # ==== INÍCIO DA LÓGICA DE CÁLCULO DO ELEMENTO DA MATRIZ D ===============
+                        # ========================================================================
 
-                            if p == q:  # Auto-interação
-                                term = np.cos(k * field_angle) if is_cosine_term else np.sin(k * field_angle)
-                                self.D_matrix[global_row_idx, global_col_idx] = (radius_q / (2 * k * epsilon_0)) * term
+                        # === BLOCO 1: CÁLCULO DE POTENCIAL (φ) ==================================
+                        # === Aplica a condição de contorno V = Vm nas superfícies condutoras. ===
+
+                        # Auto-interação (Observador NA fronteira da fonte)
+                        # Termo constante (k=0)
+                        if source_harmonic_idx == 0:
+                            if p == q:
+                                self.D_matrix[row_idx, col_idx] = (-radius_q / epsilon_0) * np.log(radius_p)
                             
-                            else:  # Interação mútua
-                                source_angle = np.arctan2(source2field_vec[1], source2field_vec[0])
-                                term = np.cos(k * source_angle) if is_cosine_term else np.sin(k * source_angle)
-                                self.D_matrix[global_row_idx, global_col_idx] = (radius_q / (2 * k * epsilon_0)) * ((radius_q / source2field_norm)**k) * term
+                            # Interação mútua
+                            else: 
+                                self.D_matrix[row_idx, col_idx] = (-radius_q / epsilon_0) * np.log(rho_b)
                         
-                        # --- Fim da Lógica de Cálculo ---
+                        # Termos harmônicos (k>0)
+                        else:  
+                            # Auto-interação
+                            if p == q:
+                                term = np.cos(k * theta_i) if is_cosine_term else np.sin(k * theta_i)
+                                self.D_matrix[row_idx, col_idx] = (radius_q / (2 * k * epsilon_0)) * term
+                            
+                            # Interação mútua
+                            else:
+                                term = np.cos(k * theta_b) if is_cosine_term else np.sin(k * theta_b)
+                                self.D_matrix[row_idx, col_idx] = (radius_q / (2 * k * epsilon_0)) * ((radius_q / rho_b)**k) * term
+                        
+                        # ========================================================================
+                        # ==== FIM DA LÓGICA DE CÁLCULO DO ELEMENTO DA MATRIZ D ==================
+                        # ========================================================================
 
         # 3. Resolver o sistema e obter os resultados
         self.sigma_coeffs = np.linalg.solve(self.D_matrix, self.V_vector)
@@ -246,13 +263,14 @@ class MulticonductorBareWireSystems(MTL):
             self.run_simulation()
 
         if self.NF < 4: 
-            print(f"\nD Matrix (Shape: {self.D_matrix.shape}):\n{self.D_matrix}")
-            print(f"\nSigma Coefficients (Shape: {self.sigma_coeffs.shape}):\n{self.sigma_coeffs}")
-            # print(f"\nT Matrix (Inverse of D) (Shape: {self.T_matrix.shape}):\n{self.T_matrix}")
+            matrix_viewer(self.D_matrix, "D Matrix")
+            matrix_viewer(self.sigma_coeffs, "Sigma Coefficients Vector")
+            print(f"\nSurfaces (len: {len(self.surfaces)}): \n{self.surfaces}")
 
+        print(f"\nSurfaces Dim: {len(self.surfaces)}.")
         print(f"\nD Matrix Shape: {self.D_matrix.shape}.")
-        print(f"\nMoM Generalized Capacitance Matrix (F/m): \n{self.C_generalized}")
-        print(f"\nMaxwellian Bifilar Capacitance (MoM): \n{self.C_maxwellian.item() * 1E12:.4f} pF/m.")
+        matrix_viewer(self.C_generalized, "MoM Generalized Capacitance Matrix (F/m)")
+        matrix_viewer(self.C_maxwellian, "Maxwellian Bifilar Capacitance (MoM) (F/m)")
 
     def plot_collocation_points(self):
         """

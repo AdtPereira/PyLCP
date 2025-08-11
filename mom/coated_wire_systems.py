@@ -6,6 +6,7 @@ import plotly.graph_objects as go
 from scipy.constants import epsilon_0
 
 from mtl_data.mtl import MulticonductorTransmissionLine as MTL
+from mtl_data.utils import *
 
 
 class TwoCoatedWireSystem(MTL):
@@ -26,7 +27,8 @@ class TwoCoatedWireSystem(MTL):
     def __init__(self, mtl: dict):
         super().__init__(mtl)
         assert isinstance(mtl, dict), "O parâmetro mtl deve ser um dicionário com a configuração da linha."
-        
+        assert len(self.surfaces) > 1, "O sistema deve ter mais de dois condutores."
+
         # Raio do condutor 'p' (primeiro condutor)
         self.R = self.surfaces[0]['radius']
         self.D = self.D_pq[0, 1]
@@ -75,11 +77,13 @@ class TwoCoatedWireSystem(MTL):
             self.collocation_data[tag][surface_type] = {
                 'source': {
                     'cartesian': source_points,
-                    'angles_rad': source_angles
+                    'angles_rad': source_angles,
+                    'angles_deg': np.degrees(source_angles)
                 },
                 'observation': {
                     'cartesian': field_points,
-                    'angles_rad': field_angles
+                    'angles_rad': field_angles,
+                    'angles_deg': np.degrees(field_angles)
                 }
             }
 
@@ -99,21 +103,44 @@ class TwoCoatedWireSystem(MTL):
 
     def _calculate_maxwellian_capacitance(self):
         """
-        Calcula a matriz de capacitância física (Maxwelliana) a partir da generalizada.
+        Calcula a matriz de capacitância física (Maxwelliana) de dimensão (N-1)x(N-1)
+        a partir da matriz de capacitância generalizada de dimensão NxN.
+
+        Este processo ocorre em duas etapas:
+        1.  Primeiro, uma matriz Maxwelliana completa (NxN) é calculada usando a
+            Equação 5.21, que é dada por:
+            C_completa_ij = c_ij - (soma_linha_i * soma_coluna_j) / soma_total
+        2.  Em seguida, a matriz é reduzida para (N-1)x(N-1) ao remover a linha e a
+            coluna correspondentes ao condutor de referência, cujo índice é
+            especificado pelo atributo da classe `self.idx_ref`.
         """
         gc = self.C_generalized
-        assert isinstance(gc, np.ndarray) and np.sum(gc) != 0 and gc.shape == (2, 2)
 
-        row_sum = np.sum(gc, axis=1)
-        column_sum = np.sum(gc, axis=0)
-        
-        # Para um sistema de 2 condutores, a matriz maxwelliana é 1x1
-        # C11 = c11 - (sum(row1) * sum(col1)) / sum(total)
-        c11 = gc[1, 1]
-        row_1_sum = row_sum[1]
-        column_1_sum = column_sum[1]
-        
-        self.C_maxwellian = c11 - (row_1_sum * column_1_sum) / np.sum(gc)
+        # --- Validações ---
+        assert isinstance(gc, np.ndarray), "A matriz de capacitância generalizada deve ser um array NumPy."
+        assert gc.ndim == 2 and gc.shape[0] == gc.shape[1], "A matriz de capacitância generalizada deve ser quadrada."
+        num_conductors = gc.shape[0]
+        assert num_conductors > 1, "O cálculo da capacitância Maxwelliana requer pelo menos 2 condutores."
+        assert hasattr(self, 'idx_ref'), "O atributo 'idx_ref' (índice do condutor de referência) não foi encontrado."
+        assert 0 <= self.idx_ref < num_conductors, f"O índice de referência self.idx_ref ({self.idx_ref}) está fora do intervalo válido [0, {num_conductors-1}]."
+
+        # --- Etapa 1: Calcular a matriz Maxwelliana completa (NxN) ---
+        total_sum = np.sum(gc)
+
+        # Evita a divisão por zero
+        if np.abs(total_sum) < 1e-15:
+            raise ValueError("A soma dos elementos da matriz de capacitância generalizada é zero, resultando em divisão por zero.")
+
+        row_sums = np.sum(gc, axis=1)
+        col_sums = np.sum(gc, axis=0)
+
+        correction_matrix = np.outer(row_sums, col_sums) / total_sum
+        C_full = gc - correction_matrix
+
+        # --- Etapa 2: Reduzir a matriz para (N-1)x(N-1) ---
+        # Usa np.delete para remover a linha (axis=0) e a coluna (axis=1)
+        # correspondentes ao índice do condutor de referência `self.idx_ref`.
+        self.C_maxwellian = np.delete(np.delete(C_full, self.idx_ref, axis=0), self.idx_ref, axis=1)
 
     def run_simulation(self):
         """
@@ -151,7 +178,7 @@ class TwoCoatedWireSystem(MTL):
             offset_p = offsets[p]
 
             # Obtém os pontos de observação para a superfície p
-            obs_points_p = self.collocation_data[tag_p][type_p]['observation']['cartesian']
+            observation_points = self.collocation_data[tag_p][type_p]['observation']['cartesian']
 
             # Preenche o vetor de potencial V para o bloco de linhas da superfície p
             if type_p == 'conductor':
@@ -166,20 +193,18 @@ class TwoCoatedWireSystem(MTL):
                 tag_q = source_surface['tag']
                 type_q = source_surface['type']
                 center_q = np.array(source_surface['center_point'])
-                radius_q = source_surface['radius']
                 nf_q = nfs_per_surface[q]
                 offset_q = offsets[q]
 
                 # Obtém os pontos de fonte para a superfície q
-                source_points_q = self.collocation_data[tag_q][type_q]['source']['cartesian']
-                angle_points_q = self.collocation_data[tag_q][type_q]['source']['angles_rad']
+                source_points = self.collocation_data[tag_q][type_q]['source']['cartesian']
 
                 # Loop sobre cada ponto de observação 'm' na superfície 'p'
                 for m in range(nf_p):
                     row_idx = offset_p + m
                     
                     # Ângulo e vetor de observação 'i' relativo ao centro da superfície FONTE 'q'
-                    rho_i_vector = obs_points_p[m] - center_q
+                    rho_i_vector = observation_points[m] - center_q
                     rho_i = np.linalg.norm(rho_i_vector)
                     theta_i = np.arctan2(rho_i_vector[1], rho_i_vector[0])
 
@@ -188,80 +213,45 @@ class TwoCoatedWireSystem(MTL):
                         col_idx = offset_q + n
                         source_harmonic_idx = n
                         
-                        # Ângulo e vetor fonte 'b' relativo ao centro da superfície FONTE 'q'
-                        rho_b_vector = source_points_q[n] - center_q
-                        rho_b = np.linalg.norm(rho_b_vector)
-                        theta_b = np.arctan2(rho_b_vector[1], rho_b_vector[0])
+                        # Trigonometric Term at observation point 
+                        is_cosine_term = (source_harmonic_idx % 2 != 0)
+                        k = (source_harmonic_idx + 1) // 2 if is_cosine_term else source_harmonic_idx // 2                  
+                        harmonic_term = np.cos(k * theta_i) if is_cosine_term else np.sin(k * theta_i)                                    
+                        
+                        # Vetor fonte 'rho_b' relativo ao centro da superfície FONTE 'q'
+                        rho_b = np.linalg.norm(source_points[m] - center_q)
 
-                        # =================================================================
-                        # ==== INÍCIO DA LÓGICA DE CÁLCULO DO ELEMENTO DA MATRIZ D ========
-                        # =================================================================
-                        is_observer_inside = rho_i < rho_b
+                        # ========================================================================
+                        # ==== INÍCIO DA LÓGICA DE CÁLCULO DO ELEMENTO DA MATRIZ D ===============
+                        # ========================================================================
+                        is_observer_inside = (rho_i < rho_b) and not np.isclose(rho_i, rho_b)
                         
                         # === BLOCO 1: CÁLCULO DE POTENCIAL (φ) ==================================
                         # === Aplica a condição de contorno V = Vm nas superfícies condutoras. ===
-                        if type_p == 'conductor':
-                            # Auto-interação (Observador NA fronteira da fonte)
-                            if p == q:  
-                                if source_harmonic_idx == 0:  # Termo Constante
-                                    self.D_matrix[row_idx, col_idx] = -rho_b * np.log(rho_i) / epsilon_0
-                                else:  # Termos Harmônicos
-                                    is_cosine_term = (source_harmonic_idx % 2 != 0)
-                                    k = (source_harmonic_idx + 1) // 2 if is_cosine_term else source_harmonic_idx // 2
-                                    term = np.cos(k * theta_i) if is_cosine_term else np.sin(k * theta_i)
-                                    self.D_matrix[row_idx, col_idx] = term / (2 * k * epsilon_0)
+
+                        if type_p == 'conductor':  
+                            # --- TABELA II.b: rho_i < rho_b (Interação para Observador DENTRO da fronteira da fonte) --- 
+                            if is_observer_inside:
+                                pass
                             
-
-                            # --- IMPLEMENTAÇÃO DA TABELA II.b (Interação Mútua (p != q) e Observador DENTRO da fronteira da fonte) --- 
-                            elif is_observer_inside:
-                                if source_harmonic_idx == 0:  # Termo Constante
-                                    # O potencial é constante e depende apenas do raio da fonte 
-                                    self.D_matrix[row_idx, col_idx] = -rho_b * np.log(rho_b) / epsilon_0
-                                else:  # Termos Harmônicos
-                                    is_cosine_term = (source_harmonic_idx % 2 != 0)
-                                    k = (source_harmonic_idx + 1) // 2 if is_cosine_term else source_harmonic_idx // 2
-                                    term = np.cos(k * theta_b) if is_cosine_term else np.sin(k * theta_b)
-                                    
-                                    # Fórmula de potencial da Tabela II.b 
-                                    numerator = (rho_b**k) * term
-                                    denominator = 2 * epsilon_0 * k * (radius_q**(k-1))
-                                    self.D_matrix[row_idx, col_idx] = numerator / denominator
-
-
-                            # --- IMPLEMENTAÇÃO DA TABELA II.a (Interação Mútua (p != q) e Observador FORA da fronteira da fonte) --- 
-                            else: 
-                                if source_harmonic_idx == 0: # Termo Constante
-                                    self.D_matrix[row_idx, col_idx] = -rho_b * np.log(rho_i) / epsilon_0
-                                else: # Termos Harmônicos
-                                    is_cosine_term = (source_harmonic_idx % 2 != 0)
-                                    k = (source_harmonic_idx + 1) // 2 if is_cosine_term else source_harmonic_idx // 2
-                                    term = np.cos(k * theta_b) if is_cosine_term else np.sin(k * theta_b)
-                                    
-                                    # Fórmula de potencial da Tabela II.a, equivalente a (20b)/(20c) [cite: 342, 349, 523]
-                                    self.D_matrix[row_idx, col_idx] = (term / (2 * k * epsilon_0)) * ((radius_q / rho_b)**k)
-                        
+                            # --- TABELA II.a: rho_i >= rho_b (Interação para Observador FORA ou SOBRE a fronteira da fonte) --- 
+                            else:                         
+                                if source_harmonic_idx == 0: # Constant Term (k=0)
+                                    self.D_matrix[row_idx, col_idx] = - rho_b * np.log(rho_i) / epsilon_0                                
+                                
+                                else: # Harmonic Terms (k>0)
+                                    self.D_matrix[row_idx, col_idx] = rho_b**(k+1) / (2 * k * epsilon_0 * rho_i**k) * harmonic_term
 
                         # === BLOCO 2: CONDIÇÃO DE CONTORNO DO VETOR DESLOCAMENTO (εE) =======================
                         # === Aplica (1 - εr) * Er = 0 nas superfícies da bainha. ============================
+                        
                         elif type_p == 'sheath':
                             er = field_surface['relative_permittivity']
-
-                            if source_harmonic_idx == 0: # Termo Constante
+                            if source_harmonic_idx == 0: # Constant Term (k=0)
                                 self.D_matrix[row_idx, col_idx] = (1 - er) * (rho_b / rho_i)
 
-                            else: # Termos Harmônicos (k>0)
-                                # Determina o índice k e se o termo é cossenoidal ou senoidal
-                                is_cosine_term = (source_harmonic_idx % 2 != 0)
-                                k = (source_harmonic_idx + 1) // 2 if is_cosine_term else source_harmonic_idx // 2
-                                
-                                # Termo trigonométrico avaliado no ponto de observação
-                                trig_term = np.cos(k * theta_i) if is_cosine_term else np.sin(k * theta_i)
-                                
-                                # Fator geométrico (r'/r)^(k+1) do campo elétrico radial
-                                geometric_factor = (rho_b / rho_i)**(k + 1)
-                                
-                                # Combina os termos para formar o elemento da matriz D
-                                self.D_matrix[row_idx, col_idx] = 0.5 * (1 - er) * geometric_factor * trig_term
+                            else: # Harmonic Terms (k>0)
+                                self.D_matrix[row_idx, col_idx] = 0.5 * (1 - er) * (rho_b / rho_i)**(k + 1) * harmonic_term
 
                         # ===============================================================
                         # ==== FIM DA LÓGICA DE CÁLCULO DO ELEMENTO DA MATRIZ D =========
@@ -275,20 +265,19 @@ class TwoCoatedWireSystem(MTL):
 
     def print_results(self):
         """Imprime um resumo dos resultados da simulação."""
-        print(f"\n--- Results for D/R = {self.DR_ratio}. k = {self.surfaces[0]['fourier_order']} and NF={self.NF} per conductor ---")
         if self.C_maxwellian is None:
             print("Executando simulação primeiro...")
             self.run_simulation()
 
+        print(f"\nSurfaces Dim: {len(self.surfaces)}.")
+        print(f"\nD Matrix Shape: {self.D_matrix.shape}.")
         if self.NF < 4: 
-            print(f"\nD Matrix (Shape: {self.D_matrix.shape}):\n{self.D_matrix}")
-            # print(f"\nT Matrix (Inverse of D) (Shape: {self.T_matrix.shape}):\n{self.T_matrix}")
+            matrix_viewer(self.D_matrix, "D Matrix")
+            print(f"\nSurfaces (len: {len(self.surfaces)}): \n{self.surfaces}")
+            print(f"\nSigma Coefficients (Shape: {self.sigma_coeffs.shape}): \n{self.sigma_coeffs}")
         
-        print(f"\nSurfaces (len: {len(self.surfaces)}): \n{self.surfaces}")
-        print(f"\nSigma Coefficients (Shape: {self.sigma_coeffs.shape}):\n{self.sigma_coeffs}")
-        print(f"\nMoM Generalized Capacitance Matrix (F/m): \n{self.C_generalized}")
-        print(f"\nExact Bifilar Bare Wire Capacitance: {self.C_exact_bare_wires * 1E12:.4f} pF/m")
-        print(f"\nMaxwellian Bifilar Capacitance (MoM): {self.C_maxwellian * 1E12:.4f} pF/m.")
+        matrix_viewer(self.C_generalized, "MoM Generalized Capacitance Matrix (F/m)")
+        matrix_viewer(self.C_maxwellian, "Maxwellian Bifilar Capacitance (MoM) (F/m)")
 
     def plot_collocation_points(self):
         """
@@ -514,52 +503,3 @@ class TwoCoatedWireSystem(MTL):
 
         plt.tight_layout()
         
-    @staticmethod
-    def plot_convergence_rates(MTL, nf_max=20):
-        """ Plota a convergência da capacitância em função de NF, usando um modelo base. """
-        print(f"\nGerando gráfico de convergência até NF={nf_max}...")
-        
-        C_FACTOR = 1e12  # Fator de conversão para pF/m
-        
-        # Extrai R e D da configuração base para calcular o valor exato.
-        R = MTL['data'][0]['radius'][1]
-        center1 = np.array(MTL['data'][0]['center_point'])
-        center2 = np.array(MTL['data'][1]['center_point'])
-        D = np.linalg.norm(center1 - center2)
-
-        c_exact = (np.pi * epsilon_0) / np.arccosh(D / R / 2.0)
-        nf_range = range(1, nf_max + 1)
-
-        nf_odd, nf_even, cap_odd, cap_even = [], [], [], []
-
-        for nf in nf_range:
-            # Cria uma cópia temporária do modelo para modificar NF sem alterar o original.
-            temp_config = copy.deepcopy(MTL)
-            temp_config['data'][0]['fourier_order'] = nf
-            temp_config['data'][1]['fourier_order'] = nf
-
-            sim = TwoBareWireSystem(temp_config)
-            sim.run_simulation()
-            
-            if nf % 2 != 0:
-                nf_odd.append(nf)
-                cap_odd.append(sim.C_maxwellian * C_FACTOR)
-            else:
-                nf_even.append(nf)
-                cap_even.append(sim.C_maxwellian * C_FACTOR)
-        
-        plt.style.use('default')
-        fig, ax = plt.subplots(figsize=(10, 7))
-        ax.axhline(y=c_exact * C_FACTOR, color='k', linestyle='-', label=f'Valor Exato = {c_exact*C_FACTOR:.2f} pF/m')
-        ax.plot(nf_odd, cap_odd, linestyle='none', marker='^', markersize=8, fillstyle='none', markeredgecolor='black', label='NF Ímpar')
-        ax.plot(nf_even, cap_even, linestyle='none', marker='*', markersize=8, color='black', label='NF Par')
-        ax.set_title(f'Convergência da Capacitância para D/R = {D/R:.2f}')
-        ax.set_xlabel('NF - Número de Coeficientes de Fourier por Fio')
-        ax.set_ylabel('Capacitância (pF/m)')
-        ax.set_xticks(np.arange(0, nf_max + 1, 2))
-        ax.set_xlim(0, nf_max); ax.set_ylim(bottom=0)
-        ax.set_ylim(0, max(cap_odd + cap_even) * 1.1)
-        ax.grid(False)
-        ax.legend()
-        plt.tight_layout()
-

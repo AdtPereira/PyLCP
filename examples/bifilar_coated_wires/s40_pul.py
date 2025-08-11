@@ -19,9 +19,9 @@ except IndexError:
 
 # IMPORTAÇÕES DOS MÓDULOS E MODELO DE DADOS
 try:
-    from mtl_data.models import BIFILAR_BARE_WIRE_S21
+    from mtl_data.models import BIFILAR_COATED_WIRE_S40
     from mtl_data.graphics import MTLRepresentation
-    from analyzer.bifilar_bare_wires import BifilarBareWirePULParameters
+    from analyzer.bifilar_coated_wires import BifilarCoatedWirePULParameters
     print("Módulos e modelo de dados importados com sucesso.")
 except ImportError as e:
     print(f"Erro ao importar módulos: {e}")
@@ -30,16 +30,11 @@ except ImportError as e:
 if __name__ == "__main__":
     """ Função principal para orquestrar a análise, cálculo e visualização dos resultados. """
     st = time.time()
-    analyzer = BifilarBareWirePULParameters(project_root, BIFILAR_BARE_WIRE_S21)
-    analyzer.run_analytical()
+    analyzer = BifilarCoatedWirePULParameters(project_root, BIFILAR_COATED_WIRE_S40)        
     analyzer.run_fortran()
-    analyzer.run_mom_so()
-    analyzer.run_py_mom()
+    analyzer.run_mom_methods()
 
     print(f"\nRotinas de cálculo finalizadas em {(time.time()-st):.2f} segundos.")
     analyzer.show_header()
-    analyzer.plot_resistance_results()
-    analyzer.plot_inductance_results()
-    analyzer.plot_capacitance_results()
-    MTLRepresentation(BIFILAR_BARE_WIRE_S21).bare_and_coated_wires()
+    MTLRepresentation(BIFILAR_COATED_WIRE_S40).bare_and_coated_wires()
     plt.show()
