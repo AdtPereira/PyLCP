@@ -1,9 +1,0 @@
-500                          =NUMBER OF FREQUENCIES (HARMONICS)
-1.0                          =PEAK PULSE LEVEL
-1.E6                         =REPETITION FREQUENCY OF PULSE TRAIN
-0.5                          =DUTY CYCLE OF PULSE TRAIN
-6.25E-9                      =PULSE RISE/FALL TIME
-20.E-9                       =FINAL SOLUTION TIME
-.1E-9                        =SOLUTION TIME INCREMENT
-1.6396E-3                    =DC VALUE OF TRANSFER FUNCTION, H(0)
-
