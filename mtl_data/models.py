@@ -132,13 +132,13 @@ BIFILAR_COATED_WIRE_S40 = {
         'sheath': {'name': 'coated',
                     'center_point': (0.0, 0.0),
                     'thickness': 0.010,
-                    'fourier_order': 4,
+                    'fourier_order': 0,
                     'relative_permittivity': 3.0},
         'relative_permeability': 1.0,
         'relative_permittivity': 1.0,
         'relative_permittivity_out': 1.0,
         'potential_to_infinity': -1.0,
-        'fourier_order': 4,
+        'fourier_order': 0,
     },
     1: {
         'line_id': 1,
@@ -152,13 +152,13 @@ BIFILAR_COATED_WIRE_S40 = {
         'sheath': {'name': 'coated',
                     'center_point': (0.040, 0.0),
                     'thickness': 0.010,
-                    'fourier_order': 4,
+                    'fourier_order': 0,
                     'relative_permittivity': 3.0},
         'relative_permeability': 1.0,
         'relative_permittivity': 1.0,
         'relative_permittivity_out': 1.0,
         'potential_to_infinity': 1.0,
-        'fourier_order': 4,
+        'fourier_order': 0,
     },    
 }
 
@@ -181,7 +181,7 @@ BIFILAR_BARE_WIRE_S21 = {
         'relative_permittivity': 1.0,
         'relative_permittivity_out': 1.0,
         'potential_to_infinity': -1.0,
-        'fourier_order': 9,
+        'fourier_order': 8,
     },
     1: {
         'line_id': 1,
@@ -197,7 +197,7 @@ BIFILAR_BARE_WIRE_S21 = {
         'relative_permittivity': 1.0,
         'relative_permittivity_out': 1.0,
         'potential_to_infinity': 1.0,
-        'fourier_order': 9,
+        'fourier_order': 8,
     },
 }
 

@@ -54,9 +54,20 @@ class TwoCoatedWireSystem(MTL):
         # Inicializa o dicionário principal que será o atributo da classe.
         self.collocation_data = {}
 
-        # Os ângulos são os mesmos para todas as superfícies, pois NF é constante.
-        source_angles = np.linspace(0, 2 * np.pi, self.NF, endpoint=False) + (np.pi / 2)
-        field_angles = source_angles + np.pi / self.NF
+        # Equação (A.4a): Ângulo de separação entre os pontos de colocação.
+        theta = 2 * np.pi / self.NF
+
+        # Equação (A.4b): Ângulo de rotação para o conjunto de pontos.
+        delta = np.pi / (2 * self.NF)
+
+        # Calcula os ângulos base, que são rotacionados por delta para obter
+        # os ângulos dos pontos de observação (match points).
+        base_angles = np.linspace(0, 2 * np.pi, self.NF, endpoint=False)
+        field_angles = base_angles + delta
+
+        # Os pontos de fonte são posicionados na metade do caminho entre os
+        # pontos de observação para garantir a estabilidade numérica.
+        source_angles = field_angles - (theta / 2)
 
         # Itera sobre cada superfície definida na classe base MTL.
         for surface in self.surfaces:
@@ -216,7 +227,8 @@ class TwoCoatedWireSystem(MTL):
                         # Trigonometric Term at observation point 
                         is_cosine_term = (source_harmonic_idx % 2 != 0)
                         k = (source_harmonic_idx + 1) // 2 if is_cosine_term else source_harmonic_idx // 2                  
-                        harmonic_term = np.cos(k * theta_i) if is_cosine_term else np.sin(k * theta_i)                                    
+                        harmonic_term = np.cos(k * theta_i) if is_cosine_term else np.sin(k * theta_i)
+                        e02k = 2 * epsilon_0 * k
                         
                         # Vetor fonte 'rho_b' relativo ao centro da superfície FONTE 'q'
                         rho_b = np.linalg.norm(source_points[m] - center_q)
@@ -232,7 +244,11 @@ class TwoCoatedWireSystem(MTL):
                         if type_p == 'conductor':  
                             # --- TABELA II.b: rho_i < rho_b (Interação para Observador DENTRO da fronteira da fonte) --- 
                             if is_observer_inside:
-                                pass
+                                if source_harmonic_idx == 0: # Constant Term (k=0)
+                                    self.D_matrix[row_idx, col_idx] = - rho_b * np.log(rho_b) / epsilon_0                                
+                                
+                                else: # Harmonic Terms (k>0)
+                                    self.D_matrix[row_idx, col_idx] = rho_i**k / e02k / rho_b**(k-1) * harmonic_term
                             
                             # --- TABELA II.a: rho_i >= rho_b (Interação para Observador FORA ou SOBRE a fronteira da fonte) --- 
                             else:                         
@@ -240,7 +256,7 @@ class TwoCoatedWireSystem(MTL):
                                     self.D_matrix[row_idx, col_idx] = - rho_b * np.log(rho_i) / epsilon_0                                
                                 
                                 else: # Harmonic Terms (k>0)
-                                    self.D_matrix[row_idx, col_idx] = rho_b**(k+1) / (2 * k * epsilon_0 * rho_i**k) * harmonic_term
+                                    self.D_matrix[row_idx, col_idx] = rho_b**(k+1) / e02k / rho_i**k * harmonic_term
 
                         # === BLOCO 2: CONDIÇÃO DE CONTORNO DO VETOR DESLOCAMENTO (εE) =======================
                         # === Aplica (1 - εr) * Er = 0 nas superfícies da bainha. ============================
@@ -269,12 +285,11 @@ class TwoCoatedWireSystem(MTL):
             print("Executando simulação primeiro...")
             self.run_simulation()
 
-        print(f"\nSurfaces Dim: {len(self.surfaces)}.")
-        print(f"\nD Matrix Shape: {self.D_matrix.shape}.")
         if self.NF < 4: 
             matrix_viewer(self.D_matrix, "D Matrix")
-            print(f"\nSurfaces (len: {len(self.surfaces)}): \n{self.surfaces}")
-            print(f"\nSigma Coefficients (Shape: {self.sigma_coeffs.shape}): \n{self.sigma_coeffs}")
+            matrix_viewer(self.sigma_coeffs, "Sigma Coefficients")
+        else:
+            print(f"\nD Matrix Shape: {self.D_matrix.shape}.")
         
         matrix_viewer(self.C_generalized, "MoM Generalized Capacitance Matrix (F/m)")
         matrix_viewer(self.C_maxwellian, "Maxwellian Bifilar Capacitance (MoM) (F/m)")

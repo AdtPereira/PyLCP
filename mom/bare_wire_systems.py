@@ -58,9 +58,20 @@ class MulticonductorBareWireSystems(MTL):
         # Inicializa o dicionário principal que será o atributo da classe.
         self.collocation_data = {}
 
-        # Os ângulos são os mesmos para todas as superfícies, pois NF é constante.
-        source_angles = np.linspace(0, 2 * np.pi, self.NF, endpoint=False) + (np.pi / 2)
-        field_angles = source_angles + np.pi / self.NF
+        ## Equação (A.4a): Ângulo de separação entre os pontos de colocação.
+        theta = 2 * np.pi / self.NF
+
+        # Equação (A.4b): Ângulo de rotação para o conjunto de pontos.
+        delta = np.pi / (2 * self.NF)
+
+        # Calcula os ângulos base, que são rotacionados por delta para obter
+        # os ângulos dos pontos de observação (match points).
+        base_angles = np.linspace(0, 2 * np.pi, self.NF, endpoint=False)
+        field_angles = base_angles + delta
+
+        # Os pontos de fonte são posicionados na metade do caminho entre os
+        # pontos de observação para garantir a estabilidade numérica.
+        source_angles = field_angles - (theta / 2)
 
         # Itera sobre cada superfície definida na classe base MTL.
         for surface in self.surfaces:

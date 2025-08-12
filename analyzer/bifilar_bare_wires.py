@@ -10,6 +10,7 @@ from mom.bare_wire_systems import MulticonductorBareWireSystems
 from analytical_forms.bare_wires import WiresHomogeneousMedia
 from mom_so.quasi_static_green import QuasiStatic
 from mom_so.lossless_medium import HomogeneousLosslessMedium, LosslessPostProcessing
+from mtl_data.utils import *
 
 
 class BifilarBareWirePULParameters():
@@ -38,6 +39,8 @@ class BifilarBareWirePULParameters():
 
         # Parâmetros de dados
         self.analytical_data = {}
+        self.srw_data = {}
+        self.srw_mum_data = {}
         self.mom_data = {}
         self.mom_so_data = {}
         self.ribbon_data = {}
@@ -136,32 +139,39 @@ class BifilarBareWirePULParameters():
         print("="*self.pt1)
 
 
-    def run_fortran(self, displayTerminal: bool = True):
+    def run_single_fortran(self):
+        """Executa uma simulação única para um valor específico de k."""
+        self._prepare_fortran_runner(self.mtl_copy)
+        self.runner.run_fortran(self.fortran_base_params)
+
+        print("\n")
+        print("="*self.pt2 + "                 RIBBON.FOR                " + "="*self.pt2)
+        if self.runner.CAP_matrix is not None:
+            if self.runner.A_matrix.shape[0] < 6:
+                matrix_viewer(self.runner.A_matrix,     "Block Matrix A")
+                matrix_viewer(self.runner.B_matrix,     "Block Matrix B")
+                matrix_viewer(self.runner.C_matrix,     "Block Matrix C")
+                matrix_viewer(self.runner.D_matrix,     "Block Matrix D")
+            else:
+                print(f"\nBlock matrices Shape: {self.runner.A_matrix.shape}.")
+
+            matrix_viewer(self.runner.IND_matrix,   "External Inductance Matrix, Le (H/m)")
+            matrix_viewer(self.runner.CAP_matrix,   "Capacitance Matrix, C (F/m)")
+            matrix_viewer(self.runner.CAP0_matrix,  "Capacitance Matrix in Vacuum, C0 (F/m)")
+            matrix_viewer(self.runner.CGEN0_matrix, "Free-Space Generalized Capacitance Matrix, CGEN0 (F/m)")
+            matrix_viewer(self.runner.CGEN_matrix,  "Generalized Capacitance Matrix, CGEN (F/m)")
+        else:
+            print("\nNo results found.")
+
+
+    def run_fortran(self):
         """Executa uma simulação única para um valor específico de k."""
         self._prepare_fortran_runner(self.mtl_copy)
         self.runner.run_fortran(self.fortran_base_params)
 
         self.ribbon_data = {
-            freq: {'c': self.c_factor * self.runner.C0_matrix[0,0], 
-                   'le': self.l_factor * self.runner.L_matrix[0,0]} for freq in self.freq_range['mom']}
-
-        if displayTerminal:
-            print("\n")
-            print("="*self.pt2 + "                 RIBBON.FOR                " + "="*self.pt2)
-            if self.runner.L_matrix is not None:
-                print("\nMatriz de Indutância Externa (Le):")
-                print(self.runner.L_matrix)
-
-                print("\nMatriz de Capacitância (C):")
-                print(self.runner.C_matrix)
-
-                print("\nMatriz de Capacitância no Vácuo (C0):")
-                print(self.runner.C0_matrix)
-
-                print("\nMatriz de Capacitância Generalizada (CGEN):")
-                print(self.runner.CGEN_matrix)
-            else:
-                print("\nNenhum resultado foi analisado. Verifique os logs de erro.")
+            freq: {'c': self.c_factor * self.runner.CAP0_matrix.item(), 
+                   'le': self.l_factor * self.runner.IND_matrix.item()} for freq in self.freq_range['mom']}
 
 
     def run_py_mom(self, autoPlots=False):
@@ -260,7 +270,7 @@ class BifilarBareWirePULParameters():
         print(f"\nMoM-SO Bifilar Capacitance: \n{np.real(maxwell_cap.item()) * 1E12:.4f} pF/m")
 
 
-    def srw_rates_analytical(self):
+    def srw_rates(self):
         """
         Executa a simulação analítica da impedância da linha de transmissão.
 
@@ -272,10 +282,9 @@ class BifilarBareWirePULParameters():
             tuple: Uma tupla contendo três listas: impedâncias série,
                 resistências de alta frequência e indutâncias externas.
         """
-        print("\n==============         Analytical Processing       =============")
+        print("\n==============         SRW RATES EVALUATION        =============")
 
         for ratio in self.srw_ratios['ana']:
-            # Cria a configuração da linha bifilar dinamicamente para cada razão.
             separation = ratio * self.mtl_copy[0]['radius'][1]
             self.mtl_copy[1]['center_point'] = (separation, 0.0)
 
@@ -283,7 +292,7 @@ class BifilarBareWirePULParameters():
             le_wires = wires.n_wires_inductance_matrix()
             pul_bifilar = wires.bifilar_pul_inductance_and_capacitance()
 
-            self.analytical_data[ratio] = {
+            self.srw_data[ratio] = {
                 'le_wires':     self.l_factor * le_wires,
                 'le_exact':     self.l_factor * pul_bifilar['inductance']['exact'],
                 'le_bifilar':   self.l_factor * pul_bifilar['inductance']['approximate'],
@@ -292,19 +301,6 @@ class BifilarBareWirePULParameters():
                 'c_wires':      self.c_factor * wires.n_wires_capacitance_matrix(le_wires),
             }
 
-
-    def srw_rates_py_mom(self):
-        """
-        Executa a simulação clássica do Método dos Momentos (MoM) para a linha de transmissão bifilar.
-
-        Returns:
-            BifilarMoM: Instância do objeto BifilarMoM configurado.
-        """
-        print("\n==============             RIBBON.FOR              =============")
-        print("\n============== pyMoM MulticonductorBareWireSystems =============")
-        print("\n==============  MoM-SO HomogeneousLosslessMedium   =============")
-
-        # Cria a configuração da linha bifilar dinamicamente para cada razão.
         for ratio in self.srw_ratios['mom']:
             separation = ratio * self.mtl_copy[0]['radius'][1]
             self.mtl_copy[1]['center_point'] = (separation, 0.0)
@@ -320,9 +316,11 @@ class BifilarBareWirePULParameters():
             gen_cap = mom_so.generalized_capacitance_matrix(green_matrix)
             capacitance = mom_so.maxwellian_capacitance_matrix(gen_cap)
 
-            self.mom_so_data[ratio] = {'c': self.c_factor * np.real(capacitance.item())}
-            self.ribbon_data[ratio] = {'c': self.c_factor * self.runner.C0_matrix[0, 0]} 
-            self.mom_data[ratio]    = {'c': self.c_factor * mom_wires.C_maxwellian.item()}
+            self.srw_mum_data[ratio] = {
+                'c_mom-so': self.c_factor * np.real(capacitance.item()),
+                'c_ribbon': self.c_factor * self.runner.CAP0_matrix.item(),
+                'c_mom': self.c_factor * mom_wires.C_maxwellian.item()
+            }
 
 
     def plot_resistance_results(self):
@@ -410,11 +408,11 @@ class BifilarBareWirePULParameters():
         """
 
         capacitante_data = {
-            'mom':      {'data': (self.srw_ratios.get('mom'), [data['c']        for data in self.mom_data.values()]),        'label': 'MoM'},
-            'ribbon':   {'data': (self.srw_ratios.get('mom'), [data['c']        for data in self.ribbon_data.values()]),     'label': 'RIBBON.FOR'},
-            'mom-so':   {'data': (self.srw_ratios.get('mom'), [data['c']        for data in self.mom_so_data.values()]),     'label': 'MoM-SO'},
-            'exactly':  {'data': (self.srw_ratios.get('ana'), [data['c_exact']  for data in self.analytical_data.values()]), 'label': 'Exactly'},
-            'approx':   {'data': (self.srw_ratios.get('ana'), [data['c_approx'] for data in self.analytical_data.values()]), 'label': 'Approx.'},
+            'mom':      {'data': (self.srw_ratios.get('mom'), [data['c_mom']    for data in self.srw_mum_data.values()]),   'label': 'MoM'},
+            'ribbon':   {'data': (self.srw_ratios.get('mom'), [data['c_ribbon'] for data in self.srw_mum_data.values()]),   'label': 'RIBBON.FOR'},
+            'mom-so':   {'data': (self.srw_ratios.get('mom'), [data['c_mom-so'] for data in self.srw_mum_data.values()]),   'label': 'MoM-SO'},
+            'exactly':  {'data': (self.srw_ratios.get('ana'), [data['c_exact']  for data in self.srw_data.values()]),       'label': 'Exactly'},
+            'approx':   {'data': (self.srw_ratios.get('ana'), [data['c_approx'] for data in self.srw_data.values()]),       'label': 'Approx.'},
         }
 
         fig, ax = plt.subplots(figsize=(8, 5))
@@ -568,47 +566,18 @@ class BifilarBareWireConvergence():
             # Coleta de resultados
             results.append({
                 'k': k,
-                'L (RIBBON.FOR)':       self.runner_silent.L_matrix if self.fortran_base_params is not None else np.nan,
-                'C (RIBBON.FOR)':       self.runner_silent.C_matrix if self.runner_silent.C_matrix is not None else np.nan,
-                'C0 (RIBBON.FOR)':      self.runner_silent.C0_matrix if self.runner_silent.C0_matrix is not None else np.nan,
+                'L (RIBBON.FOR)':       self.runner_silent.IND_matrix if self.fortran_base_params is not None else np.nan,
+                'C (RIBBON.FOR)':       self.runner_silent.CAP_matrix if self.fortran_base_params is not None else np.nan,
+                'C0 (RIBBON.FOR)':      self.runner_silent.CAP0_matrix if self.fortran_base_params is not None else np.nan,
+                'CGEN (RIBBON.FOR)':    self.runner_silent.CGEN0_matrix if self.fortran_base_params is not None else np.nan,
                 'C0 (BARE-WIRE.PY)':    mom_bare_wires.C_maxwellian if mom_bare_wires.C_maxwellian is not None else np.nan,
-                'C0 (MOM-SO.PY)':       np.real(maxwell_cap) if maxwell_cap is not None else np.nan,
-                'CGEN (RIBBON.FOR)':    self.runner_silent.CGEN_matrix if self.runner_silent.CGEN_matrix is not None else np.nan,
                 'CGEN (BARE-WIRE.PY)':  mom_bare_wires.C_generalized if mom_bare_wires.C_generalized is not None else np.nan,
+                'C0 (MOM-SO.PY)':       np.real(maxwell_cap) if maxwell_cap is not None else np.nan,
                 'CGEN (MOM-SO.PY)':     np.real(general_cap) if general_cap is not None else np.nan,
             })
             print(f"  Complete for k = {k}.")
 
         self.results_df = pd.DataFrame(results).set_index('k')
-
-
-    def run_single_fortran_simulation(self):
-        """Executa uma simulação única para um valor específico de k."""
-        
-        self._prepare_fortran_runner(self.mtl_copy)
-        self.runner.run_fortran(self.fortran_base_params)
-
-        dist1, dist2 = 59, 8
-        print("\n" + "="*dist1)
-        print("="*dist2 + " THREE-WIRE RIBBON CABLE SYSTEM SIMULATION " + "="*dist2)
-        print("="*dist1)
-        
-        print("\n")
-        print("="*dist2 + "                 RIBBON.FOR                " + "="*dist2)
-        if self.runner.L_matrix is not None:
-            print("\nMatriz de Indutância Externa (Le):")
-            print(self.runner.L_matrix)
-            
-            print("\nMatriz de Capacitância (C):")
-            print(self.runner.C_matrix)
-
-            print("\nMatriz de Capacitância no Vácuo (C0):")
-            print(self.runner.C0_matrix)
-
-            print("\nMatriz de Capacitância Generalizada (CGEN):")
-            print(self.runner.CGEN_matrix)
-        else:
-            print("\nNenhum resultado foi analisado. Verifique os logs de erro.")
 
 
     def plot_paul_fig514a(self):

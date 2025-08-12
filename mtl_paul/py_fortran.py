@@ -25,9 +25,16 @@ class FortranRunner:
         if not self.exe_path.is_file():
             raise FileNotFoundError(f"O arquivo executável não foi encontrado em: {self.exe_path}")
 
-        self.L_matrix = None
+        # Inicializa todos os atributos da matriz para refletir a nomenclatura final
+        self.A_matrix = None
+        self.B_matrix = None
         self.C_matrix = None
-        self.C0_matrix = None
+        self.D_matrix = None
+        self.CGEN0_matrix = None
+        self.IND_matrix = None
+        self.CAP_matrix = None
+        self.CAP0_matrix = None
+        self.CGEN_matrix = None
         self.NF = None
 
     def _write_input_file(self, params: dict):
@@ -83,38 +90,40 @@ class FortranRunner:
             print(f"Erro: Arquivo de saída '{self.output_filename}' não foi gerado.")
             return
 
-        results = {'L': {}, 'C': {}, 'C0': {}, 'CGEN': {}}
-        max_index = 0
+        raw_values = {}
+        max_indices = {}
+        
+        pattern = re.compile(r"(\d+)\s+(\d+)\s+([0-9.E+-]+)\s+=\s*([A-Z0-9]+)\(")
 
         with open(self.output_filename, 'r') as f:
             for line in f:
-                line_stripped = line.strip()
-                if not line_stripped:
-                    continue
-
-                match = re.match(r"(\d+)\s+(\d+)\s+([0-9.E+-]+)\s+=\s*([LC0CGEN]+)\(", line_stripped)
+                match = pattern.match(line.strip())
                 if match:
-                    i, j, value, key = match.groups()
-                    i, j, value = int(i), int(j), float(value)
-                    max_index = max(max_index, i, j)
-                    if i > j: i, j = j, i
-                    results[key][(i, j)] = value
+                    i_str, j_str, val_str, key = match.groups()
+                    i, j, value = int(i_str), int(j_str), float(val_str)
+                    
+                    if key not in raw_values:
+                        raw_values[key] = {}
+                        max_indices[key] = 0
+
+                    raw_values[key][(i, j)] = value
+                    max_indices[key] = max(max_indices[key], i, j)
         
-        matrix_size = max_index
-        if matrix_size > 0:
-            self.L_matrix = np.zeros((matrix_size, matrix_size))
-            self.C_matrix = np.zeros((matrix_size, matrix_size))
-            self.C0_matrix = np.zeros((matrix_size, matrix_size))
-            self.CGEN_matrix = np.zeros((matrix_size, matrix_size))
-            
-            for (i, j), val in results.get('L', {}).items():
-                self.L_matrix[i-1, j-1] = self.L_matrix[j-1, i-1] = val
-            for (i, j), val in results.get('C', {}).items():
-                self.C_matrix[i-1, j-1] = self.C_matrix[j-1, i-1] = val
-            for (i, j), val in results.get('C0', {}).items():
-                self.C0_matrix[i-1, j-1] = self.C0_matrix[j-1, i-1] = val
-            for (i, j), val in results.get('CGEN', {}).items():
-                self.CGEN_matrix[i-1, j-1] = self.CGEN_matrix[j-1, i-1] = val
+        # Define quais matrizes são simétricas com base nos nomes no arquivo PUL.DAT
+        symmetric_keys = ['IND', 'CAP', 'CAP0', 'CGEN', 'CGEN0']
+
+        for key, values in raw_values.items():
+            size = max_indices.get(key, 0)
+            if size > 0:
+                matrix = np.zeros((size, size))
+                is_symmetric = key in symmetric_keys
+                
+                for (i, j), val in values.items():
+                    matrix[i-1, j-1] = val
+                    if is_symmetric:
+                        matrix[j-1, i-1] = val
+                
+                setattr(self, f"{key}_matrix", matrix)
 
         if not self.silent:
             print("Análise do arquivo de saída concluída.")
@@ -132,4 +141,3 @@ class FortranRunner:
                     print("Simulação abortada devido a erro na execução.")
         except Exception as e:
             print(f"Ocorreu um erro inesperado durante a simulação: {e}")
-

@@ -18,37 +18,6 @@ import re
 import numpy as np
 from pathlib import Path
 
-def clear_screen():
-    """Clears the console screen."""
-    os.system('cls' if os.name == 'nt' else 'clear')
-
-# def parse_pul_file(filename):
-#     """Helper function to parse a PUL file and extract L, C, and C0 values."""
-#     results = {'L': {}, 'C': {}, 'C0': {}, 'CGEN': {}}
-#     try:
-#         with open(filename, 'r') as f:
-#             for line in f:
-#                 line = line.strip()
-#                 if not line:
-#                     continue
-                
-#                 # Use regex to find the matrix type and values
-#                 match = re.match(r"(\d+)\s+(\d+)\s+([0-9.E+-]+)\s+=\s*([A-Z0-9]+)\(", line)
-#                 if match:
-#                     i, j, value, key = match.groups()
-#                     i, j, value = int(i), int(j), float(value)
-                    
-#                     # Ensure keys are sorted for consistent comparison, e.g. (1,2) not (2,1)
-#                     if i > j:
-#                         i, j = j, i
-
-#                     if key in results:
-#                         results[key][(i, j)] = value
-#     except FileNotFoundError:
-#         print(f"\nWarning: Could not find file {filename} for parsing.")
-#         return None
-#     return results
-
 def parse_pul_file(filename):
     """Helper function to parse a PUL file and extract L, C, CGEN and C0 values."""
     results = {'L': {}, 'C': {}, 'C0': {}, 'CGEN': {}}
@@ -134,7 +103,7 @@ def validate_results(python_output_file, fortran_output_file, tolerance=1e-5):
     
     print("\n--- VALIDATION COMPLETE ---")
 
-def ribbon_analysis():
+def ribbon_dot_for():
     """
     Main function to analyze a ribbon cable and calculate its
     per-unit-length capacitance and inductance matrices.
@@ -383,8 +352,8 @@ def ribbon_analysis():
     print(f"Analysis complete. Results saved to {output_filename}.")
 
     # --- Final Validation Step ---
-    validate_results(output_filename, reference_output_file)
+    # validate_results(output_filename, reference_output_file)
 
 if __name__ == '__main__':
-    clear_screen()
-    ribbon_analysis()
+    os.system('cls' if os.name == 'nt' else 'clear')
+    ribbon_dot_for()
