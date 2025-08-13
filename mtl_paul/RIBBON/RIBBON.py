@@ -162,9 +162,9 @@ def ribbon_dot_for():
     C1 = np.zeros((NF, NF), dtype=dtype)
     D1 = np.zeros((NF, NF), dtype=dtype)
     for i in range(NF):
-        ang_i = i * ANGLE + DELTA
+        ANG = i * ANGLE + DELTA
         for j in range(NF):
-            j_fortran = j + 1
+            j1 = j + 1
             if j == 0:
                 A1[i, j] = -RW * np.log(RW) / EPS
                 B1[i, j] = -RD * np.log(RD) / EPS
@@ -172,9 +172,9 @@ def ribbon_dot_for():
                 D1[i, j] = -1.0
             else:
                 xm1 = dtype(j)
-                cos_val = np.cos(xm1 * ang_i)
-                A1[i, j] = (RW**j_fortran) * cos_val / (2. * EPS * xm1 * (RW**(j_fortran - 1)))
-                C1[i, j] = (ER - 1.) * ((RW / RD)**j_fortran) * cos_val / 2.0
+                cos_val = np.cos(xm1 * ANG)
+                A1[i, j] = (RW**j1) * cos_val / (2. * EPS * xm1 * RW**j)
+                C1[i, j] = (ER - 1.) * ((RW / RD)**j1) * cos_val / 2.0
                 D1[i, j] = -(ER + 1.0) * cos_val / 2.0
                 if j == 1:
                     B1[i, j] = (RW**j) * cos_val / (2. * EPS * xm1 * 1.0) # RD**(j-1) = RD**0 = 1

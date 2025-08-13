@@ -100,16 +100,69 @@ class TwoCoatedWireSystem(MTL):
 
     def _calculate_generalized_capacitance(self):
         """
-        Calcula a matriz de capacitância generalizada C a partir da matriz T (D^-1).
+        Calcula a matriz de capacitância generalizada C.
+
+        Esta versão revisada implementa a fórmula da Eq. (5.48) de forma robusta,
+        sendo capaz de lidar tanto com sistemas de fios revestidos quanto nus.
+        Para fios nus, apenas a contribuição da superfície do condutor é considerada.
         """
         self.T_matrix = np.linalg.inv(self.D_matrix)
-        C_matrix = np.zeros((2, 2))
 
-        for n in range(2):  # Índice do condutor da carga
-            for m in range(2):  # Índice do condutor do potencial
-                sum_of_T_elements = np.sum(self.T_matrix[(n * self.NF), (m * self.NF):((m + 1) * self.NF)])
-                C_matrix[n, m] = 2 * np.pi * self.R * sum_of_T_elements
+        # 1. Obter a ordem das superfícies e os parâmetros dos blocos
+        conductor_surfaces = [s for s in self.surfaces if s['type'] == 'conductor']
+        sheath_surfaces = [s for s in self.surfaces if s['type'] == 'sheath']
+        ordered_surfaces = conductor_surfaces + sheath_surfaces
         
+        num_conductors = len(conductor_surfaces)
+        nfs_per_surface = [2 * s['fourier_order'] + 1 for s in ordered_surfaces]
+        offsets = np.cumsum([0] + nfs_per_surface)
+
+        # 2. Criar um mapa para fácil acesso às propriedades e offsets de cada superfície
+        surface_map = {}
+        for i, surface in enumerate(ordered_surfaces):
+            tag = surface['tag']
+            if tag not in surface_map:
+                surface_map[tag] = {}
+            surface_map[tag][surface['type']] = {
+                'radius': surface['radius'],
+                'offset': offsets[i],
+                'nf': nfs_per_surface[i]
+            }
+
+        # 3. Calcular a matriz de capacitância
+        C_matrix = np.zeros((num_conductors, num_conductors))
+
+        # Loop sobre o condutor 'i' onde a CARGA LIVRE total é calculada (linhas de C)
+        for i in range(num_conductors):
+            # Loop sobre o condutor 'j' cujo potencial é V_j=1 (colunas de C)
+            for j in range(num_conductors):
+                # Informações do bloco de colunas do condutor 'j'
+                info_cond_j = surface_map[j]['conductor']
+                col_start_j = info_cond_j['offset']
+                col_end_j = col_start_j + info_cond_j['nf']
+
+                # Termo 1 (Eq. 5.48): Contribuição da superfície do condutor 'i'.
+                # Esta parte é sempre calculada.
+                info_cond_i = surface_map[i]['conductor']
+                row_idx_cond_i = info_cond_i['offset']
+                radius_cond_i = info_cond_i['radius']
+                sum_bij = np.sum(self.T_matrix[row_idx_cond_i, col_start_j:col_end_j])
+                term1 = 2 * np.pi * radius_cond_i * sum_bij
+
+                # Termo 2 (Eq. 5.48): Contribuição da superfície da bainha 'i'.
+                # ✅ ESTA PARTE AGORA É CONDICIONAL ✅
+                term2 = 0.0  # Inicializa como zero para o caso do fio nu.
+                if 'sheath' in surface_map[i]:
+                    info_sheath_i = surface_map[i]['sheath']
+                    row_idx_sheath_i = info_sheath_i['offset']
+                    radius_sheath_i = info_sheath_i['radius']
+                    sum_b_prime_ij = np.sum(self.T_matrix[row_idx_sheath_i, col_start_j:col_end_j])
+                    term2 = 2 * np.pi * radius_sheath_i * sum_b_prime_ij
+
+                # A carga livre total é a soma das contribuições.
+                # Para um fio nu, term2 permanecerá 0.
+                C_matrix[i, j] = term1 + term2
+
         self.C_generalized = C_matrix
 
     def _calculate_maxwellian_capacitance(self):
@@ -185,6 +238,8 @@ class TwoCoatedWireSystem(MTL):
         for p, field_surface in enumerate(ordered_surfaces):
             tag_p = field_surface['tag']
             type_p = field_surface['type']
+            radius_p = field_surface['radius']
+            center_p = np.array(field_surface['center_point'])
             nf_p = nfs_per_surface[p]
             offset_p = offsets[p]
 
@@ -214,37 +269,43 @@ class TwoCoatedWireSystem(MTL):
                 for m in range(nf_p):
                     row_idx = offset_p + m
                     
-                    # Ângulo e vetor de observação 'i' relativo ao centro da superfície FONTE 'q'
+                    # Vetor aponta do centro da superfície FONTE 'q' para o ponto de OBSERVAÇÃO 'm'.
                     rho_i_vector = observation_points[m] - center_q
                     rho_i = np.linalg.norm(rho_i_vector)
                     theta_i = np.arctan2(rho_i_vector[1], rho_i_vector[0])
 
+                    # Vetor unitário (un_rho_i) do centro da superfície 'q' até o ponto de OBSERVAÇÃO 'm'.
+                    un_rho_i = rho_i_vector / rho_i
+
+                    # Vetor normal unitário (un_p) do centro da superfície 'p' até o ponto de OBSERVAÇÃO 'm'.
+                    un_p = (observation_points[m] - center_p) / radius_p
+
                     # Loop sobre cada função de base 'n' na superfície 'q'
                     for n in range(nf_q):
                         col_idx = offset_q + n
-                        source_harmonic_idx = n
+                        harmonic_ord = n
                         
                         # Trigonometric Term at observation point 
-                        is_cosine_term = (source_harmonic_idx % 2 != 0)
-                        k = (source_harmonic_idx + 1) // 2 if is_cosine_term else source_harmonic_idx // 2                  
+                        is_cosine_term = (harmonic_ord % 2 != 0)
+                        k = (harmonic_ord + 1) // 2 if is_cosine_term else harmonic_ord // 2                  
                         harmonic_term = np.cos(k * theta_i) if is_cosine_term else np.sin(k * theta_i)
                         e02k = 2 * epsilon_0 * k
                         
                         # Vetor fonte 'rho_b' relativo ao centro da superfície FONTE 'q'
                         rho_b = np.linalg.norm(source_points[m] - center_q)
 
-                        # ========================================================================
-                        # ==== INÍCIO DA LÓGICA DE CÁLCULO DO ELEMENTO DA MATRIZ D ===============
-                        # ========================================================================
+                        # ====================================================================================
+                        # ==== INÍCIO DA LÓGICA DE CÁLCULO DO ELEMENTO DA MATRIZ D ===========================
+                        # ====================================================================================
                         is_observer_inside = (rho_i < rho_b) and not np.isclose(rho_i, rho_b)
                         
-                        # === BLOCO 1: CÁLCULO DE POTENCIAL (φ) ==================================
-                        # === Aplica a condição de contorno V = Vm nas superfícies condutoras. ===
+                        # === BLOCO 1: CÁLCULO DE POTENCIAL (φ) ==============================================
+                        # === Aplica a condição de contorno V = Vm nas superfícies condutoras. ===============
 
                         if type_p == 'conductor':  
                             # --- TABELA II.b: rho_i < rho_b (Interação para Observador DENTRO da fronteira da fonte) --- 
                             if is_observer_inside:
-                                if source_harmonic_idx == 0: # Constant Term (k=0)
+                                if harmonic_ord == 0: # Constant Term (k=0)
                                     self.D_matrix[row_idx, col_idx] = - rho_b * np.log(rho_b) / epsilon_0                                
                                 
                                 else: # Harmonic Terms (k>0)
@@ -252,26 +313,43 @@ class TwoCoatedWireSystem(MTL):
                             
                             # --- TABELA II.a: rho_i >= rho_b (Interação para Observador FORA ou SOBRE a fronteira da fonte) --- 
                             else:                         
-                                if source_harmonic_idx == 0: # Constant Term (k=0)
+                                if harmonic_ord == 0: # Constant Term (k=0)
                                     self.D_matrix[row_idx, col_idx] = - rho_b * np.log(rho_i) / epsilon_0                                
                                 
                                 else: # Harmonic Terms (k>0)
                                     self.D_matrix[row_idx, col_idx] = rho_b**(k+1) / e02k / rho_i**k * harmonic_term
 
                         # === BLOCO 2: CONDIÇÃO DE CONTORNO DO VETOR DESLOCAMENTO (εE) =======================
-                        # === Aplica (1 - εr) * Er = 0 nas superfícies da bainha. ============================
+                        # === Aplica continuidade da componente normal de D sobre a bainha dielétrica ========
                         
                         elif type_p == 'sheath':
                             er = field_surface['relative_permittivity']
-                            if source_harmonic_idx == 0: # Constant Term (k=0)
-                                self.D_matrix[row_idx, col_idx] = (1 - er) * (rho_b / rho_i)
 
-                            else: # Harmonic Terms (k>0)
-                                self.D_matrix[row_idx, col_idx] = 0.5 * (1 - er) * (rho_b / rho_i)**(k + 1) * harmonic_term
+                            # Produto escalar dos vetores unitários em RIBBON.FOR: COS(TH - ANG)
+                            RDN = np.dot(un_p, un_rho_i)
 
-                        # ===============================================================
-                        # ==== FIM DA LÓGICA DE CÁLCULO DO ELEMENTO DA MATRIZ D =========
-                        # ===============================================================
+                            # 4. RIBBON.FOR: TDN = -sin(TH-ANG) = sin(ANG-TH)
+                            TDN = np.cross(un_p, un_rho_i)
+
+                            # --- TABELA II.a: rho_i = rho_b (Interação para Observador SOBRE a fronteira dielétrica) --- 
+                            if type_q == 'sheath' and tag_p == tag_q:
+                                if harmonic_ord == 0: # Constant Term (k=0)
+                                    self.D_matrix[row_idx, col_idx] = (0 - 1) * (rho_b / rho_i) * RDN
+
+                                else: # Harmonic Terms (k>0)
+                                    pass
+                                
+                            # --- TABELA II.a: rho_i >= rho_b (Interação para Observador FORA da fronteira dielétrica) --- 
+                            else:   
+                                if harmonic_ord == 0: # Constant Term (k=0)
+                                    self.D_matrix[row_idx, col_idx] = (er - 1) * (rho_b / rho_i) * RDN
+                                
+                                else: # Harmonic Terms (k>0)
+                                    pass
+
+                        # ====================================================================================
+                        # ==== FIM DA LÓGICA DE CÁLCULO DO ELEMENTO DA MATRIZ D ==============================
+                        # ====================================================================================
 
         # 3. Resolver o sistema e obter os resultados
         self.sigma_coeffs = np.linalg.solve(self.D_matrix, self.V_vector)
