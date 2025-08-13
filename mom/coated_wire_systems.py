@@ -337,7 +337,7 @@ class TwoCoatedWireSystem(MTL):
                                     self.D_matrix[row_idx, col_idx] = (0 - 1) * (rho_b / rho_i) * RDN
 
                                 else: # Harmonic Terms (k>0)
-                                    pass
+                                    self.D_matrix[row_idx, col_idx] = - 0.5 * (er + 1) * (rho_b / rho_i)**(k-1) * RDN * harmonic_term
                                 
                             # --- TABELA II.a: rho_i >= rho_b (Interação para Observador FORA da fronteira dielétrica) --- 
                             else:   
@@ -345,7 +345,7 @@ class TwoCoatedWireSystem(MTL):
                                     self.D_matrix[row_idx, col_idx] = (er - 1) * (rho_b / rho_i) * RDN
                                 
                                 else: # Harmonic Terms (k>0)
-                                    pass
+                                    self.D_matrix[row_idx, col_idx] = 0.5 * (er - 1) * (rho_b / rho_i)**(k+1) * RDN * harmonic_term
 
                         # ====================================================================================
                         # ==== FIM DA LÓGICA DE CÁLCULO DO ELEMENTO DA MATRIZ D ==============================

@@ -115,7 +115,7 @@ BIFILAR_COATED_WIRE_S4000 = {
     },    
 }
 
-BIFILAR_COATED_WIRE_S40 = {
+BIFILAR_COATED_WIRE_S40_K0 = {
     'name': 'BIFILAR_COATED_WIRE_S40',
     'type': 'coated_wires',
     'note': 'Modified Clements (1974) problem with conductor radii rw=10mm',
@@ -162,7 +162,54 @@ BIFILAR_COATED_WIRE_S40 = {
     },    
 }
 
-BIFILAR_BARE_WIRE_S21 = {
+BIFILAR_COATED_WIRE_S40_K8 = {
+    'name': 'BIFILAR_COATED_WIRE_S40',
+    'type': 'coated_wires',
+    'note': 'Modified Clements (1974) problem with conductor radii rw=10mm',
+    'idx_ref_conductor': 0,
+    0: {
+        'line_id': 0,
+        'conductor_name': 'q',
+        'line_type': 'return',
+        'line_return': None,
+        'center_point': (0.0, 0.0),
+        'radius': [0, 0.010],
+        'conductivity': 1/1.68E-8,
+        'subconductors': None,
+        'sheath': {'name': 'coated',
+                    'center_point': (0.0, 0.0),
+                    'thickness': 0.010,
+                    'fourier_order': 8,
+                    'relative_permittivity': 3.0},
+        'relative_permeability': 1.0,
+        'relative_permittivity': 1.0,
+        'relative_permittivity_out': 1.0,
+        'potential_to_infinity': -1.0,
+        'fourier_order': 8,
+    },
+    1: {
+        'line_id': 1,
+        'conductor_name': 'p',
+        'line_type': 'active',
+        'line_return': 0,
+        'center_point': (0.040, 0.0),
+        'radius': [0, 0.010],
+        'conductivity': 1/1.68E-8,
+        'subconductors': None,
+        'sheath': {'name': 'coated',
+                    'center_point': (0.040, 0.0),
+                    'thickness': 0.010,
+                    'fourier_order': 8,
+                    'relative_permittivity': 3.0},
+        'relative_permeability': 1.0,
+        'relative_permittivity': 1.0,
+        'relative_permittivity_out': 1.0,
+        'potential_to_infinity': 1.0,
+        'fourier_order': 8,
+    },    
+}
+
+BIFILAR_BARE_WIRE_S21_K10 = {
     'name': 'BIFILAR_BARE_WIRE_S21',
     'type': 'bare_wires',
     'note': 'Modified Clements (1974) problem with conductor radii rw=10mm',
@@ -181,7 +228,7 @@ BIFILAR_BARE_WIRE_S21 = {
         'relative_permittivity': 1.0,
         'relative_permittivity_out': 1.0,
         'potential_to_infinity': -1.0,
-        'fourier_order': 8,
+        'fourier_order': 10,
     },
     1: {
         'line_id': 1,
@@ -197,7 +244,7 @@ BIFILAR_BARE_WIRE_S21 = {
         'relative_permittivity': 1.0,
         'relative_permittivity_out': 1.0,
         'potential_to_infinity': 1.0,
-        'fourier_order': 8,
+        'fourier_order': 10,
     },
 }
 

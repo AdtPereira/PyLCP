@@ -11,7 +11,7 @@ from mom.coated_wire_systems import TwoCoatedWireSystem
 from mtl_data.utils import *
 
 
-class BifilarCoatedWirePULParameters():
+class RibbonCoatedCablesPULParameters():
     """
     Encapsula a lógica para executar e analisar o estudo de convergência
     de capacitância, comparando MoM Python e Fortran.
@@ -25,7 +25,7 @@ class BifilarCoatedWirePULParameters():
             nf_max (int): Número máximo de coeficientes/ordem harmônica para testar.
         """
 
-        assert len([key for key in mtl.keys() if isinstance(key, int)]) == 2, "A linha bifilar deve conter exatamente dois condutores."
+        assert len([key for key in mtl.keys() if isinstance(key, int)]) > 1, "A linha deve conter mais de um condutor."
 
         self.project_root = project_root
         self.mtl_copy = copy.deepcopy(mtl)
@@ -320,29 +320,13 @@ class BifilarCoatedWirePULParameters():
             self._prepare_fortran_runner(temp_mtl)
             self.runner.run_fortran(self.fortran_base_params)
 
-            # === MoM TwoCoatedWireSystem Instance ===
-            mom_coated = TwoCoatedWireSystem(temp_mtl)
-            mom_coated.run_simulation()
-
-            temp_mtl['type'] = 'bare_wires'
-            for key in temp_mtl.keys():
-                if isinstance(key, int):
-                    temp_mtl[key]['sheath'] = None
-
-            mom_bare = TwoCoatedWireSystem(temp_mtl)
-            mom_bare.run_simulation()
-
             # Coleta de resultados
             results.append({
                 'k': k,
+                'L (RIBBON.FOR)':           self.runner.IND_matrix if self.fortran_base_params is not None else np.nan,
                 'C0 (RIBBON.FOR)':          self.runner.CAP0_matrix if self.fortran_base_params is not None else np.nan,
                 'C (RIBBON.FOR)':           self.runner.CAP_matrix if self.fortran_base_params is not None else np.nan,
-                'C0 (MoM.PY)':              mom_bare.C_maxwellian if mom_bare.C_maxwellian is not None else np.nan,
-                'C (MoM.PY)':               mom_coated.C_maxwellian if mom_coated.C_maxwellian is not None else np.nan,
-                # 'CGEN (RIBBON.FOR)':      self.runner_silent.CGEN0_matrix if self.fortran_base_params is not None else np.nan,
-                # 'CGEN (BARE-WIRE.PY)':    mom_bare_wires.C_generalized if mom_bare_wires.C_generalized is not None else np.nan,
-                # 'C0 (MOM-SO.PY)':         np.real(maxwell_cap) if maxwell_cap is not None else np.nan,
-                # 'CGEN (MOM-SO.PY)':       np.real(general_cap) if general_cap is not None else np.nan,
+                'CGEN (RIBBON.FOR)':        self.runner.CGEN0_matrix if self.fortran_base_params is not None else np.nan,
             })
             print(f"  Complete for k = {k}.")
 
@@ -442,6 +426,187 @@ class BifilarCoatedWirePULParameters():
         ax.legend()
         ax.grid(True, linestyle='--', linewidth=0.5)
         plt.tight_layout()
+        
+    def plot_paul_fig514a(self):
+        """
+        Gera o gráfico de convergência da indutância a partir dos resultados armazenados,
+        replicando a figura de referência.
+        """
+        if self.results_df is None:
+            print("Execute as simulações primeiro com 'run_convergence()'.")
+            return
+
+        # Garante que a simulação foi executada completamente
+        assert self.results_df.index.max() == self.sum_max - 1, \
+            f"A simulação não rodou até o valor máximo esperado de k={self.sum_max - 1}"
+
+        # Extrai os componentes da matriz de indutância 'L' e converte para µH/m.
+        try:
+            # Passa o fator de conversão correto (self.l_factor)
+            l11 = self._extract_matrix_element('L (RIBBON.FOR)', row=0, col=0)
+            l22 = self._extract_matrix_element('L (RIBBON.FOR)', row=1, col=1)
+            l12 = self._extract_matrix_element('L (RIBBON.FOR)', row=0, col=1)
+        except (TypeError, IndexError) as e:
+            # Corrige as mensagens de erro para o contexto de indutância
+            print(f"Erro ao extrair elementos da matriz de indutância: {e}")
+            print("Verifique se as simulações foram executadas e se a matriz 'L (RIBBON.FOR)' foi populada.")
+            return
+
+        plt.style.use('default')
+        fig, ax = plt.subplots(figsize=(8, 5))
+        
+        fortran_nf_axis = self.results_df.index + 1
+        ax.plot(fortran_nf_axis, l22, color='k', marker='o', linestyle='-',  label='$L_{22}$')
+        ax.plot(fortran_nf_axis, l11, color='k', marker='o', linestyle=':',  label='$L_{11}$', markerfacecolor='white', markeredgecolor='k')
+        ax.plot(fortran_nf_axis, l12, color='k', marker='s', linestyle='-.', label='$L_{12}$')
+
+        # Configuração dos eixos para corresponder à imagem de referência
+        ax.set_xlabel('Number of Fourier Coefficients', fontsize=12)
+        ax.set_ylabel('Inductance (µH/m)', fontsize=12)
+        
+        # Adiciona uma pequena margem (padding) aos limites do eixo x para melhor visualização
+        ax.set_xlim(0.8, self.sum_max + 0.2)
+        ax.set_xticks(np.arange(1, self.sum_max + 1, 1))        
+        ax.set_yticks(np.arange(0.2, 1.2, 0.1))        
+        ax.set_title('')
+        ax.grid(False)
+        ax.legend(loc='upper center', fontsize=9, markerscale=1.0, ncol=3, bbox_to_anchor=(0.5, 1.12), fancybox=True)
+        plt.tight_layout()
+
+    def plot_paul_fig514b(self):
+        """
+        Gera o gráfico de convergência a partir dos resultados armazenados,
+        replicando a figura de referência.
+        """
+        if self.results_df is None:
+            print("Execute as simulações primeiro com 'run_convergence()'.")
+            return
+
+        # Garante que a simulação foi executada completamente
+        assert self.results_df.index.max() == self.sum_max - 1, \
+            f"A simulação não rodou até o valor máximo esperado de k={self.sum_max - 1}"
+
+        # Extrai os componentes da matriz de indutância 'L' e converte para µH/m.
+        try:
+            # Passa o fator de conversão correto (self.l_factor)
+            c11 = self._extract_matrix_element('C (RIBBON.FOR)', row=0, col=0)
+            c22 = self._extract_matrix_element('C (RIBBON.FOR)', row=1, col=1)
+            c12 = self._extract_matrix_element('C (RIBBON.FOR)', row=0, col=1)
+        except (TypeError, IndexError) as e:
+            # Corrige as mensagens de erro para o contexto de indutância
+            print(f"Erro ao extrair elementos da matriz de indutância: {e}")
+            print("Verifique se as simulações foram executadas e se a matriz 'L (RIBBON.FOR)' foi populada.")
+            return
+
+        plt.style.use('default')
+        fig, ax = plt.subplots(figsize=(8, 5))
+
+        fortran_nf_axis = self.results_df.index + 1
+        ax.plot(fortran_nf_axis, c11, color='k', marker='o', linestyle='-',  label='$C_{11}$')
+        ax.plot(fortran_nf_axis, c22, color='k', marker='o', linestyle=':',  label='$C_{22}$', markerfacecolor='white', markeredgecolor='k')
+        ax.plot(fortran_nf_axis, c12, color='k', marker='s', linestyle='-.', label='$C_{12}$')
+
+        # Configuração dos eixos para corresponder à imagem de referência
+        ax.set_xlabel('Number of Fourier Coefficients', fontsize=12)
+        ax.set_ylabel('Capacitance (pF/m)', fontsize=12)
+        ax.set_xticks(np.arange(1, self.sum_max + 1, 1))
+        ax.set_yticks(np.arange(15, 40, 5))
+        ax.set_title('')
+        ax.grid(False)
+        ax.legend(loc='upper center', fontsize=9, markerscale=1.0, ncol=3, bbox_to_anchor=(0.5, 1.12), fancybox=True)
+        plt.tight_layout()
+
+    def plot_paul_fig514c(self):
+        """
+        Gera o gráfico de convergência a partir dos resultados armazenados,
+        replicando a figura de referência.
+        """
+        if self.results_df is None:
+            print("Execute as simulações primeiro com 'run_convergence()'.")
+            return
+
+        # Garante que a simulação foi executada completamente
+        assert self.results_df.index.max() == self.sum_max - 1, \
+            f"A simulação não rodou até o valor máximo esperado de k={self.sum_max - 1}"
+
+        # Extrai os componentes da matriz de indutância 'L' e converte para µH/m.
+        try:
+            # Passa o fator de conversão correto (self.l_factor)
+            c0_11 = self._extract_matrix_element('C0 (RIBBON.FOR)', row=0, col=0)
+            c0_22 = self._extract_matrix_element('C0 (RIBBON.FOR)', row=1, col=1)
+            c0_12 = self._extract_matrix_element('C0 (RIBBON.FOR)', row=0, col=1)
+        except (TypeError, IndexError) as e:
+            # Corrige as mensagens de erro para o contexto de indutância
+            print(f"Erro ao extrair elementos da matriz de indutância: {e}")
+            print("Verifique se as simulações foram executadas e se a matriz 'L (RIBBON.FOR)' foi populada.")
+            return
+
+        plt.style.use('default')
+        fig, ax = plt.subplots(figsize=(8, 5))
+
+        # Plotagem dos dados com o estilo da figura de referência
+        fortran_nf_axis = self.results_df.index + 1
+        ax.plot(fortran_nf_axis, c0_11, color='k', marker='o', linestyle='-',  label='$C0_{11}$')
+        ax.plot(fortran_nf_axis, c0_22, color='k', marker='o', linestyle=':',  label='$C0_{22}$', markerfacecolor='white', markeredgecolor='k')
+        ax.plot(fortran_nf_axis, c0_12, color='k', marker='s', linestyle='-.', label='$C0_{12}$')
+
+        # Configuração dos eixos para corresponder à imagem de referência
+        ax.set_xlabel('Number of Fourier Coefficients', fontsize=12)
+        ax.set_ylabel('Bare-Wire Capacitance (pF/m)', fontsize=12)
+        ax.set_xticks(np.arange(1, self.sum_max + 1, 1))
+        ax.set_xlim(0.8, self.sum_max + 0.2)
+        ax.set_title('')
+        ax.grid(False)
+        ax.legend(loc='upper center', fontsize=9, markerscale=1.0, ncol=3, bbox_to_anchor=(0.5, 1.12), fancybox=True)
+        plt.tight_layout()
+
+    def plot_paul_fig514d(self):
+        """ Gera o gráfico de convergência a partir dos resultados armazenados, replicando a figura de referência. """
+        if self.results_df is None:
+            print("Execute as simulações primeiro com 'run_convergence()'.")
+            return
+
+        # Garante que a simulação foi executada completamente
+        assert self.results_df.index.max() == self.sum_max - 1, \
+            f"A simulação não rodou até o valor máximo esperado de k={self.sum_max - 1}"
+
+        # Extrai os componentes da matriz de indutância 'L' e converte para µH/m.
+        try:
+            # Passa o fator de conversão correto (self.l_factor)
+            cgen_00 = self._extract_matrix_element('CGEN (RIBBON.FOR)', row=0, col=0)
+            cgen_11 = self._extract_matrix_element('CGEN (RIBBON.FOR)', row=1, col=1)
+            cgen_22 = self._extract_matrix_element('CGEN (RIBBON.FOR)', row=2, col=2)
+            cgen_01 = self._extract_matrix_element('CGEN (RIBBON.FOR)', row=0, col=1)
+            cgen_02 = self._extract_matrix_element('CGEN (RIBBON.FOR)', row=0, col=2)
+            cgen_12 = self._extract_matrix_element('CGEN (RIBBON.FOR)', row=1, col=2)
+
+        except (TypeError, IndexError) as e:
+            # Corrige as mensagens de erro para o contexto de indutância
+            print(f"Erro ao extrair elementos da matriz de indutância: {e}")
+            print("Verifique se as simulações foram executadas e se a matriz 'L (RIBBON.FOR)' foi populada.")
+            return
+
+        plt.style.use('default')
+        fig, ax = plt.subplots(figsize=(8, 5))
+
+        # Plotagem dos dados com o estilo da figura de referência
+        fortran_nf_axis = self.results_df.index + 1
+        ax.plot(fortran_nf_axis, cgen_00, color='k', marker='o', label='$CGEN_{00}$', linewidth=1.0, zorder=0, markersize=3, linestyle=':')
+        ax.plot(fortran_nf_axis, cgen_11, color='k', marker='o', label='$CGEN_{11}$', linewidth=1.0, zorder=1, markersize=3, linestyle='-')
+        ax.plot(fortran_nf_axis, cgen_22, color='k', marker='o', label='$CGEN_{22}$', linewidth=1.0, zorder=1, markersize=8, linestyle=':', fillstyle='none')
+        ax.plot(fortran_nf_axis, cgen_01, color='k', marker='s', label='$CGEN_{01}$', linewidth=1.0, zorder=0, markersize=4, linestyle='--')
+        ax.plot(fortran_nf_axis, cgen_12, color='k', marker='s', label='$CGEN_{12}$', linewidth=1.0, zorder=1, markersize=8, linestyle='--', fillstyle='none')
+        ax.plot(fortran_nf_axis, cgen_02, color='k', marker='d', label='$CGEN_{02}$', linewidth=1.0, zorder=0, markersize=6, linestyle='-.')
+
+        # Configuração dos eixos para corresponder à imagem de referência
+        ax.set_xlabel('Number of Fourier Coefficients', fontsize=12)
+        ax.set_ylabel('Generalized Capacitance (pF/m)', fontsize=12)
+        ax.set_xticks(np.arange(1, self.sum_max + 1, 1))
+        ax.set_xlim(0.8, self.sum_max + 0.2)
+        ax.set_title('')
+        ax.grid(False)
+        ax.legend(loc='upper center', fontsize=9, markerscale=1.0, ncol=6, bbox_to_anchor=(0.5, 1.12), fancybox=True)
+        plt.tight_layout()
 
     def plot_bifilar_generalized_capacitance_convergence(self):
         """ Gera o gráfico de convergência a partir dos resultados armazenados, replicando a figura de referência. """
@@ -486,8 +651,6 @@ class BifilarCoatedWirePULParameters():
         ax.set_ylabel('Generalized Capacitance (pF/m)', fontsize=12)
         ax.set_xlim(1, self.sum_max)
         ax.set_xticks(np.arange(1, self.sum_max + 1, 1))
-        ax.set_ylim(20, 100)
-        ax.set_yticks(np.arange(20, 100, 10))
         ax.set_title('')
         ax.grid(False)
         ax.legend(loc='upper center', fontsize=9, markerscale=1.0, ncol=6, bbox_to_anchor=(0.5, 1.12), fancybox=True)
@@ -513,8 +676,6 @@ class BifilarCoatedWirePULParameters():
             for i in range(self.N):
                 for j in range(self.N):
                     ribbon[f'c_{i}{j}'] =   self._extract_matrix_element('CGEN (RIBBON.FOR)', row=i, col=j)
-                    mom_so[f'c_{i}{j}'] =   self._extract_matrix_element('CGEN (MOM-SO.PY)', row=i, col=j)
-                    mom[f'c_{i}{j}'] =      self._extract_matrix_element('CGEN (BARE-WIRE.PY)', row=i, col=j)
         except (TypeError, IndexError, ValueError, KeyError) as e:
             print(f"Erro ao extrair elementos da matriz de capacitância: {e}")
             print("Verifique se as simulações foram executadas e se as matrizes 'CGEN' foram populadas com as dimensões corretas.")
@@ -533,18 +694,10 @@ class BifilarCoatedWirePULParameters():
         # --- Subplot 1: CGEN_00 ---
         ax1.plot(fortran_nf_axis, ribbon['c_00'], label='RIBBON.FOR',
                 color=self.plot_params['colors'][0], marker=self.plot_params['markers'][0], linestyle=self.plot_params['linestyles'][0])
-        ax1.plot(python_nf_axis[mask_py], mom['c_00'][mask_py], label='MoM.PY',
-                color=self.plot_params['colors'][1], marker=self.plot_params['markers'][1], linestyle=self.plot_params['linestyles'][1], fillstyle='none')
-        ax1.plot(python_nf_axis[mask_py], mom_so['c_00'][mask_py], label='MoM-SO.PY',
-                color=self.plot_params['colors'][2], marker=self.plot_params['markers'][2], linestyle=self.plot_params['linestyles'][2], fillstyle='none')
 
         # --- Subplot 2: CGEN_12 ---
         ax2.plot(fortran_nf_axis, ribbon['c_01'], label='RIBBON.FOR',
                 color=self.plot_params['colors'][0], marker=self.plot_params['markers'][0], linestyle=self.plot_params['linestyles'][0])
-        ax2.plot(python_nf_axis[mask_py], mom['c_01'][mask_py], label='MoM.PY',
-                color=self.plot_params['colors'][1], marker=self.plot_params['markers'][1], linestyle=self.plot_params['linestyles'][1], fillstyle='none')
-        ax2.plot(python_nf_axis[mask_py], mom_so['c_01'][mask_py], label='MoM-SO.PY',
-                color=self.plot_params['colors'][2], marker=self.plot_params['markers'][2], linestyle=self.plot_params['linestyles'][2], fillstyle='none')
 
         # Configuração dos eixos para ambos os subplots
         for ax in [ax1, ax2]:
@@ -572,15 +725,12 @@ class BifilarCoatedWirePULParameters():
 
         # Extração de dados de forma programática
         ribbon_c, ribbon_c0 =  {}, {}
-        mom_c, mom_c0 =  {}, {}
 
         try:
             for i in range(self.N-1):
                 for j in range(self.N-1):
                     ribbon_c0[f'c_{i}{j}'] =    self._extract_matrix_element('C0 (RIBBON.FOR)', row=i, col=j)
                     ribbon_c[f'c_{i}{j}'] =     self._extract_matrix_element('C (RIBBON.FOR)', row=i, col=j)
-                    mom_c0[f'c_{i}{j}'] =       self._extract_matrix_element('C0 (MoM.PY)', row=i, col=j)
-                    mom_c[f'c_{i}{j}'] =        self._extract_matrix_element('C (MoM.PY)', row=i, col=j)
 
         except (TypeError, IndexError, ValueError) as e:
             print(f"Erro ao extrair elementos da matriz de capacitância: {e}")
@@ -598,20 +748,14 @@ class BifilarCoatedWirePULParameters():
         for i in range(self.N-1):
             legend_items_count += 2
             idx = i % len(self.plot_params['markers'])
-            
-            ax.plot(fortran_nf_axis, ribbon_c[f'c_{i}{i}'], label='Dielectric-Coated (RIBBON.FOR)', markersize=4, 
+
+            ax.plot(fortran_nf_axis, ribbon_c[f'c_{i}{i}'], label=f'$C_{{{i}{i}}}$ Dielectric-Coated (RIBBON.FOR)', markersize=4,
                     color=self.plot_params['colors'][0], marker=self.plot_params['markers'][0], linestyle=self.plot_params['linestyles'][0])
 
-            ax.plot(python_nf_axis[mask_py], mom_c[f'c_{i}{i}'][mask_py], label='Dielectric-Coated (MoM.PY)', markersize=9,
-                    color=self.plot_params['colors'][0], marker=self.plot_params['markers'][0], linestyle=self.plot_params['linestyles'][0], fillstyle='none')
-            
-            ax.plot(fortran_nf_axis, ribbon_c0[f'c_{i}{i}'], label='Bare-Wire (RIBBON.FOR)', markersize=4,
+            ax.plot(fortran_nf_axis, ribbon_c0[f'c_{i}{i}'], label=f'$C_{{{i}{i}}}$ Bare-Wire (RIBBON.FOR)', markersize=4,
                     color=self.plot_params['colors'][1], marker=self.plot_params['markers'][1], linestyle=self.plot_params['linestyles'][1])
             
-            ax.plot(python_nf_axis[mask_py], mom_c0[f'c_{i}{i}'][mask_py], label='Bare-Wire (MoM.PY)', markersize=9,
-                    color=self.plot_params['colors'][1], marker=self.plot_params['markers'][1], linestyle=self.plot_params['linestyles'][1], fillstyle='none')
-
-        ax.set_title('Bifilar Capacitance Matrix Term $C_{11}$')
+        ax.set_title('Ribbon Capacitance Matrix Terms')
         ax.set_xlabel('Number of Fourier Coefficients (NF)', fontsize=12)
         ax.set_ylabel('Capacitance (pF/m)', fontsize=12)
         ax.set_xlim(0.8, max_nf_fortran + 0.2)
