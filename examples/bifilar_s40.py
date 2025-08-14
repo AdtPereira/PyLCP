@@ -21,7 +21,7 @@ except IndexError:
 
 # IMPORTAÇÕES DOS MÓDULOS E MODELO DE DADOS
 try:
-    from mtl_data.models import BIFILAR_COATED_WIRE_S40_K0 as MTL
+    from mtl_data.models import BIFILAR_COATED_WIRE_S40_K10 as MTL
     from mtl_data.graphics import MTLRepresentation
     from analyzer.bifilar_coated_wires import BifilarCoatedWirePULParameters as PUL
     print("Módulos e modelo de dados importados com sucesso.")
@@ -35,7 +35,7 @@ if __name__ == "__main__":
     pul = PUL(project_root, MTL, SUM_MAX=11)      
     pul.run_single_fortran()
     pul.run_mom_methods()
-    pul.srw_rates()
+    pul.run_srw_rates()
     pul.run_convergence()
 
     print(f"\nRotinas de cálculo finalizadas em {(time.time()-st):.2f} segundos.")

@@ -242,7 +242,7 @@ class BifilarCoatedWirePULParameters():
             freq: {'c_bare_wire': self.c_factor * bare_wires.C_maxwellian.item(),
                     'c_coated_wire': self.c_factor * coated_wires.C_maxwellian.item()} for freq in self.freq_range['mom']}
 
-    def srw_rates(self):
+    def run_srw_rates(self):
         """
         Executa a simulação analítica da impedância da linha de transmissão.
 
@@ -279,6 +279,7 @@ class BifilarCoatedWirePULParameters():
             temp_mtl = copy.deepcopy(self.mtl_copy)
             separation = ratio * temp_mtl[0]['radius'][1]
             temp_mtl[1]['center_point'] = (separation, 0.0)
+            temp_mtl[1]['sheath']['center_point'] = (separation, 0.0)
 
             # === Fortran RIBBON Instance ===            
             self._prepare_fortran_runner(temp_mtl)
@@ -313,8 +314,8 @@ class BifilarCoatedWirePULParameters():
             for key in temp_mtl.keys():
                 if isinstance(key, int):
                     temp_mtl[key]['fourier_order'] = k  
-                    if temp_mtl['type'] == 'coated_wires':
-                        temp_mtl[key]['sheath']['fourier_order'] = k
+                    # if temp_mtl['type'] == 'coated_wires':
+                    temp_mtl[key]['sheath']['fourier_order'] = k
 
             # === Fortran RIBBON Instance ===
             self._prepare_fortran_runner(temp_mtl)
@@ -345,8 +346,7 @@ class BifilarCoatedWirePULParameters():
                 # 'CGEN (MOM-SO.PY)':       np.real(general_cap) if general_cap is not None else np.nan,
             })
             print(f"  Complete for k = {k}.")
-
-
+            
         self.results_df = pd.DataFrame(results).set_index('k')
 
     def plot_inductance_data(self):
