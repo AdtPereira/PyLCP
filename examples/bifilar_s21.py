@@ -49,5 +49,5 @@ if __name__ == "__main__":
     pul.plot_srw_rates()
     pul.plot_generalized_capacitance_convergence()    
     pul.plot_free_space_capacitance_convergence()
-    MTLRepresentation(MTL).bare_and_coated_wires()
+    MTLRepresentation(MTL, units='meter').bare_and_coated_wires()
     plt.show()

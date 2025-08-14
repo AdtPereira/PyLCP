@@ -57,8 +57,8 @@ class RibbonCoatedCablesPULParameters():
         # Parâmetros de plotagem
         self.plot_params = {
             'linestyles': [':', '-.', '--', '-', ':', '-.', '--'],
-            'markers': ['o', 's', '^', 'd', 'v', '<', '>'],
-            'colors': ['black', 'gray', 'darkgray', 'dimgray', 'silver', 'gainsboro', 'lightgray']
+            'markers': ['o', 'd', 's', '^', 'v', '<', '>'],
+            'colors': ['black', 'gray', 'lightgray', 'gainsboro']
         }
 
     def _prepare_fortran_runner(self, mtl):
@@ -72,7 +72,7 @@ class RibbonCoatedCablesPULParameters():
         self.fortran_base_params = {
             'N':    len([key for key in mtl.keys() if isinstance(key, int)]),
             'NF':   mtl[refIdx]['fourier_order'] + 1,
-            'IREF': refIdx,
+            'IREF': refIdx + 1,
             'RW':   mtl[refIdx]['radius'][1],
             'TD':   sheath_dict.get('thickness', 0.0),
             'ER':   sheath_dict.get('relative_permittivity', 1.0),
@@ -239,8 +239,8 @@ class RibbonCoatedCablesPULParameters():
         # coated_wires.plot_collocation_points()
 
         self.mom_data = {
-            freq: {'c_bare_wire': self.c_factor * bare_wires.C_maxwellian.item(),
-                    'c_coated_wire': self.c_factor * coated_wires.C_maxwellian.item()} for freq in self.freq_range['mom']}
+            freq: {'c_bare_wire': self.c_factor * bare_wires.C_maxwellian,
+                    'c_coated_wire': self.c_factor * coated_wires.C_maxwellian} for freq in self.freq_range['mom']}
 
     def srw_rates(self):
         """
@@ -313,20 +313,24 @@ class RibbonCoatedCablesPULParameters():
             for key in temp_mtl.keys():
                 if isinstance(key, int):
                     temp_mtl[key]['fourier_order'] = k  
-                    if temp_mtl['type'] == 'coated_wires':
-                        temp_mtl[key]['sheath']['fourier_order'] = k
+                    temp_mtl[key]['sheath']['fourier_order'] = k
 
             # === Fortran RIBBON Instance ===
             self._prepare_fortran_runner(temp_mtl)
             self.runner.run_fortran(self.fortran_base_params)
 
+            # === MoM TwoCoatedWireSystem Instance ===
+            mom_coated = TwoCoatedWireSystem(temp_mtl)
+            mom_coated.run_simulation()
+
             # Coleta de resultados
             results.append({
                 'k': k,
-                'L (RIBBON.FOR)':           self.runner.IND_matrix if self.fortran_base_params is not None else np.nan,
-                'C0 (RIBBON.FOR)':          self.runner.CAP0_matrix if self.fortran_base_params is not None else np.nan,
-                'C (RIBBON.FOR)':           self.runner.CAP_matrix if self.fortran_base_params is not None else np.nan,
-                'CGEN (RIBBON.FOR)':        self.runner.CGEN0_matrix if self.fortran_base_params is not None else np.nan,
+                'L (RIBBON.FOR)':    self.runner.IND_matrix if self.fortran_base_params is not None else np.nan,
+                'C (RIBBON.FOR)':    self.runner.CAP_matrix if self.fortran_base_params is not None else np.nan,
+                'C0 (RIBBON.FOR)':   self.runner.CAP0_matrix if self.fortran_base_params is not None else np.nan,
+                'CGEN (RIBBON.FOR)': self.runner.CGEN0_matrix if self.fortran_base_params is not None else np.nan,
+                'C (MoM.PY)':        mom_coated.C_maxwellian if mom_coated.C_maxwellian is not None else np.nan,
             })
             print(f"  Complete for k = {k}.")
 
@@ -489,9 +493,12 @@ class RibbonCoatedCablesPULParameters():
         # Extrai os componentes da matriz de indutância 'L' e converte para µH/m.
         try:
             # Passa o fator de conversão correto (self.l_factor)
-            c11 = self._extract_matrix_element('C (RIBBON.FOR)', row=0, col=0)
-            c22 = self._extract_matrix_element('C (RIBBON.FOR)', row=1, col=1)
-            c12 = self._extract_matrix_element('C (RIBBON.FOR)', row=0, col=1)
+            c11_ribbon = self._extract_matrix_element('C (RIBBON.FOR)', row=0, col=0)
+            c22_ribbon = self._extract_matrix_element('C (RIBBON.FOR)', row=1, col=1)
+            c12_ribbon = self._extract_matrix_element('C (RIBBON.FOR)', row=0, col=1)
+            c11_mom = self._extract_matrix_element('C (MoM.PY)', row=0, col=0)
+            c22_mom = self._extract_matrix_element('C (MoM.PY)', row=1, col=1)
+            c12_mom = self._extract_matrix_element('C (MoM.PY)', row=0, col=1)
         except (TypeError, IndexError) as e:
             # Corrige as mensagens de erro para o contexto de indutância
             print(f"Erro ao extrair elementos da matriz de indutância: {e}")
@@ -502,15 +509,20 @@ class RibbonCoatedCablesPULParameters():
         fig, ax = plt.subplots(figsize=(8, 5))
 
         fortran_nf_axis = self.results_df.index + 1
-        ax.plot(fortran_nf_axis, c11, color='k', marker='o', linestyle='-',  label='$C_{11}$')
-        ax.plot(fortran_nf_axis, c22, color='k', marker='o', linestyle=':',  label='$C_{22}$', markerfacecolor='white', markeredgecolor='k')
-        ax.plot(fortran_nf_axis, c12, color='k', marker='s', linestyle='-.', label='$C_{12}$')
+        ax.plot(fortran_nf_axis, c11_ribbon, color='k', marker='o', linestyle='-',  label='$C_{11}$')
+        ax.plot(fortran_nf_axis, c22_ribbon, color='k', marker='o', linestyle=':',  label='$C_{22}$', markerfacecolor='white', markeredgecolor='k')
+        ax.plot(fortran_nf_axis, c12_ribbon, color='k', marker='s', linestyle='-.', label='$C_{12}$')
+
+        ax.plot(fortran_nf_axis, c11_ribbon, color='k', marker='o', linestyle='-',  label='$C_{11}$')
+        ax.plot(fortran_nf_axis, c22_ribbon, color='k', marker='o', linestyle=':',  label='$C_{22}$', markerfacecolor='white', markeredgecolor='k')
+        ax.plot(fortran_nf_axis, c12_ribbon, color='k', marker='s', linestyle='-.', label='$C_{12}$')
 
         # Configuração dos eixos para corresponder à imagem de referência
         ax.set_xlabel('Number of Fourier Coefficients', fontsize=12)
         ax.set_ylabel('Capacitance (pF/m)', fontsize=12)
         ax.set_xticks(np.arange(1, self.sum_max + 1, 1))
         ax.set_yticks(np.arange(15, 40, 5))
+        ax.set_xlim(0.8, self.sum_max + 0.2)
         ax.set_title('')
         ax.grid(False)
         ax.legend(loc='upper center', fontsize=9, markerscale=1.0, ncol=3, bbox_to_anchor=(0.5, 1.12), fancybox=True)
@@ -608,54 +620,6 @@ class RibbonCoatedCablesPULParameters():
         ax.legend(loc='upper center', fontsize=9, markerscale=1.0, ncol=6, bbox_to_anchor=(0.5, 1.12), fancybox=True)
         plt.tight_layout()
 
-    def plot_bifilar_generalized_capacitance_convergence(self):
-        """ Gera o gráfico de convergência a partir dos resultados armazenados, replicando a figura de referência. """
-        if self.results_df is None:
-            print("Execute as simulações primeiro com 'run_study()'.")
-            return
-
-        # Garante que nf_max seja consistente com os dados
-        assert self.results_df.index.max() == self.sum_max - 1, \
-            f"A simulação não rodou até o valor máximo esperado de k={self.sum_max - 1}"
-
-        # Extrai os componentes da matriz de capacitância 'C0' e converte para pF/m.
-        # Por convenção, os elementos Cgen_ij (i != j) são negativos. 
-        try:
-            c11_ribbon = self._extract_matrix_element('CGEN (RIBBON.FOR)', row=0, col=0)
-            c22_ribbon = self._extract_matrix_element('CGEN (RIBBON.FOR)', row=1, col=1)
-            c12_ribbon = self._extract_matrix_element('CGEN (RIBBON.FOR)', row=0, col=1)
-            c11_pymom  = self._extract_matrix_element('CGEN (BARE-WIRE.PY)', row=0, col=0)
-            c22_pymom  = self._extract_matrix_element('CGEN (BARE-WIRE.PY)', row=1, col=1)
-            c12_pymom  = self._extract_matrix_element('CGEN (BARE-WIRE.PY)', row=0, col=1)
-        except (TypeError, IndexError) as e:
-            print(f"Erro ao extrair elementos da matriz de capacitância: {e}")
-            print("Verifique se as simulações foram executadas e se a matriz 'CGEN' foi populada.")
-            return
-
-        plt.style.use('default')
-        fig, ax = plt.subplots(figsize=(8, 5))
-
-        # Plotagem dos dados do FORTRAN
-        fortran_nf_axis = self.results_df.index + 1
-        ax.plot(fortran_nf_axis, c11_ribbon, color='k', marker='o', label='$C_{11} (.FOR)$', linewidth=1.0, markersize=3, linestyle=':')
-        ax.plot(fortran_nf_axis, c22_ribbon, color='k', marker='o', label='$C_{22} (.FOR)$', linewidth=1.0, markersize=8, linestyle=':', fillstyle='none')
-        ax.plot(fortran_nf_axis, c12_ribbon, color='k', marker='^', label='$C_{12} (.FOR)$', linewidth=1.0, markersize=5, linestyle=':')
-
-        # Plotagem dos dados do Python com o eixo x corrigido
-        python_nf_axis = 2 * self.results_df.index + 1
-        ax.plot(python_nf_axis, c11_pymom, color='gray', marker='s', label='$C_{11} (.PY)$', linewidth=1.0, markersize=3, linestyle='-.', fillstyle='none')
-        ax.plot(python_nf_axis, c22_pymom, color='gray', marker='s', label='$C_{22} (.PY)$', linewidth=1.0, markersize=9, linestyle='-.', fillstyle='none')
-        ax.plot(python_nf_axis, c12_pymom, color='gray', marker='^', label='$C_{12} (.PY)$', linewidth=1.0, markersize=9, linestyle='-.', fillstyle='none')
-
-        ax.set_xlabel('Number of Fourier Coefficients (NF)', fontsize=12)
-        ax.set_ylabel('Generalized Capacitance (pF/m)', fontsize=12)
-        ax.set_xlim(1, self.sum_max)
-        ax.set_xticks(np.arange(1, self.sum_max + 1, 1))
-        ax.set_title('')
-        ax.grid(False)
-        ax.legend(loc='upper center', fontsize=9, markerscale=1.0, ncol=6, bbox_to_anchor=(0.5, 1.12), fancybox=True)
-        plt.tight_layout()
-
     def plot_generalized_capacitance_convergence(self):
         """
         Gera o gráfico de convergência da capacitância generalizada, com subplots
@@ -714,7 +678,7 @@ class RibbonCoatedCablesPULParameters():
         ax2.set_title('Mutual Capacitance Term $CGEN_{01}$')
         plt.tight_layout(rect=[0, 0, 1, 0.96])
 
-    def plot_capacitance_convergence(self):
+    def plot_dielectric_coated_capacitance_convergence(self):
         """ Gera o gráfico de convergência da capacitância do espaço livro, adaptando-se ao número de condutores do sistema. """
         if self.results_df is None:
             print("Execute as simulações primeiro com 'run_study()'.")
@@ -724,13 +688,13 @@ class RibbonCoatedCablesPULParameters():
             f"A simulação não rodou até o valor máximo esperado de k={self.sum_max - 1}"
 
         # Extração de dados de forma programática
-        ribbon_c, ribbon_c0 =  {}, {}
+        ribbon, mom =  {}, {}
 
         try:
             for i in range(self.N-1):
                 for j in range(self.N-1):
-                    ribbon_c0[f'c_{i}{j}'] =    self._extract_matrix_element('C0 (RIBBON.FOR)', row=i, col=j)
-                    ribbon_c[f'c_{i}{j}'] =     self._extract_matrix_element('C (RIBBON.FOR)', row=i, col=j)
+                    ribbon[f'c_{i}{j}'] = self._extract_matrix_element('C (RIBBON.FOR)', row=i, col=j)
+                    mom[f'c_{i}{j}'] = self._extract_matrix_element('C (MoM.PY)', row=i, col=j)
 
         except (TypeError, IndexError, ValueError) as e:
             print(f"Erro ao extrair elementos da matriz de capacitância: {e}")
@@ -744,24 +708,26 @@ class RibbonCoatedCablesPULParameters():
         max_nf_fortran = fortran_nf_axis.max()
         mask_py = python_nf_axis <= max_nf_fortran
         
-        legend_items_count = 0
         for i in range(self.N-1):
-            legend_items_count += 2
-            idx = i % len(self.plot_params['markers'])
+            for j in range(i, self.N-1):
+                ax.plot(fortran_nf_axis, ribbon[f'c_{i}{j}'], markersize=4, zorder = 1,
+                        label=f'$C_{{{i+1}{j+1}}}$ (RIBBON.FOR)', 
+                        color=self.plot_params['colors'][i+j],
+                        marker=self.plot_params['markers'][i+j],
+                        linestyle=self.plot_params['linestyles'][i+j])
 
-            ax.plot(fortran_nf_axis, ribbon_c[f'c_{i}{i}'], label=f'$C_{{{i}{i}}}$ Dielectric-Coated (RIBBON.FOR)', markersize=4,
-                    color=self.plot_params['colors'][0], marker=self.plot_params['markers'][0], linestyle=self.plot_params['linestyles'][0])
-
-            ax.plot(fortran_nf_axis, ribbon_c0[f'c_{i}{i}'], label=f'$C_{{{i}{i}}}$ Bare-Wire (RIBBON.FOR)', markersize=4,
-                    color=self.plot_params['colors'][1], marker=self.plot_params['markers'][1], linestyle=self.plot_params['linestyles'][1])
+                ax.plot(python_nf_axis[mask_py], mom[f'c_{i}{j}'][mask_py], markersize=10, fillstyle='none', zorder = 2,
+                        label=f'$C_{{{i+1}{j+1}}}$ (MoM.PY)', 
+                        color=self.plot_params['colors'][i+j],
+                        marker=self.plot_params['markers'][i+j],
+                        linestyle=self.plot_params['linestyles'][i+j])
             
-        ax.set_title('Ribbon Capacitance Matrix Terms')
+        ax.set_title('Three Ribbon Cable Capacitance Convergence')
         ax.set_xlabel('Number of Fourier Coefficients (NF)', fontsize=12)
         ax.set_ylabel('Capacitance (pF/m)', fontsize=12)
         ax.set_xlim(0.8, max_nf_fortran + 0.2)
         ax.set_xticks(np.arange(1, max_nf_fortran + 1, 1))
         ax.tick_params(top=True, right=True, direction='in', which='both')
-        # ax.legend(loc='upper center', fontsize=9, ncol=legend_items_count, bbox_to_anchor=(0.5, 1.1), fancybox=True)
         ax.legend(loc='best', fontsize=10)
         ax.grid(False)
         plt.tight_layout()

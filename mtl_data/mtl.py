@@ -43,7 +43,7 @@ class MulticonductorTransmissionLine():
         self.mtl_type = mtl.get('type', 'unknown')
 
         # MTL Conductor Reference Index
-        self.idx_ref = mtl.get('idx_ref_conductor', 0)
+        self.idx_ref = mtl.get('idx_ref_conductor', np.nan)
 
         key_conductors = sorted(self.mtl.keys())
         key_expected = list(range(len(key_conductors)))

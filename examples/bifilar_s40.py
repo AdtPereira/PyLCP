@@ -32,7 +32,7 @@ except ImportError as e:
 if __name__ == "__main__":
     """ Função principal para orquestrar a análise, cálculo e visualização dos resultados. """
     st = time.time()
-    pul = PUL(project_root, MTL, SUM_MAX=11)      
+    pul = PUL(project_root, MTL, SUM_MAX=15)      
     pul.run_single_fortran()
     pul.run_mom_methods()
     pul.run_srw_rates()
@@ -42,5 +42,5 @@ if __name__ == "__main__":
     pul.show_header()
     pul.plot_srw_rates()
     pul.plot_capacitance_convergence()
-    MTLRepresentation(MTL).bare_and_coated_wires()
+    MTLRepresentation(MTL, units='meter').bare_and_coated_wires()
     plt.show()

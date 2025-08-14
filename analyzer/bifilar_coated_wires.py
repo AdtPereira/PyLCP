@@ -410,10 +410,10 @@ class BifilarCoatedWirePULParameters():
         """
 
         capacitante_data = {
-            'ribbon-c':     {'data': (self.srw_ratios.get('mom'), [data['ribbon-c']     for data in self.srw_mum_data.values()]), 'label': '$C$ (RIBBON.FOR)'},
-            'mom-c':        {'data': (self.srw_ratios.get('mom'), [data['mom-c']        for data in self.srw_mum_data.values()]), 'label': '$C$ (MoM.PY)'},
-            'ribbon-c0':    {'data': (self.srw_ratios.get('mom'), [data['ribbon-c0']    for data in self.srw_mum_data.values()]), 'label': '$C_0$ (RIBBON.FOR)'},
-            'mom-c0':       {'data': (self.srw_ratios.get('mom'), [data['mom-c0']       for data in self.srw_mum_data.values()]), 'label': '$C_0$ (MoM.PY)'},
+            'ribbon-c':     {'data': (self.srw_ratios.get('mom'), [data['ribbon-c']     for data in self.srw_mum_data.values()]), 'label': 'Dielectric-Coated (RIBBON.FOR)'},
+            'mom-c':        {'data': (self.srw_ratios.get('mom'), [data['mom-c']        for data in self.srw_mum_data.values()]), 'label': 'Dielectric-Coated (MoM.PY)'},
+            'ribbon-c0':    {'data': (self.srw_ratios.get('mom'), [data['ribbon-c0']    for data in self.srw_mum_data.values()]), 'label': 'Bare-Wire (RIBBON.FOR)'},
+            'mom-c0':       {'data': (self.srw_ratios.get('mom'), [data['mom-c0']       for data in self.srw_mum_data.values()]), 'label': 'Bare-Wire (MoM.PY)'},
             'exactly':      {'data': (self.srw_ratios.get('ana'), [data['c_exact']      for data in self.srw_data.values()]),     'label': 'Exactly'},
             'approx':       {'data': (self.srw_ratios.get('ana'), [data['c_approx']     for data in self.srw_data.values()]),     'label': 'Approx.'},
         }
@@ -437,7 +437,7 @@ class BifilarCoatedWirePULParameters():
                     ax.plot(freq, value, label=label, color='k', linestyle=':', linewidth=1.0, zorder=1)
 
         ax.set_xlabel('Ratio of separation to wire radius, s/r$_w$')
-        ax.set_ylabel('Per-unit-length capacitance (pF/m)')
+        ax.set_ylabel('Per-unit-length Capacitance, $C_{11}$ (pF/m)')
         ax.set_xlim(4, 8)
         ax.legend()
         ax.grid(True, linestyle='--', linewidth=0.5)
@@ -594,11 +594,7 @@ class BifilarCoatedWirePULParameters():
         max_nf_fortran = fortran_nf_axis.max()
         mask_py = python_nf_axis <= max_nf_fortran
         
-        legend_items_count = 0
         for i in range(self.N-1):
-            legend_items_count += 2
-            idx = i % len(self.plot_params['markers'])
-            
             ax.plot(fortran_nf_axis, ribbon_c[f'c_{i}{i}'], label='Dielectric-Coated (RIBBON.FOR)', markersize=4, 
                     color=self.plot_params['colors'][0], marker=self.plot_params['markers'][0], linestyle=self.plot_params['linestyles'][0])
 

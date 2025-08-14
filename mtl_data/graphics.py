@@ -9,22 +9,38 @@ from mtl_data.mtl import MulticonductorTransmissionLine
 class MTLRepresentation(MulticonductorTransmissionLine):
     """ This class defines the coaxial cable with a sheath. """
 
+    def __init__(self, mtl, units='meter'):
+        super().__init__(mtl)
+        
+        # --- AJUSTE PRINCIPAL: Dicionário unificado ---
+        UNITS_DATA = {
+            'meter':      {'scale': 1,       'label': 'm'},
+            'centimeter': {'scale': 100,     'label': 'cm'},
+            'millimeter': {'scale': 1000,    'label': 'mm'},
+            'mil':        {'scale': 39370.1, 'label': 'mil'},
+        }
+
+        # Obtém as informações da unidade, usando 'meter' como padrão
+        unit_info = UNITS_DATA.get(units, UNITS_DATA['meter'])
+        self.scale_factor = unit_info['scale']
+        self.label_unit = unit_info['label']
+
     def bare_and_coated_wires(self):
         """
         Esta função plota a geometria de fios com revestimento isolante,
         utilizando uma abordagem elegante para definir os limites dos eixos.
         """
-        _, ax = plt.subplots(figsize=(8, 5))
+        _, ax = plt.subplots(figsize=(8, 5))   
 
         # Itera e desenha todos os condutores e isolamentos
         for conductor in reversed(self.mtl.values()):
-            conductor_radius = conductor['radius'][1]
-            conductor_center = conductor['center_point']
+            conductor_radius = conductor['radius'][1] * self.scale_factor
+            conductor_center = np.array(conductor['center_point']) * self.scale_factor
 
             # Desenha a camada de isolamento se existir
             if 'sheath' in conductor and conductor['sheath'] is not None:
-                center = conductor['sheath']['center_point']
-                thickness = conductor['sheath']['thickness']
+                center = np.array(conductor['sheath']['center_point']) * self.scale_factor
+                thickness = conductor['sheath']['thickness'] * self.scale_factor
                 outer_radius = conductor_radius + thickness
                 ax.add_patch(Wedge(center, outer_radius, 0, 360, width=thickness, edgecolor='black', facecolor='lightblue', linestyle='solid'))
 
@@ -35,8 +51,8 @@ class MTLRepresentation(MulticonductorTransmissionLine):
         ax.autoscale_view()             # Ajusta a visualização para os novos limites
         ax.margins(0.2)                 # Aplica uma margem de 20% aos limites calculados
         ax.set_aspect('equal', 'box')
-        plt.xlabel('x (m)')
-        plt.ylabel('y (m)')
+        plt.xlabel(f'x ({self.label_unit})')
+        plt.ylabel(f'y ({self.label_unit})')
         plt.grid(True, linestyle='--', linewidth=0.5)
 
     # def underground_system(self):

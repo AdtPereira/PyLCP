@@ -32,15 +32,17 @@ except ImportError as e:
 if __name__ == "__main__":
     """ Função principal para orquestrar a análise, cálculo e visualização dos resultados. """
     st = time.time()
-    pul = PUL(project_root, MTL, SUM_MAX=10)      
+    pul = PUL(project_root, MTL, SUM_MAX=9)      
     pul.run_single_fortran()
+    pul.run_mom_methods()
     pul.run_convergence()
 
     print(f"\nRotinas de cálculo finalizadas em {(time.time()-st):.2f} segundos.")
     pul.show_header()
+    pul.plot_dielectric_coated_capacitance_convergence()
     pul.plot_paul_fig514a()
     pul.plot_paul_fig514b()
-    pul.plot_paul_fig514c()
-    pul.plot_paul_fig514d()
-    MTLRepresentation(MTL).bare_and_coated_wires()
+    # pul.plot_paul_fig514c()
+    # pul.plot_paul_fig514d()
+    MTLRepresentation(MTL, units='mil').bare_and_coated_wires()
     plt.show()
