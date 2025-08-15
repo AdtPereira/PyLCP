@@ -163,7 +163,7 @@ class BifilarCoatedWirePULParameters():
         print("="*self.pt2 + " BIFILAR COATED-WIRE RIBBON CABLE SIMULATION " + "="*self.pt2)
         print(f"Project: {self.project_root}")
         print(f"Model: {self.mtl_copy['name']}")
-        print(f"D/R = {self.DR_ratio}. Fourier Order (k) = {self.mtl_copy[0]['fourier_order']}.")
+        print(f"D/R = {self.DR_ratio:.3f}. Fourier Order (k) = {self.mtl_copy[0]['fourier_order']}.")
         print(f"RIBBON Fourier Coef./cond. (NF) = {self.mtl_copy[0]['fourier_order']+1}.")
         print(f"PYTHON Fourier Coef./cond. (NF) = {2*self.mtl_copy[0]['fourier_order']+1}.")
         print(f"Exact Bifilar Bare-Wire Capacitance: {self.analytical_bifilar_capacitance * 1E12:.4f} pF/m")

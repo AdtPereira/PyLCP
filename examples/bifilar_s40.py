@@ -32,7 +32,7 @@ except ImportError as e:
 if __name__ == "__main__":
     """ Função principal para orquestrar a análise, cálculo e visualização dos resultados. """
     st = time.time()
-    pul = PUL(project_root, MTL, SUM_MAX=15)      
+    pul = PUL(project_root, MTL, SUM_MAX=17)      
     pul.run_single_fortran()
     pul.run_mom_methods()
     pul.run_srw_rates()

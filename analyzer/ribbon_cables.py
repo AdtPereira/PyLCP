@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Dict, Any
 
 from mtl_paul.py_fortran import FortranRunner
+from tulip.py_tulip import PyTulip
 from analytical_forms.bare_wires import WiresHomogeneousMedia
 from mom.coated_wire_systems import TwoCoatedWireSystem
 from mtl_data.utils import *
@@ -32,9 +33,6 @@ class RibbonCoatedCablesPULParameters():
         self.freq_range = {'ana': np.logspace(0, 6, num=200), 'mom': np.logspace(0, 6, num=30)}
         self.srw_ratios = {'ana': np.linspace(4.0, 10.0, num=300), 'mom': np.linspace(4.0, 10.0, num=40)}
 
-        # Extrai parâmetros e prepara o executor do Fortran
-        self._bifilar_analytical_solution()
-
         # Parâmetros de dados
         self.srw_data = {}
         self.srw_mum_data = {}
@@ -42,6 +40,7 @@ class RibbonCoatedCablesPULParameters():
         self.mom_data = {}
         self.mom_so_data = {}
         self.ribbon_data = {}
+        self.tulip_runner = None
 
         # Parâmetros adicionais
         self.c_factor = 1e12  # F/m to nF/km
@@ -60,6 +59,10 @@ class RibbonCoatedCablesPULParameters():
             'markers': ['o', 'd', 's', '^', 'v', '<', '>'],
             'colors': ['black', 'gray', 'lightgray', 'gainsboro']
         }
+
+        self.R = self.mtl_copy[0]['radius'][1]
+        self.D = np.linalg.norm(np.array(self.mtl_copy[0]['center_point']) - np.array(self.mtl_copy[1]['center_point']))
+        self.swr_ratio = self.D / self.R
 
     def _prepare_fortran_runner(self, mtl):
         """Prepara os parâmetros e o executor para a simulação Fortran."""
@@ -82,6 +85,24 @@ class RibbonCoatedCablesPULParameters():
         fortran_exe_path = self.project_root / 'mtl_paul' / 'RIBBON' / 'RIBBON.EXE'
         self.runner = FortranRunner(exe_path=str(fortran_exe_path), silent=True)
 
+    def _prepare_tulip_runner(self, case_name: str = "three_wires_ribbon"):
+        """Prepara o executor para a simulação Tulip."""
+        EXE_PATH = r"C:\git\tulip\pulmtln-build\rls\bin\Release\pulmtln.exe"
+
+        print(f"--- Preparing to run simulation for case: '{case_name}' ---")
+        
+        try:
+            self.tulip_runner = PyTulip(
+                executable_path=EXE_PATH,
+                case_name=case_name,
+                silent=False
+            )
+
+        except (FileNotFoundError, NotADirectoryError) as e:
+            print(f"\nConfiguration Error: {e}")
+        except Exception as e:
+            print(f"\nAn unexpected error occurred: {e}")
+        
     def _extract_matrix_element(self, column_name: str, row: int, col: int) -> pd.Series:
         """
         Extrai e processa um elemento específico de uma coluna de matrizes no DataFrame de resultados.
@@ -108,14 +129,6 @@ class RibbonCoatedCablesPULParameters():
         )
         return self.results_df[column_name].apply(extractor)
     
-    def _bifilar_analytical_solution(self):
-        """Calcula a solução analítica para fios nus como referência."""
-        R = self.mtl_copy[0]['radius'][1]
-        D = np.linalg.norm(np.array(self.mtl_copy[0]['center_point']) - np.array(self.mtl_copy[1]['center_point']))
-        self.DR_ratio = D/R
-        from scipy.constants import epsilon_0
-        self.analytical_bifilar_capacitance = (np.pi * epsilon_0) / np.arccosh(0.5*self.DR_ratio)
-
     def _configure_plot_appearance(self, ax, ylabel, data_to_plot, yscale='log'):
         """
         Função auxiliar para configurar um único subplot.
@@ -163,10 +176,9 @@ class RibbonCoatedCablesPULParameters():
         print("="*self.pt2 + " BIFILAR COATED-WIRE RIBBON CABLE SIMULATION " + "="*self.pt2)
         print(f"Project: {self.project_root}")
         print(f"Model: {self.mtl_copy['name']}")
-        print(f"D/R = {self.DR_ratio}. Fourier Order (k) = {self.mtl_copy[0]['fourier_order']}.")
+        print(f"D/R = {self.swr_ratio:.3f}. Fourier Order (k) = {self.mtl_copy[0]['fourier_order']}.")
         print(f"RIBBON Fourier Coef./cond. (NF) = {self.mtl_copy[0]['fourier_order']+1}.")
         print(f"PYTHON Fourier Coef./cond. (NF) = {2*self.mtl_copy[0]['fourier_order']+1}.")
-        print(f"Exact Bifilar Bare-Wire Capacitance: {self.analytical_bifilar_capacitance * 1E12:.4f} pF/m")
         print("="*self.pt1)
 
     def run_single_fortran(self, mtl: dict = None, displayTerminal: bool = True):
@@ -213,6 +225,27 @@ class RibbonCoatedCablesPULParameters():
         self.ribbon_data = {
             freq: {'c': self.c_factor * self.runner.CAP0_matrix[0, 0], 
                    'le': self.l_factor * self.runner.IND_matrix[0, 0]} for freq in self.freq_range['mom']}
+
+    def run_single_tulip(self):
+        """
+        Executa a simulação usando o PyTulip e processa os resultados.
+        """
+        if self.tulip_runner is None:
+            self._prepare_tulip_runner()
+
+        if not self.tulip_runner.output_filepath.is_file():
+            print(f"Error: Output file '{self.tulip_runner.output_filepath.name}' was not generated.")
+            return
+
+        print("\n============  pyTulip Simulation  ===========")
+        self.tulip_runner.run()
+        
+        print("\n--- Accessing Results ---")
+        if self.tulip_runner.C_matrix is not None:
+            matrix_viewer(self.tulip_runner.C_matrix, "Capacitance Matrix (C)")
+
+        if self.tulip_runner.L_matrix is not None:
+            matrix_viewer(self.tulip_runner.L_matrix, "Inductance Matrix (L)")
 
     def run_mom_methods(self):
         """
@@ -306,6 +339,10 @@ class RibbonCoatedCablesPULParameters():
     def run_convergence(self):
         """Executa o laço de convergência para ambas as simulações e armazena os resultados."""
         print(f"\nRunning Convergence Rate until k = {self.sum_max}!")
+
+        if self.tulip_runner is None:
+            self._prepare_tulip_runner()
+            self.tulip_runner.run()
         
         results = []
         for k in range(0, self.sum_max):
@@ -331,6 +368,8 @@ class RibbonCoatedCablesPULParameters():
                 'C0 (RIBBON.FOR)':   self.runner.CAP0_matrix if self.fortran_base_params is not None else np.nan,
                 'CGEN (RIBBON.FOR)': self.runner.CGEN0_matrix if self.fortran_base_params is not None else np.nan,
                 'C (MoM.PY)':        mom_coated.C_maxwellian if mom_coated.C_maxwellian is not None else np.nan,
+                'C (SEMBA-TULIP)':   self.tulip_runner.C_matrix if self.tulip_runner.C_matrix is not None else np.nan,
+                'L (SEMBA-TULIP)':   self.tulip_runner.L_matrix if self.tulip_runner.L_matrix is not None else np.nan,
             })
             print(f"  Complete for k = {k}.")
 
@@ -447,9 +486,12 @@ class RibbonCoatedCablesPULParameters():
         # Extrai os componentes da matriz de indutância 'L' e converte para µH/m.
         try:
             # Passa o fator de conversão correto (self.l_factor)
-            l11 = self._extract_matrix_element('L (RIBBON.FOR)', row=0, col=0)
-            l22 = self._extract_matrix_element('L (RIBBON.FOR)', row=1, col=1)
-            l12 = self._extract_matrix_element('L (RIBBON.FOR)', row=0, col=1)
+            l11_ribbon = self._extract_matrix_element('L (RIBBON.FOR)', row=0, col=0)
+            l22_ribbon = self._extract_matrix_element('L (RIBBON.FOR)', row=1, col=1)
+            l12_ribbon = self._extract_matrix_element('L (RIBBON.FOR)', row=0, col=1)
+            l11_tulip  = self._extract_matrix_element('L (SEMBA-TULIP)', row=0, col=0)
+            l22_tulip  = self._extract_matrix_element('L (SEMBA-TULIP)', row=1, col=1)
+            l12_tulip  = self._extract_matrix_element('L (SEMBA-TULIP)', row=0, col=1)
         except (TypeError, IndexError) as e:
             # Corrige as mensagens de erro para o contexto de indutância
             print(f"Erro ao extrair elementos da matriz de indutância: {e}")
@@ -459,22 +501,22 @@ class RibbonCoatedCablesPULParameters():
         plt.style.use('default')
         fig, ax = plt.subplots(figsize=(8, 5))
         
-        fortran_nf_axis = self.results_df.index + 1
-        ax.plot(fortran_nf_axis, l22, color='k', marker='o', linestyle='-',  label='$L_{22}$')
-        ax.plot(fortran_nf_axis, l11, color='k', marker='o', linestyle=':',  label='$L_{11}$', markerfacecolor='white', markeredgecolor='k')
-        ax.plot(fortran_nf_axis, l12, color='k', marker='s', linestyle='-.', label='$L_{12}$')
+        for_nf_axis = self.results_df.index + 1
+        ax.plot(for_nf_axis, l22_ribbon, color='k', marker='o', linestyle=':', label='$L_{22}$ (RIBBON.FOR)')
+        ax.plot(for_nf_axis, l11_ribbon, color='k', marker='o', linestyle=':', label='$L_{11}$ (RIBBON.FOR)', markerfacecolor='white', markeredgecolor='k')
+        ax.plot(for_nf_axis, l12_ribbon, color='k', marker='s', linestyle=':', label='$L_{12}$ (RIBBON.FOR)')
+        ax.plot(for_nf_axis, l22_tulip, color='gray', linestyle='-.', label='(SEMBA-TULIP)')
+        ax.plot(for_nf_axis, l11_tulip, color='gray', linestyle='-.')
+        ax.plot(for_nf_axis, l12_tulip, color='gray', linestyle='-.')
 
-        # Configuração dos eixos para corresponder à imagem de referência
         ax.set_xlabel('Number of Fourier Coefficients', fontsize=12)
         ax.set_ylabel('Inductance (µH/m)', fontsize=12)
-        
-        # Adiciona uma pequena margem (padding) aos limites do eixo x para melhor visualização
         ax.set_xlim(0.8, self.sum_max + 0.2)
         ax.set_xticks(np.arange(1, self.sum_max + 1, 1))        
         ax.set_yticks(np.arange(0.2, 1.2, 0.1))        
         ax.set_title('')
         ax.grid(False)
-        ax.legend(loc='upper center', fontsize=9, markerscale=1.0, ncol=3, bbox_to_anchor=(0.5, 1.12), fancybox=True)
+        ax.legend(loc='upper center', fontsize=9, markerscale=1.0, ncol=4, bbox_to_anchor=(0.5, 1.12), fancybox=True)
         plt.tight_layout()
 
     def plot_paul_fig514b(self):
@@ -496,9 +538,9 @@ class RibbonCoatedCablesPULParameters():
             c11_ribbon = self._extract_matrix_element('C (RIBBON.FOR)', row=0, col=0)
             c22_ribbon = self._extract_matrix_element('C (RIBBON.FOR)', row=1, col=1)
             c12_ribbon = self._extract_matrix_element('C (RIBBON.FOR)', row=0, col=1)
-            c11_mom = self._extract_matrix_element('C (MoM.PY)', row=0, col=0)
-            c22_mom = self._extract_matrix_element('C (MoM.PY)', row=1, col=1)
-            c12_mom = self._extract_matrix_element('C (MoM.PY)', row=0, col=1)
+            c11_tulip  = self._extract_matrix_element('C (SEMBA-TULIP)', row=0, col=0)
+            c22_tulip  = self._extract_matrix_element('C (SEMBA-TULIP)', row=1, col=1)
+            c12_tulip  = self._extract_matrix_element('C (SEMBA-TULIP)', row=0, col=1)
         except (TypeError, IndexError) as e:
             # Corrige as mensagens de erro para o contexto de indutância
             print(f"Erro ao extrair elementos da matriz de indutância: {e}")
@@ -508,16 +550,14 @@ class RibbonCoatedCablesPULParameters():
         plt.style.use('default')
         fig, ax = plt.subplots(figsize=(8, 5))
 
-        fortran_nf_axis = self.results_df.index + 1
-        ax.plot(fortran_nf_axis, c11_ribbon, color='k', marker='o', linestyle='-',  label='$C_{11}$')
-        ax.plot(fortran_nf_axis, c22_ribbon, color='k', marker='o', linestyle=':',  label='$C_{22}$', markerfacecolor='white', markeredgecolor='k')
-        ax.plot(fortran_nf_axis, c12_ribbon, color='k', marker='s', linestyle='-.', label='$C_{12}$')
+        for_nf_axis = self.results_df.index + 1
+        ax.plot(for_nf_axis, c11_ribbon, color='k', marker='o', linestyle=':', label='$C_{11}$ (RIBBON.FOR)')
+        ax.plot(for_nf_axis, c22_ribbon, color='k', marker='o', linestyle=':', label='$C_{22}$ (RIBBON.FOR)', markerfacecolor='white', markeredgecolor='k')
+        ax.plot(for_nf_axis, c12_ribbon, color='k', marker='s', linestyle=':', label='$C_{12}$ (RIBBON.FOR)')
+        ax.plot(for_nf_axis, c11_tulip, color='gray', linestyle='-.',  label='(SEMBA-TULIP)')
+        ax.plot(for_nf_axis, c22_tulip, color='gray', linestyle='-.')
+        ax.plot(for_nf_axis, c12_tulip, color='gray', linestyle='-.')
 
-        ax.plot(fortran_nf_axis, c11_ribbon, color='k', marker='o', linestyle='-',  label='$C_{11}$')
-        ax.plot(fortran_nf_axis, c22_ribbon, color='k', marker='o', linestyle=':',  label='$C_{22}$', markerfacecolor='white', markeredgecolor='k')
-        ax.plot(fortran_nf_axis, c12_ribbon, color='k', marker='s', linestyle='-.', label='$C_{12}$')
-
-        # Configuração dos eixos para corresponder à imagem de referência
         ax.set_xlabel('Number of Fourier Coefficients', fontsize=12)
         ax.set_ylabel('Capacitance (pF/m)', fontsize=12)
         ax.set_xticks(np.arange(1, self.sum_max + 1, 1))
@@ -525,7 +565,7 @@ class RibbonCoatedCablesPULParameters():
         ax.set_xlim(0.8, self.sum_max + 0.2)
         ax.set_title('')
         ax.grid(False)
-        ax.legend(loc='upper center', fontsize=9, markerscale=1.0, ncol=3, bbox_to_anchor=(0.5, 1.12), fancybox=True)
+        ax.legend(loc='upper center', fontsize=9, markerscale=1.0, ncol=4, bbox_to_anchor=(0.5, 1.12), fancybox=True)
         plt.tight_layout()
 
     def plot_paul_fig514c(self):

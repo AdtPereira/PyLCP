@@ -169,7 +169,7 @@ class BifilarBareWirePULParameters():
         print("="*self.pt2 + " BIFILAR BARE-WIRE RIBBON CABLE SIMULATION " + "="*self.pt2)
         print(f"Project: {self.project_root}")
         print(f"Model: {self.mtl_copy['name']}")
-        print(f"D/R = {self.DR_ratio}. Fourier Order (k) = {self.mtl_copy[0]['fourier_order']}.")
+        print(f"D/R = {self.DR_ratio:.3f}. Fourier Order (k) = {self.mtl_copy[0]['fourier_order']}.")
         print(f"RIBBON Fourier Coef./cond. (NF) = {self.mtl_copy[0]['fourier_order']+1}.")
         print(f"PYTHON Fourier Coef./cond. (NF) = {2*self.mtl_copy[0]['fourier_order']+1}.")
         print(f"Exact Bifilar Bare Wire Capacitance: {self.analytical_bifilar_capacitance * 1E12:.4f} pF/m")
@@ -298,8 +298,9 @@ class BifilarBareWirePULParameters():
             print(f"\n2*pi*e0*G:\n{- 2 * np.pi * epsilon_0 * np.real(green_matrix)}")
 
         print(f"\nGreen's Matrix Shape: {green_matrix.shape}.")
-        print(f"\nMoM-SO Generalized Capacitance Matrix (F/m): \n{np.real(general_cap)}")
-        print(f"\nMoM-SO Bifilar Capacitance: \n{np.real(maxwell_cap.item()) * 1E12:.4f} pF/m")
+        matrix_viewer(np.real(general_cap), "MoM-SO Generalized Capacitance Matrix (F/m)")
+        matrix_viewer(np.real(maxwell_cap), "MoM-SO Bifilar Capacitance (F/m)")
+
 
     def run_srw_rates(self):
         """
