@@ -1,4 +1,5 @@
 """ This module defines the MulticonductorTransmissionLine class.
+
 REFERENCES:
 [1] PATEL, Utkarsh R. A Surface Admittance Approach For Fast Calculation of the 
     Series Impedance of Cables Including Skin, Proximity, and Ground Return Effects.
@@ -14,6 +15,9 @@ REFERENCES:
     Accurate Impedance Calculation of Single-Core Cables Enclosed by a Conducting Pipe," 
     Proc. International Conference on Power Systems Transients (IPST 2013), Vancouver, 
     Canada July 18-20, 2013. https://www.ipstconf.org/Proc_IPST2013.php
+
+[4] PAUL, Clayton R. Analysis of multiconductor transmission lines. 2. ed. Hoboken,
+    N.J.: John Wiley & Sons, Inc., c2008.
 
 """
 

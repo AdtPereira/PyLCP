@@ -34,25 +34,38 @@ import os
 import sys
 import time
 import numpy as np
+from pathlib import Path
 import matplotlib.pyplot as plt
 
-# Adiciona a raiz do projeto ao PYTHONPATH para importação de módulos.
-# ATENÇÃO: Esta é uma solução frágil. O ideal é instalar o projeto como um pacote.
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..\..')))
+# RAIZ DO PROJETO E DIRETÓRIOS
+os.system('cls' if os.name == 'nt' else 'clear')
+try:
+    script_dir = Path(__file__).resolve().parent
+    print(f"Script directory: {script_dir}")
+    project_root = script_dir.parents[0]
+    print(f"Project root: {project_root}")
+    sys.path.append(str(project_root))
+    print("Caminhos do projeto configurados com sucesso.")
+except IndexError:
+    raise FileNotFoundError(
+        "Não foi possível encontrar a raiz do projeto. "
+        "Certifique-se de que o script está em 'examples/coated_wires'."
+    )
 
-from mtl_data.models import MTL_MODELS
-from mtl_data.graphics import MTLRepresentation
-from analytical_forms.single_core_cable import *
-
-from mom_so.utils import *
-from mom_so.quasi_static_green import QuasiStatic
-from mom_so.lossless_medium import HomogeneousLosslessMedium, LosslessPostProcessing
-
+# IMPORTAÇÕES DOS MÓDULOS E MODELO DE DADOS
+try:
+    from mtl_data.models import COAXIAL_CABLE as MTL
+    from mtl_data.graphics import MTLRepresentation
+    from analytical_forms.pul_wires_conductors import *
+    from mom_so.quasi_static_green import QuasiStatic
+    from mom_so.lossless_medium import HomogeneousLosslessMedium, LosslessPostProcessing
+    print("Módulos e modelo de dados importados com sucesso.") 
+except ImportError as e:
+    print(f"Erro ao importar módulos: {e}")
+    sys.exit(1)
 
 # --- Configurações da Simulação ---
-#MTL = MTL_MODELS['coaxial']['model']
-MTL = MTL_MODELS['coaxial']['patel']
-FREQUENCY_RANGE = {'ana': np.logspace(0, 5, num=200), 'mom': np.logspace(0, 5, num=30)}
+FREQUENCY_RANGE = {'ana': np.logspace(0, 5.9, num=200), 'mom': np.logspace(0, 5.9, num=30)}
 
 
 def run_analytical_simulation(mtl, frequencies):
@@ -68,15 +81,11 @@ def run_analytical_simulation(mtl, frequencies):
                resistências de alta frequência e indutâncias externas.
     """
     print("Iniciando rotina analítica...")
-    analytical_data = {}
-    
+    analytical_data = {}    
     for freq in frequencies:
-        # Patel's Formulation
-        coaxial = SingleCoreCable(mtl, freq)
+        coaxial = CoaxialCable(mtl, freq)
         zs = coaxial.pul_parameters()
         l_ext = coaxial.external_inductance()
-
-        # Ametani's Formulation
         z11, z12, z22 = Ametani(mtl, freq).impedance_two_layered_conductor()
 
         analytical_data[freq] = {
@@ -138,7 +147,6 @@ def plot_results(freqs, analytical_data, mom_so_data):
     """
     print("Gerando gráficos...")
 
-    # A função interna _configure_subplot permanece a mesma.
     def _configure_subplot(ax, ylabel, data_to_plot, y_lim, yscale='log'):
         for plot_params in data_to_plot:
             frequencies, values = plot_params['data']
@@ -156,12 +164,32 @@ def plot_results(freqs, analytical_data, mom_so_data):
 
         ax.set_xscale('log')
         ax.set_yscale(yscale)
-        ax.set_xlim(1E0, 1E5)
+        ax.set_xlim(1E0, 1E6)
         ax.set_ylim(y_lim)
         ax.set_xlabel('Frequency (Hz)')
         ax.set_ylabel(ylabel)
         ax.legend()
         ax.grid(False)
+
+    def _build_plot_data(param_prefix):
+        """Função auxiliar que usa a configuração explícita para construir os dados."""
+        data_list = []
+        param_prefix_upper = param_prefix.upper()
+
+        for p_def in plot_definitions:
+            data_key = p_def[f'{param_prefix}_key'] # Acessa a chave correta: 'r_key' ou 'l_key'
+            if data_key is None:
+                continue
+            plot_frequencies = freqs.get(p_def['freq_key'])            
+            label = p_def.get('label') or p_def.get('label_template', '').format(P=param_prefix_upper)
+            plot_dict = {
+                'type': p_def['type'],
+                'data': (plot_frequencies, processed_data[data_key]),
+                'label': label
+            }
+            plot_dict.update(p_def.get('style', {}))
+            data_list.append(plot_dict)
+        return data_list
 
     # --- 1. Processamento de Dados com List Comprehensions ---
     R_FACTOR = 1E3
@@ -185,8 +213,6 @@ def plot_results(freqs, analytical_data, mom_so_data):
         'leq':    [(d['l11']-2*d['l12']+d['l22']) * L_FACTOR for d in analytical_values],
     }
 
-    # --- 2. Configuração Centralizada e Explícita das Curvas ---
-    # As chaves 'r_key' e 'l_key' agora correspondem EXATAMENTE às chaves em processed_data.
     plot_definitions = [
         {'r_key': 'rs_mom', 'l_key': 'ls_mom', 'freq_key': 'mom', 'type': 'scatter', 'label': 'MoM-SO'},
         {'r_key': 'rs',     'l_key': 'ls',     'freq_key': 'ana', 'type': 'plot',    'label': 'Analytical [1]'},
@@ -196,28 +222,7 @@ def plot_results(freqs, analytical_data, mom_so_data):
         {'r_key': 'r22',    'l_key': 'l22',    'freq_key': 'ana', 'type': 'plot',    'label_template': '${P}_{{22}}$', 'style': {'color': 'b', 'linestyle': ':'}},
         {'r_key': 'req',    'l_key': 'leq',    'freq_key': 'ana', 'type': 'plot',    'label_template': '${P}_{{11}}-2{P}_{{12}}+{P}_{{22}}$', 'style': {'color': 'r', 'linestyle': ':'}},
     ]
-
-    def _build_plot_data(param_prefix):
-        """Função auxiliar que usa a configuração explícita para construir os dados."""
-        data_list = []
-        param_prefix_upper = param_prefix.upper()
-
-        for p_def in plot_definitions:
-            data_key = p_def[f'{param_prefix}_key'] # Acessa a chave correta: 'r_key' ou 'l_key'
-            if data_key is None:
-                continue
-            plot_frequencies = freqs.get(p_def['freq_key'])            
-            label = p_def.get('label') or p_def.get('label_template', '').format(P=param_prefix_upper)
-            plot_dict = {
-                'type': p_def['type'],
-                'data': (plot_frequencies, processed_data[data_key]),
-                'label': label
-            }
-            plot_dict.update(p_def.get('style', {}))
-            data_list.append(plot_dict)
-        return data_list
-
-    # --- 3. Criação da Figura ---
+    
     fig, axes = plt.subplots(1, 2, figsize=(12, 5))
     resistance_data = _build_plot_data('r')
     inductance_data = _build_plot_data('l')    
@@ -226,29 +231,17 @@ def plot_results(freqs, analytical_data, mom_so_data):
     plt.tight_layout()
 
 
-def main():
+if __name__ == "__main__":
     """ Função principal para orquestrar a análise, cálculo e visualização dos resultados. """
-    clear_screen()
-    print("Iniciando cálculos da impedância p.u.l. ...")
-    start_time = time.time()
+    st = time.time()
+    os.system('cls' if os.name == 'nt' else 'clear')
+    print("Iniciando cálculos da impedância p.u.l. do cabo coaxial...")
 
-    # 1. Exibe a geometria da linha (em uma figura separada)
-    MTLRepresentation(MTL).wires_and_cables()
-
-    # 1. Rotina Analítica
+    # Rotinas Analítica e MoM-SO
     analytical_data = run_analytical_simulation(MTL, FREQUENCY_RANGE['ana'])
-
-    # 2. Rotina MoM-SO
     momso_data = run_momso_simulation(MTL, FREQUENCY_RANGE['mom'])
 
-    # 3. Medição de tempo
-    elapsed_time = time.time() - start_time
-    print(f"\nRotinas de cálculo finalizadas! Tempo de simulação: {elapsed_time:.2f} segundos.")
-
-    # 5. Geração e exibição dos resultados com a função revisada
+    print(f"\nRotinas de cálculo finalizadas! Tempo de simulação: {(time.time() - st):.2f} segundos.")
     plot_results(FREQUENCY_RANGE, analytical_data, momso_data)
-
-
-if __name__ == "__main__":
-    main()
+    MTLRepresentation(MTL, units='millimeter').coaxial()
     plt.show()

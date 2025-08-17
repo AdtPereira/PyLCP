@@ -120,31 +120,31 @@ class PyTulip:
                 print("\nSimulation aborted due to an error during execution.")
 
 
-# if __name__ == '__main__':
-#     # --- Example Usage ---
-#     EXE_PATH = r"C:\git\tulip\pulmtln-build\rls\bin\Release\pulmtln.exe"
-#     CASE_NAME = "three_wires_ribbon" 
+if __name__ == '__main__':
+    # --- Example Usage ---
+    EXE_PATH = r"C:\git\tulip\pulmtln-build\rls\bin\Release\pulmtln.exe"
+    CASE_NAME = "two_wires_open_gmsh" 
 
-#     print(f"--- Preparing to run simulation for case: '{CASE_NAME}' ---")
+    print(f"--- Preparing to run simulation for case: '{CASE_NAME}' ---")
     
-#     try:
-#         runner = PyTulip(
-#             executable_path=EXE_PATH,
-#             case_name=CASE_NAME,
-#             silent=False
-#         )
-#         runner.run()
+    try:
+        runner = PyTulip(
+            executable_path=EXE_PATH,
+            case_name=CASE_NAME,
+            silent=False
+        )
+        runner.run()
 
-#         print("\n--- Accessing Results ---")
-#         if runner.C_matrix is not None:
-#             print("\nCapacitance Matrix (C):")
-#             print(runner.C_matrix)
+        print("\n--- Accessing Results ---")
+        if runner.C_matrix is not None:
+            print("\nCapacitance Matrix (C):")
+            print(runner.C_matrix)
         
-#         if runner.L_matrix is not None:
-#             print("\nInductance Matrix (L):")
-#             print(runner.L_matrix)
+        if runner.L_matrix is not None:
+            print("\nInductance Matrix (L):")
+            print(runner.L_matrix)
 
-#     except (FileNotFoundError, NotADirectoryError) as e:
-#         print(f"\nConfiguration Error: {e}")
-#     except Exception as e:
-#         print(f"\nAn unexpected error occurred: {e}")
+    except (FileNotFoundError, NotADirectoryError) as e:
+        print(f"\nConfiguration Error: {e}")
+    except Exception as e:
+        print(f"\nAn unexpected error occurred: {e}")

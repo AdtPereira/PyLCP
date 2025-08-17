@@ -7,7 +7,7 @@ from typing import Dict, Any
 
 from mtl_paul.py_fortran import FortranRunner
 from mom.bare_wire_systems import MulticonductorBareWireSystems
-from analytical_forms.bare_wires import WiresHomogeneousMedia
+from analytical_forms.pul_wires_conductors import WiresHomogeneousMedia
 from mom_so.quasi_static_green import QuasiStatic
 from mom_so.lossless_medium import HomogeneousLosslessMedium, LosslessPostProcessing
 from mtl_data.utils import *

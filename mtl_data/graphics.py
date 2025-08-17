@@ -1,8 +1,7 @@
 import numpy as np
 import plotly.graph_objects as go
 import matplotlib.pyplot as plt
-from matplotlib.patches import Wedge
-from matplotlib import patches
+from matplotlib.patches import Circle, Wedge
 
 from mtl_data.mtl import MulticonductorTransmissionLine
 
@@ -45,7 +44,7 @@ class MTLRepresentation(MulticonductorTransmissionLine):
                 ax.add_patch(Wedge(center, outer_radius, 0, 360, width=thickness, edgecolor='black', facecolor='lightblue', linestyle='solid'))
 
             # Desenha o condutor principal (núcleo)            
-            ax.add_patch(patches.Circle(conductor_center, conductor_radius, fill=True, edgecolor='black', facecolor='darkgrey'))
+            ax.add_patch(Circle(conductor_center, conductor_radius, fill=True, edgecolor='black', facecolor='darkgrey'))
 
         ax.relim()                      # Recalcula os limites dos dados para incluir todos os patches
         ax.autoscale_view()             # Ajusta a visualização para os novos limites
@@ -54,6 +53,77 @@ class MTLRepresentation(MulticonductorTransmissionLine):
         plt.xlabel(f'x ({self.label_unit})')
         plt.ylabel(f'y ({self.label_unit})')
         plt.grid(True, linestyle='--', linewidth=0.5)
+
+    def coaxial(self):
+        """
+        This function plots the geometry of a coaxial cable,
+        correctly interpreting a structure with separate core and sheath conductors.
+        It elegantly defines the axis limits after plotting.
+        """
+        # Ensure the data structure has the expected conductors (0 and 1)
+        if 0 not in self.mtl or 1 not in self.mtl:
+            print("Error: The cable data must contain keys for conductor 0 (sheath) and 1 (core).")
+            return
+
+        # Assign core and sheath based on the provided structure
+        # Conductor 0 is the sheath (return), Conductor 1 is the core (active)
+        sheath = self.mtl[0]
+        core = self.mtl[1]
+
+        # Create the plot and axes
+        _, ax = plt.subplots(figsize=(8, 5))
+        
+        # --- Define Radii and Center (applying scale factor) ---
+        center = np.array(core['center_point']) * self.scale_factor
+        
+        core_outer_radius = core['radius'][1] * self.scale_factor
+        sheath_inner_radius = sheath['radius'][0] * self.scale_factor
+        sheath_outer_radius = sheath['radius'][1] * self.scale_factor
+
+        # --- Plotting from outside to inside ---
+
+        # 1. Draw the outer sheath (conductor)
+        sheath_thickness = sheath_outer_radius - sheath_inner_radius
+        ax.add_patch(Wedge(
+            center, sheath_outer_radius, 0, 360, 
+            width=sheath_thickness, 
+            edgecolor='black', 
+            facecolor='darkgrey', 
+            label='Sheath'
+        ))
+
+        # 2. Draw the dielectric insulator (the space between core and sheath)
+        dielectric_thickness = sheath_inner_radius - core_outer_radius
+        if dielectric_thickness > 0:
+            ax.add_patch(Wedge(
+                center, sheath_inner_radius, 0, 360, 
+                width=dielectric_thickness, 
+                edgecolor='black', 
+                facecolor='ivory', 
+                linestyle='--',
+                label='Dielectric'
+            ))
+
+        # 3. Draw the inner core (conductor)
+        ax.add_patch(Circle(
+            center, core_outer_radius, 
+            fill=True, 
+            edgecolor='black', 
+            facecolor='sandybrown', 
+            label='Core'
+        ))
+
+        # --- Final plot adjustments ---
+        ax.relim()                     # Recalculate data limits to include all patches
+        ax.autoscale_view()            # Adjust the view to the new limits
+        ax.margins(0.2)                # Apply a 20% margin to the calculated limits
+        ax.set_aspect('equal', 'box')  # Ensure the scaling is equal on both axes
+        
+        plt.xlabel(f'x ({self.label_unit})')
+        plt.ylabel(f'y ({self.label_unit})')
+        plt.title('Coaxial Cable Cross-Section')
+        plt.grid(True, linestyle='--', linewidth=0.5)
+        plt.legend()
 
     # def underground_system(self):
     #     """This function plots the geometry of the buried SCC."""
