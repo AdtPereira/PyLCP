@@ -24,9 +24,7 @@ REFERENCES:
 """
 
 import numpy as np
-from scipy.special import jv, jvp
-from scipy.special import iv, kv
-from scipy.constants import mu_0, epsilon_0
+from scipy.special import iv, kv, jv, jvp
 from scipy.linalg import lu_factor, lu_solve
 from mtl_data.mtl import MulticonductorTransmissionLine
 
@@ -91,7 +89,7 @@ class WiresHomogeneousMedia(MulticonductorTransmissionLine):
         sigma = cond_active['conductivity']
 
         # Profundidade pelicular e Resistência superficial
-        delta = np.sqrt(2 / (w * mu_0 * sigma))
+        delta = np.sqrt(2 / (w * self.mu[0] * sigma))
         Rs = 1 / (sigma * delta)
 
         # 4. Calcular Resistência de Alta Frequência (Rhf) e Indutância Externa (Lext)
@@ -103,7 +101,7 @@ class WiresHomogeneousMedia(MulticonductorTransmissionLine):
         Rhf_loop = Rs_pia * s_2rw / np.sqrt(s_2rw**2 - 1)
 
         # Indutância Externa (H/m) - Equação (2.65)
-        Lext_loop = mu_0 / np.pi * np.arccosh(s_2rw)
+        Lext_loop = self.mu[0] / np.pi * np.arccosh(s_2rw)
 
         # 5. Calcular Impedância Interna (Zi) com Funções de Bessel
         # Equação (2.67)
@@ -132,43 +130,31 @@ class WiresHomogeneousMedia(MulticonductorTransmissionLine):
                 ('exact', 'approximate').
         """
         # 1. Validação da estrutura de dados para o caso bifilar
-        assert len(self.mtl) == 2, "Este método é específico para sistemas bifilares (2 condutores)."
+        assert len(self.mtl) == 2, "Este método é específico para sistema bifilar (2 condutores)."
 
         # 2. Acesso direto e explícito aos dados dos condutores
-        cond_0 = self.mtl[0]
-        cond_1 = self.mtl[1]
+        c0, c1 = self.mtl[0], self.mtl[1]
+        rw0, rw1 = c0['radius'][1], c1['radius'][1]
+        
+        # 3. Cálculo dinâmico da distância 's'
+        s = np.linalg.norm(np.array(c0['center_point']) - np.array(c1['center_point']))
 
-        # Extrai raios
-        r_w0 = cond_0['radius'][1]
-        r_w1 = cond_1['radius'][1]
-
-        # 3. Validação do meio externo e definição de epsilon
+        # 4. Validação do meio externo e definição de epsilon
         # A fórmula assume um meio dielétrico externo único e homogêneo.
-        eps_out_0 = epsilon_0 * cond_0['relative_permittivity_out']
-        eps_out_1 = epsilon_0 * cond_1['relative_permittivity_out']
+        eps_out_0, eps_out_1 = self.epsilon_out
+        pi2e = 2 * np.pi * eps_out_0
         assert np.isclose(eps_out_0, eps_out_1), "O meio externo deve ser homogêneo (permissividade externa igual para ambos os condutores)."
-        epsilon = eps_out_0  # Usa o valor validado
-
-        # 4. Cálculo dinâmico da distância 's'
-        center_0 = np.array(cond_0['center_point'])
-        center_1 = np.array(cond_1['center_point'])
-        s = np.linalg.norm(center_1 - center_0)
-
-        # --- 5. Cálculo da Capacitância ---
-        pi2_epsilon = 2 * np.pi * epsilon
-
-        # Aproximada
-        den_approx = np.log((s**2) / (r_w0 * r_w1))
-        capacitance_approx = pi2_epsilon / den_approx
-
-        # Exata
-        arg_arccosh = (s**2 - r_w0**2 - r_w1**2) / (2 * r_w0 * r_w1)
+        
+        # 5. Cálculo da Capacitância
+        den_approx = np.log((s**2) / (rw0 * rw1))
+        capacitance_approx = pi2e / den_approx
+        arg_arccosh = (s**2 - rw0**2 - rw1**2) / (2 * rw0 * rw1)
         den_exact = np.arccosh(arg_arccosh)
-        capacitance_exact = pi2_epsilon / den_exact
+        capacitance_exact = pi2e / den_exact
 
-        # --- 6. Cálculo da Indutância (válido para meio não magnético) ---
-        inductance_approx = mu_0 * epsilon / capacitance_approx
-        inductance_exact = mu_0 * epsilon / capacitance_exact
+        # 6. Cálculo da Indutância (válido para meio não magnético)
+        inductance_approx = self.mu[0] * eps_out_0 / capacitance_approx
+        inductance_exact = self.mu[0] * eps_out_0 / capacitance_exact
 
         # 7. Retorno dos resultados em um dicionário estruturado
         return {
@@ -249,11 +235,12 @@ class WiresHomogeneousMedia(MulticonductorTransmissionLine):
 
         return mu * epsilon * lu_solve(lu_factor(L), I)
 
+
 # 4.2.2 Per-Unit-Length Inductance and Capacitance for Wire-Type Lines [4]
 class CoaxialCable(MulticonductorTransmissionLine):
     """ This class contains the analytical formulation of the system. """
 
-    def __init__(self, mtl, frequency):
+    def __init__(self, mtl):
         """
         Initialize the AnalyticalFormulation class.
 
@@ -262,12 +249,6 @@ class CoaxialCable(MulticonductorTransmissionLine):
         frequency (float): The frequency of the system.
         """
         super().__init__(mtl)
-
-        # Angular frequency, rad/s [float]
-        self.jw = 1j * 2 * np.pi * frequency
-
-        # Propagation Constant [np.array]
-        self.gamma = np.sqrt(self.jw * mu_0 * self.sigma)
 
         # Coaxial Cable radii
         for key, conductor in self.mtl.items():
@@ -280,16 +261,22 @@ class CoaxialCable(MulticonductorTransmissionLine):
     # Equation 2.70 [1] and 4.51 [4]
     def external_inductance(self):
         """ Calculate the external inductance for a lossless coaxial cable, L'. """
-        return mu_0 / (2 * np.pi) * np.log(self.b / self.a)
+        return self.mu[0] / (2 * np.pi) * np.log(self.b / self.a)
 
     # Equation 2.71 [1]
-    def internal_impedance(self):
+    def internal_impedance(self, frequency):
         """ Calculate the internal impedance of the inner conductor Za (omega). """
+        # Angular frequency, rad/s [float]
+        jw = 1j * 2 * np.pi * frequency
+
+        # Propagation Constant [np.array]
+        gamma = np.sqrt(jw * self.mu[0] * self.sigma)
+
         # Propagation Constant of the inner conductor
-        gama_a = self.gamma[0] * self.a
+        gama_a = gamma[0] * self.a
 
         # Intrinsic Impedance of the inner conductor
-        eta = np.sqrt(self.jw * mu_0 / self.sigma)[0]
+        eta = np.sqrt(jw * self.mu[0] / self.sigma)[0]
 
         # Internal Impedance of the inner conductor
         za = eta / (2 * np.pi * self.a) * iv(0, gama_a) / iv(1, gama_a)
@@ -297,14 +284,20 @@ class CoaxialCable(MulticonductorTransmissionLine):
         return za
 
     # Equation 2.72 [1]
-    def external_impedance(self):
+    def external_impedance(self, frequency):
         """ Calculate the external impedance of the inner conductor Zb (omega). """
+        # Angular frequency, rad/s [float]
+        jw = 1j * 2 * np.pi * frequency
+
+        # Propagation Constant [np.array]
+        gamma = np.sqrt(jw * self.mu[0] * self.sigma)
+
         # Propagation Constant of the inner conductor
-        gama_b = self.gamma[0] * self.b
-        gama_c = self.gamma[0] * self.c
+        gama_b = gamma[0] * self.b
+        gama_c = gamma[0] * self.c
 
         # Intrinsic Impedance of the inner conductor
-        eta = np.sqrt(self.jw * mu_0 / self.sigma)[0]
+        eta = np.sqrt(jw * self.mu[0] / self.sigma)[0]
 
         numerator = iv(0, gama_b) * kv(1, gama_c) + (kv(0, gama_b) * iv(1, gama_c))
         denominator = iv(1, gama_c) * kv(1, gama_b) - (iv(1, gama_b) * kv(1, gama_c))
@@ -315,7 +308,7 @@ class CoaxialCable(MulticonductorTransmissionLine):
         return zb
 
     # Equation (2.69) [1]
-    def pul_parameters(self):
+    def pul_parameters(self, frequency):
         """
         This function calculates the series resistance of the system using 
         the high frequency approximation.
@@ -324,11 +317,14 @@ class CoaxialCable(MulticonductorTransmissionLine):
             tuple: A tuple containing the high frequency resistance, external inductance, 
             and matrix impedance.
         """
+        # Angular frequency, rad/s [float]
+        jw = 1j * 2 * np.pi * frequency
+
         # Matrix Impedance, z (Ω/m)
         l_ext = self.external_inductance()
-        za = self.internal_impedance()
-        zb = self.external_impedance()
-        zs = self.jw * l_ext + za + zb
+        za = self.internal_impedance(frequency)
+        zb = self.external_impedance(frequency)
+        zs = jw * l_ext + za + zb
 
         return zs
 
@@ -336,7 +332,7 @@ class CoaxialCable(MulticonductorTransmissionLine):
 class Ametani(MulticonductorTransmissionLine):
     """ This class contains the analytical formulation of the system. """
 
-    def __init__(self, mtl, frequency):
+    def __init__(self, mtl):
         """
         Initialize the AnalyticalFormulation class.
 
@@ -346,15 +342,10 @@ class Ametani(MulticonductorTransmissionLine):
         """
         super().__init__(mtl)
 
-        # Angular frequency, rad/s [float]
-        self.jw = 1j * 2 * np.pi * frequency
+        # # Angular frequency, rad/s [float]
+        # self.jw = 1j * 2 * np.pi * frequency
 
         # Call the function to configure the parameters
-        self._scc_from_data()
-
-    def _scc_from_data(self):
-        """ This function configures the parameters of the coaxial cable. """
-
         for key, conductor in self.mtl.items():
             if isinstance(key, int):  # Ensures the key is an integer
                 if conductor['conductor_name'] == 'core':
@@ -362,16 +353,20 @@ class Ametani(MulticonductorTransmissionLine):
                 elif conductor['conductor_name'] == 'sheath':
                     self.b_prime, self.c = conductor['radius']
 
-    def parameter_m(self, mu, sigma):
+    def parameter_m(self, frequency, mu, sigma):
         """ Calculate the parameter m for the two-layered conductor. """
-        return np.sqrt(self.jw * mu * sigma)
+        # Angular frequency, rad/s [float]
+        jw = 1j * 2 * np.pi * frequency
+        return np.sqrt(jw * mu * sigma)
 
-    def impedance_two_layered_conductor(self):
+    def impedance_two_layered_conductor(self, frequency):
         """ Calculate the impedance of a two-layered conductor. """
+        # Angular frequency, rad/s [float]
+        jw = 1j * 2 * np.pi * frequency
 
         # Intermediate variables
-        m1 = self.parameter_m(self.mu[0], self.sigma[0])
-        m2 = self.parameter_m(self.mu[1], self.sigma[1])
+        m1 = self.parameter_m(frequency, self.mu[0], self.sigma[0])
+        m2 = self.parameter_m(frequency, self.mu[1], self.sigma[1])
         x1 = m1 * self.a
         x2 = m1 * self.b
         x3 = m2 * self.b_prime
@@ -397,7 +392,7 @@ class Ametani(MulticonductorTransmissionLine):
         z2i = (m2 * rho2 / (2 * np.pi * self.b_prime)) * ee / ff
         z2m = rho2 / (2 * np.pi * self.b_prime * self.c * ff)
         z20 = (m2 * rho2 / (2 * np.pi * self.c)) * rr / ff
-        z12 = self.jw * (mu_0 / 2 / np.pi) * np.log(self.b_prime / self.b)
+        z12 = jw * (self.mu[0] / 2 / np.pi) * np.log(self.b_prime / self.b)
 
         # Calculating Z11, Z12, Z22
         zz22 = z20

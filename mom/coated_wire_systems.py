@@ -1,11 +1,10 @@
 import numpy as np
 import pandas as pd
+import scipy.constants as sc
 import matplotlib.pyplot as plt
 import plotly.graph_objects as go
-from scipy.constants import epsilon_0
-
-from mtl_data.mtl import MulticonductorTransmissionLine as MTL
 from mtl_data.utils import *
+from mtl_data.mtl import MulticonductorTransmissionLine as MTL
 
 
 class TwoCoatedWireSystem(MTL):
@@ -32,8 +31,8 @@ class TwoCoatedWireSystem(MTL):
         self.R = self.surfaces[0]['radius']
         self.D = self.D_pq[0, 1]
         self.DR_ratio = self.D / self.R
-
         assert self.DR_ratio > 2, "A razão D/R deve ser maior que 2 para garantir a convergência da solução."
+        self.C_exact_bare_wires = np.pi * sc.epsilon_0 / np.arccosh(0.5 * self.DR_ratio)
 
         # Atributos de resultado
         self.collocation_data = None
@@ -43,7 +42,6 @@ class TwoCoatedWireSystem(MTL):
         self.sigma_coeffs = None
         self.C_generalized = None
         self.C_maxwellian = None
-        self.C_exact_bare_wires = None
 
     def _calculate_collocation_points(self):
         """
@@ -96,73 +94,6 @@ class TwoCoatedWireSystem(MTL):
                     'angles_deg': np.degrees(field_angles)
                 }
             }
-
-    # def _calculate_generalized_capacitance(self):
-    #     """
-    #     Calcula a matriz de capacitância generalizada C.
-
-    #     Esta versão revisada implementa a fórmula da Eq. (5.48) de forma robusta,
-    #     sendo capaz de lidar tanto com sistemas de fios revestidos quanto nus.
-    #     Para fios nus, apenas a contribuição da superfície do condutor é considerada.
-    #     """
-    #     self.T_matrix = np.linalg.inv(self.D_matrix)
-
-    #     # 1. Obter a ordem das superfícies e os parâmetros dos blocos
-    #     conductor_surfaces = [s for s in self.surfaces if s['type'] == 'conductor']
-    #     sheath_surfaces = [s for s in self.surfaces if s['type'] == 'sheath']
-    #     ordered_surfaces = conductor_surfaces + sheath_surfaces
-        
-    #     num_conductors = len(conductor_surfaces)
-    #     nfs_per_surface = [2 * s['fourier_order'] + 1 for s in ordered_surfaces]
-    #     offsets = np.cumsum([0] + nfs_per_surface)
-
-    #     # 2. Criar um mapa para fácil acesso às propriedades e offsets de cada superfície
-    #     surface_map = {}
-    #     for i, surface in enumerate(ordered_surfaces):
-    #         tag = surface['tag']
-    #         if tag not in surface_map:
-    #             surface_map[tag] = {}
-    #         surface_map[tag][surface['type']] = {
-    #             'radius': surface['radius'],
-    #             'offset': offsets[i],
-    #             'nf': nfs_per_surface[i]
-    #         }
-
-    #     # 3. Calcular a matriz de capacitância
-    #     C_matrix = np.zeros((num_conductors, num_conductors))
-
-    #     # Loop sobre o condutor 'i' onde a CARGA LIVRE total é calculada (linhas de C)
-    #     for i in range(num_conductors):
-    #         # Loop sobre o condutor 'j' cujo potencial é V_j=1 (colunas de C)
-    #         for j in range(num_conductors):
-    #             # Informações do bloco de colunas do condutor 'j'
-    #             info_cond_j = surface_map[j]['conductor']
-    #             col_start_j = info_cond_j['offset']
-    #             col_end_j = col_start_j + info_cond_j['nf']
-
-    #             # Termo 1 (Eq. 5.48): Contribuição da superfície do condutor 'i'.
-    #             # Esta parte é sempre calculada.
-    #             info_cond_i = surface_map[i]['conductor']
-    #             row_idx_cond_i = info_cond_i['offset']
-    #             radius_cond_i = info_cond_i['radius']
-    #             sum_bij = np.sum(self.T_matrix[row_idx_cond_i, col_start_j:col_end_j])
-    #             term1 = 2 * np.pi * radius_cond_i * sum_bij
-
-    #             # Termo 2 (Eq. 5.48): Contribuição da superfície da bainha 'i'.
-    #             # ✅ ESTA PARTE AGORA É CONDICIONAL ✅
-    #             term2 = 0.0  # Inicializa como zero para o caso do fio nu.
-    #             if 'sheath' in surface_map[i]:
-    #                 info_sheath_i = surface_map[i]['sheath']
-    #                 row_idx_sheath_i = info_sheath_i['offset']
-    #                 radius_sheath_i = info_sheath_i['radius']
-    #                 sum_b_prime_ij = np.sum(self.T_matrix[row_idx_sheath_i, col_start_j:col_end_j])
-    #                 term2 = 2 * np.pi * radius_sheath_i * sum_b_prime_ij
-
-    #             # A carga livre total é a soma das contribuições.
-    #             # Para um fio nu, term2 permanecerá 0.
-    #             C_matrix[i, j] = term1 + term2
-
-    #     self.C_generalized = C_matrix
 
     def _calculate_generalized_capacitance(self):
         """
@@ -242,118 +173,6 @@ class TwoCoatedWireSystem(MTL):
         # --- FIM DA LÓGICA REVISADA ---
         
         self.C_generalized = C_matrix
-
-    # def _calculate_maxwellian_capacitance(self):
-    #     """
-    #     Calcula a matriz de capacitância física (Maxwelliana) de dimensão (N-1)x(N-1)
-    #     a partir da matriz de capacitância generalizada de dimensão NxN.
-
-    #     Este processo ocorre em duas etapas:
-    #     1.  Primeiro, uma matriz Maxwelliana completa (NxN) é calculada usando a
-    #         Equação 5.21, que é dada por:
-    #         C_completa_ij = c_ij - (soma_linha_i * soma_coluna_j) / soma_total
-    #     2.  Em seguida, a matriz é reduzida para (N-1)x(N-1) ao remover a linha e a
-    #         coluna correspondentes ao condutor de referência, cujo índice é
-    #         especificado pelo atributo da classe `self.idx_ref`.
-    #     """
-    #     gc = self.C_generalized
-
-    #     # --- Validações ---
-    #     assert isinstance(gc, np.ndarray), "A matriz de capacitância generalizada deve ser um array NumPy."
-    #     assert gc.ndim == 2 and gc.shape[0] == gc.shape[1], "A matriz de capacitância generalizada deve ser quadrada."
-    #     assert gc.shape[0] > 1, "O cálculo da capacitância Maxwelliana requer pelo menos 2 condutores."
-    #     assert hasattr(self, 'idx_ref'), "O atributo 'idx_ref' (índice do condutor de referência) não foi encontrado."
-    #     assert 0 <= self.idx_ref < gc.shape[0], f"O índice de referência self.idx_ref ({self.idx_ref}) está fora do intervalo válido [0, {gc.shape[0]-1}]."
-
-    #     # --- Etapa 1: Calcular a matriz Maxwelliana completa (NxN) ---
-    #     total_sum = np.sum(gc)
-
-    #     # Evita a divisão por zero
-    #     if np.abs(total_sum) < 1e-15:
-    #         raise ValueError("A soma dos elementos da matriz de capacitância generalizada é zero, resultando em divisão por zero.")
-
-    #     row_sums = np.sum(gc, axis=1)
-    #     col_sums = np.sum(gc, axis=0)
-
-    #     correction_matrix = np.outer(row_sums, col_sums) / total_sum
-    #     C_full = gc - correction_matrix
-
-    #     # --- Etapa 2: Reduzir a matriz para (N-1)x(N-1) ---
-    #     # Usa np.delete para remover a linha (axis=0) e a coluna (axis=1)
-    #     # correspondentes ao índice do condutor de referência `self.idx_ref`.
-    #     self.C_maxwellian = np.delete(np.delete(C_full, self.idx_ref, axis=0), self.idx_ref, axis=1)
-    
-    # def _calculate_maxwellian_capacitance(self):
-    #     """
-    #     Calcula a matriz de capacitância física (Maxwelliana) de dimensão (N-1)x(N-1),
-    #     adequando-se completamente à metodologia de Clayton R. Paul.
-
-    #     O processo ocorre em duas etapas:
-    #     1.  Os valores da matriz são calculados usando a fórmula de transformação
-    #         consistente com RIBBON.FOR.
-    #     2.  As linhas e colunas da matriz resultante são reordenadas para seguir
-    #         o esquema de numeração física descrito na Figura A.4 do livro de referência.
-    #     """
-    #     gc = self.C_generalized
-    #     ref_idx = self.idx_ref
-
-    #     # --- Validações ---
-    #     assert isinstance(gc, np.ndarray), "A matriz de capacitância generalizada deve ser um array NumPy."
-    #     num_conductors = gc.shape[0]
-    #     assert 0 <= ref_idx < num_conductors, f"O índice de referência ({ref_idx}) está fora do intervalo."
-
-    #     # --- Etapa 1: Calcular os VALORES da matriz usando o método de RIBBON.FOR ---
-        
-    #     total_sum = np.sum(gc)
-    #     if np.abs(total_sum) < 1e-15:
-    #         raise ValueError("A soma dos elementos da matriz de capacitância generalizada é próxima de zero.")
-        
-    #     row_sums = np.sum(gc, axis=1)
-    #     col_sums = np.sum(gc, axis=0)
-        
-    #     # Mantém os condutores em uma ordem inicial consistente (ordenados por tag)
-    #     non_ref_tags_sorted = sorted([s['tag'] for s in self.surfaces if s['tag'] != ref_idx and s['type'] == 'conductor'])
-        
-    #     C_unordered = np.zeros((num_conductors - 1, num_conductors - 1))
-    #     for i_new, i_tag in enumerate(non_ref_tags_sorted):
-    #         for j_new, j_tag in enumerate(non_ref_tags_sorted):
-    #             correction = (row_sums[i_tag] * col_sums[j_tag]) / total_sum
-    #             C_unordered[i_new, j_new] = gc[i_tag, j_tag] - correction
-
-    #     # --- Etapa 2: Reordenar a matriz de acordo com o esquema de numeração física (Figura A.4) ---
-
-    #     # Obter as coordenadas X de todos os condutores para determinar a ordem física
-    #     coords = {s['tag']: s['center_point'][0] for s in self.surfaces if s['type'] == 'conductor'}
-    #     ref_x_coord = coords[ref_idx]
-
-    #     # Separar os condutores em 'esquerda' e 'direita' em relação ao referencial
-    #     left_of_ref = [tag for tag in non_ref_tags_sorted if coords[tag] < ref_x_coord]
-    #     right_of_ref = [tag for tag in non_ref_tags_sorted if coords[tag] > ref_x_coord]
-
-    #     # Ordenar cada lado pela sua posição física (coordenada x)
-    #     left_of_ref.sort(key=lambda tag: coords[tag])
-    #     right_of_ref.sort(key=lambda tag: coords[tag])
-
-    #     # A ordem final das linhas/colunas da matriz é a sequência da esquerda para a direita
-    #     final_ordered_tags = left_of_ref + right_of_ref
-
-    #     # --- Etapa 3: Montar a matriz final na ordem correta ---
-
-    #     # Mapear cada tag para seu índice na matriz desordenada que calculamos primeiro
-    #     tag_to_unordered_idx = {tag: i for i, tag in enumerate(non_ref_tags_sorted)}
-
-    #     C_maxwellian_ordered = np.zeros_like(C_unordered)
-    #     for i_new, i_final_tag in enumerate(final_ordered_tags):
-    #         for j_new, j_final_tag in enumerate(final_ordered_tags):
-                
-    #             # Encontrar os índices originais (desordenados) para as tags da ordem final
-    #             i_original_idx = tag_to_unordered_idx[i_final_tag]
-    #             j_original_idx = tag_to_unordered_idx[j_final_tag]
-                
-    #             # Copiar o valor da matriz desordenada para a posição correta na matriz final
-    #             C_maxwellian_ordered[i_new, j_new] = C_unordered[i_original_idx, j_original_idx]
-
-    #     self.C_maxwellian = C_maxwellian_ordered
 
     def _calculate_maxwellian_capacitance(self):
         """
@@ -453,6 +272,7 @@ class TwoCoatedWireSystem(MTL):
             for q, source_surface in enumerate(ordered_surfaces):
                 tag_q = source_surface['tag']
                 type_q = source_surface['type']
+                epsilon = self.epsilon_out[source_surface['tag']]
                 center_q = np.array(source_surface['center_point'])
                 nf_q = nfs_per_surface[q]
                 offset_q = offsets[q]
@@ -484,7 +304,7 @@ class TwoCoatedWireSystem(MTL):
                         is_cosine_term = (harmonic_ord % 2 != 0)
                         k = (harmonic_ord + 1) // 2 if is_cosine_term else harmonic_ord // 2                  
                         harmonic_term = np.cos(k * theta_i) if is_cosine_term else np.sin(k * theta_i)
-                        e02k = 2 * epsilon_0 * k
+                        k2epsilon = k * 2 * epsilon
                         
                         # Vetor fonte 'rho_b' relativo ao centro da superfície FONTE 'q'
                         rho_b = np.linalg.norm(source_points[m] - center_q)
@@ -501,18 +321,18 @@ class TwoCoatedWireSystem(MTL):
                             # --- TABELA II.b: rho_i < rho_b (Interação para Observador DENTRO da fronteira da fonte) --- 
                             if is_observer_inside:
                                 if harmonic_ord == 0: # Constant Term (k=0)
-                                    self.D_matrix[row_idx, col_idx] = - rho_b * np.log(rho_b) / epsilon_0                                
+                                    self.D_matrix[row_idx, col_idx] = - rho_b * np.log(rho_b) / epsilon                                
                                 
                                 else: # Harmonic Terms (k>0)
-                                    self.D_matrix[row_idx, col_idx] = rho_i**k / e02k / rho_b**(k-1) * harmonic_term
+                                    self.D_matrix[row_idx, col_idx] = rho_i**k / k2epsilon / rho_b**(k-1) * harmonic_term
                             
                             # --- TABELA II.a: rho_i >= rho_b (Interação para Observador FORA ou SOBRE a fronteira da fonte) --- 
                             else:                         
                                 if harmonic_ord == 0: # Constant Term (k=0)
-                                    self.D_matrix[row_idx, col_idx] = - rho_b * np.log(rho_i) / epsilon_0                                
+                                    self.D_matrix[row_idx, col_idx] = - rho_b * np.log(rho_i) / epsilon                                
                                 
                                 else: # Harmonic Terms (k>0)
-                                    self.D_matrix[row_idx, col_idx] = rho_b**(k+1) / e02k / rho_i**k * harmonic_term
+                                    self.D_matrix[row_idx, col_idx] = rho_b**(k+1) / k2epsilon / rho_i**k * harmonic_term
 
                         # === BLOCO 2: CONDIÇÃO DE CONTORNO DO VETOR DESLOCAMENTO (εE) =======================
                         # === Aplica continuidade da componente normal de D sobre a bainha dielétrica ========
@@ -552,7 +372,6 @@ class TwoCoatedWireSystem(MTL):
 
         # 3. Resolver o sistema e obter os resultados
         self.sigma_coeffs = np.linalg.solve(self.D_matrix, self.V_vector)
-        self.C_exact_bare_wires = (np.pi * epsilon_0) / np.arccosh(self.DR_ratio / 2.0)
         self._calculate_generalized_capacitance()
         self._calculate_maxwellian_capacitance()
 
@@ -686,7 +505,6 @@ class TwoCoatedWireSystem(MTL):
         DR_ratio = D / R
 
         # 2. Calcular a Solução Analítica com Alinhamento e Sinal Corretos
-        C_exact = (np.pi * epsilon_0) / np.arccosh(DR_ratio / 2.0)
         theta_plot = np.linspace(0, 2 * np.pi, 360)
 
         vec_to_other = center_other - center_plot
@@ -697,7 +515,7 @@ class TwoCoatedWireSystem(MTL):
         numerator = (DR_ratio**2 / 4) - 1
         
         # CORREÇÃO FINAL: Remover o abs() para preservar o sinal da carga
-        charge_density_exact = (C_exact * delta_v / R) * (numerator / denominator)
+        charge_density_exact = (self.C_exact_bare_wires * delta_v / R) * (numerator / denominator)
 
         # 3. Reconstruir a Solução MoM para o Condutor Correto
         nfs_per_surface = [2 * s['fourier_order'] + 1 for s in self.surfaces]

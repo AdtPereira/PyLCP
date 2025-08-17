@@ -1,9 +1,9 @@
-import numpy as np
-from scipy.special import jv, jvp #, iv, kv
-from scipy.constants import mu_0
-import matplotlib.pyplot as plt
+# import numpy as np
+# from scipy.special import jv, jvp #, iv, kv
+# from scipy.constants import mu_0
+# import matplotlib.pyplot as plt
 
-from mtl_data.mtl import MulticonductorTransmissionLine
+# from mtl_data.mtl import MulticonductorTransmissionLine
 
 
 # class SingleCoreCable(FreeSpace):

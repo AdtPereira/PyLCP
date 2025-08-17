@@ -74,7 +74,7 @@ REFERENCES:
 """
 
 import numpy as np
-from scipy.constants import mu_0, epsilon_0
+import scipy.constants as sc
 from scipy.special import jv, jvp, h1vp, h2vp
 from scipy.linalg import lu_factor, lu_solve, inv
 from mtl_data.mtl import MulticonductorTransmissionLine as MTL
@@ -89,23 +89,11 @@ class HomogeneousLosslessMedium(MTL):
         # Angular frequency [float]
         self.w = 2 * np.pi * frequency
 
-        # Permeability of the medium [np.array]
-        self.mu = np.array([mu_0 * c['relative_permeability'] for c in self.mtl.values()])
-
-        # Permittivity of the medium [np.array]
-        self.epsilon = np.array([epsilon_0 * c['relative_permittivity'] for c in self.mtl.values()])
-
-        # Conductors conductivity [np.array]
-        sigma = np.array([c['conductivity'] for c in self.mtl.values()])
-
         # Conductors wave-number [float]
-        self.k = np.sqrt(self.w * self.mu * (self.w * self.epsilon - 1j * sigma))
-
-        # Permittivity of the outer medium [np.array]
-        epsilon_out = np.array([c['relative_permittivity_out'] for c in self.mtl.values()])
+        self.k = np.sqrt(self.w * self.mu * (self.w * self.epsilon - 1j * self.sigma))
 
         # Free-space wave-number [float]
-        self.kout = self.w * np.sqrt(mu_0 * epsilon_0 * epsilon_out)
+        self.kout = self.w * np.sqrt(self.mu * self.epsilon_out)
 
     # Surface admittance operator [np.array]
     # Equation (2.20) [1]
@@ -127,7 +115,7 @@ class HomogeneousLosslessMedium(MTL):
         mu = self.mu[p]
         n = np.abs(n)
         term_1 = k_ap * jvp(n, k_ap) / mu / jv(n, k_ap)
-        term_2 = k0_ap * jvp(n, k0_ap) / mu_0 / jv(n, k0_ap)
+        term_2 = k0_ap * jvp(n, k0_ap) / sc.mu_0 / jv(n, k0_ap)
 
         return 2 * np.pi / 1j / self.w * (term_1 - term_2)
 
@@ -205,16 +193,16 @@ class HomogeneousLosslessMedium(MTL):
         # Matrix elements [float]
         #try:
         y11_n = self.chi_n(n, kap, kbp) / self.eme_n(n, kap, kbp) / mu - (
-            self.chi_n(n, kout_ap, kout_bp) / self.eme_n(n, kout_ap, kout_bp) / mu_0)
+            self.chi_n(n, kout_ap, kout_bp) / self.eme_n(n, kout_ap, kout_bp) / sc.mu_0)
 
-        y12_n = self.chi_n(n, kout_bp, kout_bp) / self.eme_n(n, kout_ap, kout_bp) / mu_0 - (
+        y12_n = self.chi_n(n, kout_bp, kout_bp) / self.eme_n(n, kout_ap, kout_bp) / sc.mu_0 - (
             self.chi_n(n, kbp, kbp) / self.eme_n(n, kap, kbp) / mu)
 
-        y21_n = self.chi_n(n, kout_ap, kout_ap) / self.eme_n(n, kout_ap, kout_bp) / mu_0 - (
+        y21_n = self.chi_n(n, kout_ap, kout_ap) / self.eme_n(n, kout_ap, kout_bp) / sc.mu_0 - (
             self.chi_n(n, kap, kap) / self.eme_n(n, kap, kbp) / mu)
 
         y22_n = self.chi_n(n, kbp, kap) / self.eme_n(n, kap, kbp) / mu - (
-            self.chi_n(n, kout_bp, kout_ap) / self.eme_n(n, kout_ap, kout_bp) / mu_0)
+            self.chi_n(n, kout_bp, kout_ap) / self.eme_n(n, kout_ap, kout_bp) / sc.mu_0)
 
         # Matrix ynp [np.array]
         matrix = np.array([[y11_n, y12_n], [y21_n, y22_n]])
@@ -308,12 +296,12 @@ class HomogeneousLosslessMedium(MTL):
         numpy.ndarray: The matrix Z.
         """
 
-        jw_u0 = 1j * self.w * mu_0
+        jwu0 = 1j * self.w * sc.mu_0
         ys = self.ys_matrix()
         u = self.u_matrix()
 
         # Perform LU factorization of the matrix M
-        matrix = np.eye(self.N) - jw_u0 * (ys @ green_matrix)
+        matrix = np.eye(self.N) - jwu0 * (ys @ green_matrix)
         lu, piv = lu_factor(matrix)
 
         # Solve the linear system Mx = b for Ys
@@ -441,7 +429,6 @@ class LosslessPostProcessing(MTL):
         On the i-th row of Q, '1's are present in the columns
         corresponding to the conductors which are part of the 
         i-th line, and all other columns are zero.
-
         Reference: PAG. 122 [1]
         """
 
@@ -454,44 +441,6 @@ class LosslessPostProcessing(MTL):
 
         # print("Incident Matrix Q: \n", matrix_q)
         return matrix_q
-
-    # def q_incident_matrix(self):
-    #     """
-    #     On the i-th row of Q, '1's are present in the columns
-    #     corresponding to the conductors which are part of the
-    #     i-th line, and all other columns are zero.
-
-    #     Reference: PAG. 122 [1]
-    #     """
-    #     # 1. Identificar as linhas e colunas da matriz Q
-    #     # As linhas correspondem aos IDs únicos de linha (ex: 0, 1, 2...).
-    #     unique_line_ids = sorted(list(set(self.line_id)))
-    #     num_lines = len(unique_line_ids)
-
-    #     # As colunas correspondem ao número total de condutores.
-    #     num_conductors = len(self.mtl)
-
-    #     # Mapear cada line_id a um índice de linha (0, 1, 2...).
-    #     line_to_row_map = {line_id: i for i, line_id in enumerate(unique_line_ids)}
-
-    #     # 2. Inicializar a matriz com zeros
-    #     matrix_q = np.zeros((num_lines, num_conductors), dtype=int)
-
-    #     # 3. Preencher a matriz
-    #     # Iterar sobre cada condutor no dicionário mtl.
-    #     for tag, conductor_data in self.mtl.items():
-    #         # A tag do condutor (0, 1, 2...) é o nosso índice de coluna.
-    #         col_idx = tag
-
-    #         # O 'line_id' do condutor nos dá o índice da linha através do mapa.
-    #         conductor_line_id = conductor_data['line_id']
-    #         row_idx = line_to_row_map[conductor_line_id]
-
-    #         # Marcar a incidência
-    #         matrix_q[row_idx, col_idx] = 1
-
-    #     return matrix_q
-
 
     # Incident Matrix S [np.array]
     # Equation (A.10) [1]

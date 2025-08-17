@@ -1,12 +1,12 @@
 import copy
 import numpy as np
 import pandas as pd
+import scipy.constants as sc
 import matplotlib.pyplot as plt
 import plotly.graph_objects as go
-from scipy.constants import epsilon_0
-
-from mtl_data.mtl import MulticonductorTransmissionLine as MTL
 from mtl_data.utils import *
+from mtl_data.mtl import MulticonductorTransmissionLine as MTL
+
 
 class MulticonductorBareWireSystems(MTL):
     """
@@ -32,13 +32,12 @@ class MulticonductorBareWireSystems(MTL):
         # Número de coeficientes harmônicos de Fourier por condutor
         self.NF = [2*surface['fourier_order']+1 for surface in self.surfaces][0]
         
-        # Raio das superfícies
+        # Resultado Analítico
         self.R = self.surfaces[0]['radius']      
-
         self.D = self.D_pq[0, 1]
         self.DR_ratio = self.D / self.R
-
         assert self.DR_ratio > 2, "A razão D/R deve ser maior que 2 para garantir a convergência da solução."
+        self.C_exact_bare_wires = np.pi * sc.epsilon_0 / np.arccosh(0.5 * self.DR_ratio)
 
         # Atributos de resultado
         self.collocation_data = None
@@ -48,7 +47,6 @@ class MulticonductorBareWireSystems(MTL):
         self.sigma_coeffs = None
         self.C_generalized = None
         self.C_maxwellian = None
-        self.C_exact_bare_wires = None
 
     def _calculate_collocation_points(self):
         """
@@ -200,6 +198,7 @@ class MulticonductorBareWireSystems(MTL):
             for q, source_surface in enumerate(self.surfaces):
                 center_q = np.array(source_surface['center_point'])
                 radius_q = source_surface['radius']
+                epsilon = self.epsilon_out[source_surface['tag']]
                 nf_q = nfs_per_surface[q]
                 offset_q = offsets[q]
 
@@ -239,23 +238,23 @@ class MulticonductorBareWireSystems(MTL):
                         # Termo constante (k=0)
                         if source_harmonic_idx == 0:
                             if p == q:
-                                self.D_matrix[row_idx, col_idx] = (-radius_q / epsilon_0) * np.log(radius_p)
+                                self.D_matrix[row_idx, col_idx] = (-radius_q / epsilon) * np.log(radius_p)
                             
                             # Interação mútua
                             else: 
-                                self.D_matrix[row_idx, col_idx] = (-radius_q / epsilon_0) * np.log(rho_b)
+                                self.D_matrix[row_idx, col_idx] = (-radius_q / epsilon) * np.log(rho_b)
                         
                         # Termos harmônicos (k>0)
                         else:  
                             # Auto-interação
                             if p == q:
                                 term = np.cos(k * theta_i) if is_cosine_term else np.sin(k * theta_i)
-                                self.D_matrix[row_idx, col_idx] = (radius_q / (2 * k * epsilon_0)) * term
+                                self.D_matrix[row_idx, col_idx] = (radius_q / (2 * k * epsilon)) * term
                             
                             # Interação mútua
                             else:
                                 term = np.cos(k * theta_b) if is_cosine_term else np.sin(k * theta_b)
-                                self.D_matrix[row_idx, col_idx] = (radius_q / (2 * k * epsilon_0)) * ((radius_q / rho_b)**k) * term
+                                self.D_matrix[row_idx, col_idx] = (radius_q / (2 * k * epsilon)) * ((radius_q / rho_b)**k) * term
                         
                         # ========================================================================
                         # ==== FIM DA LÓGICA DE CÁLCULO DO ELEMENTO DA MATRIZ D ==================
@@ -263,7 +262,6 @@ class MulticonductorBareWireSystems(MTL):
 
         # 3. Resolver o sistema e obter os resultados
         self.sigma_coeffs = np.linalg.solve(self.D_matrix, self.V_vector)
-        self.C_exact_bare_wires = (np.pi * epsilon_0) / np.arccosh(self.DR_ratio / 2.0)
         self._calculate_generalized_capacitance()
         self._calculate_maxwellian_capacitance()
 
@@ -398,7 +396,6 @@ class MulticonductorBareWireSystems(MTL):
         DR_ratio = D / R
 
         # 2. Calcular a Solução Analítica com Alinhamento e Sinal Corretos
-        C_exact = (np.pi * epsilon_0) / np.arccosh(DR_ratio / 2.0)
         theta_plot = np.linspace(0, 2 * np.pi, 360)
 
         vec_to_other = center_other - center_plot
@@ -409,7 +406,7 @@ class MulticonductorBareWireSystems(MTL):
         numerator = (DR_ratio**2 / 4) - 1
         
         # CORREÇÃO FINAL: Remover o abs() para preservar o sinal da carga
-        charge_density_exact = (C_exact * delta_v / R) * (numerator / denominator)
+        charge_density_exact = (self.C_exact_bare_wires * delta_v / R) * (numerator / denominator)
 
         # 3. Reconstruir a Solução MoM para o Condutor Correto
         nfs_per_surface = [2 * s['fourier_order'] + 1 for s in self.surfaces]
@@ -521,7 +518,7 @@ class MulticonductorBareWireSystems(MTL):
         center2 = np.array(MTL[1]['center_point'])
         D = np.linalg.norm(center1 - center2)
 
-        c_exact = (np.pi * epsilon_0) / np.arccosh(D / R / 2.0)
+        c_exact = (np.pi * sc.epsilon_0) / np.arccosh(D / R / 2.0)
         nf_range = range(1, nf_max + 1)
 
         nf_odd, nf_even, cap_odd, cap_even = [], [], [], []

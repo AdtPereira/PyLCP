@@ -56,17 +56,13 @@ except IndexError:
 try:
     from mtl_data.models import COAXIAL_CABLE as MTL
     from mtl_data.graphics import MTLRepresentation
-    from analytical_forms.pul_wires_conductors import *
+    from analytical_forms.pul_wires_conductors import CoaxialCable, Ametani
     from mom_so.quasi_static_green import QuasiStatic
     from mom_so.lossless_medium import HomogeneousLosslessMedium, LosslessPostProcessing
     print("Módulos e modelo de dados importados com sucesso.") 
 except ImportError as e:
     print(f"Erro ao importar módulos: {e}")
     sys.exit(1)
-
-# --- Configurações da Simulação ---
-FREQUENCY_RANGE = {'ana': np.logspace(0, 5.9, num=200), 'mom': np.logspace(0, 5.9, num=30)}
-
 
 def run_analytical_simulation(mtl, frequencies):
     """
@@ -82,11 +78,13 @@ def run_analytical_simulation(mtl, frequencies):
     """
     print("Iniciando rotina analítica...")
     analytical_data = {}    
+    coaxial = CoaxialCable(mtl)
+    ametani = Ametani(mtl)
+
     for freq in frequencies:
-        coaxial = CoaxialCable(mtl, freq)
-        zs = coaxial.pul_parameters()
+        zs = coaxial.pul_parameters(freq)
         l_ext = coaxial.external_inductance()
-        z11, z12, z22 = Ametani(mtl, freq).impedance_two_layered_conductor()
+        z11, z12, z22 = ametani.impedance_two_layered_conductor(freq)
 
         analytical_data[freq] = {
             'zs': zs,
@@ -102,7 +100,6 @@ def run_analytical_simulation(mtl, frequencies):
         }
 
     return analytical_data
-
 
 def run_momso_simulation(mtl, frequencies):
     """
@@ -132,7 +129,6 @@ def run_momso_simulation(mtl, frequencies):
         }
 
     return momso_data
-
 
 def plot_results(freqs, analytical_data, mom_so_data):
     """
@@ -215,7 +211,7 @@ def plot_results(freqs, analytical_data, mom_so_data):
 
     plot_definitions = [
         {'r_key': 'rs_mom', 'l_key': 'ls_mom', 'freq_key': 'mom', 'type': 'scatter', 'label': 'MoM-SO'},
-        {'r_key': 'rs',     'l_key': 'ls',     'freq_key': 'ana', 'type': 'plot',    'label': 'Analytical [1]'},
+        {'r_key': 'rs',     'l_key': 'ls',     'freq_key': 'ana', 'type': 'plot',    'label': 'Analytical'},
         {'r_key': None,     'l_key': 'le',     'freq_key': 'ana', 'type': 'plot',    'label': 'Asymptotic',            'style': {'color': 'k', 'linestyle': '-.'}},
         {'r_key': 'r11',    'l_key': 'l11',    'freq_key': 'ana', 'type': 'plot',    'label_template': '${P}_{{11}}$', 'style': {'color': 'k', 'linestyle': ':'}},
         {'r_key': 'r12',    'l_key': 'l12',    'freq_key': 'ana', 'type': 'plot',    'label_template': '${P}_{{12}}$', 'style': {'color': 'g', 'linestyle': ':'}},
@@ -230,7 +226,6 @@ def plot_results(freqs, analytical_data, mom_so_data):
     _configure_subplot(axes[1], 'Series Inductance p.u.l. (mH/km)', inductance_data, y_lim=(0.0, 0.2), yscale='linear')
     plt.tight_layout()
 
-
 if __name__ == "__main__":
     """ Função principal para orquestrar a análise, cálculo e visualização dos resultados. """
     st = time.time()
@@ -238,10 +233,11 @@ if __name__ == "__main__":
     print("Iniciando cálculos da impedância p.u.l. do cabo coaxial...")
 
     # Rotinas Analítica e MoM-SO
-    analytical_data = run_analytical_simulation(MTL, FREQUENCY_RANGE['ana'])
-    momso_data = run_momso_simulation(MTL, FREQUENCY_RANGE['mom'])
+    FREQUENCY = {'ana': np.logspace(0, 5.9, num=200), 'mom': np.logspace(0, 5.9, num=30)}    
+    analytical_data = run_analytical_simulation(MTL, FREQUENCY['ana'])
+    momso_data = run_momso_simulation(MTL, FREQUENCY['mom'])
 
     print(f"\nRotinas de cálculo finalizadas! Tempo de simulação: {(time.time() - st):.2f} segundos.")
-    plot_results(FREQUENCY_RANGE, analytical_data, momso_data)
+    plot_results(FREQUENCY, analytical_data, momso_data)
     MTLRepresentation(MTL, units='millimeter').coaxial()
     plt.show()
