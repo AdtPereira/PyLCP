@@ -1,60 +1,4 @@
 """
-This script analyzes the behavior of a two-wire transmission line using the method of moments (MoM).
-The code is structured into classes and functions, facilitating a modular approach to the problem. 
-
-Below is a high-level overview of the script components:
-
-Imports and Global Variables:
-
-Required libraries and global variables are imported and defined.
-
-BIFILAR_TL: A list containing properties of the two conductors.
-Classes:
-
-Geometry: Handles basic geometry calculations, such as distance matrices between conductor centers.
-ParametersWithFrequency: Extends Geometry to include frequency-dependent parameters.
-GreensMatrices: Uses the geometry to compute Green's matrices, which are essential for the method 
-of moments.
-MoMSuperficialOperator: Implements the method of moments, calculating matrices like U, Ys, G, and Z.
-AnalyticalFormulation: Provides analytical formulations for high-frequency resistance, external 
-inductance, and impedance.
-Plotter: Handles plotting of series resistance and inductance against frequency.
-
-Functions:
-
-clear_screen: Clears the console screen.
-main: The main function orchestrates the scattering calculations and plotting. It performs the 
-following steps:
-Clears the screen.
-Initializes objects for the method of moments and analytical formulations.
-Computes series resistance, external inductance, and impedance over a range of frequencies.
-Plots the results using the Plotter class.
-Detailed Class and Function Explanations
-Geometry
-__init__: Initializes the geometry of the system based on conductor properties.
-distance_matrices: Calculates matrices for distances and angles between conductor centers.
-ParametersWithFrequency
-__init__: Extends the Geometry class to include frequency-dependent parameters such as 
-conductivity, permeability, and permittivity.
-ynp_operator: Calculates the surface admittance operator for a conductor.
-GreensMatrices
-__init__: Initializes Green's matrices using the geometry of the system.
-dissertation and ieee_paper: Calculate Green's functions using different methods.
-sub_matrices: Generates Green's sub-matrices.
-MoMSuperficialOperator
-__init__: Extends ParametersWithFrequency to initialize the method of moments parameters.
-matrix_u: Constructs matrix U.
-matrix_ys: Constructs matrix Ys.
-matrix_g and matrix_g_ieee: Constructs matrix G using different methods.
-matrix_z: Computes the impedance matrix Z.
-AnalyticalFormulation
-__init__: Initializes the analytical formulation based on the conductor properties and frequency.
-pul_parameters: Calculates high-frequency resistance, external inductance, and impedance.
-Plotter
-__init__: Initializes the plotting class with frequency and impedance data.
-series_resistance: Plots series resistance against frequency.
-series_inductance: Plots series inductance against frequency.
-
 REFERENCES:
 [1] PATEL, Utkarsh R. A Surface Admittance Approach For Fast Calculation of the 
     Series Impedance of Cables Including Skin, Proximity, and Ground Return Effects.
@@ -69,7 +13,10 @@ REFERENCES:
 [3] U. R. Patel, B. Gustavsen and P. Triverio, "Application of the MoM-SO Method for 
     Accurate Impedance Calculation of Single-Core Cables Enclosed by a Conducting Pipe," 
     Proc. International Conference on Power Systems Transients (IPST 2013), Vancouver, 
-    Canada July 18-20, 2013. https://www.ipstconf.org/Proc_IPST2013.php
+    Canada July 18-20, 2013. https://www.ipstconf.org/Proc_IPST2013.php.
+
+[4] PAUL, Clayton R. Analysis of multiconductor transmission lines. 2. ed. Hoboken,
+    N.J.: John Wiley & Sons, Inc., c2008.
 
 """
 
@@ -335,13 +282,11 @@ class HomogeneousLosslessMedium(MTL):
         """
 
         u = self.u_matrix()
-        e0 = self.epsilon[0]
-
         # Solve the linear system Gx = U and calculate U^T * G^{-1} * U
         uT_gInv_u = u.T @ lu_solve(lu_factor(green_matrix), u)
 
         # Generalized Capacitance Matrix [1]
-        return - e0 * uT_gInv_u
+        return - self.epsilon[0] * uT_gInv_u
 
     # Maxwellian Capacitance Matrix [np.array]
     def maxwellian_capacitance_matrix(self, generalized_capacitance_matrix):

@@ -225,8 +225,8 @@ class BifilarBareWirePULParameters():
 
         if autoPlots:
             mom_wires.plot_charge_density()
-            mom_wires.plot_collocation_points()
             mom_wires.plot_harmonic_coefficients()
+            mom_wires.plot_collocation_points()
             MulticonductorBareWireSystems.plot_convergence_rates(self.mtl_copy, nf_max=20)
 
     def run_analytical(self):

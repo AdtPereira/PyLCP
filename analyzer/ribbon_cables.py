@@ -88,14 +88,14 @@ class RibbonCoatedCablesPULParameters():
     def _prepare_tulip_runner(self, case_name: str = "three_wires_ribbon"):
         """Prepara o executor para a simulação Tulip."""
         EXE_PATH = r"C:\git\tulip\pulmtln-build\rls\bin\Release\pulmtln.exe"
-
         print(f"--- Preparing to run simulation for case: '{case_name}' ---")
         
         try:
             self.tulip_runner = PyTulip(
                 executable_path=EXE_PATH,
                 case_name=case_name,
-                silent=False
+                silent=False,
+                overwrite_mesh=False
             )
 
         except (FileNotFoundError, NotADirectoryError) as e:

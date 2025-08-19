@@ -534,16 +534,16 @@ class MulticonductorBareWireSystems(MTL):
             
             if nf % 2 != 0:
                 nf_odd.append(nf)
-                cap_odd.append(sim.C_maxwellian * C_FACTOR)
+                cap_odd.append(sim.C_maxwellian.item() * C_FACTOR)
             else:
                 nf_even.append(nf)
-                cap_even.append(sim.C_maxwellian * C_FACTOR)
-        
+                cap_even.append(sim.C_maxwellian.item() * C_FACTOR)
+
         plt.style.use('default')
         fig, ax = plt.subplots(figsize=(8, 5))
-        ax.axhline(y=c_exact * C_FACTOR, color='k', linestyle='-', label=f'Valor Exato = {c_exact*C_FACTOR:.2f} pF/m')
-        ax.plot(nf_odd, cap_odd, linestyle='none', marker='^', markersize=8, fillstyle='none', markeredgecolor='black', label='NF Ímpar')
-        ax.plot(nf_even, cap_even, linestyle='none', marker='*', markersize=8, color='black', label='NF Par')
+        ax.axhline(y=c_exact * C_FACTOR, color='k', linestyle=':', label=f'Exactly Value = {c_exact*C_FACTOR:.2f} pF/m')
+        ax.plot(nf_odd, cap_odd, linestyle='none', marker='x', markersize=4, fillstyle='none', markeredgecolor='black', label='NF Ímpar')
+        ax.plot(nf_even, cap_even, linestyle='none', marker='o', markersize=4, color='black', label='NF Par')
         ax.set_title(f'Convergência da Capacitância para D/R = {D/R:.2f}')
         ax.set_xlabel('NF - Número de Coeficientes de Fourier por Fio')
         ax.set_ylabel('Capacitância (pF/m)')
