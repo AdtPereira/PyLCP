@@ -9,7 +9,7 @@ os.system('cls' if os.name == 'nt' else 'clear')
 try:
     script_dir = Path(__file__).resolve().parent
     print(f"Script directory: {script_dir}")
-    project_root = script_dir.parents[0]
+    project_root = script_dir.parents[1]
     print(f"Project root: {project_root}")
     sys.path.append(str(project_root))
     print("Caminhos do projeto configurados com sucesso.")
@@ -21,7 +21,7 @@ except IndexError:
 
 # IMPORTAÇÕES DOS MÓDULOS E MODELO DE DADOS
 try:
-    from mtl_data.models import PAUL_RIBBON_CABLE as MTL
+    from mtl_data.wire_models import PAUL_RIBBON_CABLE as MTL
     from mtl_data.graphics import MTLRepresentation
     from analyzer.ribbon_cables import RibbonCoatedCablesPULParameters as PUL
     print("Módulos e modelo de dados importados com sucesso.")
@@ -45,5 +45,5 @@ if __name__ == "__main__":
     pul.plot_paul_fig514c()
     pul.plot_paul_fig514d()
     pul.plot_dielectric_coated_capacitance_convergence()
-    MTLRepresentation(MTL, units='mil').bare_and_coated_wires()
+    MTLRepresentation(MTL, units='mil').bared_and_coated_wires()
     plt.show()

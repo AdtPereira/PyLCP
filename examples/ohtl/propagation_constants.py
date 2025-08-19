@@ -54,7 +54,7 @@ except IndexError:
 
 # IMPORTAÇÕES DOS MÓDULOS E MODELO DE DADOS
 try:
-    from mtl_data.wire_models import SINGLE_OHTL_XUE as MTL
+    from mtl_data.wire_models import SINGLE_OHTL_CONTI as MTL
     from mtl_data.graphics import MTLRepresentation
     from ohtl.pul_parameters import PerUnitParameters
     print("Módulos e modelo de dados importados com sucesso.") 
@@ -63,7 +63,7 @@ except ImportError as e:
     sys.exit(1)
 
 
-def plot_gamma(freq, pul, p, q):
+def plot_gamma(freq, pul_dict, p, q):
     """
     This function plots the series resistance as a function of frequency.
 
@@ -73,53 +73,31 @@ def plot_gamma(freq, pul, p, q):
     p (int): Row index in the impedance matrix.
     q (int): Column index in the impedance matrix.
     """
-
     plt.figure(figsize=(8, 5))
-    f = np.array(freq['Analytically'])
-    w = 2 * np.pi * f
 
-    gmma_1 = np.array([item['γ'][p, q] for item in pul['rho_1u']['nakagawa']])
-    gmma_2 = np.array([item['γ'][p, q] for item in pul['rho_200']['nakagawa']])
-    gmma_3 = np.array([item['γ'][p, q] for item in pul['rho_5k']['nakagawa']])
-    gmma_4 = np.array([item['γ'][p, q] for item in pul['rho_1u']['quasi_tem']])
-    gmma_5 = np.array([item['γ'][p, q] for item in pul['rho_200']['quasi_tem']])
-    gmma_6 = np.array([item['γ'][p, q] for item in pul['rho_5k']['quasi_tem']])
+    quasitem = [1E3 * item['γ'][p, q] for item in pul_dict['quasitem']]
+    quasitem_log = [1E3 * item['γ'][p, q] for item in pul_dict['quasitem_log']]
+    nakagawa = [1E3 * item['γ'][p, q] for item in pul_dict['nakagawa']]
+    sunde = [1E3 * item['γ'][p, q] for item in pul_dict['sunde']]
+    carson = [1E3 * item['γ'][p, q] for item in pul_dict['carson']]
 
     # Plot the results
-    plt.plot(freq['Analytically'], np.real(1E3 * gmma_4), color='grey', linestyle='-') # pylint: disable=line-too-long
-    plt.plot(freq['Analytically'], np.real(1E3 * gmma_5), color='grey', linestyle='-') # pylint: disable=line-too-long
-    plt.plot(freq['Analytically'], np.real(1E3 * gmma_6), color='grey', linestyle='-') # pylint: disable=line-too-long
-    plt.plot(freq['Analytically'], np.real(1E3 * gmma_1), label=r'$\rho_g=1\;\mu\Omega m$', color='blue', linestyle='--') # pylint: disable=line-too-long
-    plt.plot(freq['Analytically'], np.real(1E3 * gmma_2), label=r'$\rho_g=200\;\Omega m$', color='green', linestyle='--') # pylint: disable=line-too-long
-    plt.plot(freq['Analytically'], np.real(1E3 * gmma_3), label=r'$\rho_g=5000\;\Omega m$', color='red', linestyle='--') # pylint: disable=line-too-long
+    plt.plot(freq['Analytically'], np.real(quasitem),       color='black',  linestyle='-',  label='Quasi-TEM (Integral Eq.)')
+    plt.plot(freq['Analytically'], np.real(quasitem_log),   color='blue',   linestyle='--', label='Quasi-TEM (Approx. Log.)')
+    plt.plot(freq['Analytically'], np.real(nakagawa),       color='red',    linestyle='--', label='Wise (1948) - Nakagawa (1981)')
+    plt.plot(freq['Analytically'], np.real(sunde),          color='green',  linestyle='--', label='Sunde (1968)', )
+    plt.plot(freq['Analytically'], np.real(carson),         color='black',  linestyle=':',  label='Carson (1926)')
 
-    # Optional: Additional plotting configurations like labels, grid, etc.
     plt.xscale('log')
-    plt.xlim(1E0, 1E10)
-    plt.ylim(0, 1.6)
+    plt.xlim(1E3, 1E10)
+    plt.ylim(0, 4)
     plt.legend()
     plt.xlabel('Frequency (Hz)')
     plt.ylabel(r'Attenuation Constant, $\alpha$ (Np/km)')
     plt.title('Attenuation Constant of the single overhead line\n'
-              r'$r_1 = 0.01\,\mathrm{m}, h_1 = 10\,\mathrm{m}, \epsilon_{rg}=5$ [3]')
-    plt.grid(False)
-
-    # Plot the results
-    plt.figure(figsize=(8, 5))
-    plt.plot(f, w / np.imag(1E6 * gmma_1), label=r'$\rho_g=1\;\mu\Omega m$', color='black', linestyle='--')
-    plt.plot(f, w / np.imag(1E6 * gmma_2), label=r'$\rho_g=200\;\Omega m$', color='black', linestyle='-')
-    plt.plot(f, w / np.imag(1E6 * gmma_3), label=r'$\rho_g=5000\;\Omega m$', color='red', linestyle='-')
-
-    # Optional: Additional plotting configurations like labels, grid, etc.
-    plt.xscale('log')
-    plt.xlim(1E0, 1E10)
-    plt.ylim(50, 350)
-    plt.legend()
-    plt.xlabel('Frequency (Hz)')
-    plt.ylabel(r'Phase Velocity\; $(m/\mu s)$')
-    plt.title('Phase Velocity of the single overhead line (Log. Approx. Quasi-TEM)\n'
-              r'$r_1 = 0.01\,\mathrm{m}, h_1 = 10\,\mathrm{m}, \epsilon_{rg}=5$ [3]')
-    plt.grid(False)
+              r'$r_1 = 0.01\,\mathrm{m}, h_1 = 10\,\mathrm{m},'
+              r'\sigma = 5.952 \times 10^7\,\mathrm{S/m}$ [1]')
+    plt.grid(True)
 
 
 if __name__ == "__main__":
@@ -128,32 +106,31 @@ if __name__ == "__main__":
 
     # Calculate the series impedance for each frequency
     frequency = {
-        'Analytically': np.logspace(0, 10, num=400),
+        'Analytically': np.logspace(0, 10, num=200),
         'Numerically': np.logspace(0, 7, num=30)
     }
 
     # Dictionary to hold the series impedance calculations
     pul_parameters = {
-        'rho_1u': {'nakagawa': [], 'quasi_tem': []},
-        'rho_200': {'nakagawa': [], 'quasi_tem': []},
-        'rho_5k': {'nakagawa': [], 'quasi_tem': []},
+        'quasitem': [],
+        'quasitem_log': [],
+        'nakagawa': [],
+        'sunde': [],
+        'carson': [],
     }
 
     # Analytical Formulation
     for f in frequency['Analytically']:
-        pul1 = PerUnitParameters(MTL, f, sigma_1=1/1E-6, er_1=5)
-        pul2 = PerUnitParameters(MTL, f, sigma_1=1/2E+2, er_1=5)
-        pul3 = PerUnitParameters(MTL, f, sigma_1=1/5E+3, er_1=5)
+        pul = PerUnitParameters(MTL, f, sigma_1=1/200, er_1=5)
 
-        pul_parameters['rho_1u']['nakagawa'].append(pul1.pul_extended_theory(type_form='nakagawa'))
-        pul_parameters['rho_1u']['quasi_tem'].append(pul1.pul_extended_theory())
-        pul_parameters['rho_200']['nakagawa'].append(pul2.pul_extended_theory(type_form='nakagawa'))
-        pul_parameters['rho_200']['quasi_tem'].append(pul2.pul_extended_theory())
-        pul_parameters['rho_5k']['nakagawa'].append(pul3.pul_extended_theory(type_form='nakagawa'))
-        pul_parameters['rho_5k']['quasi_tem'].append(pul3.pul_extended_theory())
+        # Internal and external impedance matrices
+        pul_parameters['quasitem'].append(pul.pul_extended_theory())
+        pul_parameters['quasitem_log'].append(pul.pul_extended_theory(type_form='quasitem_log'))
+        pul_parameters['nakagawa'].append(pul.pul_extended_theory(type_form='nakagawa'))
+        pul_parameters['sunde'].append(pul.pul_extended_theory(type_form='sunde'))
+        pul_parameters['carson'].append(pul.pul_extended_theory(type_form='carson'))
 
     print(f"End of the routine! Time spent on simulation: {(time.time() - st):.2f} seconds.\n")
     plot_gamma(frequency, pul_parameters, p=0, q=0)
     MTLRepresentation(MTL, units='meter').bared_and_coated_wires()
     plt.show()
-    

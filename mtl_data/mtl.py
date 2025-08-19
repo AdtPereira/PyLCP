@@ -40,24 +40,58 @@ class MulticonductorTransmissionLine():
         within the class will not affect the original TREFOIL object.
         """
 
-        # Deep copy of the conductors list
-        self.mtl = {key: value for key, value in mtl.items() if isinstance(key, int)}
-
         # MTL Type
+        mtl_types = {'coated_wires', 'bare_wires', 'coaxial', 'overhead'}
         self.mtl_type = mtl.get('type', 'unknown')
 
         # MTL Conductor Reference Index
-        self.idx_ref = mtl.get('idx_ref_conductor', np.nan)
+        self.idx_ref = mtl.get('idx_ref_conductor', np.nan)      
 
-        key_conductors = sorted(self.mtl.keys())
-        key_expected = list(range(len(key_conductors)))
+        # Deep copy of the conductors list
+        if self.mtl_type == 'overhead':
+            self.mtl = {key: value for key, value in mtl.items() if isinstance(key, int) and key > 0}
+            key_conductors = sorted(self.mtl.keys())
+            key_expected = list(range(1, len(key_conductors)+1))
         
-        assert key_conductors == key_expected, "As tags dos condutores devem ser uma sequência de inteiros começando em 0 (ex: 0, 1, 2, ...)."
-        assert len(self.mtl) > 1, "The MulticonductorTransmissionLine must have at least two conductors."
-        assert self.mtl[0]['line_type'] == 'return', "The conductor index '0' must be the return path."
-        assert self.idx_ref is not None, "The reference conductor index must be defined."
-        assert self.idx_ref in self.mtl, f"The reference conductor index {self.idx_ref} must be in the MTL dictionary."
+        else:
+            self.mtl = {key: value for key, value in mtl.items() if isinstance(key, int)}
+            key_conductors = sorted(self.mtl.keys())
+            key_expected = list(range(len(key_conductors)))
+            assert self.mtl[0]['line_type'] == 'return', "The conductor index '0' must be the return path."
+            assert self.idx_ref in self.mtl, f"The reference conductor index {self.idx_ref} must be in the MTL dictionary."
 
+            # Distance matrices [np.array]
+            self.D_pq, self.dx_pq, self.dy_pq, self.theta_pq = self.conductors_center_distance_matrix()
+        
+        assert len(self.mtl) > 1 or self.mtl_type == 'overhead', "The MulticonductorTransmissionLine must have at least two conductors."
+        assert self.mtl_type in mtl_types, f"MTL type must be one of {mtl_types}."  
+        assert key_conductors == key_expected, "As tags dos condutores devem ser uma sequência de inteiros começando em 0 (ex: 0, 1, 2, ...)."
+        assert self.idx_ref is not None, "The reference conductor index must be defined."
+
+        # Conductor surfaces dictionary
+        self._define_wire_surfaces()
+
+        # Dimension N - Equation (2.36) [1]
+        self.NF_List = [2 * surface['fourier_order'] + 1 for surface in self.surfaces]
+        self.N = sum(self.NF_List)
+
+        # Número de coeficientes harmônicos de Fourier por condutor
+        self.NF = self.NF_List[self.idx_ref]
+
+        # Conductors Permeability [np.array]
+        self.mu = np.array([mu_0 * cond['relative_permeability'] for cond in self.mtl.values()]) 
+
+        # Conductors Permittivity [np.array]
+        self.epsilon = np.array([epsilon_0 * cond['relative_permittivity'] for cond in self.mtl.values()]) 
+
+        # Conductors conductivity [np.array]
+        self.sigma = np.array([cond['conductivity'] for cond in self.mtl.values()])
+
+        # Free-Space Permittivity [np.array]
+        self.epsilon_out = np.array([epsilon_0 * cond['relative_permittivity_out'] for cond in self.mtl.values()])
+
+
+    def _define_wire_surfaces(self):
         # Conductor surfaces dictionary
         self.surfaces = []
 
@@ -94,32 +128,8 @@ class MulticonductorTransmissionLine():
                     'fourier_order': conductor['sheath']['fourier_order'],
                     'relative_permittivity': conductor['sheath']['relative_permittivity'],
                 })
-
-        # Dimension N
-        # Equation (2.36) [1]
-        self.NF_List = [2 * surface['fourier_order'] + 1 for surface in self.surfaces]
-        self.N = sum(self.NF_List)
-
-        # Número de coeficientes harmônicos de Fourier por condutor
-        self.NF = self.NF_List[self.idx_ref]
-
-        # Conductors Permeability [np.array]
-        self.mu = np.array([mu_0 * cond['relative_permeability'] for cond in self.mtl.values()]) 
-
-        # Conductors Permittivity [np.array]
-        self.epsilon = np.array([epsilon_0 * cond['relative_permittivity'] for cond in self.mtl.values()]) 
-
-        # Conductors conductivity [np.array]
-        self.sigma = np.array([cond['conductivity'] for cond in self.mtl.values()])
-
-        # Free-Space Permittivity [np.array]
-        self.epsilon_out = np.array([epsilon_0 * cond['relative_permittivity_out'] for cond in self.mtl.values()])
-
-        # Distance matrices [np.array]
-        self.D_pq, self.dx_pq, self.dy_pq, self.theta_pq = self.conductors_center_distance_matrix()
-
-    # Contour Position Vector [np.array]
-    # Equation (2.2) [1]
+    
+    # Contour Position Vector [np.array] - Equation (2.2) [1]
     def contour_vector_position(self, surfaces_list, theta, p):
         """ The boundary cp can be traced by the position vector rp(ap, θp) """
 
@@ -157,8 +167,7 @@ class MulticonductorTransmissionLine():
 
         return d_pq, x_pq, y_pq, theta_pq
 
-    # Matrices Distance dnm and Dnm [np.array]
-    # Equation 2.48 and 2.49 [2]
+    # Matrices Distance dnm and Dnm [np.array] - Equations 2.48 and 2.49 [2]
     def conductor_distances(self, n, m):
         """ Calculates the distance matrix Dnm between the center points of the conductors. """
 

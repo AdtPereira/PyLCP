@@ -1,11 +1,3 @@
-""" This script calculates the series impedance matrix of a multiconductor transmission line.
-
-
-REFERENCES:
-[1] 
-"""
-
-
 import numpy as np
 from scipy.special import iv
 from scipy.constants import mu_0, epsilon_0
@@ -35,24 +27,23 @@ class PerUnitParameters(MulticonductorTransmissionLine):
         self.jw = 1j * 2 * np.pi * f
 
         # Constant vacuum terms
-        self.jw_mu0__2pi = self.jw * mu_0 / 2 / np.pi
+        self.jw_mu0_2pi = self.jw * mu_0 / 2 / np.pi
         self.jw_2pi_e0 = self.jw * 2 * np.pi * epsilon_0
 
         # Air wave number (rad/m)
         self.ka2 = - self.jw * mu_0 * self.jw * epsilon_0
 
         # Earth wave number (rad/m)
-        self.ke2 = - self.jw * self.mur_1 * mu_0 * \
-            (self.sigma_1 + self.jw * self.er_1 * epsilon_0)
+        self.ke2 = - self.jw * self.mur_1 * mu_0 * (self.sigma_1 + self.jw * self.er_1 * epsilon_0)
 
     def internal_impedance(self, type_form='approx'):
         """ This method calculates the internal impedance of solid wires. """
 
         # Impedance matrix
-        N = len(self.surfaces)  # pylint: disable=invalid-name
-        Zi = np.zeros((N, N), dtype=complex)  # pylint: disable=invalid-name
-        Ri_cc = np.zeros_like(Zi)  # pylint: disable=invalid-name
-        Zi_hf = np.zeros_like(Zi)  # pylint: disable=invalid-name
+        N = len(self.surfaces)
+        Zi = np.zeros((N, N), dtype=complex)
+        Ri_cc = np.zeros_like(Zi)
+        Zi_hf = np.zeros_like(Zi)
 
         # Loop over the conductors
         for p, conductor in enumerate(self.surfaces):
@@ -93,18 +84,18 @@ class PerUnitParameters(MulticonductorTransmissionLine):
         """ This method calculates the impedance matrix of the earth return path. """
 
         # Impedance matrix
-        N = len(self.surfaces)  # pylint: disable=invalid-name
-        Ze = np.zeros((N, N), dtype=complex)  # pylint: disable=invalid-name
+        N = len(self.surfaces)
+        Ze = np.zeros((N, N), dtype=complex)
 
         # Loop over the conductors
-        for n, _ in enumerate(self.surfaces):
-            for m, _ in enumerate(self.surfaces):
+        for n, conductor_n in enumerate(self.surfaces):
+            for m, conductor_m in enumerate(self.surfaces):
 
                 # Distance between the conductors (m)
-                dnm, Dnm, _, _ = self.conductor_distances(n, m)  # pylint: disable=invalid-name
+                dnm, Dnm, _, _ = self.conductor_distances(conductor_n['tag'], conductor_m['tag'])
 
                 # External impedance (ohm/m)
-                Ze[n, m] = self.jw_mu0__2pi * np.log(Dnm/dnm)
+                Ze[n, m] = self.jw_mu0_2pi * np.log(Dnm/dnm)
 
         return Ze
 
@@ -112,16 +103,16 @@ class PerUnitParameters(MulticonductorTransmissionLine):
         """ This method calculates the external admittance matrix of the system. """
 
         # Admittance matrix
-        N = len(self.surfaces)  # pylint: disable=invalid-name
-        Pe = np.zeros((N, N))  # pylint: disable=invalid-name
-        Ge = np.zeros((N, N))  # pylint: disable=invalid-name
+        N = len(self.surfaces)
+        Pe = np.zeros((N, N))
+        Ge = np.zeros((N, N))
 
         # Loop over the conductors
         for n, _ in enumerate(self.surfaces):
             for m, _ in enumerate(self.surfaces):
 
                 # Distance between the conductors (m)
-                dnm, Dnm, _, _ = self.conductor_distances(n, m)  # pylint: disable=invalid-name
+                dnm, Dnm, _, _ = self.conductor_distances(n, m)
 
                 # External impedance (ohm/m)
                 Pe[n, m] = 1 / (2 * np.pi * epsilon_0) * np.log(Dnm/dnm)
@@ -131,25 +122,24 @@ class PerUnitParameters(MulticonductorTransmissionLine):
 
         # External capacitance matrix
         if type_form == 'potentials':
-            Ce = np.linalg.inv(Pe)  # pylint: disable=invalid-name
+            Ce = np.linalg.inv(Pe)
 
         elif type_form == 'indirect':
-            Le = self.external_impedance() / self.jw  # pylint: disable=invalid-name
-            Ce = np.linalg.inv(Le) * mu_0 * \
-                epsilon_0  # pylint: disable=invalid-name
+            Le = self.external_impedance() / self.jw
+            Ce = np.linalg.inv(Le) * mu_0 * epsilon_0
 
-        return Ge + self.jw * Ce  # pylint: disable=invalid-name
+        return Ge + self.jw * Ce
 
     def simplified_soil_admittance(self):
         """ This method calculates the external admittance matrix of the system. """
 
         # Earth return impedance matrix
-        Zg = self.earth_return_impedance(type_form='carson')  # pylint: disable=invalid-name
+        Zg = self.earth_return_impedance(type_form='carson')
 
         return -self.ke2 * np.linalg.inv(Zg)
 
-    def sn_sommerfeld(self, hn_hm, dn_dm, ke2, ka2, s_form='s1'):  # pylint: disable=line-too-long
-        """ Calculates the Carson integral using Gauss-Legendre quadrature and scipy.integrate.quad."""  # pylint: disable=line-too-long
+    def sn_sommerfeld(self, hn_hm, dn_dm, ke2, ka2, s_form='s1'):
+        """ Calculates the Carson integral using Gauss-Legendre quadrature and scipy.integrate.quad."""
 
         # soil refractive index
         if s_form == 's1':
@@ -169,15 +159,13 @@ class PerUnitParameters(MulticonductorTransmissionLine):
             return (num/den).imag
 
         # Calculate the real and imaginary parts of the integral using scipy.integrate.Quad
-        quad_real, _ = quad(int_real, 0, np.inf, args=(
-            hn_hm, dn_dm, ke2, ka2, n2))
-        quad_imag, _ = quad(int_imag, 0, np.inf, args=(
-            hn_hm, dn_dm, ke2, ka2, n2))
+        quad_real, _ = quad(int_real, 0, np.inf, args=(hn_hm, dn_dm, ke2, ka2, n2))
+        quad_imag, _ = quad(int_imag, 0, np.inf, args=(hn_hm, dn_dm, ke2, ka2, n2))
 
-        return quad_real + 1j * quad_imag  # pylint: disable=invalid-name
+        return quad_real + 1j * quad_imag
 
-    def sn_sommerfeld_gauss(self, hn_hm, dn_dm, ke2, ka2, s_form='s1', type_form='quad', pts=150):  # pylint: disable=line-too-long
-        """ Calculates the Carson integral using Gauss-Legendre quadrature and scipy.integrate.quad."""  # pylint: disable=line-too-long
+    def sn_sommerfeld_gauss(self, hn_hm, dn_dm, ke2, ka2, s_form='s1', type_form='quad', pts=150):
+        """ Calculates the Carson integral using Gauss-Legendre quadrature and scipy.integrate.quad."""
 
         # soil refractive index
         if s_form == 's1':
@@ -226,7 +214,7 @@ class PerUnitParameters(MulticonductorTransmissionLine):
                 int_transformed_real, 0, np.pi/2, pts, hn_hm, dn_dm, ke2, ka2, n)
             gauss_legendre_imag = int_gauss_legendre(
                 int_transformed_imag, 0, np.pi/2, pts, hn_hm, dn_dm, ke2, ka2, n)
-            S_n = gauss_legendre_real + 1j * gauss_legendre_imag  # pylint: disable=invalid-name
+            S_n = gauss_legendre_real + 1j * gauss_legendre_imag
 
         else:
             # Calculate the real and imaginary parts of the integral using scipy.integrate.Quad
@@ -234,15 +222,15 @@ class PerUnitParameters(MulticonductorTransmissionLine):
                                 args=(hn_hm, dn_dm, ke2, ka2, n))
             quad_imag, _ = quad(int_quad_imag, 0, np.inf,
                                 args=(hn_hm, dn_dm, ke2, ka2, n))
-            S_n = quad_real + 1j * quad_imag  # pylint: disable=invalid-name
+            S_n = quad_real + 1j * quad_imag
 
         return S_n
 
     def t_sommerfeld(self, hn_hm, dn_dm, k_e2, k_a2, type_form='gauss_legendre', pts=150):
-        """ Calculates the Carson integral using Gauss-Legendre quadrature and scipy.integrate.quad."""  # pylint: disable=line-too-long
+        """ Calculates the Carson integral using Gauss-Legendre quadrature and scipy.integrate.quad."""
 
         # Define the real and imaginary parts of the integrand
-        def int_quad_real(x, hn_hm, dn_dm, k_e2, k_a2):
+        def _int_quad_real(x, hn_hm, dn_dm, k_e2, k_a2):
             # soil refractive index
             n = np.sqrt(k_e2 / k_a2)
 
@@ -254,7 +242,7 @@ class PerUnitParameters(MulticonductorTransmissionLine):
 
             return (num/den).real
 
-        def int_quad_imag(x, hn_hm, dn_dm, k_e2, k_a2):
+        def _int_quad_imag(x, hn_hm, dn_dm, k_e2, k_a2):
             # soil refractive index
             n = np.sqrt(k_e2 / k_a2)
 
@@ -266,7 +254,7 @@ class PerUnitParameters(MulticonductorTransmissionLine):
 
             return (num/den).imag
 
-        def int_transformed_real(t, hn_hm, dn_dm, k_e2, k_a2):
+        def _int_transformed_real(t, hn_hm, dn_dm, k_e2, k_a2):
             x = np.tan(t)
 
             # soil refractive index
@@ -280,7 +268,7 @@ class PerUnitParameters(MulticonductorTransmissionLine):
 
             return (num/den).real * (1 / np.cos(t)**2)
 
-        def int_transformed_imag(t, hn_hm, dn_dm, k_e2, k_a2):
+        def _int_transformed_imag(t, hn_hm, dn_dm, k_e2, k_a2):
             x = np.tan(t)
 
             # soil refractive index
@@ -294,7 +282,7 @@ class PerUnitParameters(MulticonductorTransmissionLine):
 
             return (num/den).imag * (1 / np.cos(t)**2)
 
-        def int_gauss_legendre(func, a, b, n, *args):
+        def _int_gauss_legendre(func, a, b, n, *args):
             """
             Integrates the function `func` over the interval [a, b] using the Gauss-Legendre method.
             - func: function to be integrated.
@@ -308,24 +296,20 @@ class PerUnitParameters(MulticonductorTransmissionLine):
 
         # Calculate the real and imaginary parts of the integral using Gauss-Legendre
         if type_form == 'gauss_legendre':
-            gauss_legendre_real = int_gauss_legendre(
-                int_transformed_real, 0, np.pi/2, pts, hn_hm, dn_dm, k_e2, k_a2)
-            gauss_legendre_imag = int_gauss_legendre(
-                int_transformed_imag, 0, np.pi/2, pts, hn_hm, dn_dm, k_e2, k_a2)
-            T = gauss_legendre_real + 1j * gauss_legendre_imag  # pylint: disable=invalid-name
+            gauss_legendre_real = _int_gauss_legendre(_int_transformed_real, 0, np.pi/2, pts, hn_hm, dn_dm, k_e2, k_a2)
+            gauss_legendre_imag = _int_gauss_legendre(_int_transformed_imag, 0, np.pi/2, pts, hn_hm, dn_dm, k_e2, k_a2)
+            T = gauss_legendre_real + 1j * gauss_legendre_imag
 
         else:
             # Calculate the real and imaginary parts of the integral using scipy.integrate.Quad
-            quad_real, _ = quad(int_quad_real, 0, np.inf,
-                                args=(hn_hm, dn_dm, k_e2, k_a2))
-            quad_imag, _ = quad(int_quad_imag, 0, np.inf,
-                                args=(hn_hm, dn_dm, k_e2, k_a2))
-            T = quad_real + 1j * quad_imag  # pylint: disable=invalid-name
+            quad_real, _ = quad(_int_quad_real, 0, np.inf, args=(hn_hm, dn_dm, k_e2, k_a2))
+            quad_imag, _ = quad(_int_quad_imag, 0, np.inf, args=(hn_hm, dn_dm, k_e2, k_a2))
+            T = quad_real + 1j * quad_imag
 
         return T
 
-    def sn_sommerfeld_simplified(self, hn_hm, dn_dm, k_e2, n2=1, type_form='gauss_legendre', pts=150): # pylint: disable=line-too-long
-        """ Calculates the Carson integral using Gauss-Legendre quadrature and scipy.integrate.quad."""  # pylint: disable=line-too-long
+    def sn_sommerfeld_simplified(self, hn_hm, dn_dm, k_e2, n2=1, type_form='gauss_legendre', pts=150):
+        """ Calculates the Carson integral using Gauss-Legendre quadrature and scipy.integrate.quad."""  
 
         # Define the real and imaginary parts of the integrand
         def int_quad_real(x, hn_hm, dn_dm, k_e2, n2):
@@ -368,15 +352,13 @@ class PerUnitParameters(MulticonductorTransmissionLine):
                 int_transformed_real, 0, np.pi/2, pts, hn_hm, dn_dm, k_e2, n2)
             gauss_legendre_imag = int_gauss_legendre(
                 int_transformed_imag, 0, np.pi/2, pts, hn_hm, dn_dm, k_e2, n2)
-            Sn = gauss_legendre_real + 1j * gauss_legendre_imag  # pylint: disable=invalid-name
+            Sn = gauss_legendre_real + 1j * gauss_legendre_imag
 
         else:
             # Calculate the real and imaginary parts of the integral using scipy.integrate.Quad
-            quad_real, _ = quad(int_quad_real, 0, np.inf,
-                                args=(hn_hm, dn_dm, k_e2, n2))
-            quad_imag, _ = quad(int_quad_imag, 0, np.inf,
-                                args=(hn_hm, dn_dm, k_e2, n2))
-            Sn = quad_real + 1j * quad_imag  # pylint: disable=invalid-name
+            quad_real, _ = quad(int_quad_real, 0, np.inf, args=(hn_hm, dn_dm, k_e2, n2))
+            quad_imag, _ = quad(int_quad_imag, 0, np.inf, args=(hn_hm, dn_dm, k_e2, n2))
+            Sn = quad_real + 1j * quad_imag
 
         return Sn
 
@@ -384,8 +366,8 @@ class PerUnitParameters(MulticonductorTransmissionLine):
         """ This method calculates the impedance matrix of the earth return path. """
 
         # Impedance matrix
-        N = len(self.surfaces)  # pylint: disable=invalid-name
-        Zg = np.zeros((N, N), dtype=complex)  # pylint: disable=invalid-name
+        N = len(self.surfaces)
+        Zg = np.zeros((N, N), dtype=complex)
 
         # Complex depth (m)
         if type_form == 'approx_log':
@@ -399,21 +381,21 @@ class PerUnitParameters(MulticonductorTransmissionLine):
             p_dot = 1 / np.sqrt(-k_e2)
 
         # Loop over the conductors
-        for n, _ in enumerate(self.surfaces):
-            for m, _ in enumerate(self.surfaces):
+        for n, conductor_n in enumerate(self.surfaces):
+            for m, conductor_m in enumerate(self.surfaces):
 
                 # Distance between the conductors (m)
-                _, _, hn_hm, dn_dm = self.conductor_distances(n, m)
+                _, _, hn_hm, dn_dm = self.conductor_distances(conductor_n['tag'], conductor_m['tag'])
 
                 # Quasi-TEM Integral Equation
                 if type_form == 'quasi_tem':
-                    S1 = 2 * self.sn_sommerfeld(hn_hm, dn_dm, self.ke2, self.ka2)  # pylint: disable=invalid-name
+                    S1 = 2 * self.sn_sommerfeld(hn_hm, dn_dm, self.ke2, self.ka2)
 
                 # Quasi-TEM Logarithmic Approximation
                 elif type_form == 'quasitem_log':
                     eta = np.sqrt(self.ka2 - self.ke2)
                     eta_sqrt = eta * np.sqrt(hn_hm**2 + dn_dm**2)
-                    S1 = np.log(1 + 2 / eta_sqrt)  # pylint: disable=invalid-name
+                    S1 = np.log(1 + 2 / eta_sqrt)
 
                 # Sunde Integral Equation
                 elif type_form == 'sunde':
@@ -421,7 +403,7 @@ class PerUnitParameters(MulticonductorTransmissionLine):
                         dn_dm = 0
 
                     # Sommerfeld Integral
-                    S1 = 2 * self.sn_sommerfeld(hn_hm, dn_dm, self.ke2, ka2=0)  # pylint: disable=invalid-name
+                    S1 = 2 * self.sn_sommerfeld(hn_hm, dn_dm, self.ke2, ka2=0)
 
                 # Carson Integral Equation
                 elif type_form == 'carson':
@@ -429,21 +411,21 @@ class PerUnitParameters(MulticonductorTransmissionLine):
                         dn_dm = 0
 
                     # Sommerfeld Integral
-                    S1 = 2 * self.sn_sommerfeld(hn_hm, dn_dm, k_e2, ka2=0)  # pylint: disable=invalid-name
+                    S1 = 2 * self.sn_sommerfeld(hn_hm, dn_dm, k_e2, ka2=0)
 
                 # Log. Approximation Closed-Form Expression
                 else:
                     if n == m:
-                        hn = self.mtl[n]['center_point'][1]
-                        S1 = np.log((hn + p_dot) / hn)  # pylint: disable=invalid-name
+                        hn = conductor_n['center_point'][1]
+                        S1 = np.log((hn + p_dot) / hn)
 
                     else:
                         num = np.sqrt((hn_hm + 2*p_dot)**2 + dn_dm**2)
                         den = np.sqrt(hn_hm**2 + dn_dm**2)
-                        S1 = np.log(num / den)  # pylint: disable=invalid-name
+                        S1 = np.log(num / den)
 
                 # Earth return impedance (ohm/m)
-                Zg[n, m] = self.jw_mu0__2pi * S1
+                Zg[n, m] = self.jw_mu0_2pi * S1
 
         return Zg
 
@@ -452,30 +434,27 @@ class PerUnitParameters(MulticonductorTransmissionLine):
 
         # Impedance matrix
         n = len(self.surfaces)
-        M = np.zeros((n, n))  # pylint: disable=invalid-name
-        S1 = np.zeros((n, n), dtype=complex)  # pylint: disable=invalid-name
-        S2 = np.zeros((n, n), dtype=complex)  # pylint: disable=invalid-name
-        T = np.zeros((n, n), dtype=complex)  # pylint: disable=invalid-name
-        Zi = self.internal_impedance()[0]  # pylint: disable=invalid-name
+        M = np.zeros((n, n))
+        S1 = np.zeros((n, n), dtype=complex)
+        S2 = np.zeros((n, n), dtype=complex)
+        T = np.zeros((n, n), dtype=complex)
+        Zi = self.internal_impedance()[0]
 
         # Loop over the conductors
-        for n, _ in enumerate(self.surfaces):
-            for m, _ in enumerate(self.surfaces):
+        for n, conductor_n in enumerate(self.surfaces):
+            for m, conductor_m in enumerate(self.surfaces):
 
                 # Distance between the conductors (m)
-                dnm, Dnm, hn_hm, dn_dm = self.conductor_distances(n, m)  # pylint: disable=invalid-name
+                dnm, Dnm, hn_hm, dn_dm = self.conductor_distances(conductor_n['tag'], conductor_m['tag'])
 
                 # External Impedance term
                 M[n, m] = np.log(Dnm/dnm)
 
                 # Quasi-TEM Integral Equation
                 if type_form == 'quasitem':
-                    S1[n, m] = 2 * self.sn_sommerfeld_gauss(
-                        hn_hm, dn_dm, self.ke2, self.ka2)  # pylint: disable=invalid-name
-                    S2[n, m] = 2 * self.sn_sommerfeld_gauss(
-                        hn_hm, dn_dm, self.ke2, self.ka2, s_form='s2')  # pylint: disable=invalid-name
-                    T[n, m] = 2 * self.t_sommerfeld(
-                        hn_hm, dn_dm, self.ke2, self.ka2)  # pylint: disable=invalid-name
+                    S1[n, m] = 2 * self.sn_sommerfeld_gauss(hn_hm, dn_dm, self.ke2, self.ka2)
+                    S2[n, m] = 2 * self.sn_sommerfeld_gauss(hn_hm, dn_dm, self.ke2, self.ka2, s_form='s2')
+                    T[n, m] = 2 * self.t_sommerfeld(hn_hm, dn_dm, self.ke2, self.ka2)
 
                 # Quasi-TEM Logarithmic Approximation
                 elif type_form == 'quasitem_log':
@@ -500,31 +479,26 @@ class PerUnitParameters(MulticonductorTransmissionLine):
                     ke2_naka = - self.jw * self.mur_1 * mu_0 * \
                         (self.sigma_1 + self.jw * (self.er_1 - 1) * epsilon_0)
 
-                    S1[n, m] = 2 * self.sn_sommerfeld_simplified(
-                        hn_hm, dn_dm, ke2_naka)  # pylint: disable=invalid-name
-
-                    S2[n, m] = 2 * self.sn_sommerfeld_simplified(
-                        hn_hm, dn_dm, ke2_naka, n2=n2_naka)  # pylint: disable=invalid-name
+                    S1[n, m] = 2 * self.sn_sommerfeld_simplified(hn_hm, dn_dm, ke2_naka)
+                    S2[n, m] = 2 * self.sn_sommerfeld_simplified(hn_hm, dn_dm, ke2_naka, n2=n2_naka)
 
                 # Sunde Integral Equation
                 elif type_form == 'sunde':
-                    S1[n, m] = 2 * self.sn_sommerfeld_simplified(
-                        hn_hm, dn_dm, self.ke2)  # pylint: disable=invalid-name
+                    S1[n, m] = 2 * self.sn_sommerfeld_simplified(hn_hm, dn_dm, self.ke2)
 
                 # Carson Integral Equation
                 elif type_form == 'carson':
                     k_e2_carson = - self.jw * self.mur_1 * mu_0 * self.sigma_1
-                    S1[n, m] = 2 * self.sn_sommerfeld_simplified(
-                        hn_hm, dn_dm, k_e2_carson)  # pylint: disable=invalid-name
+                    S1[n, m] = 2 * self.sn_sommerfeld_simplified(hn_hm, dn_dm, k_e2_carson)
 
         # Earth return impedance and admittance (ohm/m)
         if type_form == 'quasitem' or type_form == 'quasitem_log':
-            Zg = self.jw_mu0__2pi * (M + S1 - (T + S2))  # pylint: disable=invalid-name
-            Y = self.jw_2pi_e0 * np.linalg.inv(M - T)  # pylint: disable=invalid-name
+            Zg = self.jw_mu0_2pi * (M + S1 - (T + S2))
+            Y = self.jw_2pi_e0 * np.linalg.inv(M - T)
 
         else:
-            Zg = self.jw_mu0__2pi * (M + S1)  # pylint: disable=invalid-name
-            Y = self.jw_2pi_e0 * np.linalg.inv(M + S2)  # pylint: disable=invalid-name
+            Zg = self.jw_mu0_2pi * (M + S1)
+            Y = self.jw_2pi_e0 * np.linalg.inv(M + S2)
 
         # Propagation constant (rad/m)
         gamma = np.sqrt((Zi+Zg) @ Y)

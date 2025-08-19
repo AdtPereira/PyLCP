@@ -530,9 +530,6 @@ class BifilarBareWirePULParameters():
         assert self.results_df.index.max() == self.sum_max - 1, \
             f"A simulação não rodou até o valor máximo esperado de k={self.sum_max - 1}"
 
-        # Extração de dados de forma programática.
-        # Esta parte permanece flexível para extrair todos os elementos,
-        # mesmo que apenas alguns sejam plotados.
         ribbon, mom, mom_so = {}, {}, {}
         try:
             for i in range(self.N):
@@ -546,8 +543,7 @@ class BifilarBareWirePULParameters():
             return
 
         plt.style.use('default')
-        # Cria uma figura com dois subplots (1 linha, 2 colunas)
-        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5), sharey=True)
+        _, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5), sharey=True)
         # fig.suptitle('')
 
         fortran_nf_axis = self.results_df.index + 1

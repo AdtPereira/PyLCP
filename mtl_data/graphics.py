@@ -24,7 +24,7 @@ class MTLRepresentation(MulticonductorTransmissionLine):
         self.scale_factor = unit_info['scale']
         self.label_unit = unit_info['label']
 
-    def bare_and_coated_wires(self):
+    def bared_and_coated_wires(self):
         """
         Esta função plota a geometria de fios com revestimento isolante,
         utilizando uma abordagem elegante para definir os limites dos eixos.

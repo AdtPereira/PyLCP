@@ -42,7 +42,7 @@ os.system('cls' if os.name == 'nt' else 'clear')
 try:
     script_dir = Path(__file__).resolve().parent
     print(f"Script directory: {script_dir}")
-    project_root = script_dir.parents[0]
+    project_root = script_dir.parents[1]
     print(f"Project root: {project_root}")
     sys.path.append(str(project_root))
     print("Caminhos do projeto configurados com sucesso.")
@@ -54,7 +54,7 @@ except IndexError:
 
 # IMPORTAÇÕES DOS MÓDULOS E MODELO DE DADOS
 try:
-    from mtl_data.models import COAXIAL_CABLE as MTL
+    from mtl_data.wire_models import COAXIAL_CABLE as MTL
     from mtl_data.graphics import MTLRepresentation
     from analytical_forms.pul_wires_conductors import CoaxialCable, Ametani
     from mom_so.quasi_static_green import QuasiStatic

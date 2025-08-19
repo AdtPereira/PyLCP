@@ -1,21 +1,69 @@
+""" 
+Este script executa simulações de impedância de linhas de transmissão coaxiais
+usando tanto uma abordagem analítica (formulação de Patel) quanto uma abordagem numérica
+(Método dos Momentos - MoM-SO). Ele gera gráficos comparativos dos resultados
+obtidos por ambas as metodologias.
+
+Este arquivo é parte do projeto PyLCP, que é um pacote Python para análise de linhas de transmissão.
+
+REFERENCES:
+[1] PATEL, Utkarsh R. A Surface Admittance Approach For Fast Calculation of the 
+    Series Impedance of Cables Including Skin, Proximity, and Ground Return Effects.
+    2014. University of Toronto, Graduate Department of The Edward S. Rogers Sr. 
+    Department of Electrical & Computer Engineering. 
+
+[2] U. R. Patel, B. Gustavsen and P. Triverio, "An Equivalent Surface Current Approach
+    for the Computation of the Series Impedance of Power Cables with Inclusion of Skin
+    and Proximity Effects," in IEEE Transactions on Power Delivery, vol. 28, no. 4, pp.
+    2474-2482, Oct. 2013, doi: 10.1109/TPWRD.2013.2267098.
+
+[3] U. R. Patel, B. Gustavsen and P. Triverio, "Application of the MoM-SO Method for 
+    Accurate Impedance Calculation of Single-Core Cables Enclosed by a Conducting Pipe," 
+    Proc. International Conference on Power Systems Transients (IPST 2013), Vancouver, 
+    Canada July 18-20, 2013. https://www.ipstconf.org/Proc_IPST2013.php
+
+[4] A. Ametani, "A General Formulation of Impedance and Admittance of Cables," in IEEE
+    Transactions on Power Apparatus and Systems, vol. PAS-99, no. 3, pp. 902-910, May
+    1980, doi: 10.1109/TPAS.1980.319718.
+
+[5] A. Ametani, "Wave Propagation Characteristics of Cables," in IEEE Transactions on
+    Power Apparatus and Systems, vol. PAS-99, no. 2, pp. 499-505, March 1980, 
+    doi: 10.1109/TPAS.1980.319685.
+"""
 import os
 import sys
 import time
 import numpy as np
+from pathlib import Path
 import matplotlib.pyplot as plt
 
-# Adiciona a raiz do projeto ao PYTHONPATH
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..\..')))
+# RAIZ DO PROJETO E DIRETÓRIOS
+os.system('cls' if os.name == 'nt' else 'clear')
+try:
+    script_dir = Path(__file__).resolve().parent
+    print(f"Script directory: {script_dir}")
+    project_root = script_dir.parents[1]
+    print(f"Project root: {project_root}")
+    sys.path.append(str(project_root))
+    print("Caminhos do projeto configurados com sucesso.")
+except IndexError:
+    raise FileNotFoundError(
+        "Não foi possível encontrar a raiz do projeto. "
+        "Certifique-se de que o script está em 'examples/coated_wires'."
+    )
 
-from mtl_data.models import MTL_MODELS
-from mtl_data.graphics import MTLRepresentation as graph
+# IMPORTAÇÕES DOS MÓDULOS E MODELO DE DADOS
+try:
+    from mtl_data.wire_models import SINGLE_OHTL_CONTI as MTL
+    from mtl_data.graphics import MTLRepresentation
+    from mom_so.quasi_static_green import QuasiStatic
+    from mom_so.lossless_medium import HomogeneousLosslessMedium
+    from ohtl.pul_parameters import PerUnitParameters
+    print("Módulos e modelo de dados importados com sucesso.") 
+except ImportError as e:
+    print(f"Erro ao importar módulos: {e}")
+    sys.exit(1)
 
-from ohtl.pul_parameters import PerUnitParameters
-from mom_so import lossless_medium, quasi_static_green
-
-# Multiconductor Transmission Line choices
-MTL = MTL_MODELS['overhead']['xue']
-MTL = MTL_MODELS['overhead']['deConti']
 
 def plot_zi(freq, z_dict, p, q):
     """
@@ -27,6 +75,7 @@ def plot_zi(freq, z_dict, p, q):
     p (int): Row index in the impedance matrix.
     q (int): Column index in the impedance matrix.
     """
+    plt.figure(figsize=(8, 5))
 
     # Extracting the impedance elements from zi_matrix
     exact = np.array([item[p][q] for item in z_dict['zi_exact']])
@@ -39,7 +88,6 @@ def plot_zi(freq, z_dict, p, q):
     plt.plot(freq['Analytically'], np.real(1E3 * approx), label=fr'$R_{{{p+1}}}$ (Closed-Form)', color=( 1, 0, 0, 0.5), linestyle='--')  # pylint: disable=line-too-long
     plt.plot(freq['Analytically'], np.real(1E3 * ri_cc), label=fr'$R_{{cc({p+1})}}$', color=(0, 1, 0, 0.5), linestyle='--')  # pylint: disable=line-too-long
     plt.plot(freq['Analytically'], np.real(1E3 * zi_hf), label=fr'$Z_{{hf({p+1})}}$', color=(0, 0, 1, 0.5), linestyle='--')  # pylint: disable=line-too-long
-    # plt.scatter(freq['Numerically'], np.real(1E3 * zi_mom), label=fr'$R_{{{p+1}}}$ (MoM-SO [1])', color='blue', marker='x', s=40)  # pylint: disable=line-too-long
 
     # Optional: Additional plotting configurations like labels, grid, etc.
     plt.xscale('log')
@@ -53,7 +101,7 @@ def plot_zi(freq, z_dict, p, q):
               r'$r_1 = 0.01\,\mathrm{m}, h_1 = 10\,\mathrm{m},'
               r'\sigma = 5.952 \times 10^7\,\mathrm{S/m}$ [1]')
     plt.grid(True)
-    plt.show()
+    # plt.show()
 
 
 def plot_zs(freq, z_dict, zg_dict, p, q):
@@ -66,6 +114,7 @@ def plot_zs(freq, z_dict, zg_dict, p, q):
     p (int): Row index in the impedance matrix.
     q (int): Column index in the impedance matrix.
     """
+    plt.figure(figsize=(8, 5))
 
     # Extracting the impedance elements from zi_matrix
     zi = np.array([item[p, q] for item in z_dict['zi_exact']])
@@ -109,7 +158,7 @@ def plot_zs(freq, z_dict, zg_dict, p, q):
                  r'$r_1 = 0.01\,\mathrm{m}, h_1 = 10\,\mathrm{m},'
                  r'\sigma = 5.952 \times 10^7\,\mathrm{S/m}$ [1]')
     plt.tight_layout()
-    plt.show()
+    # plt.show()
 
 
 def plot_zg(freq, zg_dict, p, q):
@@ -122,6 +171,7 @@ def plot_zg(freq, zg_dict, p, q):
     p (int): Row index in the impedance matrix.
     q (int): Column index in the impedance matrix.
     """
+    plt.figure(figsize=(8, 5))
 
     # Extracting the impedance elements from zg dictionary
     quasitem = [item[p, q] for item in zg_dict['quasi_tem']]
@@ -183,7 +233,7 @@ def plot_zg(freq, zg_dict, p, q):
                  r'$r_1 = 0.01\,\mathrm{m}, h_1 = 10\,\mathrm{m},'
                  r'\sigma = 5.952 \times 10^7\,\mathrm{S/m}$ [1]')
     plt.tight_layout()
-    plt.show()
+    # plt.show()
 
 
 def plot_ys(freq, ys_dict, p, q):
@@ -196,6 +246,7 @@ def plot_ys(freq, ys_dict, p, q):
     p (int): Row index in the impedance matrix.
     q (int): Column index in the impedance matrix.
     """
+    plt.figure(figsize=(8, 5))
 
     # Extracting the impedance elements from zi_matrix
     ye = np.array([item[p, q] for item in ys_dict['ye']])
@@ -237,16 +288,12 @@ def plot_ys(freq, ys_dict, p, q):
                  r'$r_1 = 0.01\,\mathrm{m}, h_1 = 10\,\mathrm{m},'
                  r'\sigma = 5.952 \times 10^7\,\mathrm{S/m}$ [1]')
     plt.tight_layout()
-    plt.show()
+    # plt.show()
 
 
-def main():
+if __name__ == "__main__":
     """ Main function to perform the calculations and display the results."""
-
-    # Clears the console screen and starts the timer
-    os.system('cls' if os.name == 'nt' else 'clear')
-    print("Calculations were started ... ...")
-    start_time = time.time()
+    st = time.time()
 
     # Calculate the series impedance for each frequency
     frequency = {
@@ -294,24 +341,16 @@ def main():
         zg_results['deri'].append(pul.earth_return_impedance(type_form='deri'))
 
     # MoM-SO routine
-    green_list = ['Analytically', 'Numerically']
-    green_matrix = quasi_static_green.QuasiStatic(MTL).green_matrix(green_mode=green_list[0])
+    green_matrix = QuasiStatic(MTL).green_matrix(green_mode='Analytically')
     for f in frequency['Numerically']:
-        mom_so = lossless_medium.HomogeneousLosslessMedium(MTL, f)
+        mom_so = HomogeneousLosslessMedium(MTL, f)
         z_results['zi_momso'].append(mom_so.z_partial(green_matrix))
 
-    # End the timer
-    elapsed_time = time.time() - start_time
-    print(f"End of the routine! Time spent on simulation: {elapsed_time:.2f} seconds.\n")
-
-    # Display the geometry of the transmission line
-    graph(MTL).wires_and_cables()
-
     # Plot the series resistance as a function of frequency
+    print(f"End of the routine! Time spent on simulation: {(time.time() - st):.2f} seconds.\n")
     plot_zi(frequency, z_results, p=0, q=0)
     plot_zg(frequency, zg_results, p=0, q=0)
     plot_zs(frequency, z_results, zg_results, p=0, q=0)
-
-
-if __name__ == "__main__":
-    main()
+    MTLRepresentation(MTL, units='meter').bared_and_coated_wires()
+    plt.show()
+    

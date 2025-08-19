@@ -1,4 +1,18 @@
 """ This module contains the definition of the MOM-So systems used in the """
+LINNET = { 'type': 'ACSR',
+    'radius': {'value': [6.74E-3/2, 18.29E-3/2], 'unit': 'm'},
+    'resistance_20': {'value': 0.1695, 'unit': 'ohm/km'},
+    'resistance_65': {'value': 0.2002, 'unit': 'ohm/km'},
+    'conductivity': None,
+}
+
+STEEL_3_8 = { 'type': 'Steel',
+    'radius': {'value': [0, 9.52E-3/2], 'unit': 'm'},
+    'resistance_20': {'value': 3.81, 'unit': 'ohm/km'},
+    'resistance_65': {'value': 4.5815, 'unit': 'ohm/km'},
+    'conductivity': None,
+}
+
 CMTM = 2.54E-5 # 1 mil in meters
 
 PAUL_RIBBON_CABLE = {
@@ -289,41 +303,67 @@ COAXIAL_CABLE = {
     },
 }
 
-# SINGLE_OVERHEAD_DECONTI = [
-#     {
-#         'line_id': 0,
-#         'conductor_name': 'p',
-#         'line_type': 'active',
-#         'line_return': None,
-#         'center_point': (0, 10),
-#         'radius': [0, 0.01],
-#         'conductivity': 6.496E7,
-#         'subconductors': None,
-#         'insulation': None,
-#         'relative_permeability': 1,
-#         'relative_permittivity': 1,
-#         'relative_permittivity_out': 1,
-#         'fourier_order': 0,
-#     }
-# ]
+SINGLE_OHTL_CONTI = {
+    'name': 'single_ohtl',
+    'type': 'overhead',
+    'note': 'De Conti (2018) model',
+    'idx_ref_conductor': 0,
+    0: {
+        'line_id': 0,
+        'conductor_name': 'soil',
+        'line_type': 'return',
+        'line_return': None,
+        'conductivity': 6.496E7,
+    },
+    1: {
+        'line_id': 1,
+        'conductor_name': 'p',
+        'line_type': 'active',
+        'line_return': 0,
+        'center_point': (0.0, 10.0),
+        'radius': [0, 0.010],
+        'conductivity': 6.496E7,
+        'subconductors': None,
+        'sheath': None,
+        'conductor_layers': 1,
+        'relative_permeability': 1.0,
+        'relative_permittivity': 1.0,
+        'relative_permittivity_out': 1.0,
+        'potential_to_infinity': -1.0,
+        'fourier_order': 0,
+    },
+}
 
-# SINGLE_OVERHEAD_XUE = [
-#     {
-#         'line_id': 0,
-#         'conductor_name': 'p',
-#         'line_type': 'active',
-#         'line_return': None,
-#         'center_point': (0, 10),
-#         'radius': [0, 0.01],
-#         'conductivity': 1/1.68E-8,
-#         'subconductors': None,
-#         'insulation': None,
-#         'relative_permeability': 1,
-#         'relative_permittivity': 1,
-#         'relative_permittivity_out': 1,
-#         'fourier_order': 0,
-#     }
-# ]
+SINGLE_OHTL_XUE = {
+    'name': 'single_ohtl',
+    'type': 'overhead',
+    'note': 'Xue (2018) model',
+    'idx_ref_conductor': 0,
+    0: {
+        'line_id': 0,
+        'conductor_name': 'soil',
+        'line_type': 'return',
+        'line_return': None,
+        'conductivity': 6.496E7,
+    },
+    1: {
+        'line_id': 1,
+        'conductor_name': 'p',
+        'line_type': 'active',
+        'line_return': 0,
+        'center_point': (0.0, 10.0),
+        'radius': [0, 0.010],
+        'conductivity': 1/1.68E-8,
+        'subconductors': None,
+        'sheath': None,
+        'conductor_layers': 1,
+        'relative_permeability': 1.0,
+        'relative_permittivity': 1.0,
+        'relative_permittivity_out': 1.0,
+        'potential_to_infinity': -1.0,
+        'fourier_order': 0,
+    },
+}
 
 # TL_138kV_OVERHEAD = [
 #     {
