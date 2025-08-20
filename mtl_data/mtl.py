@@ -21,12 +21,14 @@ REFERENCES:
 
 """
 
+import copy
 import numpy as np
-from scipy.constants import mu_0, epsilon_0
-
+from pyparsing import Dict
+import scipy.constants as sc
+from mtl_data.mtl_strategy import mtl_strategy_factory
 
 class MulticonductorTransmissionLine():
-    def __init__(self, mtl):
+    def __init__(self, mtl: Dict):
         """Initialize the MulticonductorTransmissionLine class.
 
         Key Points
@@ -38,36 +40,30 @@ class MulticonductorTransmissionLine():
         within the class will not affect the original TREFOIL object.
         """
 
-        # MTL Type
-        mtl_types = {'coated_wires', 'bare_wires', 'coaxial', 'overhead', 'scc'}
-        self.mtl_type = mtl.get('type', 'unknown')
+        mtl_input = copy.deepcopy(mtl)
+        self.mtl_type = mtl_input.get('type', 'unknown')
+        self.idx_ref = mtl_input.get('idx_ref_conductor', 0)      
 
-        # MTL Conductor Reference Index
-        self.idx_ref = mtl.get('idx_ref_conductor', np.nan)      
+        # Delegate preprocessing and validation to the strategy
+        strategy = mtl_strategy_factory(self.mtl_type)
+        self.mtl = strategy.preprocess_mtl_dict(mtl_input)
+        strategy.validate(self.mtl, self.idx_ref)
 
-        # Deep copy of the conductors list
-        if self.mtl_type == 'overhead':
-            self.mtl = {key: value for key, value in mtl.items() if isinstance(key, int) and key > 0}
-            key_conductors = sorted(self.mtl.keys())
-            key_expected = list(range(1, len(key_conductors)+1))
-        
-        else:
-            self.mtl = {key: value for key, value in mtl.items() if isinstance(key, int)}
-            key_conductors = sorted(self.mtl.keys())
-            key_expected = list(range(len(key_conductors)))
-            assert self.mtl[0]['line_type'] == 'return', "The conductor index '0' must be the return path."
-            assert self.idx_ref in self.mtl, f"The reference conductor index {self.idx_ref} must be in the MTL dictionary."
+        # Pré-inicializa todos os atributos específicos
+        # self.D_pq = None
+        # self.dx_pq = None
+        # self.dy_pq = None
+        # self.theta_pq = None
+        # self.d_matrix_ground_return = None
+        # self.D_matrix_ground_return = None
+        # self.vertical_separation_matrix = None
+        # self.horizontal_separation_matrix = None
 
-            # Distance matrices [np.array]
-            self.D_pq, self.dx_pq, self.dy_pq, self.theta_pq = self.conductors_center_distance_matrix()
-        
-        assert len(self.mtl) > 1 or self.mtl_type == 'overhead', "The MulticonductorTransmissionLine must have at least two conductors."
-        assert self.mtl_type in mtl_types, f"MTL type must be one of {mtl_types}."  
-        assert key_conductors == key_expected, "As tags dos condutores devem ser uma sequência de inteiros começando em 0 (ex: 0, 1, 2, ...)."
-        assert self.idx_ref is not None, "The reference conductor index must be defined."
+        # Delegate calculation of type-specific properties
+        strategy.apply_properties(self, self.mtl)          
 
         # Conductor surfaces dictionary
-        self._define_wire_surfaces()
+        self._define_mtl_surfaces()
 
         # Dimension N - Equation (2.36) [1]
         self.NF_List = [2 * surface['fourier_order'] + 1 for surface in self.surfaces]
@@ -77,58 +73,18 @@ class MulticonductorTransmissionLine():
         self.NF = self.NF_List[self.idx_ref]
 
         # Conductors Permeability [np.array]
-        self.mu = np.array([mu_0 * cond['relative_permeability'] for cond in self.mtl.values()]) 
+        self.mu = np.array([sc.mu_0 * cond['relative_permeability'] for cond in self.mtl.values()]) 
 
         # Conductors Permittivity [np.array]
-        self.epsilon = np.array([epsilon_0 * cond['relative_permittivity'] for cond in self.mtl.values()]) 
+        self.epsilon = np.array([sc.epsilon_0 * cond['relative_permittivity'] for cond in self.mtl.values()]) 
 
         # Conductors conductivity [np.array]
         self.sigma = np.array([cond['conductivity'] for cond in self.mtl.values()])
 
         # Free-Space Permittivity [np.array]
-        self.epsilon_out = np.array([epsilon_0 * cond['relative_permittivity_out'] for cond in self.mtl.values()])
+        self.epsilon_out = np.array([sc.epsilon_0 * cond['relative_permittivity_out'] for cond in self.mtl.values()])
 
-
-    # def _define_wire_surfaces(self):
-    #     # Conductor surfaces dictionary
-    #     self.surfaces = []
-
-    #     for key, conductor in self.mtl.items():
-    #         # Check if the conductor is hollow
-    #         if conductor['radius'][0] != 0:
-    #             for radius in conductor['radius']:
-    #                 self.surfaces.append({
-    #                     'type': 'conductor',
-    #                     'tag': key,
-    #                     'radius': radius,
-    #                     'center_point': conductor['center_point'],
-    #                     'fourier_order': conductor['fourier_order'],
-    #                 })
-
-    #         # Then, the conductor is solid
-    #         else:
-    #             self.surfaces.append({
-    #                 'type': 'conductor',
-    #                 'tag': key,
-    #                 'radius': conductor['radius'][1],
-    #                 'center_point': conductor['center_point'],
-    #                 'fourier_order': conductor['fourier_order'],
-    #             })
-
-    #         # Check if the conductor has a insulation
-    #         if conductor['insulation'] is not None:
-    #             insulation = conductor['insulation']
-    #             # Add the insulation surface
-    #             self.surfaces.append({
-    #                 'type': insulation['name'],
-    #                 'tag': key,
-    #                 'radius': conductor['radius'][1] + insulation['thickness'],
-    #                 'center_point': insulation['center_point'],
-    #                 'fourier_order': insulation['fourier_order'],
-    #                 'relative_permittivity': insulation['relative_permittivity'],
-    #             })
-    
-    def _define_wire_surfaces(self):
+    def _define_mtl_surfaces(self):
         """
         Defines the surfaces for all conductors and their insulations,
         handling geometric duplicates by prioritizing conductor surfaces.
@@ -201,61 +157,6 @@ class MulticonductorTransmissionLine():
         ap = surfaces_list[p]['radius']
 
         return np.array([xp + ap * np.cos(theta), yp + ap * np.sin(theta)])
-
-    # Distance matrices [np.array]
-    def conductors_center_distance_matrix(self):
-        """ Calculates the distance matrix between the center points of the conductors. """
-
-        # Principal Dimension: Number of conductor surfaces
-        N = len(self.mtl)  
-        d_pq = np.zeros((N, N))
-        x_pq = np.zeros_like(d_pq)
-        y_pq = np.zeros_like(d_pq)
-        theta_pq = np.zeros_like(d_pq)
-
-        for p, conductor_p in self.mtl.items():
-            cp = conductor_p['center_point']
-
-            for q, conductor_q in self.mtl.items():
-                cq = conductor_q['center_point']
-
-                # Distance between the center points of the conductors
-                x_pq[p, q] = cp[0] - cq[0]
-                y_pq[p, q] = cp[1] - cq[1]
-
-                # Angle between the center points of the conductors
-                theta_pq[p, q] = np.arctan2(y_pq[p, q], x_pq[p, q])
-
-                # Distance between the center points of the conductors
-                d_pq[p, q] = np.linalg.norm(np.array(cp) - np.array(cq))
-
-        return d_pq, x_pq, y_pq, theta_pq
-
-    # Matrices Distance dnm and Dnm [np.array] - Equations 2.48 and 2.49 [2]
-    def conductor_distances(self, n, m):
-        """ Calculates the distance matrix Dnm between the center points of the conductors. """
-
-        cn = self.mtl[n]['center_point']
-        cm = self.mtl[m]['center_point']
-        rn = self.mtl[n]['radius'][1]
-
-        # Horizontal separation
-        # Self-elements
-        if n == m:
-            dn_dm = rn
-        else:
-            dn_dm = cn[0] - cm[0]
-
-        # Vertical separation
-        hn_hm = cn[1] + cm[1]
-
-        # Matrix Distance dnm [np.array]
-        d = np.sqrt(dn_dm ** 2 + (cn[1] - cm[1]) ** 2)
-
-        # Matrix Distance dnm [np.array]
-        D = np.sqrt(dn_dm ** 2 + hn_hm ** 2)
-
-        return d, D, hn_hm, dn_dm
 
     # Create a diagonal matrix by concatenating a list of matrices along the diagonal
     def create_diagonal_matrix(self, matrix_list):

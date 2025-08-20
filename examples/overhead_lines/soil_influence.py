@@ -54,7 +54,8 @@ except IndexError:
 
 # IMPORTAÇÕES DOS MÓDULOS E MODELO DE DADOS
 try:
-    from mtl_data.wire_models import SINGLE_OHTL_XUE as MTL
+    from mtl_data.wire_models import SINGLE_OHTL_XUE as MODEL
+    from mtl_data.mtl import MulticonductorTransmissionLine
     from mtl_data.graphics import MTLRepresentation
     from ohtl.pul_parameters import PerUnitParameters
     print("Módulos e modelo de dados importados com sucesso.") 
@@ -139,11 +140,14 @@ if __name__ == "__main__":
         'rho_5k': {'nakagawa': [], 'quasi_tem': []},
     }
 
+    # The geometric model is constant, so we create the object once for efficiency.
+    mtl_model = MulticonductorTransmissionLine(MODEL)
+
     # Analytical Formulation
     for f in frequency['Analytically']:
-        pul1 = PerUnitParameters(MTL, f, sigma_1=1/1E-6, er_1=5)
-        pul2 = PerUnitParameters(MTL, f, sigma_1=1/2E+2, er_1=5)
-        pul3 = PerUnitParameters(MTL, f, sigma_1=1/5E+3, er_1=5)
+        pul1 = PerUnitParameters(mtl_model, f, sigma_1=1/1E-6, er_1=5)
+        pul2 = PerUnitParameters(mtl_model, f, sigma_1=1/2E+2, er_1=5)
+        pul3 = PerUnitParameters(mtl_model, f, sigma_1=1/5E+3, er_1=5)
 
         pul_parameters['rho_1u']['nakagawa'].append(pul1.pul_extended_theory(type_form='nakagawa'))
         pul_parameters['rho_1u']['quasi_tem'].append(pul1.pul_extended_theory())
@@ -154,6 +158,6 @@ if __name__ == "__main__":
 
     print(f"End of the routine! Time spent on simulation: {(time.time() - st):.2f} seconds.\n")
     plot_gamma(frequency, pul_parameters, p=0, q=0)
-    MTLRepresentation(MTL, units='meter').bared_and_coated_wires()
+    MTLRepresentation(MODEL, units='meter').bared_and_coated_wires()
     plt.show()
     

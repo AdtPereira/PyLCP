@@ -54,8 +54,9 @@ except IndexError:
 
 # IMPORTAÇÕES DOS MÓDULOS E MODELO DE DADOS
 try:
-    from mtl_data.wire_models import SINGLE_OHTL_CONTI as MTL
+    from mtl_data.wire_models import SINGLE_OHTL_CONTI as MODEL
     from mtl_data.graphics import MTLRepresentation
+    from mtl_data.mtl import MulticonductorTransmissionLine
     from mom_so.quasi_static_green import QuasiStatic
     from mom_so.lossless_medium import HomogeneousLosslessMedium
     from ohtl.pul_parameters import PerUnitParameters
@@ -321,16 +322,19 @@ if __name__ == "__main__":
         'ze': []
     }
 
+    # The geometric model is constant, so we create the object once for efficiency.
+    mtl_model = MulticonductorTransmissionLine(MODEL)
+
     # Analytical Formulation
     for f in frequency['Analytically']:
-        pul = PerUnitParameters(MTL, f, sigma_1=1/200, er_1=5)
+        pul = PerUnitParameters(mtl_model, f, sigma_1=1/200, er_1=5)
 
         # Internal and external impedance matrices
-        z_results['zi_exact'].append(pul.internal_impedance(type_form='bessel')[0])
-        z_results['zi_approx'].append(pul.internal_impedance()[0])
-        z_results['ri_cc'].append(pul.internal_impedance()[1])
-        z_results['zi_hf'].append(pul.internal_impedance()[2])
-        z_results['ze'].append(pul.external_impedance())
+        z_results['zi_exact'].append(pul.internal_impedance_matrix(type_form='bessel')[0])
+        z_results['zi_approx'].append(pul.internal_impedance_matrix()[0])
+        z_results['ri_cc'].append(pul.internal_impedance_matrix()[1])
+        z_results['zi_hf'].append(pul.internal_impedance_matrix()[2])
+        z_results['ze'].append(pul.external_impedance_matrix())
 
         # Store the results in the dictionary
         zg_results['quasi_tem'].append(pul.earth_return_impedance())
@@ -341,9 +345,9 @@ if __name__ == "__main__":
         zg_results['deri'].append(pul.earth_return_impedance(type_form='deri'))
 
     # MoM-SO routine
-    green_matrix = QuasiStatic(MTL).green_matrix(green_mode='Analytically')
+    green_matrix = QuasiStatic(MODEL).green_matrix(green_mode='Analytically')
     for f in frequency['Numerically']:
-        mom_so = HomogeneousLosslessMedium(MTL, f)
+        mom_so = HomogeneousLosslessMedium(MODEL, f)
         z_results['zi_momso'].append(mom_so.z_partial(green_matrix))
 
     # Plot the series resistance as a function of frequency
@@ -351,6 +355,6 @@ if __name__ == "__main__":
     plot_zi(frequency, z_results, p=0, q=0)
     plot_zg(frequency, zg_results, p=0, q=0)
     plot_zs(frequency, z_results, zg_results, p=0, q=0)
-    MTLRepresentation(MTL, units='meter').bared_and_coated_wires()
+    MTLRepresentation(MODEL, units='meter').bared_and_coated_wires()
     plt.show()
     

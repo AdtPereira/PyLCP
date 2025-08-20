@@ -5,11 +5,12 @@ from scipy.integrate import quad
 from mtl_data.mtl import MulticonductorTransmissionLine
 
 
-class PerUnitParameters(MulticonductorTransmissionLine):
-    """ This class contains the basic geometry of the system. """
+class PerUnitParameters():
+    """ This class calculates PUL parameters using an MTL geometry model. """
 
-    def __init__(self, mtl, f, sigma_1, er_1=1, mur_1=1, ge=0):
-        super().__init__(mtl)
+    def __init__(self, mtl: MulticonductorTransmissionLine, f, sigma_1, er_1=1, mur_1=1, ge=0):
+        # MTL Geometry Model
+        self.mtl = mtl
 
         # Soil Permittivity [np.array]
         self.er_1 = er_1
@@ -36,26 +37,22 @@ class PerUnitParameters(MulticonductorTransmissionLine):
         # Earth wave number (rad/m)
         self.ke2 = - self.jw * self.mur_1 * mu_0 * (self.sigma_1 + self.jw * self.er_1 * epsilon_0)
 
-    def internal_impedance(self, type_form='approx'):
+    def internal_impedance_matrix(self, type_form='approx'):
         """ This method calculates the internal impedance of solid wires. """
-
-        # Impedance matrix
-        N = len(self.surfaces)
+        N = len(self.mtl.surfaces)
         Zi = np.zeros((N, N), dtype=complex)
         Ri_cc = np.zeros_like(Zi)
         Zi_hf = np.zeros_like(Zi)
 
-        # Loop over the conductors
-        for p, conductor in enumerate(self.surfaces):
-
+        for p, conductor in enumerate(self.mtl.surfaces):
             # Angular frequency (rad/s)
-            jw_mu = self.jw * self.mu[p]
+            jw_mu = self.jw * self.mtl.mu[p]
 
             # Outer wire radius (m)
             ro = conductor['radius']
 
             # Wire conductivity (S/m)
-            sigma = self.sigma[p]
+            sigma = self.mtl.sigma[p]
 
             # High frequency impedance (ohm/m)
             # Derived assuming current conduction in a ring with
@@ -64,7 +61,6 @@ class PerUnitParameters(MulticonductorTransmissionLine):
 
             # Approximation Closed-Form Expression
             if type_form == 'approx':
-
                 # Continuous current resistance (ohm/m)
                 ri_cc = 1.0/(sigma * np.pi * ro**2)
 
@@ -80,52 +76,66 @@ class PerUnitParameters(MulticonductorTransmissionLine):
 
         return Zi, Ri_cc, Zi_hf
 
-    def external_impedance(self):
+    def external_impedance_matrix(self):
         """ This method calculates the impedance matrix of the earth return path. """
-
-        # Impedance matrix
-        N = len(self.surfaces)
+        N = len(self.mtl.surfaces)
         Ze = np.zeros((N, N), dtype=complex)
 
-        # Loop over the conductors
-        for n, conductor_n in enumerate(self.surfaces):
-            for m, conductor_m in enumerate(self.surfaces):
+        # Busca as matrizes pré-calculadas do modelo
+        d_matrix = self.mtl.d_matrix_ground_return
+        D_matrix = self.mtl.D_matrix_ground_return
 
-                # Distance between the conductors (m)
-                dnm, Dnm, _, _ = self.conductor_distances(conductor_n['tag'], conductor_m['tag'])
+        # for n, conductor_n in enumerate(self.mtl.surfaces):
+        #     for m, conductor_m in enumerate(self.mtl.surfaces):
+        #         # Distance between the conductors (m)
+        #         dnm, Dnm, _, _ = self.conductor_distances(conductor_n['tag'], conductor_m['tag'])
 
-                # External impedance (ohm/m)
-                Ze[n, m] = self.jw_mu0_2pi * np.log(Dnm/dnm)
+        #         # External impedance (ohm/m)
+        #         Ze[n, m] = self.jw_mu0_2pi * np.log(Dnm/dnm)
+
+        # O cálculo agora é uma operação de matriz, muito mais eficiente
+        # Nota: np.log(0) na diagonal de log(d_matrix) pode dar -inf. Tratar se necessário.
+        # A diagonal de Ze geralmente é tratada de forma diferente (impedância interna).
+        Ze = self.jw_mu0_2pi * (np.log(D_matrix) - np.log(d_matrix))
 
         return Ze
 
     def external_admittance(self, type_form='potentials'):
-        """ This method calculates the external admittance matrix of the system. """
+        """
+        This method calculates the external admittance matrix of the system using a 
+        vectorized approach for the Maxwell Potential Coefficients matrix (Pe).
+        """
 
-        # Admittance matrix
-        N = len(self.surfaces)
+        N = len(self.mtl.surfaces)
         Pe = np.zeros((N, N))
         Ge = np.zeros((N, N))
 
+        # Busca as matrizes pré-calculadas do modelo
+        d_matrix = self.mtl.d_matrix_ground_return
+        D_matrix = self.mtl.D_matrix_ground_return
+
         # Loop over the conductors
-        for n, _ in enumerate(self.surfaces):
-            for m, _ in enumerate(self.surfaces):
+        # for n, _ in enumerate(self.mtl.surfaces):
+        #     for m, _ in enumerate(self.mtl.surfaces):
 
-                # Distance between the conductors (m)
-                dnm, Dnm, _, _ = self.conductor_distances(n, m)
+        #         # Distance between the conductors (m)
+        #         dnm, Dnm, _, _ = self.conductor_distances(n, m)
 
-                # External impedance (ohm/m)
-                Pe[n, m] = 1 / (2 * np.pi * epsilon_0) * np.log(Dnm/dnm)
+        #         # External impedance (ohm/m)
+        #         Pe[n, m] = 1 / (2 * np.pi * epsilon_0) * np.log(Dnm/dnm)
 
-                # External admittance (mho/m)
-                Ge[n, n] = self.ge[n] * 1E-6
+        #         # External admittance (mho/m)
+        #         Ge[n, n] = self.ge[n] * 1E-6
+
+        # 3. Calculate the complete Pe matrix
+        Pe = (1 / (2 * np.pi * epsilon_0)) * (np.log(D_matrix) - np.log(d_matrix))
 
         # External capacitance matrix
         if type_form == 'potentials':
             Ce = np.linalg.inv(Pe)
 
         elif type_form == 'indirect':
-            Le = self.external_impedance() / self.jw
+            Le = self.external_impedance_matrix() / self.jw
             Ce = np.linalg.inv(Le) * mu_0 * epsilon_0
 
         return Ge + self.jw * Ce
@@ -366,7 +376,7 @@ class PerUnitParameters(MulticonductorTransmissionLine):
         """ This method calculates the impedance matrix of the earth return path. """
 
         # Impedance matrix
-        N = len(self.surfaces)
+        N = len(self.mtl.surfaces)
         Zg = np.zeros((N, N), dtype=complex)
 
         # Complex depth (m)
@@ -381,11 +391,12 @@ class PerUnitParameters(MulticonductorTransmissionLine):
             p_dot = 1 / np.sqrt(-k_e2)
 
         # Loop over the conductors
-        for n, conductor_n in enumerate(self.surfaces):
-            for m, conductor_m in enumerate(self.surfaces):
+        for n, conductor_n in enumerate(self.mtl.surfaces):
+            for m, conductor_m in enumerate(self.mtl.surfaces):
 
                 # Distance between the conductors (m)
-                _, _, hn_hm, dn_dm = self.conductor_distances(conductor_n['tag'], conductor_m['tag'])
+                hn_hm = self.mtl.vertical_separation_matrix[n, m]
+                dn_dm = self.mtl.horizontal_separation_matrix[n, m]
 
                 # Quasi-TEM Integral Equation
                 if type_form == 'quasi_tem':
@@ -433,19 +444,24 @@ class PerUnitParameters(MulticonductorTransmissionLine):
         """ This method calculates the impedance matrix of the earth return path. """
 
         # Impedance matrix
-        n = len(self.surfaces)
-        M = np.zeros((n, n))
-        S1 = np.zeros((n, n), dtype=complex)
-        S2 = np.zeros((n, n), dtype=complex)
-        T = np.zeros((n, n), dtype=complex)
-        Zi = self.internal_impedance()[0]
+        N = len(self.mtl.surfaces)
+        M = np.zeros((N, N))
+        S1 = np.zeros((N, N), dtype=complex)
+        S2 = np.zeros((N, N), dtype=complex)
+        T = np.zeros((N, N), dtype=complex)
+        Zi = self.internal_impedance_matrix()[0]
 
         # Loop over the conductors
-        for n, conductor_n in enumerate(self.surfaces):
-            for m, conductor_m in enumerate(self.surfaces):
+        for n, _ in enumerate(self.mtl.surfaces):
+            for m, _ in enumerate(self.mtl.surfaces):
 
                 # Distance between the conductors (m)
-                dnm, Dnm, hn_hm, dn_dm = self.conductor_distances(conductor_n['tag'], conductor_m['tag'])
+                # dnm, Dnm, hn_hm, dn_dm = self.conductor_distances(conductor_n['tag'], conductor_m['tag'])
+                # Distance between the conductors (m)
+                dnm = self.mtl.d_matrix_ground_return[n, m]
+                Dnm = self.mtl.D_matrix_ground_return[n, m]
+                hn_hm = self.mtl.vertical_separation_matrix[n, m]
+                dn_dm = self.mtl.horizontal_separation_matrix[n, m]
 
                 # External Impedance term
                 M[n, m] = np.log(Dnm/dnm)

@@ -54,7 +54,8 @@ except IndexError:
 
 # IMPORTAÇÕES DOS MÓDULOS E MODELO DE DADOS
 try:
-    from mtl_data.wire_models import SINGLE_OHTL_CONTI as MTL
+    from mtl_data.wire_models import SINGLE_OHTL_CONTI as MODEL
+    from mtl_data.mtl import MulticonductorTransmissionLine
     from mtl_data.graphics import MTLRepresentation
     from ohtl.pul_parameters import PerUnitParameters
     print("Módulos e modelo de dados importados com sucesso.") 
@@ -119,9 +120,12 @@ if __name__ == "__main__":
         'carson': [],
     }
 
+    # The geometric model is constant, so we create the object once for efficiency.
+    mtl_model = MulticonductorTransmissionLine(MODEL)
+
     # Analytical Formulation
     for f in frequency['Analytically']:
-        pul = PerUnitParameters(MTL, f, sigma_1=1/200, er_1=5)
+        pul = PerUnitParameters(mtl_model, f, sigma_1=1/200, er_1=5)
 
         # Internal and external impedance matrices
         pul_parameters['quasitem'].append(pul.pul_extended_theory())
@@ -132,5 +136,5 @@ if __name__ == "__main__":
 
     print(f"End of the routine! Time spent on simulation: {(time.time() - st):.2f} seconds.\n")
     plot_gamma(frequency, pul_parameters, p=0, q=0)
-    MTLRepresentation(MTL, units='meter').bared_and_coated_wires()
+    MTLRepresentation(MODEL, units='meter').bared_and_coated_wires()
     plt.show()

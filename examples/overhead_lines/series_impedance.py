@@ -54,7 +54,8 @@ except IndexError:
 
 # IMPORTAÇÕES DOS MÓDULOS E MODELO DE DADOS
 try:
-    from mtl_data.wire_models import SINGLE_OHTL_XUE as MTL
+    from mtl_data.wire_models import SINGLE_OHTL_XUE as MODEL
+    from mtl_data.mtl import MulticonductorTransmissionLine
     from mtl_data.graphics import MTLRepresentation
     from ohtl.pul_parameters import PerUnitParameters
     print("Módulos e modelo de dados importados com sucesso.") 
@@ -123,16 +124,22 @@ if __name__ == "__main__":
     st = time.time()
 
     # Calculate the series impedance for each frequency
-    frequency = {'Analytically': np.logspace(3, 9, num=200), 'Numerically': np.logspace(0, 7, num=30)}
+    frequency = {
+        'Analytically': np.logspace(3, 9, num=200),
+        'Numerically': np.logspace(0, 7, num=30)
+    }
 
     # Dictionary to hold the series impedance calculations
     pul_dict = {'a': [], 'b': [], 'c': []}
 
+    # The geometric model is constant, so we create the object once for efficiency.
+    mtl_model = MulticonductorTransmissionLine(MODEL)
+
     # Analytical Formulation
     for f in frequency['Analytically']:
-        pul_a = PerUnitParameters(MTL, f, sigma_1=1/1E2, er_1=1)
-        pul_b = PerUnitParameters(MTL, f, sigma_1=1/1E2, er_1=20)
-        pul_c = PerUnitParameters(MTL, f, sigma_1=1/2E3, er_1=1)
+        pul_a = PerUnitParameters(mtl_model, f, sigma_1=1/1E2, er_1=1)
+        pul_b = PerUnitParameters(mtl_model, f, sigma_1=1/1E2, er_1=20)
+        pul_c = PerUnitParameters(mtl_model, f, sigma_1=1/2E3, er_1=1)
 
         # Internal and external impedance matrices
         pul_dict['a'].append(pul_a.pul_extended_theory())
@@ -142,6 +149,6 @@ if __name__ == "__main__":
     # End the timer
     print(f"End of the routine! Time spent on simulation: {(time.time() - st):.2f} seconds.\n")
     plot_series_impedance(frequency, pul_dict, p=0, q=0)
-    MTLRepresentation(MTL, units='meter').bared_and_coated_wires()
+    MTLRepresentation(MODEL, units='meter').bared_and_coated_wires()
     plt.show()
     
