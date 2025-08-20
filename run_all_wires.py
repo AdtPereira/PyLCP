@@ -8,10 +8,11 @@ import os
 
 # --- Configuration ---
 SCRIPTS_TO_RUN = [
-    os.path.join("examples", "wires", "bifilar_pymom.py"),
-    os.path.join("examples", "wires", "bifilar_s21.py"),
-    os.path.join("examples", "wires", "bifilar_s40.py"),
-    os.path.join("examples", "wires", "ribbon_s50.py"),
+    os.path.join("examples", "isolated_wires", "bifilar_pymom.py"),
+    os.path.join("examples", "isolated_wires", "bifilar_s21.py"),
+    os.path.join("examples", "isolated_wires", "bifilar_s40.py"),
+    os.path.join("examples", "isolated_wires", "coaxial.py"),
+    os.path.join("examples", "isolated_wires", "ribbon_s50.py"),
 ]
 
 def main():

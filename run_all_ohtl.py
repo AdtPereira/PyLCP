@@ -8,10 +8,10 @@ import os
 
 # --- Configuration ---
 SCRIPTS_TO_RUN = [
-    os.path.join("examples", "ohtl", "propagation_constants.py"),
-    os.path.join("examples", "ohtl", "series_impedance.py"),
-    os.path.join("examples", "ohtl", "single_conductor.py"),
-    os.path.join("examples", "ohtl", "soil_influence.py"),
+    os.path.join("examples", "overhead_lines", "propagation_constants.py"),
+    os.path.join("examples", "overhead_lines", "series_impedance.py"),
+    os.path.join("examples", "overhead_lines", "single_conductor.py"),
+    os.path.join("examples", "overhead_lines", "soil_influence.py"),
 ]
 
 def main():

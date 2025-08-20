@@ -1,6 +1,5 @@
 import numpy as np
-from scc_parameters import TransmissionLineParameters
-from scc_functions import VectorialOperation  
+from scc.scc_parameters import TransmissionLineParameters
 
 class MonoNetworkTopology():
 

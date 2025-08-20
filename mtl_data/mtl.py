@@ -26,8 +26,6 @@ from scipy.constants import mu_0, epsilon_0
 
 
 class MulticonductorTransmissionLine():
-    """ This class defines the coaxial cable with a sheath. """
-
     def __init__(self, mtl):
         """Initialize the MulticonductorTransmissionLine class.
 
@@ -41,7 +39,7 @@ class MulticonductorTransmissionLine():
         """
 
         # MTL Type
-        mtl_types = {'coated_wires', 'bare_wires', 'coaxial', 'overhead'}
+        mtl_types = {'coated_wires', 'bare_wires', 'coaxial', 'overhead', 'scc'}
         self.mtl_type = mtl.get('type', 'unknown')
 
         # MTL Conductor Reference Index
@@ -91,25 +89,66 @@ class MulticonductorTransmissionLine():
         self.epsilon_out = np.array([epsilon_0 * cond['relative_permittivity_out'] for cond in self.mtl.values()])
 
 
-    def _define_wire_surfaces(self):
-        # Conductor surfaces dictionary
-        self.surfaces = []
+    # def _define_wire_surfaces(self):
+    #     # Conductor surfaces dictionary
+    #     self.surfaces = []
 
+    #     for key, conductor in self.mtl.items():
+    #         # Check if the conductor is hollow
+    #         if conductor['radius'][0] != 0:
+    #             for radius in conductor['radius']:
+    #                 self.surfaces.append({
+    #                     'type': 'conductor',
+    #                     'tag': key,
+    #                     'radius': radius,
+    #                     'center_point': conductor['center_point'],
+    #                     'fourier_order': conductor['fourier_order'],
+    #                 })
+
+    #         # Then, the conductor is solid
+    #         else:
+    #             self.surfaces.append({
+    #                 'type': 'conductor',
+    #                 'tag': key,
+    #                 'radius': conductor['radius'][1],
+    #                 'center_point': conductor['center_point'],
+    #                 'fourier_order': conductor['fourier_order'],
+    #             })
+
+    #         # Check if the conductor has a insulation
+    #         if conductor['insulation'] is not None:
+    #             insulation = conductor['insulation']
+    #             # Add the insulation surface
+    #             self.surfaces.append({
+    #                 'type': insulation['name'],
+    #                 'tag': key,
+    #                 'radius': conductor['radius'][1] + insulation['thickness'],
+    #                 'center_point': insulation['center_point'],
+    #                 'fourier_order': insulation['fourier_order'],
+    #                 'relative_permittivity': insulation['relative_permittivity'],
+    #             })
+    
+    def _define_wire_surfaces(self):
+        """
+        Defines the surfaces for all conductors and their insulations,
+        handling geometric duplicates by prioritizing conductor surfaces.
+        """
+        # Step 1: Generate a temporary list of all potential surfaces, including duplicates.
+        all_surfaces = []
         for key, conductor in self.mtl.items():
             # Check if the conductor is hollow
             if conductor['radius'][0] != 0:
                 for radius in conductor['radius']:
-                    self.surfaces.append({
+                    all_surfaces.append({
                         'type': 'conductor',
                         'tag': key,
                         'radius': radius,
                         'center_point': conductor['center_point'],
                         'fourier_order': conductor['fourier_order'],
                     })
-
             # Then, the conductor is solid
             else:
-                self.surfaces.append({
+                all_surfaces.append({
                     'type': 'conductor',
                     'tag': key,
                     'radius': conductor['radius'][1],
@@ -117,18 +156,43 @@ class MulticonductorTransmissionLine():
                     'fourier_order': conductor['fourier_order'],
                 })
 
-            # Check if the conductor has a sheath
-            if conductor['sheath'] is not None:
-                # Add the sheath surface
-                self.surfaces.append({
-                    'type': 'sheath',
+            # Check if the conductor has insulation
+            if conductor['insulation'] is not None:
+                insulation = conductor['insulation']
+                # Add the insulation surface
+                all_surfaces.append({
+                    'type': insulation['name'],
                     'tag': key,
-                    'radius': conductor['radius'][1] + conductor['sheath']['thickness'],
-                    'center_point': conductor['sheath']['center_point'],
-                    'fourier_order': conductor['sheath']['fourier_order'],
-                    'relative_permittivity': conductor['sheath']['relative_permittivity'],
+                    'radius': conductor['radius'][1] + insulation['thickness'],
+                    'center_point': insulation['center_point'],
+                    'fourier_order': insulation['fourier_order'],
+                    'relative_permittivity': insulation['relative_permittivity'],
                 })
-    
+
+        # Step 2: Use a dictionary to identify unique surfaces based on geometry,
+        # applying the preference rule for conductors.
+        unique_surfaces_map = {}
+        for surface in all_surfaces:
+            # A unique key is defined by the center point and radius.
+            key = (surface['center_point'], surface['radius'])
+            
+            # If this geometry is new, or if the new surface is a conductor
+            # and the existing one is not, we add/update the map.
+            if key not in unique_surfaces_map or \
+               (surface['type'] == 'conductor' and unique_surfaces_map[key]['type'] != 'conductor'):
+                unique_surfaces_map[key] = surface
+
+        # Step 3: Reconstruct the final list, preserving the original order of appearance
+        # of the unique geometries.
+        self.surfaces = []
+        added_geometries = set()
+        for surface in all_surfaces:
+            key = (surface['center_point'], surface['radius'])
+            if key not in added_geometries:
+                # Append the definitive version of the surface from our map
+                self.surfaces.append(unique_surfaces_map[key])
+                added_geometries.add(key)
+
     # Contour Position Vector [np.array] - Equation (2.2) [1]
     def contour_vector_position(self, surfaces_list, theta, p):
         """ The boundary cp can be traced by the position vector rp(ap, θp) """

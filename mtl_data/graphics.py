@@ -37,9 +37,9 @@ class MTLRepresentation(MulticonductorTransmissionLine):
             conductor_center = np.array(conductor['center_point']) * self.scale_factor
 
             # Desenha a camada de isolamento se existir
-            if 'sheath' in conductor and conductor['sheath'] is not None:
-                center = np.array(conductor['sheath']['center_point']) * self.scale_factor
-                thickness = conductor['sheath']['thickness'] * self.scale_factor
+            if 'insulation' in conductor and conductor['insulation'] is not None:
+                center = np.array(conductor['insulation']['center_point']) * self.scale_factor
+                thickness = conductor['insulation']['thickness'] * self.scale_factor
                 outer_radius = conductor_radius + thickness
                 ax.add_patch(Wedge(center, outer_radius, 0, 360, width=thickness, edgecolor='black', facecolor='lightblue', linestyle='solid'))
 

@@ -34,6 +34,11 @@ class TwoCoatedWireSystem(MTL):
         assert self.DR_ratio > 2, "A razão D/R deve ser maior que 2 para garantir a convergência da solução."
         self.C_exact_bare_wires = np.pi * sc.epsilon_0 / np.arccosh(0.5 * self.DR_ratio)
 
+        # Superfícies de condutores e isolamento
+        self.conductor_surfaces = [s for s in self.surfaces if s['type'] == 'conductor']
+        self.insulation_surfaces = [s for s in self.surfaces if s['type'] == 'primary_insulation']
+        self.ordered_surfaces = self.conductor_surfaces + self.insulation_surfaces
+
         # Atributos de resultado
         self.collocation_data = None
         self.D_matrix = None
@@ -46,7 +51,7 @@ class TwoCoatedWireSystem(MTL):
     def _calculate_collocation_points(self):
         """
         Calcula e armazena os pontos de colocação, classificando-os em um dicionário
-        aninhado pela 'tag' do condutor e pelo tipo de superfície ('conductor', 'sheath').
+        aninhado pela 'tag' do condutor e pelo tipo de superfície ('conductor', 'primary_insulation').
         """
         # Inicializa o dicionário principal que será o atributo da classe.
         self.collocation_data = {}
@@ -105,18 +110,13 @@ class TwoCoatedWireSystem(MTL):
         """
         self.T_matrix = np.linalg.inv(self.D_matrix)
 
-        # 1. Obter as superfícies e os parâmetros dos blocos
-        conductor_surfaces = [s for s in self.surfaces if s['type'] == 'conductor']
-        sheath_surfaces = [s for s in self.surfaces if s['type'] == 'sheath']
-        ordered_surfaces = conductor_surfaces + sheath_surfaces
-        
-        num_conductors = len(conductor_surfaces)
-        nfs_per_surface = [2 * s['fourier_order'] + 1 for s in ordered_surfaces]
+        num_conductors = len(self.conductor_surfaces)
+        nfs_per_surface = [2 * s['fourier_order'] + 1 for s in self.ordered_surfaces]
         offsets = np.cumsum([0] + nfs_per_surface)
 
         # 2. Criar um mapa para fácil acesso às propriedades e offsets de cada superfície
         surface_map = {}
-        for i, surface in enumerate(ordered_surfaces):
+        for i, surface in enumerate(self.ordered_surfaces):
             tag = surface['tag']
             if tag not in surface_map:
                 surface_map[tag] = {}
@@ -130,7 +130,7 @@ class TwoCoatedWireSystem(MTL):
         
         # 3. Garantir uma ordem consistente para a matriz de capacitância
         ### Obter uma lista ordenada das tags dos condutores. Essencial para consistência.
-        sorted_conductor_tags = sorted([s['tag'] for s in conductor_surfaces])
+        sorted_conductor_tags = sorted([s['tag'] for s in self.conductor_surfaces])
         
         ### Criar um mapa de 'tag' para o índice da matriz (0, 1, 2...).
         tag_to_idx = {tag: i for i, tag in enumerate(sorted_conductor_tags)}
@@ -160,18 +160,15 @@ class TwoCoatedWireSystem(MTL):
 
                 # Termo 2 (Eq. 5.48): Contribuição da superfície da bainha 'i_tag'.
                 term2 = 0.0
-                if 'sheath' in surface_map[i_tag]:
-                    info_sheath_i = surface_map[i_tag]['sheath']
-                    row_idx_sheath_i = info_sheath_i['offset']
-                    radius_sheath_i = info_sheath_i['radius']
-                    sum_b_prime_ij = np.sum(self.T_matrix[row_idx_sheath_i, col_start_j:col_end_j])
-                    term2 = 2 * np.pi * radius_sheath_i * sum_b_prime_ij
+                if 'primary_insulation' in surface_map[i_tag]:
+                    surface_i = surface_map[i_tag]['primary_insulation']
+                    row_idx_i = surface_i['offset']
+                    sum_b_prime_ij = np.sum(self.T_matrix[row_idx_i, col_start_j:col_end_j])
+                    term2 = 2 * np.pi * surface_i['radius'] * sum_b_prime_ij
 
                 ### Atribuir o valor à posição correta na matriz usando os índices mapeados.
                 C_matrix[row, col] = term1 + term2
 
-        # --- FIM DA LÓGICA REVISADA ---
-        
         self.C_generalized = C_matrix
 
     def _calculate_maxwellian_capacitance(self):
@@ -235,13 +232,8 @@ class TwoCoatedWireSystem(MTL):
         """
         self._calculate_collocation_points()
 
-        # 1. Separar as superfícies por tipo para garantir a ordem de bloco correta.
-        conductor_surfaces = [s for s in self.surfaces if s['type'] == 'conductor']
-        sheath_surfaces = [s for s in self.surfaces if s['type'] == 'sheath']
-        ordered_surfaces = conductor_surfaces + sheath_surfaces
-
         # 1. Preparar os índices e vetores do sistema
-        nfs_per_surface = [2 * surface['fourier_order'] + 1 for surface in ordered_surfaces]
+        nfs_per_surface = [2 * surface['fourier_order'] + 1 for surface in self.ordered_surfaces]
         offsets = np.cumsum([0] + nfs_per_surface)
 
         self.D_matrix = np.zeros((self.N, self.N))
@@ -249,7 +241,7 @@ class TwoCoatedWireSystem(MTL):
 
         # 2. Montar a Matriz [D] e o Vetor [V]
         # Loop sobre as superfícies de OBSERVAÇÃO p (linhas da matriz)
-        for p, field_surface in enumerate(ordered_surfaces):
+        for p, field_surface in enumerate(self.ordered_surfaces):
             tag_p = field_surface['tag']
             type_p = field_surface['type']
             radius_p = field_surface['radius']
@@ -265,11 +257,11 @@ class TwoCoatedWireSystem(MTL):
                 self.V_vector[offset_p : offset_p + nf_p] = self.mtl[tag_p]['potential_to_infinity']
             
             # A condição de fronteira na bainha dielétrica resulta em 0 no lado direito [cite: 222]
-            elif type_p == 'sheath':
+            elif type_p == 'primary_insulation':
                 self.V_vector[offset_p : offset_p + nf_p] = 0.0
 
             # Loop sobre as superfícies de FONTE q (colunas da matriz)
-            for q, source_surface in enumerate(ordered_surfaces):
+            for q, source_surface in enumerate(self.ordered_surfaces):
                 tag_q = source_surface['tag']
                 type_q = source_surface['type']
                 epsilon = self.epsilon_out[source_surface['tag']]
@@ -337,7 +329,7 @@ class TwoCoatedWireSystem(MTL):
                         # === BLOCO 2: CONDIÇÃO DE CONTORNO DO VETOR DESLOCAMENTO (εE) =======================
                         # === Aplica continuidade da componente normal de D sobre a bainha dielétrica ========
                         
-                        elif type_p == 'sheath':
+                        elif type_p == 'primary_insulation':
                             er = field_surface['relative_permittivity']
 
                             # Produto escalar dos vetores unitários em RIBBON.FOR: COS(TH - ANG)
@@ -347,7 +339,7 @@ class TwoCoatedWireSystem(MTL):
                             TDN = np.cross(un_p, un_rho_i)
 
                             # --- TABELA II.a: rho_i = rho_b (Interação para Observador SOBRE a fronteira dielétrica) --- 
-                            if type_q == 'sheath' and tag_p == tag_q:
+                            if type_q == 'primary_insulation' and tag_p == tag_q:
                                 if harmonic_ord == 0: # Constant Term (k=0)
                                     self.D_matrix[row_idx, col_idx] = (0 - 1) * (rho_b / rho_i) * RDN
 
@@ -402,7 +394,7 @@ class TwoCoatedWireSystem(MTL):
         plot_data = []
         # Itera sobre cada 'tag' de condutor no dicionário (ex: 0, 1)
         for tag, conductor_surfaces in self.collocation_data.items():
-            # Itera sobre cada superfície desse condutor (ex: 'conductor', 'sheath')
+            # Itera sobre cada superfície desse condutor (ex: 'conductor', 'primary_insulation')
             for surface_type, surface_data in conductor_surfaces.items():
                 
                 # Busca o raio correspondente na lista self.surfaces,

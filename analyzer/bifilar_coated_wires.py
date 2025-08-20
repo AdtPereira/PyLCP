@@ -64,18 +64,18 @@ class BifilarCoatedWirePULParameters():
     def _prepare_fortran_runner(self, mtl):
         """Prepara os parâmetros e o executor para a simulação Fortran."""
 
-        # Obtenha o dicionário 'sheath' de forma segura.
-        #    Se 'sheath' não existir ou for None, use um dicionário vazio {} como fallback.
+        # Obtenha o dicionário 'insulation' de forma segura.
+        #    Se 'insulation' não existir ou for None, use um dicionário vazio {} como fallback.
         refIdx = mtl['idx_ref_conductor']
-        sheath_dict = mtl[refIdx].get('sheath') or {}
+        insulation_dict = mtl[refIdx].get('insulation') or {}
 
         self.fortran_base_params = {
             'N':    len([key for key in mtl.keys() if isinstance(key, int)]),
             'NF':   mtl[refIdx]['fourier_order'] + 1,
             'IREF': refIdx,
             'RW':   mtl[refIdx]['radius'][1],
-            'TD':   sheath_dict.get('thickness', 0.0),
-            'ER':   sheath_dict.get('relative_permittivity', 1.0),
+            'TD':   insulation_dict.get('thickness', 0.0),
+            'ER':   insulation_dict.get('relative_permittivity', 1.0),
             'S':    np.linalg.norm(np.array(mtl[0]['center_point']) - np.array(mtl[1]['center_point'])),
         }
 
@@ -226,7 +226,7 @@ class BifilarCoatedWirePULParameters():
         bare_wire_mtl['type'] = 'bare_wires'
         for key in bare_wire_mtl.keys():
             if isinstance(key, int):
-                bare_wire_mtl[key]['sheath'] = None
+                bare_wire_mtl[key]['insulation'] = None
 
         bare_wires = TwoCoatedWireSystem(bare_wire_mtl)
         bare_wires.run_simulation()
@@ -279,7 +279,7 @@ class BifilarCoatedWirePULParameters():
             temp_mtl = copy.deepcopy(self.mtl_copy)
             separation = ratio * temp_mtl[0]['radius'][1]
             temp_mtl[1]['center_point'] = (separation, 0.0)
-            temp_mtl[1]['sheath']['center_point'] = (separation, 0.0)
+            temp_mtl[1]['insulation']['center_point'] = (separation, 0.0)
 
             # === Fortran RIBBON Instance ===            
             self._prepare_fortran_runner(temp_mtl)
@@ -292,7 +292,7 @@ class BifilarCoatedWirePULParameters():
             temp_mtl['type'] = 'bare_wires'
             for key in temp_mtl.keys():
                 if isinstance(key, int):
-                    temp_mtl[key]['sheath'] = None
+                    temp_mtl[key]['insulation'] = None
 
             mom_bare = TwoCoatedWireSystem(temp_mtl)
             mom_bare.run_simulation()
@@ -315,7 +315,7 @@ class BifilarCoatedWirePULParameters():
                 if isinstance(key, int):
                     temp_mtl[key]['fourier_order'] = k  
                     # if temp_mtl['type'] == 'coated_wires':
-                    temp_mtl[key]['sheath']['fourier_order'] = k
+                    temp_mtl[key]['insulation']['fourier_order'] = k
 
             # === Fortran RIBBON Instance ===
             self._prepare_fortran_runner(temp_mtl)
@@ -328,7 +328,7 @@ class BifilarCoatedWirePULParameters():
             temp_mtl['type'] = 'bare_wires'
             for key in temp_mtl.keys():
                 if isinstance(key, int):
-                    temp_mtl[key]['sheath'] = None
+                    temp_mtl[key]['insulation'] = None
 
             mom_bare = TwoCoatedWireSystem(temp_mtl)
             mom_bare.run_simulation()

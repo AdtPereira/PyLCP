@@ -158,9 +158,6 @@ class MulticonductorBareWireSystems(MTL):
         Executa a simulação completa do MoM, montando o sistema de equações para
         todas as superfícies (condutoras e dielétricas) com base nas novas
         estruturas de dados.
-
-        NOTA: Esta versão estrutura os loops corretamente, mas a física para as
-        fronteiras dielétricas ('sheath') ainda precisa ser implementada.
         """
         self._calculate_collocation_points()
 
@@ -191,7 +188,7 @@ class MulticonductorBareWireSystems(MTL):
                 self.V_vector[offset_p : offset_p + nf_p] = self.mtl[tag_p]['potential_to_infinity']
             
             # A condição de fronteira na bainha dielétrica resulta em 0 no lado direito da equação
-            elif type_p == 'sheath':
+            elif type_p == 'primary_insulation':
                 self.V_vector[offset_p : offset_p + nf_p] = 0.0
 
             # Loop sobre as superfícies de FONTE q (colunas da matriz)
@@ -220,7 +217,6 @@ class MulticonductorBareWireSystems(MTL):
                         
                         # --- Início da Lógica de Cálculo do Elemento da Matriz ---
                         # Esta seção implementa a física. Por enquanto, calcula o potencial.
-                        # TODO: Adicionar a lógica do vetor deslocamento para type_p == 'sheath'
 
                         # Ângulo e vetor fonte 'b' relativo ao centro da superfície FONTE 'q'
                         rho_b_vector = field_collocated_points[m] - center_q

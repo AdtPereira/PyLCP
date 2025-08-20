@@ -8,7 +8,7 @@ import os
 
 # --- Configuration ---
 SCRIPTS_TO_RUN = [
-    os.path.join("examples", "cables", "coaxial.py"),
+    os.path.join("examples", "buried_cables", "one_scc.py"),
 ]
 
 def main():

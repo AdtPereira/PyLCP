@@ -1,7 +1,7 @@
 import numpy as np
-from scipy.special import kv # Modified second-order Bessel function
+from scipy.special import kv
 from scipy.constants import mu_0 as MUO, epsilon_0 as EO
-from scc_functions import MatrixOperation as mo, TrigonometricOperation as trig, MatrixDistances as md
+from scc.scc_functions import MatrixOperation as mo, TrigonometricOperation as trig, MatrixDistances as md
 
 class InternalParameters:
 
