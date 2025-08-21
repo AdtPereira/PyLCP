@@ -61,6 +61,7 @@ try:
     from scc.scc_data import scc_models_list
     from scc.scc_systm import SystemType
     from scc.scc_nlt import MonoNetworkTopology, NumericalLaplaceTransform
+    from scc.scc_parameters import TransmissionLineParameters
     print("Módulos e modelo de dados importados com sucesso.") 
 except ImportError as e:
     print(f"Erro ao importar módulos: {e}")
@@ -71,22 +72,6 @@ def load_data(file_path):
     m_data = sio.loadmat(file_path)    
     return m_data['Vktd'][0], m_data['Vmtd'][0], m_data['t'][0], \
             m_data['Vk'][0], m_data['Vm'][0], m_data['f'][0]
-
-def FrequencyDomain_Graph(Voltage_m, freq_m, Voltage_py):
-    """Plots the comparison between MATLAB and Python results."""
-    # Create the subplot to compare results
-    fig, axs = plt.subplots(2, 1, figsize=(8, 8))
-
-    axs[0].plot(freq_m, np.abs(Voltage_m), color='black', label='MATLAB')
-    axs[0].plot(nlt.f, np.abs(Voltage_py), color='red', linestyle='--', label='Python')
-    axs[0].legend()
-
-    axs[1].plot(freq_m, np.angle(Voltage_m) * 180 / np.pi, color='black', label='MATLAB')
-    axs[1].plot(nlt.f, np.angle(Voltage_py) * 180 / np.pi, color='red', linestyle='--', label='Python')
-    axs[1].legend()
-
-    plt.tight_layout()
-    plt.show()
 
 def TimeDomain_Graph(Vktd_m, Vmtd_m, t_m, Vktd, Vmtd, NP):
     """Plots the comparison between MATLAB and Python results."""
@@ -114,46 +99,46 @@ if __name__ == "__main__":
 
     # Rotinas Analítica e MoM-SO
     mtl_model = MulticonductorTransmissionLine(MODEL)
+    syst = SystemType(Model=scc_models_list[0], rhog=100, erg=1, Syst_id='#1')
+    tl = TransmissionLineParameters(s=1e3, syst=syst)
 
-    # Load the MATLAB or ATP data
-    Vktd_mat, Vmtd_mat, t_mat, Vk_mat, Vm_mat, f_mat = load_data('C:\\Users\\adilt\\OneDrive\\1 ACADEMIA\\MODELOS\\2.PRYSMIAN\\PRY_M01_1SCC_1C.mat')
+    # # Load the MATLAB or ATP data
+    # Vktd_mat, Vmtd_mat, t_mat, Vk_mat, Vm_mat, f_mat = load_data('C:\\Users\\adilt\\OneDrive\\1 ACADEMIA\\MODELOS\\2.PRYSMIAN\\PRY_M01_1SCC_1C.mat')
 
-    # Define system configuration and soil parameters
-    # Model Name: PRY_M01_1SCC_1C
-    scc = scc_models_list[0]
-    syst = SystemType(Model=scc, rhog=100, erg=1, Syst_id='#1')
+    # # Define system configuration and soil parameters
+    # # Model Name: PRY_M01_1SCC_1C
+    # scc = scc_models_list[0]
+    # syst = SystemType(Model=scc, rhog=100, erg=1, Syst_id='#1')
 
-    ## Transmission Line and NLT Constants
-    LX = 200                        # Line distance
-    RS = 1                          # Load Resistance [Ohm]
-    N = 1024*8                      # Point numbers
-    T = 1E-3                        # Simulation maximum time [s]
-    display = int(np.floor(N * 0.20));   # Graph window display
+    # ## Transmission Line and NLT Constants
+    # LX = 200                        # Line distance
+    # RS = 1                          # Load Resistance [Ohm]
+    # N = 1024*8                      # Point numbers
+    # T = 1E-3                        # Simulation maximum time [s]
+    # display = int(np.floor(N * 0.20));   # Graph window display
 
-    # Transmission Line Topology
-    nlt = NumericalLaplaceTransform(N, T)
-    VkVm = []
-    for s_value in nlt.s[0:round(N/2)+1]:
-        tl = MonoNetworkTopology(s_value, syst, RS, LX)
-        tl.StepUnitSource(ksi=0, T=T)
-        tl.TerminalVoltages(tl.VS)
-        VkVm.append(tl.V)
+    # # Transmission Line Topology
+    # nlt = NumericalLaplaceTransform(N, T)
+    # VkVm = []
+    # for s_value in nlt.s[0:round(N/2)+1]:
+    #     tl = MonoNetworkTopology(s_value, syst, RS, LX)
+    #     tl.StepUnitSource(ksi=0, T=T)
+    #     tl.TerminalVoltages(tl.VS)
+    #     VkVm.append(tl.V)
 
-    # Calculate Vk and Vm
-    Vk = np.array([v[0] for v in VkVm]).flatten()
-    Vm = np.array([v[1] for v in VkVm]).flatten()
+    # # Calculate Vk and Vm
+    # Vk = np.array([v[0] for v in VkVm]).flatten()
+    # Vm = np.array([v[1] for v in VkVm]).flatten()
 
-    # Extend Vk and Vm to include the conjugate
-    for k in range(round(N/2)+1, N):
-        Vk = np.append(Vk, np.conj(Vk[2 * round(N/2) - k]))
-        Vm = np.append(Vm, np.conj(Vm[2 * round(N/2) - k]))
+    # # Extend Vk and Vm to include the conjugate
+    # for k in range(round(N/2)+1, N):
+    #     Vk = np.append(Vk, np.conj(Vk[2 * round(N/2) - k]))
+    #     Vm = np.append(Vm, np.conj(Vm[2 * round(N/2) - k]))
 
-    # Main NLT routine
-    Vktd, Vmtd = nlt.Main_NLT(Vk, Vm)
+    # # Main NLT routine
+    # Vktd, Vmtd = nlt.Main_NLT(Vk, Vm)
 
-    # Plot the graphs
-    # FrequencyDomain_Graph(Vk_mat, f_mat, Vk)
-    # FrequencyDomain_Graph(Vm_mat, f_mat, Vm)
-    TimeDomain_Graph(Vktd_mat, Vmtd_mat, t_mat, Vktd, Vmtd, display)
-    MTLRepresentation(mtl_model, units='millimeter').single_core_cable()
+    # TimeDomain_Graph(Vktd_mat, Vmtd_mat, t_mat, Vktd, Vmtd, display)
+
+    MTLRepresentation(mtl_model, units='millimeter').ground_return_systems()
     plt.show()

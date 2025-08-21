@@ -33,6 +33,7 @@ REFERENCES:
 import os
 import sys
 import time
+import copy
 import numpy as np
 from pathlib import Path
 import matplotlib.pyplot as plt
@@ -141,13 +142,26 @@ if __name__ == "__main__":
     }
 
     # The geometric model is constant, so we create the object once for efficiency.
-    mtl_model = MulticonductorTransmissionLine(MODEL)
+    model_a = copy.deepcopy(MODEL)
+    model_a[0]['relative_permittivity'] = 5
+    model_a[0]['conductivity'] = 1E6
+    mtl_model_a = MulticonductorTransmissionLine(model_a)
+
+    model_b = copy.deepcopy(MODEL)
+    model_b[0]['relative_permittivity'] = 5
+    model_b[0]['conductivity'] = 1/2E2
+    mtl_model_b = MulticonductorTransmissionLine(model_b)
+
+    model_c = copy.deepcopy(MODEL)
+    model_c[0]['relative_permittivity'] = 5
+    model_c[0]['conductivity'] = 1/5E3
+    mtl_model_c = MulticonductorTransmissionLine(model_c)
 
     # Analytical Formulation
     for f in frequency['Analytically']:
-        pul1 = PerUnitParameters(mtl_model, f, sigma_1=1/1E-6, er_1=5)
-        pul2 = PerUnitParameters(mtl_model, f, sigma_1=1/2E+2, er_1=5)
-        pul3 = PerUnitParameters(mtl_model, f, sigma_1=1/5E+3, er_1=5)
+        pul1 = PerUnitParameters(mtl_model_a, f)
+        pul2 = PerUnitParameters(mtl_model_b, f)
+        pul3 = PerUnitParameters(mtl_model_c, f)
 
         pul_parameters['rho_1u']['nakagawa'].append(pul1.pul_extended_theory(type_form='nakagawa'))
         pul_parameters['rho_1u']['quasi_tem'].append(pul1.pul_extended_theory())
@@ -158,6 +172,6 @@ if __name__ == "__main__":
 
     print(f"End of the routine! Time spent on simulation: {(time.time() - st):.2f} seconds.\n")
     plot_gamma(frequency, pul_parameters, p=0, q=0)
-    MTLRepresentation(mtl_model, units='meter').isolated_wires()
+    MTLRepresentation(mtl_model_a, units='meter').ground_return_systems()
     plt.show()
     

@@ -125,7 +125,7 @@ class MTLRepresentation:
         # --- Final plot adjustments ---
         self._finalize_plot(ax, title='Coaxial Cable Cross-Section')
 
-    def single_core_cable(self):
+    def ground_return_systems(self):
         """
         This function plots a simplified schematic of a single-core buried cable,
         including any defined insulation layers around the conductors.
@@ -153,9 +153,15 @@ class MTLRepresentation:
                 if current_outer_radius > max_radius:
                     max_radius = current_outer_radius
         
-        max_radius_scaled = max_radius * self.scale_factor
+        if self.model.mtl_type == 'overhead':
+            mtl_title = 'Overhead Transmission Line'
+            h_factor = 5
+        elif self.model.mtl_type == 'scc':
+            mtl_title = 'Buried Single-Core Cable'
+            h_factor = -3
+
         center_x = core_conductor['center_point'][0] * self.scale_factor
-        center_y_depth = -3 * max_radius_scaled
+        center_y_depth = h_factor * max_radius * self.scale_factor
         plot_center_point = np.array([center_x, center_y_depth])
 
         # --- Plot Conductor and Insulation Layers ---
@@ -184,25 +190,19 @@ class MTLRepresentation:
                     edgecolor='black', facecolor=insulation_color, linestyle='solid', label=insulation_label))
 
         # --- Finalize Plot and Add Schematic Ground ---
-
-        # 1. Draw all data artists FIRST, including the ground level line
         ax.axhline(y=0, color='darkgreen', linestyle=':', linewidth=1.5, label='Ground Level')
-
-        # 2. Now, let Matplotlib find the tight boundaries for all artists
         ax.relim()
         ax.autoscale_view()
 
         # 3. Manually calculate margins and set final, explicit limits
         tight_xlim = ax.get_xlim()
-        x_data_width = tight_xlim[1] - tight_xlim[0]
-        x_margin = x_data_width * 0.45
+        x_margin = (tight_xlim[1] - tight_xlim[0]) * 0.45
         final_xmin = tight_xlim[0] - x_margin
         final_xmax = tight_xlim[1] + x_margin
         ax.set_xlim(final_xmin, final_xmax)
 
         tight_ylim = ax.get_ylim()
-        y_data_height = tight_ylim[1] - tight_ylim[0]
-        y_margin = y_data_height * 0.2
+        y_margin = (tight_ylim[1] - tight_ylim[0]) * 0.2
         final_ymin = tight_ylim[0] - y_margin
         final_ymax = tight_ylim[1] + y_margin
         ax.set_ylim(final_ymin, final_ymax)
@@ -212,19 +212,16 @@ class MTLRepresentation:
         ax.set_xlabel(f'x ({self.label_unit})')
         ax.set_ylabel('')
         ax.grid(True, linestyle='--', linewidth=0.5, zorder=0)
-        ax.set_title('Buried Single-Core Cable')
+        ax.set_title(mtl_title)
         handles, labels = ax.get_legend_handles_labels()
         ax.legend(handles=handles[::-1], labels=labels[::-1], loc='upper right')
         ax.set_yticks([])
 
         # 5. Fill background and place text using the final limits
         ax.fill_between([final_xmin, final_xmax], final_ymin, 0, color='saddlebrown', alpha=0.2)
-
         plot_height = final_ymax - final_ymin
-        text_x_pos = final_xmin + (final_xmax - final_xmin) * 0.05
+        text_x = final_xmin + (final_xmax - final_xmin) * 0.05
         y_offset = plot_height * 0.03
-
-        ax.text(text_x_pos, y_offset, 'Air ($\\varepsilon_0$, $\\mu_0$)',
-                verticalalignment='bottom', fontsize=10, style='italic')
-        ax.text(text_x_pos, -y_offset, 'Ground ($\\varepsilon_g$, $\\mu_g$, $\\sigma_g$)',
-                verticalalignment='top', fontsize=10, style='italic')    
+        ax.text(text_x, +y_offset, 'Air ($\\varepsilon_0$, $\\mu_0$)', verticalalignment='bottom', fontsize=10, style='italic')
+        ax.text(text_x, -y_offset, 'Ground ($\\varepsilon_1$, $\\mu_1$, $\\sigma_1$)', verticalalignment='top', fontsize=10, style='italic')    
+      

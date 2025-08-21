@@ -46,41 +46,44 @@ class MulticonductorTransmissionLine:
 
         # Delegate preprocessing and validation to the strategy
         strategy = mtl_strategy_factory(self.mtl_type)
-        self.mtl = strategy.preprocess_mtl_dict(mtl_input)
-        strategy.validate(self.mtl, mtl_input)
+        self.mtl, self.mtl_ref = strategy.preprocess_mtl_data(mtl_input)
+        strategy.validate(self.mtl, self.mtl_ref, mtl_input)
 
         # Delegate calculation of type-specific properties
-        strategy.apply_properties(self, self.mtl)          
+        strategy.apply_properties(self, self.mtl)
 
         # Conductor surfaces dictionary
-        self.surfaces = []
         self._define_mtl_surfaces()
 
-        # Dimension N - Equation (2.36) [1]
+        # Number of Fourier coefficients List  
         self.NF_List = [2 * surface['fourier_order'] + 1 for surface in self.surfaces]
+        
+        # Dimension N - Equation (2.36) [1]
         self.N = sum(self.NF_List)
 
         # Número de coeficientes harmônicos de Fourier por condutor
         self.NF = self.NF_List[self.idx_ref]
 
-        # Conductors Permeability [np.array]
-        self.mu = np.array([sc.mu_0 * cond['relative_permeability'] for cond in self.mtl.values()]) 
+        # # Conductors Permeability [np.array]
+        # self.mu = np.array([sc.mu_0 * cond['relative_permeability'] for cond in self.mtl.values()]) 
 
-        # Conductors Permittivity [np.array]
-        self.epsilon = np.array([sc.epsilon_0 * cond['relative_permittivity'] for cond in self.mtl.values()]) 
+        # # Conductors Permittivity [np.array]
+        # self.epsilon = np.array([sc.epsilon_0 * cond['relative_permittivity'] for cond in self.mtl.values()]) 
 
-        # Conductors conductivity [np.array]
-        self.sigma = np.array([cond['conductivity'] for cond in self.mtl.values()])
+        # # Conductors conductivity [np.array]
+        # self.sigma = np.array([cond['conductivity'] for cond in self.mtl.values()])
 
-        # Free-Space Permittivity [np.array]
-        self.epsilon_out = np.array([sc.epsilon_0 * cond['relative_permittivity_out'] for cond in self.mtl.values()])
+        # # Free-Space Permittivity [np.array]
+        # self.epsilon_out = np.array([sc.epsilon_0 * cond['relative_permittivity_out'] for cond in self.mtl.values()])
 
+    # Define the surfaces for the MTL
     def _define_mtl_surfaces(self):
         """
         Defines the surfaces for all conductors and their insulations,
         handling geometric duplicates by prioritizing conductor surfaces.
         """
         # Step 1: Generate a temporary list of all potential surfaces, including duplicates.
+        self.surfaces = []
         all_surfaces = []
         for key, conductor in self.mtl.items():
             # Check if the conductor is hollow

@@ -125,9 +125,7 @@ if __name__ == "__main__":
 
     # Analytical Formulation
     for f in frequency['Analytically']:
-        pul = PerUnitParameters(mtl_model, f, sigma_1=1/200, er_1=5)
-
-        # Internal and external impedance matrices
+        pul = PerUnitParameters(mtl_model, f)
         pul_parameters['quasitem'].append(pul.pul_extended_theory())
         pul_parameters['quasitem_log'].append(pul.pul_extended_theory(type_form='quasitem_log'))
         pul_parameters['nakagawa'].append(pul.pul_extended_theory(type_form='nakagawa'))
@@ -136,5 +134,5 @@ if __name__ == "__main__":
 
     print(f"End of the routine! Time spent on simulation: {(time.time() - st):.2f} seconds.\n")
     plot_gamma(frequency, pul_parameters, p=0, q=0)
-    MTLRepresentation(mtl_model, units='meter').isolated_wires()
+    MTLRepresentation(mtl_model, units='meter').ground_return_systems()
     plt.show()

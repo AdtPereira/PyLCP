@@ -327,7 +327,7 @@ if __name__ == "__main__":
 
     # Analytical Formulation
     for f in frequency['Analytically']:
-        pul = PerUnitParameters(mtl_model, f, sigma_1=1/200, er_1=5)
+        pul = PerUnitParameters(mtl_model, f)
 
         # Internal and external impedance matrices
         z_results['zi_exact'].append(pul.internal_impedance(type_form='bessel')[0])
@@ -355,6 +355,6 @@ if __name__ == "__main__":
     plot_zi(frequency, z_results, p=0, q=0)
     plot_zg(frequency, zg_results, p=0, q=0)
     plot_zs(frequency, z_results, zg_results, p=0, q=0)
-    # MTLRepresentation(MODEL, units='meter').isolated_wires()
+    MTLRepresentation(mtl_model, units='meter').ground_return_systems()
     plt.show()
     

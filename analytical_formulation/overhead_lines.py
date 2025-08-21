@@ -1,6 +1,6 @@
 import numpy as np
 from scipy.special import iv
-from scipy.constants import mu_0, epsilon_0
+import scipy.constants as sc
 from scipy.integrate import quad
 from mtl_main.source import MulticonductorTransmissionLine
 
@@ -8,34 +8,34 @@ from mtl_main.source import MulticonductorTransmissionLine
 class PerUnitParameters:
     """ This class calculates PUL parameters using an MTL geometry model. """
 
-    def __init__(self, model: MulticonductorTransmissionLine, f, sigma_1, er_1=1, mur_1=1, ge=0):
+    def __init__(self, model: MulticonductorTransmissionLine, f: float):
         # MTL Geometry Model
         self.model = model
 
-        # Soil Permittivity [np.array]
-        self.er_1 = er_1
+        # Soil Relative Permittivity
+        self.er_1 = model.mtl_ref[0]['relative_permittivity']
 
-        # Soil conductivity [np.array]
-        self.sigma_1 = sigma_1
+        # Soil conductivity (S/m)
+        self.sigma_1 = model.mtl_ref[0]['conductivity']
 
-        # Soil Permeability [np.array]
-        self.mur_1 = mur_1
+        # Soil Relative Permeability
+        self.mur_1 = model.mtl_ref[0]['relative_permeability']
 
-        # External Conductance [np.array]
-        self.ge = ge
+        # External Conductance (S/m)
+        self.ge = model.mtl_ref[0]['external_conductance']
 
         # Angular frequency (rad/s)
         self.jw = 1j * 2 * np.pi * f
 
         # Constant vacuum terms
-        self.jw_mu0_2pi = self.jw * mu_0 / 2 / np.pi
-        self.jw_2pi_e0 = self.jw * 2 * np.pi * epsilon_0
+        self.jw_mu0_2pi = self.jw * sc.mu_0 / 2 / np.pi
+        self.jw_2pi_e0 = self.jw * 2 * np.pi * sc.epsilon_0
 
         # Air wave number (rad/m)
-        self.ka2 = - self.jw * mu_0 * self.jw * epsilon_0
+        self.ka2 = - self.jw * sc.mu_0 * self.jw * sc.epsilon_0
 
         # Earth wave number (rad/m)
-        self.ke2 = - self.jw * self.mur_1 * mu_0 * (self.sigma_1 + self.jw * self.er_1 * epsilon_0)
+        self.ke2 = - self.jw * self.mur_1 * sc.mu_0 * (self.sigma_1 + self.jw * self.er_1 * sc.epsilon_0)
 
     def internal_impedance(self, type_form='approx'):
         """ This method calculates the internal impedance of solid wires. """
@@ -55,8 +55,6 @@ class PerUnitParameters:
             sigma = self.model.sigma[p]
 
             # High frequency impedance (ohm/m)
-            # Derived assuming current conduction in a ring with
-            # thickness equal to the penetration depth (ohm/m).
             zi_hf = 1.0/(2 * np.pi * ro) * np.sqrt(jw_mu/sigma)
 
             # Approximation Closed-Form Expression
@@ -114,21 +112,8 @@ class PerUnitParameters:
         d_matrix = self.model.d_matrix_ground_return
         D_matrix = self.model.D_matrix_ground_return
 
-        # Loop over the conductors
-        # for n, _ in enumerate(self.mtl.surfaces):
-        #     for m, _ in enumerate(self.mtl.surfaces):
-
-        #         # Distance between the conductors (m)
-        #         dnm, Dnm, _, _ = self.conductor_distances(n, m)
-
-        #         # External impedance (ohm/m)
-        #         Pe[n, m] = 1 / (2 * np.pi * epsilon_0) * np.log(Dnm/dnm)
-
-        #         # External admittance (mho/m)
-        #         Ge[n, n] = self.ge[n] * 1E-6
-
-        # 3. Calculate the complete Pe matrix
-        Pe = (1 / (2 * np.pi * epsilon_0)) * (np.log(D_matrix) - np.log(d_matrix))
+        # 3. Calculate the complete Maxwell Potential matrix
+        Pe = (1 / (2 * np.pi * sc.epsilon_0)) * (np.log(D_matrix) - np.log(d_matrix))
 
         # External capacitance matrix
         if type_form == 'potentials':
@@ -136,7 +121,7 @@ class PerUnitParameters:
 
         elif type_form == 'indirect':
             Le = self.external_impedance() / self.jw
-            Ce = np.linalg.inv(Le) * mu_0 * epsilon_0
+            Ce = np.linalg.inv(Le) * sc.mu_0 * sc.epsilon_0
 
         return Ge + self.jw * Ce
 
@@ -385,7 +370,7 @@ class PerUnitParameters:
 
         if type_form == 'carson' or type_form == 'deri':
             # Soil wave number (rad/m)
-            k_e2 = - self.jw * self.mur_1 * mu_0 * self.sigma_1
+            k_e2 = - self.jw * self.mur_1 * sc.mu_0 * self.sigma_1
 
             # A. Deri Complex depth (m)
             p_dot = 1 / np.sqrt(-k_e2)
@@ -492,8 +477,8 @@ class PerUnitParameters:
                     n2_naka = self.ke2 / self.ka2
 
                     # Earth wave number (rad/m)
-                    ke2_naka = - self.jw * self.mur_1 * mu_0 * \
-                        (self.sigma_1 + self.jw * (self.er_1 - 1) * epsilon_0)
+                    ke2_naka = - self.jw * self.mur_1 * sc.mu_0 * \
+                        (self.sigma_1 + self.jw * (self.er_1 - 1) * sc.epsilon_0)
 
                     S1[n, m] = 2 * self.sn_sommerfeld_simplified(hn_hm, dn_dm, ke2_naka)
                     S2[n, m] = 2 * self.sn_sommerfeld_simplified(hn_hm, dn_dm, ke2_naka, n2=n2_naka)
@@ -504,7 +489,7 @@ class PerUnitParameters:
 
                 # Carson Integral Equation
                 elif type_form == 'carson':
-                    k_e2_carson = - self.jw * self.mur_1 * mu_0 * self.sigma_1
+                    k_e2_carson = - self.jw * self.mur_1 * sc.mu_0 * self.sigma_1
                     S1[n, m] = 2 * self.sn_sommerfeld_simplified(hn_hm, dn_dm, k_e2_carson)
 
         # Earth return impedance and admittance (ohm/m)

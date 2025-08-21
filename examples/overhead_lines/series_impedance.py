@@ -32,6 +32,7 @@ REFERENCES:
 """
 import os
 import sys
+import copy
 import time
 import numpy as np
 from pathlib import Path
@@ -64,7 +65,7 @@ except ImportError as e:
     sys.exit(1)
 
 
-def plot_series_impedance(freq, pul_dict, p, q):
+def plot_series_impedance(freq, pul, p, q):
     """
     This function plots the series resistance as a function of frequency.
 
@@ -78,17 +79,17 @@ def plot_series_impedance(freq, pul_dict, p, q):
     # fig.suptitle('')
 
     f = np.array(freq['Analytically'])
-    z_a = np.array([item['Zs'][p, q] for item in pul_dict['a']])
-    z_b = np.array([item['Zs'][p, q] for item in pul_dict['b']])
-    z_c = np.array([item['Zs'][p, q] for item in pul_dict['c']])
-    l_a = np.imag(z_a) / (2 * np.pi * f)  # H/m
-    l_b = np.imag(z_b) / (2 * np.pi * f)  # H/m
-    l_c = np.imag(z_c) / (2 * np.pi * f)  # H/m
+    zsa = np.array([item['Zs'][p, q] for item in pul['a']])
+    zsb = np.array([item['Zs'][p, q] for item in pul['b']])
+    zsc = np.array([item['Zs'][p, q] for item in pul['c']])
+    lsa = np.imag(zsa) / (2 * np.pi * f)
+    lsb = np.imag(zsb) / (2 * np.pi * f)
+    lsc = np.imag(zsc) / (2 * np.pi * f)
 
     # Extracting the impedance elements from zi_matrix
-    ax1.plot(f, 1E3 * np.real(z_a), label=r'$\rho_e = 100 \;\Omega m, \epsilon_r=1$', color='black', linestyle='-')
-    ax1.plot(f, 1E3 * np.real(z_b), label=r'$\rho_e = 100 \;\Omega m, \epsilon_r=20$', color='black', linestyle='--')
-    ax1.plot(f, 1E3 * np.real(z_c), label=r'$\rho_e = 2000 \;\Omega m, \epsilon_r=1$', color='black', linestyle='-.')
+    ax1.plot(f, 1E3 * np.real(zsa), label=r'$\rho_e = 100 \;\Omega m, \epsilon_r=1$', color='black', linestyle='-')
+    ax1.plot(f, 1E3 * np.real(zsb), label=r'$\rho_e = 100 \;\Omega m, \epsilon_r=20$', color='black', linestyle='--')
+    ax1.plot(f, 1E3 * np.real(zsc), label=r'$\rho_e = 2000 \;\Omega m, \epsilon_r=1$', color='black', linestyle='-.')
 
     # Additional plotting configurations
     ax1.set_xscale('log')
@@ -103,9 +104,9 @@ def plot_series_impedance(freq, pul_dict, p, q):
                  r'$r_1 = 0.01\,\mathrm{m}, h_1 = 10\,\mathrm{m}, \rho = 1.68 \times 10^{-8} \, \mathrm{\Omega m}$ [1]')
 
     # Extracting the impedance elements from zi_matrix
-    ax2.plot(f, 1E6 * l_a, label=r'$\rho_e = 100 \;\Omega m, \epsilon_r=1$', color='black', linestyle='-')
-    ax2.plot(f, 1E6 * l_b, label=r'$\rho_e = 100 \;\Omega m, \epsilon_r=20$', color='black', linestyle='--')
-    ax2.plot(f, 1E6 * l_c, label=r'$\rho_e = 2000 \;\Omega m, \epsilon_r=1$', color='black', linestyle='-.')
+    ax2.plot(f, 1E6 * lsa, label=r'$\rho_e = 100 \;\Omega m, \epsilon_r=1$', color='black', linestyle='-')
+    ax2.plot(f, 1E6 * lsb, label=r'$\rho_e = 100 \;\Omega m, \epsilon_r=20$', color='black', linestyle='--')
+    ax2.plot(f, 1E6 * lsc, label=r'$\rho_e = 2000 \;\Omega m, \epsilon_r=1$', color='black', linestyle='-.')
 
     ax2.set_xscale('log')
     ax2.set_xlim(1E3, 1E9)
@@ -125,30 +126,31 @@ if __name__ == "__main__":
 
     # Calculate the series impedance for each frequency
     frequency = {
-        'Analytically': np.logspace(3, 9, num=200),
+        'Analytically': np.logspace(3, 9, num=100),
         'Numerically': np.logspace(0, 7, num=30)
     }
 
     # Dictionary to hold the series impedance calculations
-    pul_dict = {'a': [], 'b': [], 'c': []}
+    pul = {'a': [], 'b': [], 'c': []}
 
     # The geometric model is constant, so we create the object once for efficiency.
-    mtl_model = MulticonductorTransmissionLine(MODEL)
+    mtl_model_a = MulticonductorTransmissionLine(MODEL)
 
-    # Analytical Formulation
+    model_b = copy.deepcopy(MODEL)
+    model_b[0]['relative_permittivity'] = 20
+    mtl_model_b = MulticonductorTransmissionLine(model_b)
+
+    model_c = copy.deepcopy(MODEL)
+    model_c[0]['conductivity'] = 0.0005
+    mtl_model_c = MulticonductorTransmissionLine(model_c)
+
     for f in frequency['Analytically']:
-        pul_a = PerUnitParameters(mtl_model, f, sigma_1=1/1E2, er_1=1)
-        pul_b = PerUnitParameters(mtl_model, f, sigma_1=1/1E2, er_1=20)
-        pul_c = PerUnitParameters(mtl_model, f, sigma_1=1/2E3, er_1=1)
+        pul['a'].append(PerUnitParameters(mtl_model_a, f).pul_extended_theory())
+        pul['b'].append(PerUnitParameters(mtl_model_b, f).pul_extended_theory())
+        pul['c'].append(PerUnitParameters(mtl_model_c, f).pul_extended_theory())
 
-        # Internal and external impedance matrices
-        pul_dict['a'].append(pul_a.pul_extended_theory())
-        pul_dict['b'].append(pul_b.pul_extended_theory())
-        pul_dict['c'].append(pul_c.pul_extended_theory())
-
-    # End the timer
     print(f"End of the routine! Time spent on simulation: {(time.time() - st):.2f} seconds.\n")
-    plot_series_impedance(frequency, pul_dict, p=0, q=0)
-    MTLRepresentation(mtl_model, units='meter').isolated_wires()
+    plot_series_impedance(frequency, pul, p=0, q=0)
+    MTLRepresentation(mtl_model_a, units='millimeter').ground_return_systems()
     plt.show()
     
