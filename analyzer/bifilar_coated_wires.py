@@ -5,9 +5,9 @@ import matplotlib.pyplot as plt
 from pathlib import Path
 from typing import Dict, Any
 
-from mtl_data.utils import *
+from mtl_main.utils import *
 from mtl_paul.py_fortran import FortranRunner
-from analytical_forms.pul_wires_conductors import WiresHomogeneousMedia
+from analytical_formulation.isolated_wires import WiresHomogeneousMedia
 from mom.coated_wire_systems import TwoCoatedWireSystem
 
 

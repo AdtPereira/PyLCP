@@ -21,8 +21,8 @@ except IndexError:
 
 # IMPORTAÇÕES DOS MÓDULOS E MODELO DE DADOS
 try:
-    from mtl_data.wire_models import BIFILAR_COATED_WIRE_S40_K10 as MTL
-    from mtl_data.graphics import MTLRepresentation
+    from mtl_main.models_wires import BIFILAR_COATED_WIRE_S40_K10 as MTL
+    from mtl_main.graphics import MTLRepresentation
     from analyzer.bifilar_coated_wires import BifilarCoatedWirePULParameters as PUL
     print("Módulos e modelo de dados importados com sucesso.")
 except ImportError as e:
@@ -42,5 +42,5 @@ if __name__ == "__main__":
     pul.show_header()
     pul.plot_srw_rates()
     pul.plot_capacitance_convergence()
-    MTLRepresentation(MTL, units='centimeter').bared_and_coated_wires()
+    # MTLRepresentation(MTL, units='centimeter').isolated_wires()
     plt.show()

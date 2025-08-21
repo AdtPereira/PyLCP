@@ -2,15 +2,15 @@ import numpy as np
 from scipy.special import iv
 from scipy.constants import mu_0, epsilon_0
 from scipy.integrate import quad
-from mtl_data.mtl import MulticonductorTransmissionLine
+from mtl_main.source import MulticonductorTransmissionLine
 
 
-class PerUnitParameters():
+class PerUnitParameters:
     """ This class calculates PUL parameters using an MTL geometry model. """
 
-    def __init__(self, mtl: MulticonductorTransmissionLine, f, sigma_1, er_1=1, mur_1=1, ge=0):
+    def __init__(self, model: MulticonductorTransmissionLine, f, sigma_1, er_1=1, mur_1=1, ge=0):
         # MTL Geometry Model
-        self.mtl = mtl
+        self.mtl = model
 
         # Soil Permittivity [np.array]
         self.er_1 = er_1
@@ -37,7 +37,7 @@ class PerUnitParameters():
         # Earth wave number (rad/m)
         self.ke2 = - self.jw * self.mur_1 * mu_0 * (self.sigma_1 + self.jw * self.er_1 * epsilon_0)
 
-    def internal_impedance_matrix(self, type_form='approx'):
+    def internal_impedance(self, type_form='approx'):
         """ This method calculates the internal impedance of solid wires. """
         N = len(self.mtl.surfaces)
         Zi = np.zeros((N, N), dtype=complex)
@@ -76,7 +76,7 @@ class PerUnitParameters():
 
         return Zi, Ri_cc, Zi_hf
 
-    def external_impedance_matrix(self):
+    def external_impedance(self):
         """ This method calculates the impedance matrix of the earth return path. """
         N = len(self.mtl.surfaces)
         Ze = np.zeros((N, N), dtype=complex)
@@ -135,7 +135,7 @@ class PerUnitParameters():
             Ce = np.linalg.inv(Pe)
 
         elif type_form == 'indirect':
-            Le = self.external_impedance_matrix() / self.jw
+            Le = self.external_impedance() / self.jw
             Ce = np.linalg.inv(Le) * mu_0 * epsilon_0
 
         return Ge + self.jw * Ce
@@ -449,7 +449,7 @@ class PerUnitParameters():
         S1 = np.zeros((N, N), dtype=complex)
         S2 = np.zeros((N, N), dtype=complex)
         T = np.zeros((N, N), dtype=complex)
-        Zi = self.internal_impedance_matrix()[0]
+        Zi = self.internal_impedance()[0]
 
         # Loop over the conductors
         for n, _ in enumerate(self.mtl.surfaces):

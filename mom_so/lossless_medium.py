@@ -24,7 +24,7 @@ import numpy as np
 import scipy.constants as sc
 from scipy.special import jv, jvp, h1vp, h2vp
 from scipy.linalg import lu_factor, lu_solve, inv
-from mtl_data.mtl import MulticonductorTransmissionLine as MTL
+from mtl_main.source import MulticonductorTransmissionLine as MTL
 
 
 class HomogeneousLosslessMedium(MTL):

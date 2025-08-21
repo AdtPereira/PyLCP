@@ -1,4 +1,5 @@
 """ This module contains the definition of the MOM-So systems used in the """
+
 SCC_SINGLE_PHASE = {
     'name': 'SCC_SINGLE_PHASE',
     'type': 'scc',

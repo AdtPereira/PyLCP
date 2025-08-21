@@ -54,12 +54,12 @@ except IndexError:
 
 # IMPORTAÇÕES DOS MÓDULOS E MODELO DE DADOS
 try:
-    from mtl_data.wire_models import SINGLE_OHTL_CONTI as MODEL
-    from mtl_data.graphics import MTLRepresentation
-    from mtl_data.mtl import MulticonductorTransmissionLine
+    from mtl_main.models_wires import SINGLE_OHTL_CONTI as MODEL
+    from mtl_main.graphics import MTLRepresentation
+    from mtl_main.source import MulticonductorTransmissionLine
     from mom_so.quasi_static_green import QuasiStatic
     from mom_so.lossless_medium import HomogeneousLosslessMedium
-    from ohtl.pul_parameters import PerUnitParameters
+    from analytical_formulation.overhead_lines import PerUnitParameters
     print("Módulos e modelo de dados importados com sucesso.") 
 except ImportError as e:
     print(f"Erro ao importar módulos: {e}")
@@ -330,11 +330,11 @@ if __name__ == "__main__":
         pul = PerUnitParameters(mtl_model, f, sigma_1=1/200, er_1=5)
 
         # Internal and external impedance matrices
-        z_results['zi_exact'].append(pul.internal_impedance_matrix(type_form='bessel')[0])
-        z_results['zi_approx'].append(pul.internal_impedance_matrix()[0])
-        z_results['ri_cc'].append(pul.internal_impedance_matrix()[1])
-        z_results['zi_hf'].append(pul.internal_impedance_matrix()[2])
-        z_results['ze'].append(pul.external_impedance_matrix())
+        z_results['zi_exact'].append(pul.internal_impedance(type_form='bessel')[0])
+        z_results['zi_approx'].append(pul.internal_impedance()[0])
+        z_results['ri_cc'].append(pul.internal_impedance()[1])
+        z_results['zi_hf'].append(pul.internal_impedance()[2])
+        z_results['ze'].append(pul.external_impedance())
 
         # Store the results in the dictionary
         zg_results['quasi_tem'].append(pul.earth_return_impedance())
@@ -355,6 +355,6 @@ if __name__ == "__main__":
     plot_zi(frequency, z_results, p=0, q=0)
     plot_zg(frequency, zg_results, p=0, q=0)
     plot_zs(frequency, z_results, zg_results, p=0, q=0)
-    MTLRepresentation(MODEL, units='meter').bared_and_coated_wires()
+    # MTLRepresentation(MODEL, units='meter').isolated_wires()
     plt.show()
     

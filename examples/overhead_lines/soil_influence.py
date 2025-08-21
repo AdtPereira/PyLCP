@@ -54,10 +54,10 @@ except IndexError:
 
 # IMPORTAÇÕES DOS MÓDULOS E MODELO DE DADOS
 try:
-    from mtl_data.wire_models import SINGLE_OHTL_XUE as MODEL
-    from mtl_data.mtl import MulticonductorTransmissionLine
-    from mtl_data.graphics import MTLRepresentation
-    from ohtl.pul_parameters import PerUnitParameters
+    from mtl_main.models_wires import SINGLE_OHTL_XUE as MODEL
+    from mtl_main.source import MulticonductorTransmissionLine
+    from mtl_main.graphics import MTLRepresentation
+    from analytical_formulation.overhead_lines import PerUnitParameters
     print("Módulos e modelo de dados importados com sucesso.") 
 except ImportError as e:
     print(f"Erro ao importar módulos: {e}")
@@ -158,6 +158,6 @@ if __name__ == "__main__":
 
     print(f"End of the routine! Time spent on simulation: {(time.time() - st):.2f} seconds.\n")
     plot_gamma(frequency, pul_parameters, p=0, q=0)
-    MTLRepresentation(MODEL, units='meter').bared_and_coated_wires()
+    MTLRepresentation(mtl_model, units='meter').isolated_wires()
     plt.show()
     

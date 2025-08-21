@@ -25,9 +25,9 @@ import copy
 import numpy as np
 from pyparsing import Dict
 import scipy.constants as sc
-from mtl_data.mtl_strategy import mtl_strategy_factory
+from mtl_main.strategy import mtl_strategy_factory
 
-class MulticonductorTransmissionLine():
+class MulticonductorTransmissionLine:
     def __init__(self, mtl: Dict):
         """Initialize the MulticonductorTransmissionLine class.
 
@@ -47,17 +47,7 @@ class MulticonductorTransmissionLine():
         # Delegate preprocessing and validation to the strategy
         strategy = mtl_strategy_factory(self.mtl_type)
         self.mtl = strategy.preprocess_mtl_dict(mtl_input)
-        strategy.validate(self.mtl, self.idx_ref)
-
-        # Pré-inicializa todos os atributos específicos
-        # self.D_pq = None
-        # self.dx_pq = None
-        # self.dy_pq = None
-        # self.theta_pq = None
-        # self.d_matrix_ground_return = None
-        # self.D_matrix_ground_return = None
-        # self.vertical_separation_matrix = None
-        # self.horizontal_separation_matrix = None
+        strategy.validate(self.mtl, mtl_input)
 
         # Delegate calculation of type-specific properties
         strategy.apply_properties(self, self.mtl)          

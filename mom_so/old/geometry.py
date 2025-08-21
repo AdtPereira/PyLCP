@@ -69,7 +69,7 @@ REFERENCES:
 
 import numpy as np
 from scipy.constants import epsilon_0
-from mtl_data.mtl import MulticonductorTransmissionLine as MTL
+from mtl_main.source import MulticonductorTransmissionLine as MTL
 
 # class UndergroundSystem(MTL):
 #     """ This class contains the basic geometry of the system. """

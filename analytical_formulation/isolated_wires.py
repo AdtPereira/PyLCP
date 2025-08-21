@@ -26,7 +26,7 @@ REFERENCES:
 import numpy as np
 from scipy.special import iv, kv, jv, jvp
 from scipy.linalg import lu_factor, lu_solve
-from mtl_data.mtl import MulticonductorTransmissionLine
+from mtl_main.source import MulticonductorTransmissionLine
 
 # 4.2.2 Per-Unit-Length Inductance and Capacitance for Wire-Type Lines [4]
 class WiresHomogeneousMedia(MulticonductorTransmissionLine):
@@ -341,9 +341,6 @@ class Ametani(MulticonductorTransmissionLine):
         frequency (float): The frequency of the system.
         """
         super().__init__(mtl)
-
-        # # Angular frequency, rad/s [float]
-        # self.jw = 1j * 2 * np.pi * frequency
 
         # Call the function to configure the parameters
         for key, conductor in self.mtl.items():

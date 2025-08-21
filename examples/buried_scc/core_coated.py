@@ -55,6 +55,9 @@ except IndexError:
 
 # IMPORTAÇÕES DOS MÓDULOS E MODELO DE DADOS
 try:
+    from mtl_main.models_scc import SCC_SINGLE_PHASE as MODEL
+    from mtl_main.graphics import MTLRepresentation
+    from mtl_main.source import MulticonductorTransmissionLine
     from scc.scc_data import scc_models_list
     from scc.scc_systm import SystemType
     from scc.scc_nlt import MonoNetworkTopology, NumericalLaplaceTransform
@@ -102,45 +105,55 @@ def TimeDomain_Graph(Vktd_m, Vmtd_m, t_m, Vktd, Vmtd, NP):
     axs[1].legend()
 
     plt.tight_layout()
+
+if __name__ == "__main__":
+    """ Função principal para orquestrar a análise, cálculo e visualização dos resultados. """
+    st = time.time()
+    os.system('cls' if os.name == 'nt' else 'clear')
+    print("Iniciando cálculos da impedância p.u.l. do cabo coaxial...")
+
+    # Rotinas Analítica e MoM-SO
+    mtl_model = MulticonductorTransmissionLine(MODEL)
+
+    # Load the MATLAB or ATP data
+    Vktd_mat, Vmtd_mat, t_mat, Vk_mat, Vm_mat, f_mat = load_data('C:\\Users\\adilt\\OneDrive\\1 ACADEMIA\\MODELOS\\2.PRYSMIAN\\PRY_M01_1SCC_1C.mat')
+
+    # Define system configuration and soil parameters
+    # Model Name: PRY_M01_1SCC_1C
+    scc = scc_models_list[0]
+    syst = SystemType(Model=scc, rhog=100, erg=1, Syst_id='#1')
+
+    ## Transmission Line and NLT Constants
+    LX = 200                        # Line distance
+    RS = 1                          # Load Resistance [Ohm]
+    N = 1024*8                      # Point numbers
+    T = 1E-3                        # Simulation maximum time [s]
+    display = int(np.floor(N * 0.20));   # Graph window display
+
+    # Transmission Line Topology
+    nlt = NumericalLaplaceTransform(N, T)
+    VkVm = []
+    for s_value in nlt.s[0:round(N/2)+1]:
+        tl = MonoNetworkTopology(s_value, syst, RS, LX)
+        tl.StepUnitSource(ksi=0, T=T)
+        tl.TerminalVoltages(tl.VS)
+        VkVm.append(tl.V)
+
+    # Calculate Vk and Vm
+    Vk = np.array([v[0] for v in VkVm]).flatten()
+    Vm = np.array([v[1] for v in VkVm]).flatten()
+
+    # Extend Vk and Vm to include the conjugate
+    for k in range(round(N/2)+1, N):
+        Vk = np.append(Vk, np.conj(Vk[2 * round(N/2) - k]))
+        Vm = np.append(Vm, np.conj(Vm[2 * round(N/2) - k]))
+
+    # Main NLT routine
+    Vktd, Vmtd = nlt.Main_NLT(Vk, Vm)
+
+    # Plot the graphs
+    # FrequencyDomain_Graph(Vk_mat, f_mat, Vk)
+    # FrequencyDomain_Graph(Vm_mat, f_mat, Vm)
+    TimeDomain_Graph(Vktd_mat, Vmtd_mat, t_mat, Vktd, Vmtd, display)
+    MTLRepresentation(mtl_model, units='millimeter').single_core_cable()
     plt.show()
-
-# Load the MATLAB or ATP data
-Vktd_mat, Vmtd_mat, t_mat, Vk_mat, Vm_mat, f_mat = load_data('C:\\Users\\adilt\\OneDrive\\1 ACADEMIA\\MODELOS\\2.PRYSMIAN\\PRY_M01_1SCC_1C.mat')
-
-# Define system configuration and soil parameters
-# Model Name: PRY_M01_1SCC_1C
-scc = scc_models_list[0]
-syst = SystemType(Model=scc, rhog=100, erg=1, Syst_id='#1')
-
-## Transmission Line and NLT Constants
-LX = 200                        # Line distance
-RS = 1                          # Load Resistance [Ohm]
-N = 1024*8                      # Point numbers
-T = 1E-3                        # Simulation maximum time [s]
-display = int(np.floor(N * 0.20));   # Graph window display
-
-# Transmission Line Topology
-nlt = NumericalLaplaceTransform(N, T)
-VkVm = []
-for s_value in nlt.s[0:round(N/2)+1]:
-    tl = MonoNetworkTopology(s_value, syst, RS, LX)
-    tl.StepUnitSource(ksi=0, T=T)
-    tl.TerminalVoltages(tl.VS)
-    VkVm.append(tl.V)
-
-# Calculate Vk and Vm
-Vk = np.array([v[0] for v in VkVm]).flatten()
-Vm = np.array([v[1] for v in VkVm]).flatten()
-
-# Extend Vk and Vm to include the conjugate
-for k in range(round(N/2)+1, N):
-    Vk = np.append(Vk, np.conj(Vk[2 * round(N/2) - k]))
-    Vm = np.append(Vm, np.conj(Vm[2 * round(N/2) - k]))
-
-# Main NLT routine
-Vktd, Vmtd = nlt.Main_NLT(Vk, Vm)
-
-# Plot the graphs
-# FrequencyDomain_Graph(Vk_mat, f_mat, Vk)
-# FrequencyDomain_Graph(Vm_mat, f_mat, Vm)
-TimeDomain_Graph(Vktd_mat, Vmtd_mat, t_mat, Vktd, Vmtd, display)

@@ -21,8 +21,8 @@ except IndexError:
 
 # IMPORTAÇÕES DOS MÓDULOS E MODELO DE DADOS
 try:
-    from mtl_data.wire_models import BIFILAR_BARE_WIRE_S21_K10 as MTL
-    from mtl_data.graphics import MTLRepresentation
+    from mtl_main.models_wires import BIFILAR_BARE_WIRE_S21_K10 as MTL
+    from mtl_main.graphics import MTLRepresentation
     from analyzer.bifilar_bare_wires import BifilarBareWirePULParameters as PUL
     print("Módulos e modelo de dados importados com sucesso.") 
 except ImportError as e:
@@ -49,5 +49,5 @@ if __name__ == "__main__":
     pul.plot_srw_rates()
     pul.plot_generalized_capacitance_convergence()    
     pul.plot_free_space_capacitance_convergence()
-    MTLRepresentation(MTL, units='millimeter').bared_and_coated_wires()
+    # MTLRepresentation(MTL, units='millimeter').isolated_wires()
     plt.show()

@@ -54,9 +54,10 @@ except IndexError:
 
 # IMPORTAÇÕES DOS MÓDULOS E MODELO DE DADOS
 try:
-    from mtl_data.wire_models import COAXIAL_CABLE as MTL
-    from mtl_data.graphics import MTLRepresentation
-    from analytical_forms.pul_wires_conductors import CoaxialCable, Ametani
+    from mtl_main.models_wires import COAXIAL_CABLE as MODEL
+    from mtl_main.graphics import MTLRepresentation
+    from mtl_main.source import MulticonductorTransmissionLine
+    from analytical_formulation.isolated_wires import CoaxialCable, Ametani
     from mom_so.quasi_static_green import QuasiStatic
     from mom_so.lossless_medium import HomogeneousLosslessMedium, LosslessPostProcessing
     print("Módulos e modelo de dados importados com sucesso.") 
@@ -233,11 +234,12 @@ if __name__ == "__main__":
     print("Iniciando cálculos da impedância p.u.l. do cabo coaxial...")
 
     # Rotinas Analítica e MoM-SO
+    mtl_model = MulticonductorTransmissionLine(MODEL)
     FREQUENCY = {'ana': np.logspace(0, 5.9, num=200), 'mom': np.logspace(0, 5.9, num=30)}    
-    analytical_data = run_analytical_simulation(MTL, FREQUENCY['ana'])
-    momso_data = run_momso_simulation(MTL, FREQUENCY['mom'])
+    analytical_data = run_analytical_simulation(MODEL, FREQUENCY['ana'])
+    momso_data = run_momso_simulation(MODEL, FREQUENCY['mom'])
 
     print(f"\nRotinas de cálculo finalizadas! Tempo de simulação: {(time.time() - st):.2f} segundos.")
     plot_results(FREQUENCY, analytical_data, momso_data)
-    MTLRepresentation(MTL, units='millimeter').coaxial()
+    MTLRepresentation(mtl_model, units='millimeter').isolated_coaxial_cables()
     plt.show()

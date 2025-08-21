@@ -16,7 +16,7 @@ REFERENCES:
 import math
 import numpy as np
 from scipy.integrate import quad
-from mtl_data.mtl import MulticonductorTransmissionLine as MTL
+from mtl_main.source import MulticonductorTransmissionLine as MTL
 
 
 class QuasiStatic(MTL):

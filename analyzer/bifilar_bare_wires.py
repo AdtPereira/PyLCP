@@ -5,9 +5,9 @@ import matplotlib.pyplot as plt
 from pathlib import Path
 from typing import Dict, Any
 
-from mtl_data.utils import *
+from mtl_main.utils import *
 from mtl_paul.py_fortran import FortranRunner
-from analytical_forms.pul_wires_conductors import WiresHomogeneousMedia
+from analytical_formulation.isolated_wires import WiresHomogeneousMedia
 from mom_so.quasi_static_green import QuasiStatic
 from mom_so.lossless_medium import HomogeneousLosslessMedium, LosslessPostProcessing
 from mom.bare_wire_systems import MulticonductorBareWireSystems
@@ -300,7 +300,6 @@ class BifilarBareWirePULParameters():
         print(f"\nGreen's Matrix Shape: {green_matrix.shape}.")
         matrix_viewer(np.real(general_cap), "MoM-SO Generalized Capacitance Matrix (F/m)")
         matrix_viewer(np.real(maxwell_cap), "MoM-SO Bifilar Capacitance (F/m)")
-
 
     def run_srw_rates(self):
         """
