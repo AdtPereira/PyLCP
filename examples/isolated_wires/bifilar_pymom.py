@@ -35,7 +35,7 @@ if __name__ == "__main__":
     pul.run_single_fortran()
     pul.run_analytical()
     pul.run_fortran()
-    pul.run_py_mom(autoPlots=True)
+    pul.run_mom_methods(autoPlots=True)
 
     print(f"\nRotinas de cálculo finalizadas em {(time.time()-st):.2f} segundos.")
     pul.show_header()    

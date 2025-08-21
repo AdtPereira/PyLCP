@@ -4,10 +4,9 @@ import scipy.constants as sc
 import matplotlib.pyplot as plt
 import plotly.graph_objects as go
 from mtl_main.utils import *
-from mtl_main.source import MulticonductorTransmissionLine as MTL
+from mtl_main.source import MulticonductorTransmissionLine
 
-
-class TwoCoatedWireSystem(MTL):
+class MulticonductorCoatedWireSystems:
     """
     Calcula a capacitância e distribuição de carga para sistemas de fios nus
     usando o Método dos Momentos (MoM) com expansão em séries harmônicas.
@@ -22,21 +21,20 @@ class TwoCoatedWireSystem(MTL):
     Nesta classe, a ordem máxima da harmônica é definida por 'k',
     enquanto NF (número de coeficientes) é derivado como 2*k + 1.
     """
-    def __init__(self, mtl: dict):
-        super().__init__(mtl)
-        assert isinstance(mtl, dict), "O parâmetro mtl deve ser um dicionário com a configuração da linha."
-        assert len(self.surfaces) > 1, "O sistema deve ter mais de dois condutores."
-
+    def __init__(self, model: MulticonductorTransmissionLine):
+        # MTL Geometry Model
+        self.model = model
+        
         # Raio do condutor 'p' (primeiro condutor)
-        self.R = self.surfaces[0]['radius']
-        self.D = self.D_pq[0, 1]
+        self.R = self.model.surfaces[0]['radius']
+        self.D = self.model.D_pq[0, 1]
         self.DR_ratio = self.D / self.R
         assert self.DR_ratio > 2, "A razão D/R deve ser maior que 2 para garantir a convergência da solução."
         self.C_exact_bare_wires = np.pi * sc.epsilon_0 / np.arccosh(0.5 * self.DR_ratio)
 
         # Superfícies de condutores e isolamento
-        self.conductor_surfaces = [s for s in self.surfaces if s['type'] == 'conductor']
-        self.insulation_surfaces = [s for s in self.surfaces if s['type'] == 'primary_insulation']
+        self.conductor_surfaces = [s for s in self.model.surfaces if s['type'] == 'conductor']
+        self.insulation_surfaces = [s for s in self.model.surfaces if s['type'] == 'primary_insulation']
         self.ordered_surfaces = self.conductor_surfaces + self.insulation_surfaces
 
         # Atributos de resultado
@@ -57,14 +55,14 @@ class TwoCoatedWireSystem(MTL):
         self.collocation_data = {}
 
         # Equação (A.4a): Ângulo de separação entre os pontos de colocação.
-        theta = 2 * np.pi / self.NF
+        theta = 2 * np.pi / self.model.NF
 
         # Equação (A.4b): Ângulo de rotação para o conjunto de pontos.
-        delta = np.pi / (2 * self.NF)
+        delta = np.pi / (2 * self.model.NF)
 
         # Calcula os ângulos base, que são rotacionados por delta para obter
         # os ângulos dos pontos de observação (match points).
-        base_angles = np.linspace(0, 2 * np.pi, self.NF, endpoint=False)
+        base_angles = np.linspace(0, 2 * np.pi, self.model.NF, endpoint=False)
         field_angles = base_angles + delta
 
         # Os pontos de fonte são posicionados na metade do caminho entre os
@@ -72,7 +70,7 @@ class TwoCoatedWireSystem(MTL):
         source_angles = field_angles - (theta / 2)
 
         # Itera sobre cada superfície definida na classe base MTL.
-        for surface in self.surfaces:
+        for surface in self.model.surfaces:
             tag = surface['tag']
             surface_type = surface['type']
             center = np.array(surface['center_point'])
@@ -182,8 +180,8 @@ class TwoCoatedWireSystem(MTL):
         """
         gc = self.C_generalized
         
-        # Supondo que self.idx_ref já foi corrigido para 0-base no __init__
-        ref_idx = self.idx_ref 
+        # Supondo que self.model.idx_ref já foi corrigido para 0-base no __init__
+        ref_idx = self.model.idx_ref 
 
         # --- Validações ---
         num_conductors = gc.shape[0]
@@ -236,8 +234,8 @@ class TwoCoatedWireSystem(MTL):
         nfs_per_surface = [2 * surface['fourier_order'] + 1 for surface in self.ordered_surfaces]
         offsets = np.cumsum([0] + nfs_per_surface)
 
-        self.D_matrix = np.zeros((self.N, self.N))
-        self.V_vector = np.zeros(self.N)
+        self.D_matrix = np.zeros((self.model.N, self.model.N))
+        self.V_vector = np.zeros(self.model.N)
 
         # 2. Montar a Matriz [D] e o Vetor [V]
         # Loop sobre as superfícies de OBSERVAÇÃO p (linhas da matriz)
@@ -254,7 +252,7 @@ class TwoCoatedWireSystem(MTL):
 
             # Preenche o vetor de potencial V para o bloco de linhas da superfície p
             if type_p == 'conductor':
-                self.V_vector[offset_p : offset_p + nf_p] = self.mtl[tag_p]['potential_to_infinity']
+                self.V_vector[offset_p : offset_p + nf_p] = self.model.mtl[tag_p]['potential_to_infinity']
             
             # A condição de fronteira na bainha dielétrica resulta em 0 no lado direito [cite: 222]
             elif type_p == 'primary_insulation':
@@ -264,7 +262,7 @@ class TwoCoatedWireSystem(MTL):
             for q, source_surface in enumerate(self.ordered_surfaces):
                 tag_q = source_surface['tag']
                 type_q = source_surface['type']
-                epsilon = self.epsilon_out[source_surface['tag']]
+                epsilon = self.model.epsilon_out[source_surface['tag']]
                 center_q = np.array(source_surface['center_point'])
                 nf_q = nfs_per_surface[q]
                 offset_q = offsets[q]
@@ -373,7 +371,7 @@ class TwoCoatedWireSystem(MTL):
             print("Executando simulação primeiro...")
             self.run_simulation()
 
-        if self.NF < 4: 
+        if self.model.NF < 4: 
             matrix_viewer(self.D_matrix, "D Matrix")
             # matrix_viewer(self.sigma_coeffs, "Sigma Coefficients")
         else:
@@ -397,9 +395,9 @@ class TwoCoatedWireSystem(MTL):
             # Itera sobre cada superfície desse condutor (ex: 'conductor', 'primary_insulation')
             for surface_type, surface_data in conductor_surfaces.items():
                 
-                # Busca o raio correspondente na lista self.surfaces,
+                # Busca o raio correspondente na lista self.model.surfaces,
                 # pois ele não está em self.collocation_data.
-                matching_surface = next(s for s in self.surfaces if s['tag'] == tag and s['type'] == surface_type)
+                matching_surface = next(s for s in self.model.surfaces if s['tag'] == tag and s['type'] == surface_type)
                 radius = matching_surface['radius']
 
                 # Extrai e adiciona os dados de pontos de fonte
@@ -427,8 +425,8 @@ class TwoCoatedWireSystem(MTL):
         df = pd.DataFrame(plot_data)
         fig = go.Figure()
 
-        # 3. Adicionar as formas dos círculos (esta parte não muda, pois já itera sobre self.surfaces)
-        for surface in self.surfaces:
+        # 3. Adicionar as formas dos círculos (esta parte não muda, pois já itera sobre self.model.surfaces)
+        for surface in self.model.surfaces:
             fig.add_shape(type="circle",
                         xref="x", yref="y",
                         x0=surface['center_point'][0] - surface['radius'], y0=surface['center_point'][1] - surface['radius'],
@@ -482,16 +480,16 @@ class TwoCoatedWireSystem(MTL):
             self.run_simulation()
 
         # 1. Obter dados do condutor a ser plotado e de seu par
-        all_tags = list(self.mtl.keys())
+        all_tags = list(self.model.mtl.keys())
         if len(all_tags) != 2:
             print("Erro: plot_charge_density foi projetado para sistemas de 2 condutores.")
             return
         other_tag = next(tag for tag in all_tags if tag != tag_to_plot)
 
-        center_plot = np.array(self.mtl[tag_to_plot]['center_point'])
-        center_other = np.array(self.mtl[other_tag]['center_point'])
+        center_plot = np.array(self.model.mtl[tag_to_plot]['center_point'])
+        center_other = np.array(self.model.mtl[other_tag]['center_point'])
 
-        conductor_surface = next(s for s in self.surfaces if s['tag'] == tag_to_plot and s['type'] == 'conductor')
+        conductor_surface = next(s for s in self.model.surfaces if s['tag'] == tag_to_plot and s['type'] == 'conductor')
         R = conductor_surface['radius']
         D = np.linalg.norm(center_plot - center_other)
         DR_ratio = D / R
@@ -503,17 +501,17 @@ class TwoCoatedWireSystem(MTL):
         angle_of_max_charge = np.arctan2(vec_to_other[1], vec_to_other[0])
         denominator = DR_ratio - 2 * np.cos(theta_plot - angle_of_max_charge)
 
-        delta_v = self.mtl[tag_to_plot]['potential_to_infinity'] - self.mtl[other_tag]['potential_to_infinity']
+        delta_v = self.model.mtl[tag_to_plot]['potential_to_infinity'] - self.model.mtl[other_tag]['potential_to_infinity']
         numerator = (DR_ratio**2 / 4) - 1
         
         # CORREÇÃO FINAL: Remover o abs() para preservar o sinal da carga
         charge_density_exact = (self.C_exact_bare_wires * delta_v / R) * (numerator / denominator)
 
         # 3. Reconstruir a Solução MoM para o Condutor Correto
-        nfs_per_surface = [2 * s['fourier_order'] + 1 for s in self.surfaces]
+        nfs_per_surface = [2 * s['fourier_order'] + 1 for s in self.model.surfaces]
         offsets = np.cumsum([0] + nfs_per_surface)
         
-        surface_index = next(i for i, s in enumerate(self.surfaces) if s['tag'] == tag_to_plot and s['type'] == 'conductor')
+        surface_index = next(i for i, s in enumerate(self.model.surfaces) if s['tag'] == tag_to_plot and s['type'] == 'conductor')
         
         offset = offsets[surface_index]
         nf = nfs_per_surface[surface_index]
@@ -555,7 +553,7 @@ class TwoCoatedWireSystem(MTL):
             self.run_simulation()
 
         # Isola os coeficientes do primeiro condutor
-        coeffs_condutor1 = self.sigma_coeffs[:self.NF]
+        coeffs_condutor1 = self.sigma_coeffs[:self.model.NF]
 
         # O coeficiente constante (alpha_n1) está no índice 0 do código
         constant_term = coeffs_condutor1[0]
@@ -569,13 +567,13 @@ class TwoCoatedWireSystem(MTL):
         ratio_const = [1.0]
 
         # j=2, 4, 6,...: Coeficientes Cossenoidais (índices 1, 3, 5,... no código)
-        code_indices_cos = np.arange(1, self.NF, 2)
+        code_indices_cos = np.arange(1, self.model.NF, 2)
         plot_j_cos = code_indices_cos + 1 # Mapeia [1, 3, 5] para [2, 4, 6]
         coeffs_cos = coeffs_condutor1[code_indices_cos]
         ratio_cos = np.abs(coeffs_cos) / np.abs(constant_term)
 
         # j=3, 5, 7,...: Coeficientes Senoidais (índices 2, 4, 6,... no código)
-        code_indices_sin = np.arange(2, self.NF, 2)
+        code_indices_sin = np.arange(2, self.model.NF, 2)
         plot_j_sin = code_indices_sin + 1 # Mapeia [2, 4, 6] para [3, 5, 7]
         coeffs_sin = coeffs_condutor1[code_indices_sin]
         ratio_sin = np.abs(coeffs_sin) / np.abs(constant_term)
@@ -600,7 +598,7 @@ class TwoCoatedWireSystem(MTL):
         ax.legend()
         ax.set_xlim(left=0)
         ax.set_ylim(bottom=-0.05)
-        ax.set_xticks(np.arange(1, self.NF + 1))
+        ax.set_xticks(np.arange(1, self.model.NF + 1))
         ax.grid(True, which='major', axis='y', linestyle='--', alpha=0.7)
 
         plt.tight_layout()

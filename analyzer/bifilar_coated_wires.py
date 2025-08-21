@@ -6,12 +6,14 @@ from pathlib import Path
 from typing import Dict, Any
 
 from mtl_main.utils import *
+from mtl_main.graphics import MTLRepresentation
+from mtl_main.source import MulticonductorTransmissionLine
 from mtl_paul.py_fortran import FortranRunner
 from analytical_formulation.isolated_wires import WiresHomogeneousMedia
-from mom.coated_wire_systems import TwoCoatedWireSystem
+from mom.coated_wire_systems import MulticonductorCoatedWireSystems
 
 
-class BifilarCoatedWirePULParameters():
+class BifilarCoatedWirePULParameters:
     """
     Encapsula a lógica para executar e analisar o estudo de convergência
     de capacitância, comparando MoM Python e Fortran.
@@ -24,8 +26,6 @@ class BifilarCoatedWirePULParameters():
             mtl_config (Dict[str, Any]): Dicionário com a configuração do modelo MTL.
             nf_max (int): Número máximo de coeficientes/ordem harmônica para testar.
         """
-
-        assert len([key for key in mtl.keys() if isinstance(key, int)]) == 2, "A linha bifilar deve conter exatamente dois condutores."
 
         self.project_root = project_root
         self.mtl_copy = copy.deepcopy(mtl)
@@ -228,15 +228,18 @@ class BifilarCoatedWirePULParameters():
             if isinstance(key, int):
                 bare_wire_mtl[key]['insulation'] = None
 
-        bare_wires = TwoCoatedWireSystem(bare_wire_mtl)
+        bare_wires_model = MulticonductorTransmissionLine(bare_wire_mtl)
+        bare_wires = MulticonductorCoatedWireSystems(bare_wires_model)
         bare_wires.run_simulation()
         bare_wires.print_results()
 
         print("\n==============      pyMoM TwoCoatedWireSystem      =============")
-        coated_wires = TwoCoatedWireSystem(self.mtl_copy)
+        coated_wires_model = MulticonductorTransmissionLine(self.mtl_copy)
+        MTLRepresentation(coated_wires_model, units='millimeter').isolated_wires()
+        coated_wires = MulticonductorCoatedWireSystems(coated_wires_model)
         coated_wires.run_simulation()
         coated_wires.print_results()
-        # coated_wires.plot_collocation_points()
+        coated_wires.plot_collocation_points()
 
         self.mom_data = {
             freq: {'c_bare_wire': self.c_factor * bare_wires.C_maxwellian.item(),
@@ -277,6 +280,8 @@ class BifilarCoatedWirePULParameters():
 
         for ratio in self.srw_ratios['mom']:
             temp_mtl = copy.deepcopy(self.mtl_copy)
+
+            # === Conductor Separation ===
             separation = ratio * temp_mtl[0]['radius'][1]
             temp_mtl[1]['center_point'] = (separation, 0.0)
             temp_mtl[1]['insulation']['center_point'] = (separation, 0.0)
@@ -286,7 +291,8 @@ class BifilarCoatedWirePULParameters():
             self.runner.run_fortran(self.fortran_base_params)
 
             # === MoM TwoCoatedWireSystem Instance ===
-            mom_coated = TwoCoatedWireSystem(temp_mtl)
+            model = MulticonductorTransmissionLine(temp_mtl)
+            mom_coated = MulticonductorCoatedWireSystems(model)
             mom_coated.run_simulation()
             
             temp_mtl['type'] = 'bare_wires'
@@ -294,7 +300,8 @@ class BifilarCoatedWirePULParameters():
                 if isinstance(key, int):
                     temp_mtl[key]['insulation'] = None
 
-            mom_bare = TwoCoatedWireSystem(temp_mtl)
+            model = MulticonductorTransmissionLine(temp_mtl)
+            mom_bare = MulticonductorCoatedWireSystems(model)
             mom_bare.run_simulation()
 
             self.srw_mum_data[ratio] = {
@@ -322,7 +329,8 @@ class BifilarCoatedWirePULParameters():
             self.runner.run_fortran(self.fortran_base_params)
 
             # === MoM TwoCoatedWireSystem Instance ===
-            mom_coated = TwoCoatedWireSystem(temp_mtl)
+            mom_coated_model = MulticonductorTransmissionLine(temp_mtl)
+            mom_coated = MulticonductorCoatedWireSystems(mom_coated_model)
             mom_coated.run_simulation()
 
             temp_mtl['type'] = 'bare_wires'
@@ -330,10 +338,10 @@ class BifilarCoatedWirePULParameters():
                 if isinstance(key, int):
                     temp_mtl[key]['insulation'] = None
 
-            mom_bare = TwoCoatedWireSystem(temp_mtl)
+            mom_bare_model = MulticonductorTransmissionLine(temp_mtl)
+            mom_bare = MulticonductorCoatedWireSystems(mom_bare_model)
             mom_bare.run_simulation()
 
-            # Coleta de resultados
             results.append({
                 'k': k,
                 'C0 (RIBBON.FOR)':          self.runner.CAP0_matrix if self.fortran_base_params is not None else np.nan,

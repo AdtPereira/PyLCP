@@ -62,7 +62,7 @@ class MTLRepresentation:
 
             ax.add_patch(Circle(conductor_center, conductor_radius, fill=True, edgecolor='black', facecolor='darkgrey'))
 
-        self._finalize_plot(ax, title='Coaxial Cable Cross-Section')
+        self._finalize_plot(ax, title='Multiconductor Transmission Line Cross-Section')
 
     def isolated_coaxial_cables(self):
         """

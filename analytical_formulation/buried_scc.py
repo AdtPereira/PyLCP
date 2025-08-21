@@ -167,31 +167,84 @@ class GroundReturnAdmittance(GroundReturnImpedance):
         return Pg, Yg 
 
 class PerUnitParameters:    
-    def __init__(self, mtl: MulticonductorTransmissionLine, s, syst):
+    def __init__(self, model: MulticonductorTransmissionLine, s: float):
+        # MTL Geometry Model
+        self.mtl = model
+
         self.s = s
-        self.syst = syst
+
+        # scc model
+        self.ra = Model['ra']['value']
+        self.rb = Model['rb']['value']
+        self.rc = Model['rc']['value']
+        self.rd = Model['rd']['value']
+        self.re = Model['re']['value']
+        self.rf = Model['rf']['value']  
+        self.rho_c = Model['rho_cor']['value']
+        self.rho_s = Model['rho_sth']['value']
+        self.rho_a = Model['rho_arm']['value']
+        self.er_ei = Model['er_eins']['value']
+        self.er_pi = Model['er_pins']['value']
+        self.er_si = Model['er_sins']['value']
+        self.pos_x = Model['pos_x']['value']
+        self.pos_y = Model['pos_y']['value']        
+
+        # Soil resistivity (ohm.m)    
+        self.rho1 = rhog                
+        
+        # Soil relative permittivity
+        self.eps_r1 = erg                
+
+        # Soil permeability (H/m)
+        self.mu1 = MUO                  
+
+        # Soil Conductivity (S/m)
+        self.sgm1 = 1/rhog         
+
+        # Soil permittivity (F/m)
+        self.eps1 = EO * erg    
+
+        # Number of internal conductors (core - sheath - armor)
+        if self.rho_c != 0 and self.rho_s == 0 and self.rho_a == 0:
+            self.ncc = 1
+
+        elif self.rho_c != 0 and self.rho_s != 0 and self.rho_a == 0:
+            self.ncc = 2
+
+        elif self.rho_c != 0 and self.rho_s != 0 and self.rho_a != 0:
+            self.ncc = 3
+
+        else:
+            self.ncc = 0
+
+        # Number of single cables (single-phase - bi-phase - three-phase)
+        self.nph = len(self.pos_y)
+
+        # Number of total conductor (multi-phase transmission line)
+        self.nc = self.ncc*self.nph
+
 
     def SeriesImpedance(self):
         # Ground Return Impedance
         Zg = GroundReturnImpedance(self.s, self.syst).DeConti(self.syst)
         
-        # Loop Impedance Matrix (NODA,2008)
-        zL = SeriesImpedanceMatrix(self.s).LoopImpedance(self.syst, Zg[0][0])
-        A, ZL = SeriesImpedanceMatrix(self.s).MatrixTransformation(self.syst, zL, Zg)
+    #     # Loop Impedance Matrix (NODA,2008)
+    #     zL = SeriesImpedanceMatrix(self.s).LoopImpedance(self.syst, Zg[0][0])
+    #     A, ZL = SeriesImpedanceMatrix(self.s).MatrixTransformation(self.syst, zL, Zg)
         
-        # Series Impedance Matrix
-        self.Zs = SeriesImpedanceMatrix(self.s).SeriesImpedance(A, ZL)
+    #     # Series Impedance Matrix
+    #     self.Zs = SeriesImpedanceMatrix(self.s).SeriesImpedance(A, ZL)
             
-    def ShuntAdmittance(self):
-        self.Ye = GroundReturnAdmittance(self.s, self.syst).LowFrequency(self.syst)
+    # def ShuntAdmittance(self):
+    #     self.Ye = GroundReturnAdmittance(self.s, self.syst).LowFrequency(self.syst)
             
-    def PropagationFunction(self):
-        self.gama = np.sqrt(self.Zs * self.Ye)  
-        self.Yc = np.sqrt(self.Ye / self.Zs)
+    # def PropagationFunction(self):
+    #     self.gama = np.sqrt(self.Zs * self.Ye)  
+    #     self.Yc = np.sqrt(self.Ye / self.Zs)
 
-    def QuadripoleParameters(self, RS, LX):
-        self.Ykk = self.Yc * trig.coth(self.gama*LX)
-        self.Ykm = -self.Yc * trig.csch(self.gama*LX)
-        L1 = np.hstack((self.Ykk + 1/RS, self.Ykm))
-        L2 = np.hstack((self.Ykm       , self.Ykk))
-        return np.vstack((L1, L2))
+    # def QuadripoleParameters(self, RS, LX):
+    #     self.Ykk = self.Yc * trig.coth(self.gama*LX)
+    #     self.Ykm = -self.Yc * trig.csch(self.gama*LX)
+    #     L1 = np.hstack((self.Ykk + 1/RS, self.Ykm))
+    #     L2 = np.hstack((self.Ykm       , self.Ykk))
+    #     return np.vstack((L1, L2))

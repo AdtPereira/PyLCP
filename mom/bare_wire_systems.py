@@ -5,36 +5,36 @@ import scipy.constants as sc
 import matplotlib.pyplot as plt
 import plotly.graph_objects as go
 from mtl_main.utils import *
-from mtl_main.source import MulticonductorTransmissionLine as MTL
+from mtl_main.source import MulticonductorTransmissionLine
 
-
-class MulticonductorBareWireSystems(MTL):
+class MulticonductorBareWireSystems:
     """
     Calcula a capacitância e distribuição de carga para sistemas de fios nus
     usando o Método dos Momentos (MoM) com expansão em séries harmônicas.
 
-    Esta classe herda de MulticonductorTransmissionLine (MTL) e a especializa
-    para o caso de dois fios, derivando seus parâmetros de uma configuração 'mtl'.
+    Esta classe utiliza uma instância de MulticonductorTransmissionLine (MTL)
+    para obter os parâmetros geométricos e elétricos do sistema. Ela então
+    executa a simulação completa do MoM, preenchendo seus próprios atributos 
+    de resultado.
 
-    Executa a simulação completa do MoM, preenchendo todos os atributos de resultado.
-    A construção da matriz D agora inclui os termos de expansão constante, cossenoidal e senoidal,
-    conforme as expressões (20a), (20b) e (20c) de Clements (1975).    
+    Executa a simulação completa do MoM, preenchendo todos os atributos de 
+    resultado. A construção da matriz D agora inclui os termos de expansão
+    constante, cossenoidal e senoidal, conforme as expressões (20a), (20b)
+    e (20c) de Clements (1975).    
 
     Nesta classe, a ordem máxima da harmônica é definida por 'k',
     enquanto NF (número de coeficientes) é derivado como 2*k + 1.
     """
-    def __init__(self, mtl: dict):
-        super().__init__(mtl)
-
-        assert isinstance(mtl, dict), "O parâmetro mtl deve ser um dicionário com a configuração da linha."
-        assert len(self.surfaces) > 1, "A classe MulticonductorBareWireSystems foi projetada para modelos com mais de 1 superfície."
+    def __init__(self, model: MulticonductorTransmissionLine):
+        # MTL Geometry Model
+        self.model = model
         
         # Número de coeficientes harmônicos de Fourier por condutor
-        self.NF = [2*surface['fourier_order']+1 for surface in self.surfaces][0]
+        self.NF = [2*surface['fourier_order']+1 for surface in self.model.surfaces][0]
         
         # Resultado Analítico
-        self.R = self.surfaces[0]['radius']      
-        self.D = self.D_pq[0, 1]
+        self.R = self.model.surfaces[0]['radius']      
+        self.D = self.model.D_pq[0, 1]
         self.DR_ratio = self.D / self.R
         assert self.DR_ratio > 2, "A razão D/R deve ser maior que 2 para garantir a convergência da solução."
         self.C_exact_bare_wires = np.pi * sc.epsilon_0 / np.arccosh(0.5 * self.DR_ratio)
@@ -72,7 +72,7 @@ class MulticonductorBareWireSystems(MTL):
         source_angles = field_angles - (theta / 2)
 
         # Itera sobre cada superfície definida na classe base MTL.
-        for surface in self.surfaces:
+        for surface in self.model.surfaces:
             tag = surface['tag']
             surface_type = surface['type']
             center = np.array(surface['center_point'])
@@ -105,7 +105,7 @@ class MulticonductorBareWireSystems(MTL):
         self.T_matrix = np.linalg.inv(self.D_matrix)
         C_matrix = np.zeros((2, 2))
 
-        for n in range(2):  # Índice do condutor da carga
+        for n in range(2):      # Índice do condutor da carga
             for m in range(2):  # Índice do condutor do potencial
                 sum_of_T_elements = np.sum(self.T_matrix[(n * self.NF), (m * self.NF):((m + 1) * self.NF)])
                 C_matrix[n, m] = 2 * np.pi * self.R * sum_of_T_elements
@@ -132,8 +132,8 @@ class MulticonductorBareWireSystems(MTL):
         assert gc.ndim == 2 and gc.shape[0] == gc.shape[1], "A matriz de capacitância generalizada deve ser quadrada."
         num_conductors = gc.shape[0]
         assert num_conductors > 1, "O cálculo da capacitância Maxwelliana requer pelo menos 2 condutores."
-        assert hasattr(self, 'idx_ref'), "O atributo 'idx_ref' (índice do condutor de referência) não foi encontrado."
-        assert 0 <= self.idx_ref < num_conductors, f"O índice de referência self.idx_ref ({self.idx_ref}) está fora do intervalo válido [0, {num_conductors-1}]."
+        assert hasattr(self.model, 'idx_ref'), "O atributo 'idx_ref' (índice do condutor de referência) não foi encontrado."
+        assert 0 <= self.model.idx_ref < num_conductors, f"O índice de referência self.idx_ref ({self.model.idx_ref}) está fora do intervalo válido [0, {num_conductors-1}]."
 
         # --- Etapa 1: Calcular a matriz Maxwelliana completa (NxN) ---
         total_sum = np.sum(gc)
@@ -151,7 +151,7 @@ class MulticonductorBareWireSystems(MTL):
         # --- Etapa 2: Reduzir a matriz para (N-1)x(N-1) ---
         # Usa np.delete para remover a linha (axis=0) e a coluna (axis=1)
         # correspondentes ao índice do condutor de referência `self.idx_ref`.
-        self.C_maxwellian = np.delete(np.delete(C_full, self.idx_ref, axis=0), self.idx_ref, axis=1)
+        self.C_maxwellian = np.delete(np.delete(C_full, self.model.idx_ref, axis=0), self.model.idx_ref, axis=1)
 
     def run_simulation(self):
         """
@@ -163,15 +163,15 @@ class MulticonductorBareWireSystems(MTL):
 
         # 1. Preparar os índices e vetores do sistema
         # Pré-calcula o número de coeficientes (NF) para cada superfície
-        nfs_per_surface = [2 * surface['fourier_order'] + 1 for surface in self.surfaces]
+        nfs_per_surface = [2 * surface['fourier_order'] + 1 for surface in self.model.surfaces]
         offsets = np.cumsum([0] + nfs_per_surface)
 
-        self.D_matrix = np.zeros((self.N, self.N))
-        self.V_vector = np.zeros(self.N)
+        self.D_matrix = np.zeros((self.model.N, self.model.N))
+        self.V_vector = np.zeros(self.model.N)
 
         # 2. Montar a Matriz [D] e o Vetor [V]
         # Loop sobre as superfícies de OBSERVAÇÃO p (linhas da matriz)
-        for p, field_surface in enumerate(self.surfaces):
+        for p, field_surface in enumerate(self.model.surfaces):
             tag_p = field_surface['tag']
             type_p = field_surface['type']
             radius_p = field_surface['radius']
@@ -185,17 +185,17 @@ class MulticonductorBareWireSystems(MTL):
             # Preenche o vetor de potencial V para o bloco de linhas da superfície p
             if type_p == 'conductor':
                 # A fonte de potencial é o potencial do condutor
-                self.V_vector[offset_p : offset_p + nf_p] = self.mtl[tag_p]['potential_to_infinity']
+                self.V_vector[offset_p : offset_p + nf_p] = self.model.mtl[tag_p]['potential_to_infinity']
             
             # A condição de fronteira na bainha dielétrica resulta em 0 no lado direito da equação
             elif type_p == 'primary_insulation':
                 self.V_vector[offset_p : offset_p + nf_p] = 0.0
 
             # Loop sobre as superfícies de FONTE q (colunas da matriz)
-            for q, source_surface in enumerate(self.surfaces):
+            for q, source_surface in enumerate(self.model.surfaces):
                 center_q = np.array(source_surface['center_point'])
                 radius_q = source_surface['radius']
-                epsilon = self.epsilon_out[source_surface['tag']]
+                epsilon = self.model.epsilon_out[source_surface['tag']]
                 nf_q = nfs_per_surface[q]
                 offset_q = offsets[q]
 
@@ -270,9 +270,9 @@ class MulticonductorBareWireSystems(MTL):
         if self.NF < 4: 
             matrix_viewer(self.D_matrix, "D Matrix")
             matrix_viewer(self.sigma_coeffs, "Sigma Coefficients Vector")
-            print(f"\nSurfaces (len: {len(self.surfaces)}): \n{self.surfaces}")
+            print(f"\nSurfaces (len: {len(self.model.surfaces)}): \n{self.model.surfaces}")
 
-        print(f"\nSurfaces Dim: {len(self.surfaces)}.")
+        print(f"\nSurfaces Dim: {len(self.model.surfaces)}.")
         print(f"\nD Matrix Shape: {self.D_matrix.shape}.")
         matrix_viewer(self.C_generalized, "MoM Generalized Capacitance Matrix (F/m)")
         matrix_viewer(self.C_maxwellian, "Maxwellian Bifilar Capacitance (MoM) (F/m)")
@@ -292,9 +292,7 @@ class MulticonductorBareWireSystems(MTL):
             # Itera sobre cada superfície desse condutor (ex: 'conductor', 'sheath')
             for surface_type, surface_data in conductor_surfaces.items():
                 
-                # Busca o raio correspondente na lista self.surfaces,
-                # pois ele não está em self.collocation_data.
-                matching_surface = next(s for s in self.surfaces if s['tag'] == tag and s['type'] == surface_type)
+                matching_surface = next(s for s in self.model.surfaces if s['tag'] == tag and s['type'] == surface_type)
                 radius = matching_surface['radius']
 
                 # Extrai e adiciona os dados de pontos de fonte
@@ -322,8 +320,7 @@ class MulticonductorBareWireSystems(MTL):
         df = pd.DataFrame(plot_data)
         fig = go.Figure()
 
-        # 3. Adicionar as formas dos círculos (esta parte não muda, pois já itera sobre self.surfaces)
-        for surface in self.surfaces:
+        for surface in self.model.surfaces:
             fig.add_shape(type="circle",
                         xref="x", yref="y",
                         x0=surface['center_point'][0] - surface['radius'], y0=surface['center_point'][1] - surface['radius'],
@@ -377,16 +374,16 @@ class MulticonductorBareWireSystems(MTL):
             self.run_simulation()
 
         # 1. Obter dados do condutor a ser plotado e de seu par
-        all_tags = list(self.mtl.keys())
+        all_tags = list(self.model.mtl.keys())
         if len(all_tags) != 2:
             print("Erro: plot_charge_density foi projetado para sistemas de 2 condutores.")
             return
         other_tag = next(tag for tag in all_tags if tag != tag_to_plot)
 
-        center_plot = np.array(self.mtl[tag_to_plot]['center_point'])
-        center_other = np.array(self.mtl[other_tag]['center_point'])
+        center_plot = np.array(self.model.mtl[tag_to_plot]['center_point'])
+        center_other = np.array(self.model.mtl[other_tag]['center_point'])
 
-        conductor_surface = next(s for s in self.surfaces if s['tag'] == tag_to_plot and s['type'] == 'conductor')
+        conductor_surface = next(s for s in self.model.surfaces if s['tag'] == tag_to_plot and s['type'] == 'conductor')
         R = conductor_surface['radius']
         D = np.linalg.norm(center_plot - center_other)
         DR_ratio = D / R
@@ -398,17 +395,17 @@ class MulticonductorBareWireSystems(MTL):
         angle_of_max_charge = np.arctan2(vec_to_other[1], vec_to_other[0])
         denominator = DR_ratio - 2 * np.cos(theta_plot - angle_of_max_charge)
 
-        delta_v = self.mtl[tag_to_plot]['potential_to_infinity'] - self.mtl[other_tag]['potential_to_infinity']
+        delta_v = self.model.mtl[tag_to_plot]['potential_to_infinity'] - self.model.mtl[other_tag]['potential_to_infinity']
         numerator = (DR_ratio**2 / 4) - 1
         
         # CORREÇÃO FINAL: Remover o abs() para preservar o sinal da carga
         charge_density_exact = (self.C_exact_bare_wires * delta_v / R) * (numerator / denominator)
 
         # 3. Reconstruir a Solução MoM para o Condutor Correto
-        nfs_per_surface = [2 * s['fourier_order'] + 1 for s in self.surfaces]
+        nfs_per_surface = [2 * s['fourier_order'] + 1 for s in self.model.surfaces]
         offsets = np.cumsum([0] + nfs_per_surface)
         
-        surface_index = next(i for i, s in enumerate(self.surfaces) if s['tag'] == tag_to_plot and s['type'] == 'conductor')
+        surface_index = next(i for i, s in enumerate(self.model.surfaces) if s['tag'] == tag_to_plot and s['type'] == 'conductor')
         
         offset = offsets[surface_index]
         nf = nfs_per_surface[surface_index]
@@ -433,7 +430,6 @@ class MulticonductorBareWireSystems(MTL):
         ax.set_xticks(np.arange(0, 361, 90)); ax.set_xlim(0, 360)
         ax.legend()
         plt.tight_layout()
-        # plt.show()
 
     def plot_harmonic_coefficients(self):
         """
@@ -502,38 +498,37 @@ class MulticonductorBareWireSystems(MTL):
         plt.tight_layout()
         
     @staticmethod
-    def plot_convergence_rates(MTL, nf_max=20):
+    def plot_convergence_rates(mtl: dict, nf_max=20):
         """ Plota a convergência da capacitância em função de NF, usando um modelo base. """
         print(f"\nGerando gráfico de convergência até NF={nf_max}...")
         
         C_FACTOR = 1e12  # Fator de conversão para pF/m
         
         # Extrai R e D da configuração base para calcular o valor exato.
-        R = MTL[0]['radius'][1]
-        center1 = np.array(MTL[0]['center_point'])
-        center2 = np.array(MTL[1]['center_point'])
+        R = mtl[0]['radius'][1]
+        center1 = np.array(mtl[0]['center_point'])
+        center2 = np.array(mtl[1]['center_point'])
         D = np.linalg.norm(center1 - center2)
-
         c_exact = (np.pi * sc.epsilon_0) / np.arccosh(D / R / 2.0)
         nf_range = range(1, nf_max + 1)
 
         nf_odd, nf_even, cap_odd, cap_even = [], [], [], []
 
         for nf in nf_range:
-            # Cria uma cópia temporária do modelo para modificar NF sem alterar o original.
-            temp_config = copy.deepcopy(MTL)
-            temp_config[0]['fourier_order'] = nf
-            temp_config[1]['fourier_order'] = nf
+            temp_mtl = copy.deepcopy(mtl)
+            temp_mtl[0]['fourier_order'] = nf
+            temp_mtl[1]['fourier_order'] = nf
 
-            sim = MulticonductorBareWireSystems(temp_config)
-            sim.run_simulation()
+            mtl_model = MulticonductorTransmissionLine(temp_mtl)
+            bare_wires = MulticonductorBareWireSystems(mtl_model)
+            bare_wires.run_simulation()
             
             if nf % 2 != 0:
                 nf_odd.append(nf)
-                cap_odd.append(sim.C_maxwellian.item() * C_FACTOR)
+                cap_odd.append(bare_wires.C_maxwellian.item() * C_FACTOR)
             else:
                 nf_even.append(nf)
-                cap_even.append(sim.C_maxwellian.item() * C_FACTOR)
+                cap_even.append(bare_wires.C_maxwellian.item() * C_FACTOR)
 
         plt.style.use('default')
         fig, ax = plt.subplots(figsize=(8, 5))

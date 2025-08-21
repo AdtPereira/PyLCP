@@ -53,6 +53,7 @@ class MulticonductorTransmissionLine:
         strategy.apply_properties(self, self.mtl)          
 
         # Conductor surfaces dictionary
+        self.surfaces = []
         self._define_mtl_surfaces()
 
         # Dimension N - Equation (2.36) [1]
@@ -130,7 +131,6 @@ class MulticonductorTransmissionLine:
 
         # Step 3: Reconstruct the final list, preserving the original order of appearance
         # of the unique geometries.
-        self.surfaces = []
         added_geometries = set()
         for surface in all_surfaces:
             key = (surface['center_point'], surface['radius'])

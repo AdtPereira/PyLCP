@@ -6,6 +6,8 @@ from pathlib import Path
 from typing import Dict, Any
 
 from mtl_main.utils import *
+from mtl_main.graphics import MTLRepresentation
+from mtl_main.source import MulticonductorTransmissionLine
 from mtl_paul.py_fortran import FortranRunner
 from analytical_formulation.isolated_wires import WiresHomogeneousMedia
 from mom_so.quasi_static_green import QuasiStatic
@@ -13,7 +15,7 @@ from mom_so.lossless_medium import HomogeneousLosslessMedium, LosslessPostProces
 from mom.bare_wire_systems import MulticonductorBareWireSystems
 
 
-class BifilarBareWirePULParameters():
+class BifilarBareWirePULParameters:
     """
     The ConvergenceAnalyzer class is a tool designed to perform and visualize a convergence analysis 
     for the electrical parameters of multiconductor transmission lines (MTLs). 
@@ -208,7 +210,7 @@ class BifilarBareWirePULParameters():
             freq: {'c': self.c_factor * self.runner.CAP0_matrix.item(), 
                    'le': self.l_factor * self.runner.IND_matrix.item()} for freq in self.freq_range['mom']}
 
-    def run_py_mom(self, autoPlots=False):
+    def run_mom_methods(self, autoPlots=False):
         """
         Executa a simulação clássica do Método dos Momentos (MoM) para a linha de transmissão bifilar.
 
@@ -217,7 +219,9 @@ class BifilarBareWirePULParameters():
         """
         print("\n============== pyMoM MulticonductorBareWireSystems =============")
 
-        mom_wires = MulticonductorBareWireSystems(self.mtl_copy)
+        mtl_model = MulticonductorTransmissionLine(self.mtl_copy)
+        MTLRepresentation(mtl_model, units='millimeter').isolated_wires()
+        mom_wires = MulticonductorBareWireSystems(mtl_model)
         mom_wires.run_simulation()
         mom_wires.print_results()
 
@@ -316,6 +320,7 @@ class BifilarBareWirePULParameters():
         print("\n==============         SRW RATES EVALUATION        =============")
 
         mtl_local = copy.deepcopy(self.mtl_copy)
+        
         for ratio in self.srw_ratios['ana']:
             separation = ratio * mtl_local[0]['radius'][1]
             mtl_local[1]['center_point'] = (separation, 0.0)
@@ -332,13 +337,13 @@ class BifilarBareWirePULParameters():
                 'c_approx':     self.c_factor * pul_bifilar['capacitance']['approximate'],
                 'c_wires':      self.c_factor * wires.n_wires_capacitance_matrix(le_wires),
             }
-
         
         for ratio in self.srw_ratios['mom']:
             separation = ratio * mtl_local[0]['radius'][1]
             mtl_local[1]['center_point'] = (separation, 0.0)
 
-            mom_wires = MulticonductorBareWireSystems(mtl_local)
+            mtl_model = MulticonductorTransmissionLine(mtl_local)
+            mom_wires = MulticonductorBareWireSystems(mtl_model)
             mom_wires.run_simulation()
 
             self._prepare_fortran_runner(mtl_local)
@@ -379,7 +384,8 @@ class BifilarBareWirePULParameters():
                     temp_mtl[key]['fourier_order'] = k
                     temp_mtl[key]['sheath'] = None
 
-            mom_bare_wires = MulticonductorBareWireSystems(temp_mtl)
+            mom_bare_wires_model = MulticonductorTransmissionLine(temp_mtl)
+            mom_bare_wires = MulticonductorBareWireSystems(mom_bare_wires_model)
             mom_bare_wires.run_simulation()
 
             # === MoM-SO Instance ===

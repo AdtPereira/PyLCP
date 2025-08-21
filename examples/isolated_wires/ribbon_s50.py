@@ -22,7 +22,6 @@ except IndexError:
 # IMPORTAÇÕES DOS MÓDULOS E MODELO DE DADOS
 try:
     from mtl_main.models_wires import PAUL_RIBBON_CABLE as MTL
-    from mtl_main.graphics import MTLRepresentation
     from analyzer.ribbon_cables import RibbonCoatedCablesPULParameters as PUL
     print("Módulos e modelo de dados importados com sucesso.")
 except ImportError as e:
@@ -45,5 +44,4 @@ if __name__ == "__main__":
     pul.plot_paul_fig514c()
     pul.plot_paul_fig514d()
     pul.plot_dielectric_coated_capacitance_convergence()
-    # MTLRepresentation(MTL, units='mil').isolated_wires()
     plt.show()
