@@ -4,7 +4,6 @@ from scipy.constants import mu_0 as MUO, epsilon_0 as EO
 from scc.scc_functions import MatrixOperation as mo, TrigonometricOperation as trig, MatrixDistances as md
 
 class InternalParameters:
-
     def __init__(self, jw):
         self.jw = jw
 
@@ -85,7 +84,6 @@ class SeriesImpedanceMatrix(InternalParameters):
         return Zs
     
 class GroundReturnImpedance:
-
     def __init__(self, jw, syst):        
         # Pre-calculated constants
         self.jwu = jw * MUO
@@ -119,7 +117,6 @@ class GroundReturnImpedance:
         return Zg    
     
 class GroundReturnAdmittance(GroundReturnImpedance):
-
     def __init__(self, jw, syst):  
         super().__init__(jw, syst) 
         self.P1 = jw/2/np.pi/(syst.sgm1 + jw*syst.eps1)  

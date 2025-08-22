@@ -96,6 +96,7 @@ class MulticonductorTransmissionLine:
                         'center_point': conductor['center_point'],
                         'fourier_order': conductor['fourier_order'],
                     })
+            
             # Then, the conductor is solid
             else:
                 all_surfaces.append({

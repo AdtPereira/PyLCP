@@ -8,10 +8,8 @@ import os
 
 # --- Configuration ---
 SCRIPTS_TO_RUN = [
-    os.path.join("examples", "overhead_lines", "propagation_constants.py"),
-    os.path.join("examples", "overhead_lines", "series_impedance.py"),
-    os.path.join("examples", "overhead_lines", "single_conductor.py"),
-    os.path.join("examples", "overhead_lines", "soil_influence.py"),
+    os.path.join("examples", "overhead_lines", "lima_model.py"),
+    os.path.join("examples", "overhead_lines", "xue_model.py"),
 ]
 
 def main():

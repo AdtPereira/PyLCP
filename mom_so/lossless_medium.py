@@ -18,6 +18,10 @@ REFERENCES:
 [4] PAUL, Clayton R. Analysis of multiconductor transmission lines. 2. ed. Hoboken,
     N.J.: John Wiley & Sons, Inc., c2008.
 
+[5] XUE, Haoyan. General Formulation and Accurate Evaluation of Earth-Return Parameters
+    for Overhead / Underground Cables. PhD thesis, Department of Electrical Engineering,
+    École Polytechnique de Montréal, Université de Montréal, August 2018. 
+
 """
 
 import numpy as np

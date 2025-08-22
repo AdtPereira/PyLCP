@@ -55,7 +55,7 @@ except IndexError:
 
 # IMPORTAÇÕES DOS MÓDULOS E MODELO DE DADOS
 try:
-    from mtl_main.models_scc import SCC_SINGLE_PHASE as MODEL
+    from mtl_main.models_scc import PRYSMIAN_SINGLE_PHASE as MODEL
     from mtl_main.graphics import MTLRepresentation
     from mtl_main.source import MulticonductorTransmissionLine
     from scc.scc_data import scc_models_list

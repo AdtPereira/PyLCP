@@ -189,6 +189,30 @@ class MTLRepresentation:
                 ax.add_patch(Wedge(plot_center_point, insulation_outer_radius, 0, 360, width=insulation_thickness,
                     edgecolor='black', facecolor=insulation_color, linestyle='solid', label=insulation_label))
 
+        # Draw the vertical dimension line with arrows at both ends
+        dim_x_arrow = plot_center_point[0] + (max_radius * self.scale_factor) * 1.5
+        ax.annotate(
+            '',
+            xy=(dim_x_arrow, 0),
+            xycoords='data',
+            xytext=(dim_x_arrow, plot_center_point[1]),
+            textcoords='data',
+            arrowprops=dict(arrowstyle='<->', color='black', shrinkA=0, shrinkB=0, lw=1)
+        )
+
+        # 2. Add the text label next to the dimension line
+        real_h = self.model.surfaces[0]['center_point'][1]
+        label_text = f'h = {real_h:.2f} m'
+        ax.text(
+            dim_x_arrow,
+            plot_center_point[1] / 2,
+            label_text,
+            ha='center',
+            va='center',
+            fontsize=9,
+            bbox=dict(boxstyle='square,pad=0.3', fc='white', ec='none', alpha=0.8)
+        )
+
         # --- Finalize Plot and Add Schematic Ground ---
         ax.axhline(y=0, color='darkgreen', linestyle=':', linewidth=1.5, label='Ground Level')
         ax.relim()
@@ -218,10 +242,18 @@ class MTLRepresentation:
         ax.set_yticks([])
 
         # 5. Fill background and place text using the final limits
-        ax.fill_between([final_xmin, final_xmax], final_ymin, 0, color='saddlebrown', alpha=0.2)
+        ax.fill_between(
+            [final_xmin, final_xmax],
+            final_ymin, 0,
+            color='saddlebrown',
+            alpha=0.2
+        )
+        
         plot_height = final_ymax - final_ymin
         text_x = final_xmin + (final_xmax - final_xmin) * 0.05
         y_offset = plot_height * 0.03
-        ax.text(text_x, +y_offset, 'Air ($\\varepsilon_0$, $\\mu_0$)', verticalalignment='bottom', fontsize=10, style='italic')
-        ax.text(text_x, -y_offset, 'Ground ($\\varepsilon_1$, $\\mu_1$, $\\sigma_1$)', verticalalignment='top', fontsize=10, style='italic')    
+        ax.text(text_x, +y_offset,
+                'Air ($\\varepsilon_0$, $\\mu_0$)', verticalalignment='bottom', fontsize=10, style='italic')
+        ax.text(text_x, -y_offset,
+                'Ground ($\\varepsilon_1$, $\\mu_1$, $\\sigma_1$)', verticalalignment='top', fontsize=10, style='italic')    
       

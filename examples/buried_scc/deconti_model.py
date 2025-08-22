@@ -32,15 +32,14 @@ REFERENCES:
 """
 import os
 import sys
-import copy
 import time
 import numpy as np
 from pathlib import Path
 import matplotlib.pyplot as plt
 
 # RAIZ DO PROJETO E DIRETÓRIOS
-os.system('cls' if os.name == 'nt' else 'clear')
 try:
+    os.system('cls' if os.name == 'nt' else 'clear')
     script_dir = Path(__file__).resolve().parent
     print(f"Script directory: {script_dir}")
     project_root = script_dir.parents[1]
@@ -55,102 +54,71 @@ except IndexError:
 
 # IMPORTAÇÕES DOS MÓDULOS E MODELO DE DADOS
 try:
-    from mtl_main.models_wires import SINGLE_OHTL_XUE as MODEL
-    from mtl_main.source import MulticonductorTransmissionLine
+    from mtl_main.models_scc import DECONTI_SINGLE_PHASE as MODEL
     from mtl_main.graphics import MTLRepresentation
-    from analytical_formulation.overhead_lines import PerUnitParameters
+    from mtl_main.source import MulticonductorTransmissionLine
+    from scc.scc_data import scc_models_list
+    from scc.scc_systm import SystemType
+    from scc.scc_parameters import GroundReturnImpedance
     print("Módulos e modelo de dados importados com sucesso.") 
 except ImportError as e:
     print(f"Erro ao importar módulos: {e}")
     sys.exit(1)
 
-
-def plot_series_impedance(freq, pul, p, q):
-    """
-    This function plots the series resistance as a function of frequency.
-
-    Parameters:
-    freq (array): Frequency array.
-    zi_matrix (list of matrices): Matrix containing impedance values.
-    p (int): Row index in the impedance matrix.
-    q (int): Column index in the impedance matrix.
-    """
+def plot_ground_return_impedance(freq, pul_parameters, p, q):
     _, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5), sharey=False)
     # fig.suptitle('')
 
     f = np.array(freq['Analytically'])
-    zsa = np.array([item['Zs'][p, q] for item in pul['a']])
-    zsb = np.array([item['Zs'][p, q] for item in pul['b']])
-    zsc = np.array([item['Zs'][p, q] for item in pul['c']])
-    lsa = np.imag(zsa) / (2 * np.pi * f)
-    lsb = np.imag(zsb) / (2 * np.pi * f)
-    lsc = np.imag(zsc) / (2 * np.pi * f)
+    zg = np.array([item[p, q] for item in pul_parameters['de_conti']])
+    lg = np.imag(zg) / (2 * np.pi * f)
 
     # Extracting the impedance elements from zi_matrix
-    ax1.plot(f, 1E3 * np.real(zsa), label=r'$\rho_e = 100 \;\Omega m, \epsilon_r=1$', color='black', linestyle='-')
-    ax1.plot(f, 1E3 * np.real(zsb), label=r'$\rho_e = 100 \;\Omega m, \epsilon_r=20$', color='black', linestyle='--')
-    ax1.plot(f, 1E3 * np.real(zsc), label=r'$\rho_e = 2000 \;\Omega m, \epsilon_r=1$', color='black', linestyle='-.')
-
-    # Additional plotting configurations
+    ax1.plot(f, np.real(zg), label='Approx. De Conti et al.', color='red', linestyle='--')
     ax1.set_xscale('log')
-    ax1.set_yscale('log')
-    ax1.set_xlim(1E3, 1E9)
-    ax1.set_ylim(1E0, 1E5)
+    ax1.set_xlim(1E4, 1E7)
+    ax1.set_ylim(0, 35)
     ax1.legend()
     ax1.set_xlabel('Frequency (Hz)')
-    ax1.set_ylabel(r'$R_s \, (\Omega/km)$')
+    ax1.set_ylabel(r'$R_s \, (\Omega/m)$')
     ax1.grid(False)
-    ax1.set_title('P.u.l. series resistance of the single overhead line\n'
-                 r'$r_1 = 0.01\,\mathrm{m}, h_1 = 10\,\mathrm{m}, \rho = 1.68 \times 10^{-8} \, \mathrm{\Omega m}$ [1]')
+    ax1.set_title('P.u.l. ground return resistance of the single buried bare-wire line')
 
     # Extracting the impedance elements from zi_matrix
-    ax2.plot(f, 1E6 * lsa, label=r'$\rho_e = 100 \;\Omega m, \epsilon_r=1$', color='black', linestyle='-')
-    ax2.plot(f, 1E6 * lsb, label=r'$\rho_e = 100 \;\Omega m, \epsilon_r=20$', color='black', linestyle='--')
-    ax2.plot(f, 1E6 * lsc, label=r'$\rho_e = 2000 \;\Omega m, \epsilon_r=1$', color='black', linestyle='-.')
-
+    ax2.plot(f, 1E6 * lg, color='red', linestyle='--')
     ax2.set_xscale('log')
-    ax2.set_xlim(1E3, 1E9)
-    ax2.set_ylim(1, 2.5)
-    ax2.legend()
+    ax2.set_xlim(1E-1, 1E7)
+    ax2.set_ylim(0, 3.5)
     ax2.set_xlabel('Frequency (Hz)')
     ax2.set_ylabel(r'$L_s \, (mH/km)$')
     ax2.grid(False)
-    ax2.set_title('P.u.l. series inductance of the single overhead line\n'
-                 r'$r_1 = 0.01 \, \mathrm{m}, h_1 = 10 \, \mathrm{m}, \rho = 1.68 \times 10^{-8} \, \mathrm{\Omega m}$ [1]')
+    ax2.set_title('P.u.l. ground return inductance of the single buried bare-wire line')
     plt.tight_layout(rect=[0, 0, 1, 0.96])
 
-
 if __name__ == "__main__":
-    """ Main function to perform the calculations and display the results."""
+    """ Função principal para orquestrar a análise, cálculo e visualização dos resultados. """
     st = time.time()
 
     # Calculate the series impedance for each frequency
     frequency = {
-        'Analytically': np.logspace(3, 9, num=100),
-        'Numerically': np.logspace(0, 7, num=30)
+        'Analytically': np.logspace(-1, 7, num=200),
+        'Numerically': np.logspace(-1, 7, num=30)
     }
 
     # Dictionary to hold the series impedance calculations
-    pul = {'a': [], 'b': [], 'c': []}
+    pul_parameters = {
+        'de_conti': [],
+    }
 
-    # The geometric model is constant, so we create the object once for efficiency.
-    mtl_model_a = MulticonductorTransmissionLine(MODEL)
+    mtl_model = MulticonductorTransmissionLine(MODEL)
+    syst = SystemType(Model=scc_models_list[4], rhog=100, erg=10, Syst_id='#1')
 
-    model_b = copy.deepcopy(MODEL)
-    model_b[0]['relative_permittivity'] = 20
-    mtl_model_b = MulticonductorTransmissionLine(model_b)
-
-    model_c = copy.deepcopy(MODEL)
-    model_c[0]['conductivity'] = 0.0005
-    mtl_model_c = MulticonductorTransmissionLine(model_c)
-
+    # Analytical Formulation
     for f in frequency['Analytically']:
-        pul['a'].append(PerUnitParameters(mtl_model_a, f).pul_extended_theory())
-        pul['b'].append(PerUnitParameters(mtl_model_b, f).pul_extended_theory())
-        pul['c'].append(PerUnitParameters(mtl_model_c, f).pul_extended_theory())
+        jw = 1j * 2 * np.pi * f
+        tl = GroundReturnImpedance(jw, syst)
+        pul_parameters['de_conti'].append(tl.DeConti(syst))
 
-    print(f"End of the routine! Time spent on simulation: {(time.time() - st):.2f} seconds.\n")
-    plot_series_impedance(frequency, pul, p=0, q=0)
-    MTLRepresentation(mtl_model_a, units='millimeter').ground_return_systems()
+    plot_ground_return_impedance(frequency, pul_parameters, p=0, q=0)
+    MTLRepresentation(mtl_model, units='millimeter').ground_return_systems()
     plt.show()
-    
