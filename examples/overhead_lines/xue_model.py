@@ -29,7 +29,7 @@ except IndexError:
 
 # --- MODULES AND DATA MODEL IMPORTS ---
 try:
-    from mtl_main.models_wires import SINGLE_OHTL_XUE as MODEL
+    from mtl_main.models_wires import SINGLE_WIRE_R10_XUE as MODEL
     from mtl_main.source import MulticonductorTransmissionLine
     from mtl_main.graphics import MTLRepresentation
     from analytical_formulation.overhead_lines import PerUnitParameters

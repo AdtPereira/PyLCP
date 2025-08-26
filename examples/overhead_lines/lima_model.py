@@ -24,7 +24,7 @@ except IndexError:
 
 # --- MODULES AND DATA MODEL IMPORTS ---
 try:
-    from mtl_main.models_wires import SINGLE_OHTL_LIMA as MODEL
+    from mtl_main.models_wires import SINGLE_WIRE_R10_LIMA as MODEL
     from mtl_main.graphics import MTLRepresentation
     from mtl_main.source import MulticonductorTransmissionLine
     from analytical_formulation.overhead_lines import PerUnitParameters

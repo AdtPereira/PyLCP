@@ -6,7 +6,6 @@ import subprocess
 import sys
 import os
 
-# --- Configuration ---
 SCRIPTS_TO_RUN = [
     os.path.join("examples", "isolated_wires", "bifilar_pymom.py"),
     os.path.join("examples", "isolated_wires", "bifilar_s21.py"),

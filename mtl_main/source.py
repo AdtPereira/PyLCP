@@ -64,18 +64,6 @@ class MulticonductorTransmissionLine:
         # Número de coeficientes harmônicos de Fourier por condutor
         self.NF = self.NF_List[self.idx_ref]
 
-        # # Conductors Permeability [np.array]
-        # self.mu = np.array([sc.mu_0 * cond['relative_permeability'] for cond in self.mtl.values()]) 
-
-        # # Conductors Permittivity [np.array]
-        # self.epsilon = np.array([sc.epsilon_0 * cond['relative_permittivity'] for cond in self.mtl.values()]) 
-
-        # # Conductors conductivity [np.array]
-        # self.sigma = np.array([cond['conductivity'] for cond in self.mtl.values()])
-
-        # # Free-Space Permittivity [np.array]
-        # self.epsilon_out = np.array([sc.epsilon_0 * cond['relative_permittivity_out'] for cond in self.mtl.values()])
-
     # Define the surfaces for the MTL
     def _define_mtl_surfaces(self):
         """

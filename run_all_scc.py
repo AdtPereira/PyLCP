@@ -6,7 +6,6 @@ import subprocess
 import sys
 import os
 
-# --- Configuration ---
 SCRIPTS_TO_RUN = [
     os.path.join("examples", "buried_scc", "core_coated.py"),
 ]

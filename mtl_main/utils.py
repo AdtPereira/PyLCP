@@ -11,7 +11,6 @@ def complex_formatter(x):
     else:
         return f"{x.real:.3e}{x.imag:+.3e}j"
 
-# Set the print options to use the custom formatter
 def set_numpy_print_options():
     """ Set the numpy print options to use the custom formatter."""
     # Define a custom formatter for the numpy print options
@@ -21,6 +20,14 @@ def set_numpy_print_options():
     }
     np.set_printoptions(formatter=my_formatter)
 
+def format_scientific_notation(value, precision=1):
+    """
+    Formats a number into scientific notation using LaTeX style (e.g., 5.8 x 10^7).
+    """
+    e_notation = f'{value:.{precision}e}'
+    base, exponent = e_notation.split('e')
+    exponent_int = int(exponent)
+    return fr'{base} \times 10^{{{exponent_int}}}'
 
 def matrix_viewer(matrix: np.ndarray, title: str, columns_name: Optional[list] = None) -> pd.DataFrame:
     """

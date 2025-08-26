@@ -6,9 +6,10 @@ import subprocess
 import sys
 import os
 
-# --- Configuration ---
 SCRIPTS_TO_RUN = [
+    os.path.join("examples", "overhead_lines", "internal_parameters.py"),
     os.path.join("examples", "overhead_lines", "lima_model.py"),
+    os.path.join("examples", "overhead_lines", "single_wire.py"),
     os.path.join("examples", "overhead_lines", "xue_model.py"),
 ]
 

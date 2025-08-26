@@ -83,7 +83,7 @@ PAUL_RIBBON_CABLE = {
 }
 
 BIFILAR_COATED_WIRE_S4000 = {
-    'name': 'CLEMENTS_BIFILAR_COATED_WIRE_S40',
+    'name': 'BIFILAR_COATED_WIRE_S4000',
     'type': 'coated_wires',
     'note': 'Original Clements (1974) problem',
     'idx_ref_conductor': 0,
@@ -130,7 +130,7 @@ BIFILAR_COATED_WIRE_S4000 = {
 }
 
 BIFILAR_COATED_WIRE_S40_K0 = {
-    'name': 'BIFILAR_COATED_WIRE_S40',
+    'name': 'BIFILAR_COATED_WIRE_S40_K0',
     'type': 'coated_wires',
     'note': 'Modified Clements (1974) problem with conductor radii rw=10mm',
     'idx_ref_conductor': 0,
@@ -177,7 +177,7 @@ BIFILAR_COATED_WIRE_S40_K0 = {
 }
 
 BIFILAR_COATED_WIRE_S40_K10 = {
-    'name': 'BIFILAR_COATED_WIRE_S40',
+    'name': 'BIFILAR_COATED_WIRE_S40_K10',
     'type': 'coated_wires',
     'note': 'Modified Clements (1974) problem with conductor radii rw=10mm',
     'idx_ref_conductor': 0,
@@ -224,7 +224,7 @@ BIFILAR_COATED_WIRE_S40_K10 = {
 }
 
 BIFILAR_BARE_WIRE_S21_K10 = {
-    'name': 'BIFILAR_BARE_WIRE_S21',
+    'name': 'BIFILAR_BARE_WIRE_S21_K10',
     'type': 'bare_wires',
     'note': 'Modified Clements (1974) problem with conductor radii rw=10mm',
     'idx_ref_conductor': 0,
@@ -307,8 +307,8 @@ COAXIAL_CABLE = {
     },
 }
 
-SINGLE_OHTL_LIMA = {
-    'name': 'SINGLE_OHTL_LIMA',
+SINGLE_WIRE_R10_LIMA = {
+    'name': 'SINGLE_WIRE_R10_LIMA',
     'type': 'overhead',
     'note': 'Lima e Tomasevich (2015) model',
     'idx_ref_conductor': 0,
@@ -350,10 +350,10 @@ SINGLE_OHTL_LIMA = {
     },
 }
 
-SINGLE_OHTL_CONTI = {
-    'name': 'SINGLE_OHTL_CONTI',
+SINGLE_WIRE_R05 = {
+    'name': 'SINGLE_WIRE_R05',
     'type': 'overhead',
-    'note': 'De Conti (2018) model',
+    'note': 'De Conti (2021) model',
     'idx_ref_conductor': 0,
     0: {
         'line_id': 0,
@@ -379,8 +379,8 @@ SINGLE_OHTL_CONTI = {
         'line_type': 'active',
         'line_return': 0,
         'center_point': (0.0, 10.0),
-        'radius': [0, 0.010],
-        'conductivity': 6.496E7,
+        'radius': [0, 0.0005],
+        'conductivity': 5.8E7,
         'subconductors': None,
         'insulation': None,
         'conductor_layers': 1,
@@ -393,8 +393,8 @@ SINGLE_OHTL_CONTI = {
     },
 }
 
-SINGLE_OHTL_XUE = {
-    'name': 'SINGLE_OHTL_XUE',
+SINGLE_WIRE_R10_XUE = {
+    'name': 'SINGLE_WIRE_R10_XUE',
     'type': 'overhead',
     'note': 'Xue (2018) model',
     'idx_ref_conductor': 0,
@@ -427,6 +427,49 @@ SINGLE_OHTL_XUE = {
         'subconductors': None,
         'insulation': None,
         'conductor_layers': None,
+        'relative_permeability': 1.0,
+        'relative_permittivity': 1.0,
+        'external_conductance': 0.0,
+        'relative_permittivity_out': 1.0,
+        'potential_to_infinity': -1.0,
+        'fourier_order': 0,
+    },
+}
+
+SINGLE_WIRE_R468 = {
+    'name': 'SINGLE_WIRE_R468',
+    'type': 'overhead',
+    'note': 'De Conti (2021) model',
+    'idx_ref_conductor': 0,
+    0: {
+        'line_id': 0,
+        'conductor_name': 'soil',
+        'line_type': 'return',
+        'line_return': None,
+        'center_point': None,
+        'radius': None,
+        'conductivity': 0.001,
+        'subconductors': None,
+        'insulation': None,
+        'conductor_layers': None,
+        'relative_permeability': 1.0,
+        'relative_permittivity': 1.0,
+        'external_conductance': 0.0,
+        'relative_permittivity_out': 1.0,
+        'potential_to_infinity': +1.0,
+        'fourier_order': 0,
+    },
+    1: {
+        'line_id': 1,
+        'conductor_name': 'p',
+        'line_type': 'active',
+        'line_return': 0,
+        'center_point': (0.0, 8.40),
+        'radius': [0, 0.00468],
+        'conductivity': 3.8E7, # Aluminum Conductivity
+        'subconductors': None,
+        'insulation': None,
+        'conductor_layers': 1,
         'relative_permeability': 1.0,
         'relative_permittivity': 1.0,
         'external_conductance': 0.0,
