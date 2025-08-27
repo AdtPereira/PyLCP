@@ -134,13 +134,13 @@ class MTLRepresentation:
         """
         _, ax = plt.subplots(figsize=(8, 6))
 
-        core_conductor = None
-        for cond in self.model.mtl.values():
-            if cond.get('line_type') == 'active':
-                core_conductor = cond
+        core = None
+        for conductor in self.model.mtl.values():
+            if conductor.get('line_type') == 'active':
+                core = conductor
                 break
                 
-        if not core_conductor:
+        if not core:
             print("Error: Could not find an 'active' conductor.")
             return
 
@@ -158,59 +158,45 @@ class MTLRepresentation:
             h_factor = 5
         elif self.model.mtl_type == 'scc':
             mtl_title = 'Buried Single-Core Cable'
-            h_factor = -3
+            h_factor = - 3
 
-        center_x = core_conductor['center_point'][0] * self.scale_factor
-        center_y_depth = h_factor * max_radius * self.scale_factor
-        plot_center_point = np.array([center_x, center_y_depth])
+        center_point = np.array([core['center_point'][0], h_factor * max_radius]) * self.scale_factor
 
         # --- Plot Conductor and Insulation Layers ---
-        sorted_conductors = sorted(self.model.mtl.values(), key=lambda c: c.get('radius', [0,0])[1])
-        for conductor in sorted_conductors:
+        for conductor in sorted(self.model.mtl.values(), key=lambda c: c.get('radius', [0,0])[1]):
             if 'radius' not in conductor:
                 continue
-            conductor_outer_radius = conductor['radius'][1] * self.scale_factor
-            conductor_inner_radius = conductor['radius'][0] * self.scale_factor
-            conductor_thickness = conductor_outer_radius - conductor_inner_radius
+            
+            outer_radius = conductor['radius'][1] * self.scale_factor
+            thickness = outer_radius - conductor['radius'][0] * self.scale_factor
             label = conductor.get('conductor_name', 'Conductor').capitalize()
             color = self.color_map.get(label.lower(), self.color_map['default'])
-            if conductor_thickness > 0:
-                ax.add_patch(Wedge(plot_center_point, conductor_outer_radius, 0, 360, width=conductor_thickness,
-                                edgecolor='black', facecolor=color, linestyle='solid', label=label))
+            
+            if thickness > 0:
+                ax.add_patch(Wedge(center_point, outer_radius, 0, 360, width=thickness, edgecolor='black', facecolor=color, linestyle='solid', label=label))
+            
             else:
-                ax.add_patch(Circle(plot_center_point, conductor_outer_radius, fill=True, 
-                                    edgecolor='black', facecolor=color, label=label))
+                ax.add_patch(Circle(center_point, outer_radius, fill=True, edgecolor='black', facecolor=color, label=label))
+            
             if 'insulation' in conductor and conductor['insulation'] is not None:
-                insulation_data = conductor['insulation']
-                insulation_thickness = insulation_data['thickness'] * self.scale_factor
-                insulation_outer_radius = conductor_outer_radius + insulation_thickness
-                insulation_label = insulation_data.get('name', 'Insulation').replace('_', ' ').capitalize()
-                insulation_color = self.color_map.get(insulation_data.get('name'), 'cyan')
-                ax.add_patch(Wedge(plot_center_point, insulation_outer_radius, 0, 360, width=insulation_thickness,
-                    edgecolor='black', facecolor=insulation_color, linestyle='solid', label=insulation_label))
+                ins_data = conductor['insulation']
+                ins_thickness = ins_data['thickness'] * self.scale_factor
+                ins_outer_radius = outer_radius + ins_thickness
+                ins_label = ins_data.get('name', 'Insulation').replace('_', ' ').capitalize()
+                ins_color = self.color_map.get(ins_data.get('name'), 'cyan')
+                ax.add_patch(Wedge(center_point, ins_outer_radius, 0, 360, width=ins_thickness, edgecolor='black', facecolor=ins_color, linestyle='solid', label=ins_label))
 
         # Draw the vertical dimension line with arrows at both ends
-        dim_x_arrow = plot_center_point[0] + (max_radius * self.scale_factor) * 1.5
-        ax.annotate(
-            '',
-            xy=(dim_x_arrow, 0),
-            xycoords='data',
-            xytext=(dim_x_arrow, plot_center_point[1]),
-            textcoords='data',
-            arrowprops=dict(arrowstyle='<->', color='black', shrinkA=0, shrinkB=0, lw=1)
+        dim_x_arrow = center_point[0] + (max_radius * self.scale_factor) * 1.5
+        ax.annotate('', xy=(dim_x_arrow, 0), xycoords='data', xytext=(dim_x_arrow, center_point[1]),
+            textcoords='data', arrowprops=dict(arrowstyle='<->', color='black', shrinkA=0, shrinkB=0, lw=1)
         )
 
         # 2. Add the text label next to the dimension line
         real_h = self.model.surfaces[0]['center_point'][1]
         label_text = f'h = {real_h:.2f} m'
-        ax.text(
-            dim_x_arrow,
-            plot_center_point[1] / 2,
-            label_text,
-            ha='center',
-            va='center',
-            fontsize=9,
-            bbox=dict(boxstyle='square,pad=0.3', fc='white', ec='none', alpha=0.8)
+        ax.text(dim_x_arrow, center_point[1] / 2, label_text, ha='center', va='center',
+            fontsize=9, bbox=dict(boxstyle='square,pad=0.3', fc='white', ec='none', alpha=0.8)
         )
 
         # --- Finalize Plot and Add Schematic Ground ---
@@ -223,8 +209,8 @@ class MTLRepresentation:
         x_margin = (tight_xlim[1] - tight_xlim[0]) * 0.45
         final_xmin = tight_xlim[0] - x_margin
         final_xmax = tight_xlim[1] + x_margin
+        
         ax.set_xlim(final_xmin, final_xmax)
-
         tight_ylim = ax.get_ylim()
         y_margin = (tight_ylim[1] - tight_ylim[0]) * 0.2
         final_ymin = tight_ylim[0] - y_margin
@@ -242,18 +228,10 @@ class MTLRepresentation:
         ax.set_yticks([])
 
         # 5. Fill background and place text using the final limits
-        ax.fill_between(
-            [final_xmin, final_xmax],
-            final_ymin, 0,
-            color='saddlebrown',
-            alpha=0.2
-        )
-        
+        ax.fill_between([final_xmin, final_xmax], final_ymin, 0, color='saddlebrown', alpha=0.2)        
         plot_height = final_ymax - final_ymin
         text_x = final_xmin + (final_xmax - final_xmin) * 0.05
         y_offset = plot_height * 0.03
-        ax.text(text_x, +y_offset,
-                'Air ($\\varepsilon_0$, $\\mu_0$)', verticalalignment='bottom', fontsize=10, style='italic')
-        ax.text(text_x, -y_offset,
-                'Ground ($\\varepsilon_1$, $\\mu_1$, $\\sigma_1$)', verticalalignment='top', fontsize=10, style='italic')    
+        ax.text(text_x, +y_offset, 'Air ($\\varepsilon_0$, $\\mu_0$)', verticalalignment='bottom', fontsize=10, style='italic')
+        ax.text(text_x, -y_offset, 'Ground ($\\varepsilon_1$, $\\mu_1$, $\\sigma_1$)', verticalalignment='top', fontsize=10, style='italic')    
       

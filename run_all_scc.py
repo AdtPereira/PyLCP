@@ -8,6 +8,7 @@ import os
 
 SCRIPTS_TO_RUN = [
     os.path.join("examples", "buried_scc", "core_coated.py"),
+    os.path.join("examples", "buried_scc", "deconti_model.py"),
 ]
 
 def main():

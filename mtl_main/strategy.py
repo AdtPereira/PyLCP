@@ -68,8 +68,6 @@ class MTLStrategy(ABC):
         Returns a dictionary of the calculated matrices.
         """
         N = len(mtl_data)
-
-        # Initialize all four matrices
         d_matrix = np.zeros((N, N))
         D_matrix = np.zeros((N, N))
         vertical_separation_matrix = np.zeros((N, N))
@@ -84,23 +82,23 @@ class MTLStrategy(ABC):
                 cm = m_cond_data['center_point']
 
                 # Horizontal and Vertical separation
-                dn_dm = cn[0] - cm[0]
-                hn_hm = cn[1] + cm[1]
+                dnm = cn[0] - cm[0]
+                hnm = cn[1] + cm[1]
 
                 # Geometric Distance (d_nm)
                 if n_tag == m_tag:
                     d = n_cond_data['radius'][1] # Use radius for self-distance
                 else:
-                    d = np.sqrt(dn_dm ** 2 + (cn[1] - cm[1]) ** 2)
+                    d = np.sqrt(dnm ** 2 + (cn[1] - cm[1]) ** 2)
 
                 # Distance to Image (D_nm)
-                D = np.sqrt(dn_dm ** 2 + hn_hm ** 2)
+                D = np.sqrt(dnm ** 2 + hnm ** 2)
 
                 # Populate the matrices at the correct indices
                 d_matrix[n_idx, m_idx] = d
                 D_matrix[n_idx, m_idx] = D
-                vertical_separation_matrix[n_idx, m_idx] = hn_hm
-                horizontal_separation_matrix[n_idx, m_idx] = dn_dm
+                vertical_separation_matrix[n_idx, m_idx] = hnm
+                horizontal_separation_matrix[n_idx, m_idx] = dnm
 
         return {
             'd_matrix_ground_return': d_matrix,
@@ -128,14 +126,28 @@ class SingleCoreCableStrategy(MTLStrategy):
         # assert idx_ref in mtl_data, f"The reference conductor index {idx_ref} must be in the MTL dictionary."
 
     def apply_properties(self, context, mtl: dict) -> None:
-        """Applies cable-specific distance properties to the MTL object."""
-        # # 1. Delegate the complex calculation to the static method
-        # properties = MTLStrategy._conductors_center_distance_matrix(mtl_data)
+        """
+        Calculates and applies overhead-line-specific distance matrices to the MTL object
+        by delegating the calculation to a static helper method.
+        """
+        # 1. Delegate the complex calculation to the static method
+        properties = MTLStrategy._distances_with_ground_return(mtl)
+        context.d_matrix_ground_return = properties['d_matrix_ground_return']
+        context.D_matrix_ground_return = properties['D_matrix_ground_return']
+        context.vertical_separation_matrix = properties['vertical_separation_matrix']
+        context.horizontal_separation_matrix = properties['horizontal_separation_matrix']
 
-        # context.D_pq = properties['distance_pq']
-        # context.x_pq = properties['x_pq']
-        # context.y_pq = properties['y_pq']
-        # context.theta_pq = properties['theta_pq']
+        # Conductors Permeability [np.array]
+        context.mu = np.array([sc.mu_0 * conductor['relative_permeability'] for conductor in mtl.values()]) 
+
+        # Conductors Permittivity [np.array]
+        context.epsilon = np.array([sc.epsilon_0 * conductor['relative_permittivity'] for conductor in mtl.values()]) 
+
+        # Conductors conductivity [np.array]
+        context.sigma = np.array([conductor['conductivity'] for conductor in mtl.values()])
+
+        # Free-Space Permittivity [np.array]
+        context.epsilon_out = np.array([sc.epsilon_0 * conductor['relative_permittivity_out'] for conductor in mtl.values()])
 
 class CableStrategy(MTLStrategy):
     """Strategy for cable-based MTLs like 'coaxial', 'coated_wires', etc."""

@@ -1,9 +1,9 @@
 """ This module contains the definition of the MOM-So systems used in the """
 
-DECONTI_SINGLE_PHASE = {
-    'name': 'DECONTI_SINGLE_PHASE',
+BARE_SINGLE_WIRE = {
+    'name': 'BARED_SINGLE_WIRE',
     'type': 'scc',
-    'note': 'An DECONTI buried bare-wire',
+    'note': 'An DE CONTI buried bare-wire. Ref.: Example 6a, p.157, 2023',
     'idx_ref_conductor': 0,
     0: {
         'line_id': 0,
@@ -20,7 +20,7 @@ DECONTI_SINGLE_PHASE = {
         'conductor_name': 'core',
         'line_type': 'active',
         'line_return': 0,
-        'center_point': (0.0, 2.0), # Positive numbers denotes cable depth
+        'center_point': (0.0, - 2.0), # Negative numbers denotes cable depth above ground
         'radius': [0, 0.040],
         'conductivity': 1/1.934753E-8,
         'subconductors': None,
@@ -54,12 +54,12 @@ PRYSMIAN_SINGLE_PHASE = {
         'conductor_name': 'core',
         'line_type': 'active',
         'line_return': 0,
-        'center_point': (0.0, 1.7), # Positive numbers denotes cable depth
+        'center_point': (0.0, -1.7), # Negative numbers denotes cable depth above ground
         'radius': [0, 0.012975],
         'conductivity': 1/1.934753E-8,
         'subconductors': None,
         'insulation': {'name': 'primary_insulation',
-                        'center_point': (0.0, 1.7),
+                        'center_point': (0.0, -1.7),
                         'thickness': 0.02634,
                         'fourier_order': 0,
                         'relative_permittivity': 2.963538},

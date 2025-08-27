@@ -405,7 +405,7 @@ SINGLE_WIRE_R10_XUE = {
         'line_return': None,
         'center_point': None,
         'radius': None,
-        'conductivity': 0.01,
+        'conductivity': 0.010, # rho_g = 100 Ohm.m
         'subconductors': None,
         'insulation': None,
         'conductor_layers': None,

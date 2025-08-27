@@ -12,7 +12,7 @@ from scipy.integrate import quad
 from mtl_main.source import MulticonductorTransmissionLine
 from scipy import linalg
 
-def sn_sommerfeld(hnm, dnm, ke2, ka2, s_form='s1', type_form='gauss_legendre', pts=150):
+def sommerfeld(hnm, dnm, ke2, ka2, s_form='s1', type_form='gauss_legendre', pts=150):
     """ Calculates the Carson integral using Gauss-Legendre quadrature and scipy.integrate.quad."""
 
     # soil refractive index
@@ -22,29 +22,29 @@ def sn_sommerfeld(hnm, dnm, ke2, ka2, s_form='s1', type_form='gauss_legendre', p
         n = np.sqrt(ke2 / ka2)
 
     # Define the real and imaginary parts of the integrand
-    def int_quad_real(x, hn_hm, dn_dm, ke2, ka2, n):
+    def _int_quad_real(x, hn_hm, dn_dm, ke2, ka2, n):
         num = np.exp(-hn_hm * x) * np.cos(dn_dm * x)
         den = np.sqrt(x**2 + ka2 - ke2) + (n**2 * x)
         return (num/den).real
 
-    def int_quad_imag(x, hn_hm, dn_dm, ke2, ka2, n):
+    def _int_quad_imag(x, hn_hm, dn_dm, ke2, ka2, n):
         num = np.exp(-hn_hm * x) * np.cos(dn_dm * x)
         den = np.sqrt(x**2 + ka2 - ke2) + (n**2 * x)
         return (num/den).imag
 
-    def int_transformed_real(t, hn_hm, dn_dm, k_e2, k_a2, n):
+    def _int_transformed_real(t, hn_hm, dn_dm, k_e2, k_a2, n):
         x = np.tan(t)
         num = np.exp(-hn_hm * x) * np.cos(dn_dm * x)
         den = np.sqrt(x**2 + k_a2 - k_e2) + (n**2 * x)
         return (num/den).real * (1 / np.cos(t)**2)
 
-    def int_transformed_imag(t, hn_hm, dn_dm, k_e2, k_a2, n):
+    def _int_transformed_imag(t, hn_hm, dn_dm, k_e2, k_a2, n):
         x = np.tan(t)
         num = np.exp(-hn_hm * x) * np.cos(dn_dm * x)
         den = np.sqrt(x**2 + k_a2 - k_e2) + (n**2 * x)
         return (num/den).imag * (1 / np.cos(t)**2)
 
-    def int_gauss_legendre(func, a, b, n, *args):
+    def _int_gauss_legendre(func, a, b, n, *args):
         """
         Integrates the function `func` over the interval [a, b] using the Gauss-Legendre method.
         - func: function to be integrated.
@@ -58,74 +58,70 @@ def sn_sommerfeld(hnm, dnm, ke2, ka2, s_form='s1', type_form='gauss_legendre', p
 
     # Calculate the real and imaginary parts of the integral using Gauss-Legendre
     if type_form == 'gauss_legendre':
-        gauss_legendre_real = int_gauss_legendre(
-            int_transformed_real, 0, np.pi/2, pts, hnm, dnm, ke2, ka2, n)
-        gauss_legendre_imag = int_gauss_legendre(
-            int_transformed_imag, 0, np.pi/2, pts, hnm, dnm, ke2, ka2, n)
-        S_n = gauss_legendre_real + 1j * gauss_legendre_imag
+        gauss_legendre_real = _int_gauss_legendre(_int_transformed_real, 0, np.pi/2, pts, hnm, dnm, ke2, ka2, n)
+        gauss_legendre_imag = _int_gauss_legendre(_int_transformed_imag, 0, np.pi/2, pts, hnm, dnm, ke2, ka2, n)
+        Sn = gauss_legendre_real + 1j * gauss_legendre_imag
 
+    # Calculate the real and imaginary parts of the integral using scipy.integrate.Quad
     else:
-        # Calculate the real and imaginary parts of the integral using scipy.integrate.Quad
-        quad_real, _ = quad(int_quad_real, 0, np.inf,
-                            args=(hnm, dnm, ke2, ka2, n))
-        quad_imag, _ = quad(int_quad_imag, 0, np.inf,
-                            args=(hnm, dnm, ke2, ka2, n))
-        S_n = quad_real + 1j * quad_imag
+        quad_real, _ = quad(_int_quad_real, 0, np.inf, args=(hnm, dnm, ke2, ka2, n))
+        quad_imag, _ = quad(_int_quad_imag, 0, np.inf, args=(hnm, dnm, ke2, ka2, n))
+        Sn = quad_real + 1j * quad_imag
 
-    return S_n
+    return Sn
 
 def t_sommerfeld(hnm, dnm, ke2, ka2, type_form='gauss_legendre', pts=150):
     """ Calculates the Carson integral using Gauss-Legendre quadrature and scipy.integrate.quad."""
 
     # Define the real and imaginary parts of the integrand
-    def _int_quad_real(x, hn_hm, dn_dm, k_e2, k_a2):
+    def _int_quad_real(x, hnm, dnm, k_e2, k_a2):
         # soil refractive index
         n = np.sqrt(k_e2 / k_a2)
 
-        exp_1 = np.exp(-hn_hm * x)
-        exp_2 = np.exp(-0.5 * hn_hm * x)
+        exp_1 = np.exp(-hnm * x)
+        exp_2 = np.exp(-0.5 * hnm * x)
         u2 = np.sqrt(x**2 + k_a2 - k_e2)
-        num = u2 * (exp_2 - exp_1) * np.cos(dn_dm * x)
+        num = u2 * (exp_2 - exp_1) * np.cos(dnm * x)
         den = (n * x)**2 + x * u2
 
         return (num/den).real
 
-    def _int_quad_imag(x, hn_hm, dn_dm, k_e2, k_a2):
+    def _int_quad_imag(x, hnm, dnm, k_e2, k_a2):
         # soil refractive index
         n = np.sqrt(k_e2 / k_a2)
 
-        exp_1 = np.exp(-hn_hm * x)
-        exp_2 = np.exp(-0.5 * hn_hm * x)
+        exp_1 = np.exp(-hnm * x)
+        exp_2 = np.exp(-0.5 * hnm * x)
         u2 = np.sqrt(x**2 + k_a2 - k_e2)
-        num = u2 * (exp_2 - exp_1) * np.cos(dn_dm * x)
+        num = u2 * (exp_2 - exp_1) * np.cos(dnm * x)
         den = (n * x)**2 + x * u2
 
         return (num/den).imag
 
-    def _int_transformed_real(t, hn_hm, dn_dm, k_e2, k_a2):
+    def _int_transformed_real(t, hnm, dnm, k_e2, k_a2):
         x = np.tan(t)
 
         # soil refractive index
         n = np.sqrt(k_e2 / k_a2)
 
-        exp_1 = np.exp(-hn_hm * x)
-        exp_2 = np.exp(-0.5 * hn_hm * x)
+        exp_1 = np.exp(-hnm * x)
+        exp_2 = np.exp(-0.5 * hnm * x)
         u2 = np.sqrt(x**2 + k_a2 - k_e2)
-        num = u2 * (exp_2 - exp_1) * np.cos(dn_dm * x)
+        num = u2 * (exp_2 - exp_1) * np.cos(dnm * x)
         den = (n * x)**2 + x * u2
 
         return (num/den).real * (1 / np.cos(t)**2)
 
-    def _int_transformed_imag(t, hn_hm, dn_dm, k_e2, k_a2):
+    def _int_transformed_imag(t, hnm, dnm, k_e2, k_a2):
         x = np.tan(t)
 
         # soil refractive index
         n = np.sqrt(k_e2 / k_a2)
 
-        exp_1 = np.exp(-hn_hm * x)
-        exp_2 = np.exp(-0.5 * hn_hm * x)
+        exp_1 = np.exp(-hnm * x)
+        exp_2 = np.exp(-0.5 * hnm * x)
         u2 = np.sqrt(x**2 + k_a2 - k_e2)
-        num = u2 * (exp_2 - exp_1) * np.cos(dn_dm * x)
+        num = u2 * (exp_2 - exp_1) * np.cos(dnm * x)
         den = (n * x)**2 + x * u2
 
         return (num/den).imag * (1 / np.cos(t)**2)
@@ -148,40 +144,40 @@ def t_sommerfeld(hnm, dnm, ke2, ka2, type_form='gauss_legendre', pts=150):
         gauss_legendre_imag = _int_gauss_legendre(_int_transformed_imag, 0, np.pi/2, pts, hnm, dnm, ke2, ka2)
         T = gauss_legendre_real + 1j * gauss_legendre_imag
 
+    # Calculate the real and imaginary parts of the integral using scipy.integrate.Quad
     else:
-        # Calculate the real and imaginary parts of the integral using scipy.integrate.Quad
         quad_real, _ = quad(_int_quad_real, 0, np.inf, args=(hnm, dnm, ke2, ka2))
         quad_imag, _ = quad(_int_quad_imag, 0, np.inf, args=(hnm, dnm, ke2, ka2))
         T = quad_real + 1j * quad_imag
 
     return T
 
-def sn_sommerfeld_low_frequencies(hnm, dnm, ke2, n2=1, type_form='gauss_legendre', pts=150):
+def sommerfeld_quasi_tem_approx(hnm, dnm, ke2, n2=1, type_form='gauss_legendre', pts=150):
     """ Calculates the Carson integral using Gauss-Legendre quadrature and scipy.integrate.quad."""  
 
-    def int_quad_real(x, hn_hm, dn_dm, k_e2, n2):
-        num = np.exp(-hn_hm * x) * np.cos(dn_dm * x)
+    def _int_quad_real(x, hnm, dnm, k_e2, n2):
+        num = np.exp(-hnm * x) * np.cos(dnm * x)
         den = np.sqrt(x**2 - k_e2) + n2 * x
         return (num/den).real
 
-    def int_quad_imag(x, hn_hm, dn_dm, k_e2, n2):
-        num = np.exp(-hn_hm * x) * np.cos(dn_dm * x)
+    def _int_quad_imag(x, hnm, dnm, k_e2, n2):
+        num = np.exp(-hnm * x) * np.cos(dnm * x)
         den = np.sqrt(x**2 - k_e2) + n2 * x
         return (num/den).imag
 
-    def int_transformed_real(t, hn_hm, dn_dm, k_e2, n2):
+    def _int_transformed_real(t, hnm, dnm, k_e2, n2):
         x = np.tan(t)
-        num = np.exp(-hn_hm * x) * np.cos(dn_dm * x)
+        num = np.exp(-hnm * x) * np.cos(dnm * x)
         den = np.sqrt(x**2 - k_e2) + n2 * x
         return (num/den).real * (1 / np.cos(t)**2)
 
-    def int_transformed_imag(t, hn_hm, dn_dm, k_e2, n2):
+    def _int_transformed_imag(t, hnm, dnm, k_e2, n2):
         x = np.tan(t)
-        num = np.exp(-hn_hm * x) * np.cos(dn_dm * x)
+        num = np.exp(-hnm * x) * np.cos(dnm * x)
         den = np.sqrt(x**2 - k_e2) + n2 * x
         return (num/den).imag * (1 / np.cos(t)**2)
 
-    def int_gauss_legendre(func, a, b, n, *args):
+    def _int_gauss_legendre(func, a, b, n, *args):
         """
         Integrates the function `func` over the interval [a, b] using the Gauss-Legendre method.
         - func: function to be integrated.
@@ -195,14 +191,14 @@ def sn_sommerfeld_low_frequencies(hnm, dnm, ke2, n2=1, type_form='gauss_legendre
     
     # Calculate the real and imaginary parts of the integral using Gauss-Legendre
     if type_form == 'gauss_legendre':
-        gauss_legendre_real = int_gauss_legendre(int_transformed_real, 0, np.pi/2, pts, hnm, dnm, ke2, n2)
-        gauss_legendre_imag = int_gauss_legendre(int_transformed_imag, 0, np.pi/2, pts, hnm, dnm, ke2, n2)
+        gauss_legendre_real = _int_gauss_legendre(_int_transformed_real, 0, np.pi/2, pts, hnm, dnm, ke2, n2)
+        gauss_legendre_imag = _int_gauss_legendre(_int_transformed_imag, 0, np.pi/2, pts, hnm, dnm, ke2, n2)
         Sn = gauss_legendre_real + 1j * gauss_legendre_imag
 
     # Calculate the real and imaginary parts of the integral using scipy.integrate.Quad
     else:
-        quad_real, _ = quad(int_quad_real, 0, np.inf, args=(hnm, dnm, ke2, n2))
-        quad_imag, _ = quad(int_quad_imag, 0, np.inf, args=(hnm, dnm, ke2, n2))
+        quad_real, _ = quad(_int_quad_real, 0, np.inf, args=(hnm, dnm, ke2, n2))
+        quad_imag, _ = quad(_int_quad_imag, 0, np.inf, args=(hnm, dnm, ke2, n2))
         Sn = quad_real + 1j * quad_imag
 
     return Sn
@@ -298,7 +294,7 @@ class PerUnitParameters:
         # Earth wave number - Equation (2.15) [1] (rad/m)
         self.k_earth2 = - self.jw * self.mur_1 * sc.mu_0 * (self.sigma_1 + self.jw * self.er_1 * sc.epsilon_0)
 
-    def internal_impedance_elements_solid_wires(self):
+    def internal_impedance_elements_solid_wires(self, ExactlyForms=True):
         """ This method calculates the internal impedance of solid wires. """
         N = len(self.model.surfaces)
         Zi_approx = np.zeros((N, N), dtype=complex)
@@ -312,7 +308,6 @@ class PerUnitParameters:
         for conductor in self.model.surfaces:
             p = conductor['tag'] - 1
             ro = conductor['radius']
-            q = np.sqrt(2) * ro / self.skin_depth[p]
             jw_mu = self.jw * self.model.mu[p]
             sigma = self.model.sigma[p]
 
@@ -327,34 +322,35 @@ class PerUnitParameters:
             Zi_approx[p, p] = np.sqrt(ri_cc ** 2 + zi_hf ** 2)
             Zi_nahman[p, p] = ri_cc + zi_hf
 
-            # Exact Expression with Modified Bessel Functions
-            bessel_arg = np.sqrt(jw_mu * sigma) * ro
-            
-            # Prevenir erro em DC (f=0), onde o argumento é 0
-            if np.abs(bessel_arg) < 1e-9:
-                Zi_bessel[p, p] = ri_cc
-            else:
-                Zi_bessel[p, p] = zi_hf * ss.iv(0, bessel_arg) / ss.iv(1, bessel_arg)
+            # Exact Expression with Modified Bessel and Kelvin Functions
+            if ExactlyForms:
+                bessel_arg = np.sqrt(jw_mu * sigma) * ro                
+                if np.abs(bessel_arg) < 1e-9:
+                    # DC Case
+                    Zi_bessel[p, p] = ri_cc
+                else:
+                    Zi_bessel[p, p] = zi_hf * ss.iv(0, bessel_arg) / ss.iv(1, bessel_arg)
 
-            # Caso DC (frequência zero)
-            if q < 1e-6:
-                Ri_val = ri_cc
-                wLi_val = 0
-            else:
-                # ss.kelvin(q) retorna uma tupla de números complexos
-                Be, Ke, Bep, Kep = ss.kelvin(q)
-                scaling_factor = ri_cc * (q / 2) / (Bep.imag**2 + Bep.real**2)
-                
-                # Fórmula da Resistência (ca) - Parte Real
-                numerador_R = Be.real * Bep.imag - Be.imag * Bep.real
-                Ri_val = scaling_factor * numerador_R
-                
-                # Fórmula da Reatância (ca) - Parte Imaginária
-                numerador_wL = Be.real * Bep.real + Be.imag * Bep.imag
-                wLi_val = scaling_factor * numerador_wL
+                q = np.sqrt(2) * ro / self.skin_depth[p]
+                if q < 1e-6:
+                    # DC Case
+                    Ri_val = ri_cc
+                    wLi_val = 0
+                else:
+                    # ss.kelvin(q) retorna uma tupla de números complexos
+                    Be, Ke, Bep, Kep = ss.kelvin(q)
+                    scaling_factor = ri_cc * (q / 2) / (Bep.imag**2 + Bep.real**2)
+                    
+                    # Fórmula da Resistência (ca) - Parte Real
+                    numerador_R = Be.real * Bep.imag - Be.imag * Bep.real
+                    Ri_val = scaling_factor * numerador_R
+                    
+                    # Fórmula da Reatância (ca) - Parte Imaginária
+                    numerador_wL = Be.real * Bep.real + Be.imag * Bep.imag
+                    wLi_val = scaling_factor * numerador_wL
 
-            # Reconstrói a impedância complexa
-            Zi_kelvin[p, p] = Ri_val + 1j * wLi_val
+                # Reconstrói a impedância complexa
+                Zi_kelvin[p, p] = Ri_val + 1j * wLi_val
 
         return {
             'Zi_bessel': Zi_bessel,
@@ -525,19 +521,19 @@ class PerUnitParameters:
                 n, m = conductor_n['tag']-1, conductor_m['tag']-1
 
                 # Distance between the conductors (m)
-                hn_hm = self.model.vertical_separation_matrix[n, m]
-                dn_dm = self.model.horizontal_separation_matrix[n, m]
+                hnm = self.model.vertical_separation_matrix[n, m]
+                dnm = self.model.horizontal_separation_matrix[n, m]
 
                 # Quasi-TEM Integral Equation
                 if form == 'quasi_tem':
-                    S1[n, m] = 2 * sn_sommerfeld(hn_hm, dn_dm, self.k_earth2, self.k_air2)
-                    S2[n, m] = 2 * sn_sommerfeld(hn_hm, dn_dm, self.k_earth2, self.k_air2, s_form='s2')
-                    T[n, m] = 2 * t_sommerfeld(hn_hm, dn_dm, self.k_earth2, self.k_air2)
+                    S1[n, m] = 2 * sommerfeld(hnm, dnm, self.k_earth2, self.k_air2)
+                    S2[n, m] = 2 * sommerfeld(hnm, dnm, self.k_earth2, self.k_air2, s_form='s2')
+                    T[n, m] = 2 * t_sommerfeld(hnm, dnm, self.k_earth2, self.k_air2)
 
                 # Quasi-TEM Logarithmic Approximation
                 elif form == 'quasi_tem_log':
                     eta = np.sqrt(self.k_air2 - self.k_earth2)
-                    eta_sqrt = eta * np.sqrt(hn_hm**2 + dn_dm**2)
+                    eta_sqrt = eta * np.sqrt(hnm**2 + dnm**2)
                     n2 = self.k_earth2 / self.k_air2
 
                     log_s1 = 1 + 2 / eta_sqrt
@@ -557,16 +553,16 @@ class PerUnitParameters:
                     ke2_naka = - self.jw * self.mur_1 * sc.mu_0 * \
                         (self.sigma_1 + self.jw * (self.er_1 - 1) * sc.epsilon_0)
 
-                    S1[n, m] = 2 * sn_sommerfeld_low_frequencies(hn_hm, dn_dm, ke2_naka)
-                    S2[n, m] = 2 * sn_sommerfeld_low_frequencies(hn_hm, dn_dm, ke2_naka, n2=n2_naka)
+                    S1[n, m] = 2 * sommerfeld_quasi_tem_approx(hnm, dnm, ke2_naka)
+                    S2[n, m] = 2 * sommerfeld_quasi_tem_approx(hnm, dnm, ke2_naka, n2=n2_naka)
 
                 # Sunde Integral Equation
                 elif form == 'sunde':
-                    S1[n, m] = 2 * sn_sommerfeld_low_frequencies(hn_hm, dn_dm, self.k_earth2)
+                    S1[n, m] = 2 * sommerfeld_quasi_tem_approx(hnm, dnm, self.k_earth2)
 
                 # Carson Integral Equation
                 elif form == 'carson':
-                    S1[n, m] = 2 * sn_sommerfeld_low_frequencies(hn_hm, dn_dm, k_e2)
+                    S1[n, m] = 2 * sommerfeld_quasi_tem_approx(hnm, dnm, k_e2)
 
                 # Log. Approximation Closed-Form Expression
                 else:
@@ -576,12 +572,12 @@ class PerUnitParameters:
                         S1[n, m] = np.log((hn + p_dot) / hn)
 
                     else:
-                        num = np.sqrt((hn_hm + 2*p_dot)**2 + dn_dm**2)
-                        den = np.sqrt(hn_hm**2 + dn_dm**2)
+                        num = np.sqrt((hnm + 2*p_dot)**2 + dnm**2)
+                        den = np.sqrt(hnm**2 + dnm**2)
                         S1[n, m] = np.log(num / den)
 
         # Approx. Internal Impedance Matrix
-        zi = self.internal_impedance_elements_solid_wires()['Zi_approx']
+        zi = self.internal_impedance_elements_solid_wires(ExactlyForms=False)['Zi_approx']
 
         # External Impedance term
         M = self.external_impedance_term()

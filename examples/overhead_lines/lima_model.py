@@ -56,15 +56,12 @@ class LimaModelPlotter:
         # --- Centralized Plotting Configuration with Specific Overrides ---
         self.plot_configs = {
             'attenuation': {
-                # Common settings for all attenuation plots
                 'title': f'Attenuation Constant {title_suffix}',
                 'ylabel': r'Attenuation Constant, $\alpha$ (Np/km)',
                 'quantity_key': 'gamma_v',
                 'transform': lambda x: 1E3 * np.real(x),
                 'xscale': 'log',
                 'xlim': (1E2, 1E10),
-                # ### ALTERAÇÃO AQUI ###
-                # Specific settings for each plot type are now nested
                 'single_plot': {
                     'models': ['quasi_tem', 'quasi_tem_log', 'nakagawa', 'sunde', 'carson'],
                     'ylim': (0, 4),
@@ -127,13 +124,10 @@ class LimaModelPlotter:
 
     def _plot_single_comparison(self, config_key):
         """Generic method to create a single plot comparing different models."""
-        # ### ALTERAÇÃO AQUI ###
-        # Fetch common and plot-specific settings
         config = self.plot_configs[config_key]
-        plot_settings = config['single_plot']
+        plot_settings = config['single_plot']        
         
         plt.figure(figsize=(8, 5))
-
         for model_key in plot_settings['models']:
             data_source = self.pul_data[model_key]
             if isinstance(data_source, dict):
@@ -148,7 +142,6 @@ class LimaModelPlotter:
         plt.xlabel('Frequency (Hz)')
         plt.xscale(config['xscale'])
         plt.xlim(config['xlim'])
-        # Use the specific ylim from plot_settings
         plt.ylim(plot_settings['ylim'])
         plt.legend(loc='best', fontsize='small')
         if plot_settings.get('grid', False):
@@ -203,7 +196,7 @@ class LimaModelPlotter:
 
 if __name__ == "__main__":
     st = time.time()
-    frequency = {'Analytically': np.logspace(0, 10, num=200)}
+    frequency = {'Analytically': np.logspace(0, 10, num=100)}
 
     # --- Data-Driven Calculation Setup ---
     pul_parameters = {}
