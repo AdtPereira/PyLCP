@@ -7,8 +7,9 @@ import sys
 import os
 
 SCRIPTS_TO_RUN = [
-    os.path.join("examples", "buried_scc", "core_coated.py"),
-    os.path.join("examples", "buried_scc", "deconti_model.py"),
+    os.path.join("examples", "scc", "bare_single_wire.py"),
+    os.path.join("examples", "scc", "prysmian_core_cabe.py"),
+    os.path.join("examples", "scc", "prysmian_core_sheath.py"),
 ]
 
 def main():

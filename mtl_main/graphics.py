@@ -23,8 +23,11 @@ class MTLRepresentation:
         self.label_unit = unit_info['label']
         self.color_map = {
             'default': 'darkgrey',
-            'primary_insulation': 'lightblue',
-            'sheath': 'dimgray',
+            'core': 'darkgrey',
+            'sheath': 'darkblue',
+            'insulation': 'cyan',
+            'XLPE': 'lightblue',
+            'HDPE': 'lightgreen',
             'jacket': 'black'
         }
 
@@ -169,8 +172,8 @@ class MTLRepresentation:
             
             outer_radius = conductor['radius'][1] * self.scale_factor
             thickness = outer_radius - conductor['radius'][0] * self.scale_factor
-            label = conductor.get('conductor_name', 'Conductor').capitalize()
-            color = self.color_map.get(label.lower(), self.color_map['default'])
+            label = conductor.get('conductor_name', 'Conductor')
+            color = self.color_map.get(label, self.color_map['default'])
             
             if thickness > 0:
                 ax.add_patch(Wedge(center_point, outer_radius, 0, 360, width=thickness, edgecolor='black', facecolor=color, linestyle='solid', label=label))
@@ -182,8 +185,8 @@ class MTLRepresentation:
                 ins_data = conductor['insulation']
                 ins_thickness = ins_data['thickness'] * self.scale_factor
                 ins_outer_radius = outer_radius + ins_thickness
-                ins_label = ins_data.get('name', 'Insulation').replace('_', ' ').capitalize()
-                ins_color = self.color_map.get(ins_data.get('name'), 'cyan')
+                ins_label = ins_data.get('type', 'Insulation')
+                ins_color = self.color_map.get(ins_data.get('type'), self.color_map['insulation'])
                 ax.add_patch(Wedge(center_point, ins_outer_radius, 0, 360, width=ins_thickness, edgecolor='black', facecolor=ins_color, linestyle='solid', label=ins_label))
 
         # Draw the vertical dimension line with arrows at both ends

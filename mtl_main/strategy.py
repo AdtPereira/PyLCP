@@ -3,9 +3,7 @@ import numpy as np
 import scipy.constants as sc
 
 class MTLStrategy(ABC):
-    """
-    Abstract Base Class defining the interface for MTL type-specific logic.
-    """
+    """ Abstract Base Class defining the interface for MTL type-specific logic."""
 
     @abstractmethod
     def preprocess_mtl_data(self, mtl_data: dict) -> dict:
@@ -61,20 +59,20 @@ class MTLStrategy(ABC):
         }
 
     @staticmethod
-    def _distances_with_ground_return(mtl_data: dict) -> dict:
+    def _surface_distance_with_ground_return(mtl: dict) -> dict:
         """
         Calculates all necessary distance matrices for overhead line analysis,
         including geometric, ground return, horizontal, and vertical separations.
         Returns a dictionary of the calculated matrices.
         """
-        N = len(mtl_data)
+        N = len(mtl)
         d_matrix = np.zeros((N, N))
         D_matrix = np.zeros((N, N))
         vertical_separation_matrix = np.zeros((N, N))
         horizontal_separation_matrix = np.zeros((N, N))
 
         # Create a sorted list of conductors to ensure consistent ordering
-        conductors = sorted(mtl_data.items())
+        conductors = sorted(mtl.items())
 
         for n_idx, (n_tag, n_cond_data) in enumerate(conductors):
             for m_idx, (m_tag, m_cond_data) in enumerate(conductors):
@@ -88,6 +86,55 @@ class MTLStrategy(ABC):
                 # Geometric Distance (d_nm)
                 if n_tag == m_tag:
                     d = n_cond_data['radius'][1] # Use radius for self-distance
+                else:
+                    d = np.sqrt(dnm ** 2 + (cn[1] - cm[1]) ** 2)
+
+                # Distance to Image (D_nm)
+                D = np.sqrt(dnm ** 2 + hnm ** 2)
+
+                # Populate the matrices at the correct indices
+                d_matrix[n_idx, m_idx] = d
+                D_matrix[n_idx, m_idx] = D
+                vertical_separation_matrix[n_idx, m_idx] = hnm
+                horizontal_separation_matrix[n_idx, m_idx] = dnm
+
+        return {
+            'd_matrix_ground_return': d_matrix,
+            'D_matrix_ground_return': D_matrix,
+            'vertical_separation_matrix': vertical_separation_matrix,
+            'horizontal_separation_matrix': horizontal_separation_matrix
+        }
+
+    @staticmethod
+    def _cable_distance_with_ground_return(mtl: dict) -> dict:
+        """
+        Calculates all necessary distance matrices for overhead line analysis,
+        including geometric, ground return, horizontal, and vertical separations.
+        Returns a dictionary of the calculated matrices.
+        """
+        # Create a sorted list of CORE conductors to ensure consistent ordering
+        core_conductors = sorted({key: value for key, value in mtl.items() if value.get('conductor_name') in ['core']}.items())
+        
+        # Count number of CORE conductors 
+        N = len(core_conductors)
+        
+        d_matrix = np.zeros((N, N))
+        D_matrix = np.zeros((N, N))
+        vertical_separation_matrix = np.zeros((N, N))
+        horizontal_separation_matrix = np.zeros((N, N))
+
+        for n_idx, (n_tag, n_conductor) in enumerate(core_conductors):
+            for m_idx, (m_tag, m_conductor) in enumerate(core_conductors):
+                cn = n_conductor['center_point']
+                cm = m_conductor['center_point']
+
+                # Horizontal and Vertical separation
+                dnm = cn[0] - cm[0]
+                hnm = cn[1] + cm[1]
+
+                # Geometric Distance (d_nm)
+                if n_tag == m_tag:
+                    d = n_conductor['radius'][1] # Use radius for self-distance
                 else:
                     d = np.sqrt(dnm ** 2 + (cn[1] - cm[1]) ** 2)
 
@@ -125,17 +172,94 @@ class SingleCoreCableStrategy(MTLStrategy):
         # assert mtl_data[0]['line_type'] == 'return', "Conductor with index '0' must be the return path for cables."
         # assert idx_ref in mtl_data, f"The reference conductor index {idx_ref} must be in the MTL dictionary."
 
+    def _extract_scc_parameters(self, mtl: dict) -> dict:
+        """
+        Extracts geometric and physical parameters from a single-core cable
+        data structure using descriptive names for clarity. It handles solid
+        cores (inner radius = 0) and hollow layers.
+
+        Args:
+            mtl (dict): The dictionary containing conductor data for the SCC.
+
+        Returns:
+            dict: A dictionary with the calculated parameters (radii, rho, mu, epsilon).
+        """
+        scc = {}
+        core, sheath, armor = None, None, None
+
+        # Identify each layer by its name
+        for conductor_data in mtl.values():
+            name = conductor_data.get('conductor_name')
+            if name == 'core':
+                core = conductor_data
+            elif name == 'sheath':
+                sheath = conductor_data
+            elif name == 'armor':
+                armor = conductor_data
+        
+        # === CORE ===
+        if core:
+            scc['core_inner_radius'], scc['core_outer_radius'] = core['radius']
+            if 'insulation' in core and core['insulation']:
+                scc['core_insulation_outer_radius'] = scc['core_outer_radius'] + core['insulation']['thickness']
+                scc['core_insulation_permittivity'] = core['insulation']['relative_permittivity'] * sc.epsilon_0
+                scc['core_insulation_permeability'] = core['insulation']['relative_permeability'] * sc.mu_0
+            
+            # Extract physical properties for the core conductor (layer 1)
+            scc['core_resistivity'] = 1 / core['conductivity']
+            scc['core_permeability'] = core['relative_permeability'] * sc.mu_0
+            scc['core_permittivity'] = core['relative_permittivity'] * sc.epsilon_0
+        
+        # === SHEATH ===
+        if sheath and scc.get('core_insulation_outer_radius') is not None:
+            assert np.isclose(scc['core_insulation_outer_radius'], sheath['radius'][0]), \
+                (f"Geometric mismatch: Core's insulation outer radius ({scc['core_insulation_outer_radius']}) "
+                     f"does not match sheath's inner radius ({sheath['radius'][0]})")
+
+            scc['sheath_inner_radius'], scc['sheath_outer_radius'] = sheath['radius']
+            if 'insulation' in sheath and sheath['insulation']:
+                scc['sheath_insulation_outer_radius'] = scc['sheath_outer_radius'] + sheath['insulation']['thickness']
+                scc['sheath_insulation_permittivity'] = sheath['insulation']['relative_permittivity'] * sc.epsilon_0
+                scc['sheath_insulation_permeability'] = sheath['insulation']['relative_permeability'] * sc.mu_0
+
+            # Extract physical properties for the sheath conductor (layer 2)
+            scc['sheath_resistivity'] = 1 / sheath['conductivity']
+            scc['sheath_permeability'] = sheath['relative_permeability'] * sc.mu_0
+            scc['sheath_permittivity'] = sheath['relative_permittivity'] * sc.epsilon_0
+
+        # === ARMOR ===
+        if armor and scc.get('sheath_insulation_outer_radius') is not None:
+            assert np.isclose(scc['sheath_insulation_outer_radius'], armor['radius'][0]), \
+                (f"Geometric mismatch: Sheath's insulation outer radius ({scc['sheath_insulation_outer_radius']}) "
+                     f"does not match armor's inner radius ({armor['radius'][0]})")
+            
+            scc['armor_inner_radius'], scc['armor_outer_radius'] = armor['radius']
+            if 'insulation' in armor and armor['insulation']:
+                scc['armor_insulation_outer_radius'] = scc['armor_outer_radius'] + armor['insulation']['thickness']
+                scc['armor_insulation_permittivity'] = armor['insulation']['relative_permittivity'] * sc.epsilon_0
+                scc['armor_insulation_permeability'] = armor['insulation']['relative_permeability'] * sc.mu_0
+
+            # Extract physical properties for the armor conductor (layer 3)
+            scc['armor_resistivity'] = 1 / armor['conductivity']
+            scc['armor_permeability'] = armor['relative_permeability'] * sc.mu_0
+            scc['armor_permittivity'] = armor['relative_permittivity'] * sc.epsilon_0
+
+        return scc
+    
     def apply_properties(self, context, mtl: dict) -> None:
         """
         Calculates and applies overhead-line-specific distance matrices to the MTL object
         by delegating the calculation to a static helper method.
         """
         # 1. Delegate the complex calculation to the static method
-        properties = MTLStrategy._distances_with_ground_return(mtl)
+        properties = MTLStrategy._cable_distance_with_ground_return(mtl)
         context.d_matrix_ground_return = properties['d_matrix_ground_return']
         context.D_matrix_ground_return = properties['D_matrix_ground_return']
         context.vertical_separation_matrix = properties['vertical_separation_matrix']
         context.horizontal_separation_matrix = properties['horizontal_separation_matrix']
+
+        # NEW: Extract and apply SCC geometric parameters
+        context.scc = self._extract_scc_parameters(mtl)
 
         # Conductors Permeability [np.array]
         context.mu = np.array([sc.mu_0 * conductor['relative_permeability'] for conductor in mtl.values()]) 
@@ -212,7 +336,7 @@ class OverheadLineStrategy(MTLStrategy):
         by delegating the calculation to a static helper method.
         """
         # 1. Delegate the complex calculation to the static method
-        properties = MTLStrategy._distances_with_ground_return(mtl)
+        properties = MTLStrategy._surface_distance_with_ground_return(mtl)
         context.d_matrix_ground_return = properties['d_matrix_ground_return']
         context.D_matrix_ground_return = properties['D_matrix_ground_return']
         context.vertical_separation_matrix = properties['vertical_separation_matrix']

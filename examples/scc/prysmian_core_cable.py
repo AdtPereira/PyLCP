@@ -57,16 +57,16 @@ except IndexError:
 
 # IMPORTAÇÕES DOS MÓDULOS E MODELO DE DADOS
 try:
-    from mtl_main.models_scc import BARE_SINGLE_WIRE as MODEL
+    from mtl_main.models_scc import PRYSMIAN_138kV_CORE_CABLE as MODEL
     from mtl_main.graphics import MTLRepresentation
     from mtl_main.source import MulticonductorTransmissionLine
-    from analytical_formulation.buried_scc import PerUnitParameters
+    from analytical_formulation.scc import PerUnitParameters
     print("Módulos e modelo de dados importados com sucesso.") 
 except ImportError as e:
     print(f"Erro ao importar módulos: {e}")
     sys.exit(1)
 
-class DeContiModelPlotter:
+class PrysmianModelPlotter:
     """
     A highly refactored class to handle plotting for the Xue model results.
     It uses a configuration-driven approach to generate complex subplot figures.
@@ -80,6 +80,8 @@ class DeContiModelPlotter:
         self.w = 2 * np.pi * self.f
         self.ro = mtl_model.surfaces[0]['radius']
         self.h1 = mtl_model.surfaces[0]['center_point'][1]
+        self.rho_1 = 1/mtl_model.mtl_ref[0]['conductivity']
+        self.epsr_1 = mtl_model.mtl_ref[0]['relative_permittivity']
 
         self.nakagawa_series = [
             {'key': 'magalhaes_xue', 'label': 'Magalhães/Xue',  'color': 'black', 'linestyle': '-', 'linewidth': 2},
@@ -88,21 +90,30 @@ class DeContiModelPlotter:
             {'key': 'ametani', 'label': 'Ametani', 'color': 'cyan', 'linestyle': '-', 'linewidth': 1},
             {'key': 'deconti', 'label': 'De Conti', 'color': 'red', 'linestyle': '--', 'linewidth': 1},
             {'key': 'saad', 'label': 'Saad', 'color': 'red', 'linestyle': '--', 'linewidth': 1},
-            {'key': 'wedepohl', 'label': 'Wedepohl and Wilcox', 'color': 'darkgreen', 'linestyle': '-', 'linewidth': 1},
         ]
         
         self.plot_configs = {
-            'ground_return_impedance': {
-                'suptitle': r'P.u.l. ground-return impedance for single buried bare-wire for $\rho_e=100 \;\Omega$ m and $\epsilon_r=10$',
+            'core': {
+                'suptitle': fr'Prysmian 138 kV SCC P.u.l. parameters of core conductor, $z_{{cs}}$ [2]',
                 'resistance_title': 'P.u.l. resistance',
                 'inductance_title': 'P.u.l. inductance',
-                'x_lim': {'resistance': (1E5, 1E8), 'inductance': (1E-1, 1E8)},
-                'y_lim': {'resistance': (0, 200), 'inductance': (0.5, 3.0)},
+                'series_to_plot': [
+                    {'key': 'zcs', 'label': r'$[Z_i] = Z_{cc} = z_{11} + z_{12}$', 'color': 'black', 'linestyle': '-', 'linewidth': 2.0},
+                    {'key': 'z11', 'label': r'$z_{11}$: Internal impedance of core outer surface', 'color': 'darkgreen', 'linestyle': ':', 'linewidth': 1.0},
+                    {'key': 'z12', 'label': r'$z_{12}$: Core outer insulator impedance', 'color': 'darkblue',  'linestyle': '--', 'linewidth': 1.0},
+                ]
+            },
+            'ground_return_impedance': {
+                'suptitle': fr'Prysmian 138 kV SCC P.u.l. ground-return impedance for $\rho_1={self.rho_1:.0f} \;\Omega$ m and $\epsilon_{{r1}}={self.epsr_1:.0f}$',
+                'resistance_title': 'P.u.l. resistance',
+                'inductance_title': 'P.u.l. inductance',
+                'x_lim': {'resistance': (1E3, 1E7), 'inductance': (1E3, 1E7)},
+                # 'y_lim': {'resistance': (0, 200), 'inductance': (0.5, 3.0)},
                 'series_to_plot': self.nakagawa_series
             },
         }
 
-    def _plot_impedance_subplots(self, config_key):
+    def _ground_return_impedance_subplots(self, config_key):
         """
         Generic method to create a 1x2 subplot for series resistance (left)
         and series inductance (right) based on a configuration key.
@@ -121,26 +132,24 @@ class DeContiModelPlotter:
 
         # Configure left subplot (Resistance)
         ax1.set_xscale('log')
-        ax1.set_xlim(config['x_lim']['resistance'])
-        ax1.set_ylim(config['y_lim']['resistance'])
         ax1.legend(fontsize='small')
         ax1.set_xlabel('Frequency (Hz)')
         ax1.set_ylabel(r'$R_s \, (\Omega/m)$')
         ax1.grid(True, which='both', linestyle='--', linewidth=0.5)
+        ax1.set_xlim(config['x_lim']['resistance'])
         ax1.set_title(config['resistance_title'])
 
         # Configure right subplot (Inductance)
         ax2.set_xscale('log')
-        ax2.set_xlim(config['x_lim']['inductance'])
-        # ax2.set_ylim(config['y_lim']['inductance'])
         ax2.legend(fontsize='small')
         ax2.set_xlabel('Frequency (Hz)')
         ax2.set_ylabel(r'$L_s \, (mH/km)$')
         ax2.grid(True, which='both', linestyle='--', linewidth=0.5)
+        ax2.set_xlim(config['x_lim']['inductance'])
         ax2.set_title(config['inductance_title'])
         plt.tight_layout(rect=[0, 0, 1, 0.96])
 
-    def _plot_admittance_subplots(self, config_key):
+    def _ground_return_admittance_subplots(self, config_key):
         """
         Generic method to create a 1x2 subplot for shunt conductance (left)
         and shunt capacitance (right) based on a configuration key.
@@ -178,7 +187,7 @@ class DeContiModelPlotter:
         ax2.set_title(config['capacitance_title'])
         plt.tight_layout(rect=[0, 0, 1, 0.96])
 
-    def _plot_propagation_constant_subplots(self, config_key):
+    def _propagation_constant_subplots(self, config_key):
         config = self.plot_configs[config_key]
         fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5), sharey=False)
         fig.suptitle(config['suptitle'], fontsize=12, y=0.98)
@@ -213,36 +222,98 @@ class DeContiModelPlotter:
         ax2.set_title(config['phase_velocity_title'])
         plt.tight_layout(rect=[0, 0, 1, 0.96])
 
-    def plot_ground_return_impedance(self):
-        self._plot_impedance_subplots('ground_return_impedance')
+    def ground_return_impedance(self):
+        self._ground_return_impedance_subplots('ground_return_impedance')
+
+    def core_parameters(self, config_key='core'):
+        """
+        This method now pre-calculates the impedance components, including
+        the summed 'zcs', and stores them in a dictionary for easy plotting.
+        """
+        config = self.plot_configs[config_key]
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5), sharey=False)
+        fig.suptitle(config['suptitle'], fontsize=12, y=0.98)
+
+        # Step 1: Pre-calculate base impedance arrays from simulation results.
+        z11 = np.array([data['zcs']['z11'] for data in self.pul_data['internal']])
+        z12 = np.array([data['zcs']['z12'] for data in self.pul_data['internal']])
+        impedance_data = {
+            'zcs': z11 + z12,
+            'z11': z11,
+            'z12': z12,
+        }
+
+        # Step 3: Iterate through the plotting configuration and plot from pre-calculated data.
+        for series_config in config['series_to_plot']:
+            z_values = impedance_data[series_config['key']]
+            r_values = np.real(z_values) 
+            l_values = np.imag(z_values) / self.w * 1e6  # Convert to uH/m
+            
+            # Define the plot style from the configuration.
+            style = {
+                'label': series_config['label'], 
+                'color': series_config['color'], 
+                'linestyle': series_config['linestyle'], 
+                'linewidth': series_config['linewidth']
+            }
+            
+            # Plot resistance and inductance on their respective subplots.
+            ax1.plot(self.f, r_values, **style)
+            ax2.plot(self.f, l_values, **style)
+
+        # Configure left subplot (Resistance)
+        ax1.set_xscale('log')
+        ax1.legend(fontsize='small')
+        ax1.set_xlabel('Frequency (Hz)')
+        ax1.set_ylabel(r'Resistance ($\Omega$/m)')
+        ax1.grid(True, which='both', linestyle='--', linewidth=0.5)
+        ax1.set_title(config['resistance_title'])
+
+        # Configure right subplot (Inductance)
+        ax2.set_xscale('log')
+        ax2.legend(fontsize='small')
+        ax2.set_xlabel('Frequency (Hz)')
+        ax2.set_ylabel(r'Inductance ($\mu$H/m)')
+        ax2.grid(True, which='both', linestyle='--', linewidth=0.5)
+        ax2.set_title(config['inductance_title'])
+        plt.tight_layout(rect=[0, 0, 1, 0.96])
 
 if __name__ == "__main__":
     st = time.time()
-    frequency = {'Analytically': np.logspace(-1, 8, num=200)}
+    frequency = {'Analytically': np.logspace(1, 7, num=100)}
 
     # Define models for different physical scenarios
     mtl_model = MulticonductorTransmissionLine(MODEL)
-    
+
     # Define the calculation scenarios
     scenarios = {
+        'internal': {'mtl': mtl_model},
         'magalhaes_xue': {'mtl': mtl_model, 'form': 'magalhaes_xue'},
         'sunde': {'mtl': mtl_model, 'form': 'sunde'},
         'pollaczek': {'mtl': mtl_model, 'form': 'pollaczek'},
         'ametani': {'mtl': mtl_model, 'form': 'ametani'},
         'deconti': {'mtl': mtl_model, 'form': 'deconti'},
         'saad': {'mtl': mtl_model, 'form': 'saad'},
-        'wedepohl': {'mtl': mtl_model, 'form': 'wedepohl'},
     }
     
     pul_parameters = {key: [] for key in scenarios}
     for f in frequency['Analytically']:
         for key, params in scenarios.items():
-            pul_parameters[key].append(
-                PerUnitParameters(params['mtl'], f).pul_extended_theory(form=params['form'])
-            )
+            # Internal Parameters
+            if key == 'internal':
+                pul_parameters[key].append(
+                    PerUnitParameters(params['mtl'], f).internal_parameters_by_bessel()
+                )
+            
+            # Ground Return Parameters
+            else:
+                pul_parameters[key].append(
+                    PerUnitParameters(params['mtl'], f).ground_return_parameters(form=params['form'])
+                )
 
-    print(f"End of the routine! Time spent on simulation: {(time.time() - st):.2f} seconds.\n")
-    plotter = DeContiModelPlotter(mtl_model, frequency, pul_parameters)
-    plotter.plot_ground_return_impedance()
+    print(f"End of the routine! Time spent on simulation: {(time.time() - st):.1f} seconds.\n")
+    plotter = PrysmianModelPlotter(mtl_model, frequency, pul_parameters)
+    plotter.core_parameters()
+    plotter.ground_return_impedance()
     MTLRepresentation(mtl_model, units='millimeter').ground_return_systems()
     plt.show()
