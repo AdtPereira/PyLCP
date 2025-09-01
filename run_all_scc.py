@@ -8,8 +8,9 @@ import os
 
 SCRIPTS_TO_RUN = [
     os.path.join("examples", "scc", "bare_single_wire.py"),
-    os.path.join("examples", "scc", "prysmian_core_cabe.py"),
+    os.path.join("examples", "scc", "prysmian_core_cable.py"),
     os.path.join("examples", "scc", "prysmian_core_sheath.py"),
+    os.path.join("examples", "scc", "xue_flat.py"),
 ]
 
 def main():

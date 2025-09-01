@@ -12,34 +12,28 @@ import numpy as np
 import scipy.special as ss
 import scipy.constants as sc
 from scipy.integrate import quad
+from scipy.linalg import lu_factor, lu_solve
 from mtl_main.source import MulticonductorTransmissionLine
-from scipy import linalg
 
-def sommerfeld_quasi_tem_approx(hnm, dnm, ke2, ka2, s_form='s1', type_form='gauss_legendre', pts=150):
+def sommerfeld_quasi_tem_approx_impedance(hnm, dnm, ke2, ka2, type_form='gauss_legendre', pts=150):
     """ Calculates the Carson integral using Gauss-Legendre quadrature and scipy.integrate.quad."""
 
-    # soil refractive index
-    if s_form == 's1':
-        n = 1
-    elif s_form == 's2':
-        n = np.sqrt(ke2 / ka2)
-
     # Define the real and imaginary parts of the integrand
-    def _int_quad_real(x, hnm, dnm, ke2, ka2, n):
+    def _int_quad_real(x, hnm, dnm, ke2, ka2):
         sqrt_x2_ke2 = np.sqrt(x**2 - ke2)            
         sqrt_x2_ka2 = np.sqrt(x**2 - ka2)
         num = np.exp(hnm * sqrt_x2_ke2) * np.cos(dnm * x)
         den = sqrt_x2_ka2 + sqrt_x2_ke2
         return (num/den).real
 
-    def _int_quad_imag(x, hnm, dnm, ke2, ka2, n):
+    def _int_quad_imag(x, hnm, dnm, ke2, ka2):
         sqrt_x2_ke2 = np.sqrt(x**2 - ke2)
         sqrt_x2_ka2 = np.sqrt(x**2 - ka2)
         num = np.exp(hnm * sqrt_x2_ke2) * np.cos(dnm * x)
         den = sqrt_x2_ka2 + sqrt_x2_ke2
         return (num/den).imag
 
-    def _int_transformed_real(t, hnm, dnm, ke2, ka2, n):
+    def _int_transformed_real(t, hnm, dnm, ke2, ka2):
         x = np.tan(t)
         sqrt_x2_ke2 = np.sqrt(x**2 - ke2)
         sqrt_x2_ka2 = np.sqrt(x**2 - ka2)
@@ -47,7 +41,7 @@ def sommerfeld_quasi_tem_approx(hnm, dnm, ke2, ka2, s_form='s1', type_form='gaus
         den = sqrt_x2_ka2 + sqrt_x2_ke2
         return (num/den).real * (1 / np.cos(t)**2)
 
-    def _int_transformed_imag(t, hnm, dnm, ke2, ka2, n):
+    def _int_transformed_imag(t, hnm, dnm, ke2, ka2):
         x = np.tan(t)
         sqrt_x2_ke2 = np.sqrt(x**2 - ke2)
         sqrt_x2_ka2 = np.sqrt(x**2 - ka2)
@@ -69,14 +63,14 @@ def sommerfeld_quasi_tem_approx(hnm, dnm, ke2, ka2, s_form='s1', type_form='gaus
 
     # Calculate the real and imaginary parts of the integral using Gauss-Legendre
     if type_form == 'gauss_legendre':
-        gauss_legendre_real = _int_gauss_legendre(_int_transformed_real, 0, np.pi/2, pts, hnm, dnm, ke2, ka2, n)
-        gauss_legendre_imag = _int_gauss_legendre(_int_transformed_imag, 0, np.pi/2, pts, hnm, dnm, ke2, ka2, n)
+        gauss_legendre_real = _int_gauss_legendre(_int_transformed_real, 0, np.pi/2, pts, hnm, dnm, ke2, ka2)
+        gauss_legendre_imag = _int_gauss_legendre(_int_transformed_imag, 0, np.pi/2, pts, hnm, dnm, ke2, ka2)
         Sn = gauss_legendre_real + 1j * gauss_legendre_imag
 
     # Calculate the real and imaginary parts of the integral using scipy.integrate.Quad
     else:
-        quad_real, _ = quad(_int_quad_real, 0, np.inf, args=(hnm, dnm, ke2, ka2, n))
-        quad_imag, _ = quad(_int_quad_imag, 0, np.inf, args=(hnm, dnm, ke2, ka2, n))
+        quad_real, _ = quad(_int_quad_real, 0, np.inf, args=(hnm, dnm, ke2, ka2))
+        quad_imag, _ = quad(_int_quad_imag, 0, np.inf, args=(hnm, dnm, ke2, ka2))
         Sn = quad_real + 1j * quad_imag
 
     return Sn
@@ -133,60 +127,37 @@ def sommerfeld_ametani_approx(hnm, dnm, ke2, type_form='gauss_legendre', pts=150
 
     return Sn
 
-def t_sommerfeld(hnm, dnm, ke2, ka2, type_form='gauss_legendre', pts=150):
+def sommerfeld_quasi_tem_approx_admittance(hnm, dnm, ke2, ka2, type_form='gauss_legendre', pts=150):
     """ Calculates the Carson integral using Gauss-Legendre quadrature and scipy.integrate.quad."""
 
-    # Define the real and imaginary parts of the integrand
-    def _int_quad_real(x, hnm, dnm, k_e2, k_a2):
-        # soil refractive index
-        n = np.sqrt(k_e2 / k_a2)
-
-        exp_1 = np.exp(-hnm * x)
-        exp_2 = np.exp(-0.5 * hnm * x)
-        u2 = np.sqrt(x**2 + k_a2 - k_e2)
-        num = u2 * (exp_2 - exp_1) * np.cos(dnm * x)
-        den = (n * x)**2 + x * u2
-
+    def _int_quad_real(x, hnm, dnm, ke2, ka2):
+        sqrt_ke2 = np.sqrt(x**2 - ke2)            
+        sqrt_ka2 = np.sqrt(x**2 - ka2)
+        num = sqrt_ka2 * np.exp(hnm * sqrt_ke2) * np.cos(dnm * x)
+        den = sqrt_ke2 * (sqrt_ka2 + (ka2 / ke2) * sqrt_ke2)
         return (num/den).real
 
-    def _int_quad_imag(x, hnm, dnm, k_e2, k_a2):
-        # soil refractive index
-        n = np.sqrt(k_e2 / k_a2)
-
-        exp_1 = np.exp(-hnm * x)
-        exp_2 = np.exp(-0.5 * hnm * x)
-        u2 = np.sqrt(x**2 + k_a2 - k_e2)
-        num = u2 * (exp_2 - exp_1) * np.cos(dnm * x)
-        den = (n * x)**2 + x * u2
-
+    def _int_quad_imag(x, hnm, dnm, ke2, ka2):
+        sqrt_ke2 = np.sqrt(x**2 - ke2)            
+        sqrt_ka2 = np.sqrt(x**2 - ka2)
+        num = sqrt_ka2 * np.exp(hnm * sqrt_ke2) * np.cos(dnm * x)
+        den = sqrt_ke2 * (sqrt_ka2 + (ka2 / ke2) * sqrt_ke2)
         return (num/den).imag
 
-    def _int_transformed_real(t, hnm, dnm, k_e2, k_a2):
+    def _int_transformed_real(t, hnm, dnm, ke2, ka2):
         x = np.tan(t)
-
-        # soil refractive index
-        n = np.sqrt(k_e2 / k_a2)
-
-        exp_1 = np.exp(-hnm * x)
-        exp_2 = np.exp(-0.5 * hnm * x)
-        u2 = np.sqrt(x**2 + k_a2 - k_e2)
-        num = u2 * (exp_2 - exp_1) * np.cos(dnm * x)
-        den = (n * x)**2 + x * u2
-
+        sqrt_ke2 = np.sqrt(x**2 - ke2)            
+        sqrt_ka2 = np.sqrt(x**2 - ka2)
+        num = sqrt_ka2 * np.exp(hnm * sqrt_ke2) * np.cos(dnm * x)
+        den = sqrt_ke2 * (sqrt_ka2 + (ka2 / ke2) * sqrt_ke2)
         return (num/den).real * (1 / np.cos(t)**2)
 
-    def _int_transformed_imag(t, hnm, dnm, k_e2, k_a2):
+    def _int_transformed_imag(t, hnm, dnm, ke2, ka2):
         x = np.tan(t)
-
-        # soil refractive index
-        n = np.sqrt(k_e2 / k_a2)
-
-        exp_1 = np.exp(-hnm * x)
-        exp_2 = np.exp(-0.5 * hnm * x)
-        u2 = np.sqrt(x**2 + k_a2 - k_e2)
-        num = u2 * (exp_2 - exp_1) * np.cos(dnm * x)
-        den = (n * x)**2 + x * u2
-
+        sqrt_ke2 = np.sqrt(x**2 - ke2)            
+        sqrt_ka2 = np.sqrt(x**2 - ka2)
+        num = sqrt_ka2 * np.exp(hnm * sqrt_ke2) * np.cos(dnm * x)
+        den = sqrt_ke2 * (sqrt_ka2 + (ka2 / ke2) * sqrt_ke2)
         return (num/den).imag * (1 / np.cos(t)**2)
 
     def _int_gauss_legendre(func, a, b, n, *args):
@@ -205,15 +176,15 @@ def t_sommerfeld(hnm, dnm, ke2, ka2, type_form='gauss_legendre', pts=150):
     if type_form == 'gauss_legendre':
         gauss_legendre_real = _int_gauss_legendre(_int_transformed_real, 0, np.pi/2, pts, hnm, dnm, ke2, ka2)
         gauss_legendre_imag = _int_gauss_legendre(_int_transformed_imag, 0, np.pi/2, pts, hnm, dnm, ke2, ka2)
-        T = gauss_legendre_real + 1j * gauss_legendre_imag
+        Sn = gauss_legendre_real + 1j * gauss_legendre_imag
 
     # Calculate the real and imaginary parts of the integral using scipy.integrate.Quad
     else:
         quad_real, _ = quad(_int_quad_real, 0, np.inf, args=(hnm, dnm, ke2, ka2))
         quad_imag, _ = quad(_int_quad_imag, 0, np.inf, args=(hnm, dnm, ke2, ka2))
-        T = quad_real + 1j * quad_imag
+        Sn = quad_real + 1j * quad_imag
 
-    return T
+    return Sn
 
 class PerUnitParameters:    
     """ This class calculates PUL parameters using an MTL geometry model. """
@@ -221,10 +192,8 @@ class PerUnitParameters:
     def __init__(self, model: MulticonductorTransmissionLine, f: float):
         # MTL Geometry Model
         self.model = model
+        self.num_sc_cables, self.num_conductors_per_scc = model._count_scc_and_conductors()
 
-        # Create a sorted list of CORE conductors to ensure consistent ordering
-        self.core_conductors = {key: value for key, value in model.mtl.items() if value.get('conductor_name') in ['core']}.items()
-        
         # Soil Relative Permittivity
         self.e1 = model.mtl_ref[0]['relative_permittivity'] * sc.epsilon_0
 
@@ -234,9 +203,6 @@ class PerUnitParameters:
         # Soil Relative Permeability
         self.mu1 = model.mtl_ref[0]['relative_permeability'] * sc.mu_0
 
-        # External Conductance (S/m)
-        # self.ge = model.mtl_ref[0]['external_conductance']
-
         # Soil resistivity (ohm.m)
         self.rho_1 = 1 / self.sigma_1
 
@@ -244,6 +210,7 @@ class PerUnitParameters:
         self.jw = 1j * 2 * np.pi * f
         self.jw_mu0_2pi = self.jw * sc.mu_0 / (2 * np.pi)
         self.jw_2pi_e0 = self.jw * 2 * np.pi * sc.epsilon_0
+        self.jw_2pi_sg = self.jw / (2 * np.pi * (self.sigma_1 + self.jw * self.e1))
 
         # Air wave number - Equation (2.15) [1]
         self.k_air2 = - self.jw * sc.mu_0 * self.jw * sc.epsilon_0
@@ -389,12 +356,15 @@ class PerUnitParameters:
         }
     
     # 3.3.2.2 Earth-return impedance and admittance formulas based on quasi-TEM assumption [1]
-    def ground_return_parameters(self, form='magalhaes_xue'):
-        """ This method calculates the impedance matrix of the earth return path. """
-        N = len(self.core_conductors)
+    def ground_return_parameters(self, zg_form='magalhaes_xue', yg_form='magalhaes_xue'):
+        """
+        This method calculates the impedance matrix and potential coefficient matrix 
+        of the earth return path.
+        """
+        N = self.num_sc_cables
         S1c = np.zeros((N, N), dtype=complex)
         S2c = np.zeros((N, N), dtype=complex)
-        Tc = np.zeros((N, N), dtype=complex)
+        pg = np.zeros((N, N), dtype=complex)
 
         # Distance between the conductors (m)
         d_matrix = self.model.d_matrix_ground_return
@@ -404,10 +374,10 @@ class PerUnitParameters:
 
         k_air2, k_earth2 = self.k_air2, self.k_earth2
         
-        if form in ['sunde', 'deconti_sunde']:
+        if zg_form in ['sunde', 'deconti_sunde']:
             k_air2 = 0
         
-        elif form in ['pollaczek', 'ametani', 'saad', 'wedepohl']:
+        elif zg_form in ['pollaczek', 'ametani', 'saad', 'wedepohl']:
             k_air2 = 0
             k_earth2 = - self.jw * self.mu1 * self.sigma_1        
         
@@ -415,46 +385,157 @@ class PerUnitParameters:
         K0_jke_Dnm = ss.kv(0,  1j * np.sqrt(k_earth2) * D_matrix)
 
         # Wedepohl e Wilcox Approximation Expression
-        if form in ['wedepohl']:
+        if zg_form in ['wedepohl']:
             yg = 1j * np.sqrt(k_earth2)
             ln_term = np.log(0.5 * np.euler_gamma * yg * d_matrix)
             S1c = - ln_term + 0.5 + (2/3) * yg * hnm
             zg = self.jw_mu0_2pi * S1c
 
         # De Conti Approximation Expressions
-        elif form in ['deconti', 'deconti_sunde', 'saad']:
+        elif zg_form in ['deconti', 'deconti_sunde', 'saad']:
             y0 = 1j * np.sqrt(k_air2)
             yg = 1j * np.sqrt(k_earth2)
-            term_1 = (yg - y0) / (yg + y0)
+            zg_term_1 = (yg - y0) / (yg + y0)
+            yg_term_1 = (yg**2 - y0**2) / (yg**2 + y0**2)
             exp_term = np.exp(hnm * yg)
             term_2 = 2 / (4 + (yg**2 * dnm**2))
-            zg = self.jw_mu0_2pi * (K0_jke_dnm + term_1 * exp_term * term_2)
+            
+            # Earth-return impedance based on quasi-TEM assumption [1]
+            zg = self.jw_mu0_2pi * (K0_jke_dnm + zg_term_1 * exp_term * term_2)
+
+            # Earth-return admittance based on quasi-TEM assumption [1]
+            if yg_form in ['deconti']:
+                pg = self.jw_2pi_sg * (K0_jke_dnm + yg_term_1 * K0_jke_Dnm)
+                yg = self.jw * lu_solve(lu_factor(pg), np.identity(N))
 
         # Integral Expressions
-        elif form in ['magalhaes_xue', 'sunde', 'pollaczek', 'ametani']:
+        elif zg_form in ['magalhaes_xue', 'sunde', 'pollaczek', 'ametani']:
             for n in range(N):
                 for m in range(N):
                     hnm = self.model.vertical_separation_matrix[n, m]
                     dnm = self.model.horizontal_separation_matrix[n, m]                    
                     
                     # Ametani Integral Equation
-                    if form == 'ametani':
+                    if zg_form == 'ametani':
                         S1c[n, m] = 2 * sommerfeld_ametani_approx(hnm, dnm, ke2=k_earth2)                    
                     
                     # Quasi-TEM Integral Equation
                     else:
-                        S1c[n, m] = 2 * sommerfeld_quasi_tem_approx(hnm, dnm, ke2=k_earth2, ka2=k_air2)
+                        S1c[n, m] = 2 * sommerfeld_quasi_tem_approx_impedance(hnm, dnm, ke2=k_earth2, ka2=k_air2)
+                        
+                        if yg_form in ['magalhaes_xue']:
+                            S2c[n, m] = 2 * sommerfeld_quasi_tem_approx_admittance(hnm, dnm, ke2=k_earth2, ka2=k_air2)
 
             # Earth-return impedance based on quasi-TEM assumption [1]
             zg = self.jw_mu0_2pi * (K0_jke_dnm - K0_jke_Dnm + S1c)
-        
-        # ysh = self.jw_2pi_e0 * np.linalg.inv(M - Tc)
-        # else:
-        #     zg = self.jw_mu0_2pi * (S1c)
-        #     ysh = self.jw_2pi_e0 * np.linalg.inv(M + S2c)
 
-        # # Series Impedance Matrix
-        # zs = zi + ze + zg 
+            # Earth-return admittance based on quasi-TEM assumption [1]
+            pg = self.jw_2pi_sg * (K0_jke_dnm - K0_jke_Dnm + S2c)
+            yg = self.jw * lu_solve(lu_factor(pg), np.identity(N))
+
+        # Vance Approximation Expression
+        if yg_form in ['vance']:
+            yg = -k_earth2 * lu_solve(lu_factor(zg), np.identity(N))
+
+        return {
+            'ground_return_impedance': zg,
+            'ground_return_potential_coefficient': pg,
+        }
+    
+    def pul_extended_theory(self, zg_form='magalhaes_xue', yg_form='magalhaes_xue'):
+        """
+        This method calculates the per-unit-length parameters of a single-core cable (SCC)
+        using the extended theory for multilayered cables with earth return.
+        """
+        N, M = self.num_sc_cables, self.num_conductors_per_scc
+
+        # Internal Impedance elements
+        zi = self.internal_parameters_by_bessel()
+
+        # earth-return impedance and admittance between the jth and kth cables.
+        earth_return = self.ground_return_parameters(zg_form, yg_form)
+        z0_jk = earth_return['ground_return_impedance']
+        # y0_jk = earth_return['ground_return_potential_coefficient']
+
+        # 1. SCC with core, core_insulation, sheath, sheath_insulation, armor, armor_insulation
+        if 'armor_insulation_outer_radius' in self.model.scc:
+            zcs = zi['zcs']['z11'] + zi['zcs']['z12'] + zi['zcs']['z2i']
+            zsa = zi['zsa']['z20'] + zi['zsa']['z23'] + zi['zsa']['z3i']
+            za4 = zi['za4']['z30'] + zi['za4']['z34']
+
+            # core self-impedance
+            Zcc_j = zcs + zsa + za4 - 2 * zi['z2m'] - 2 * zi['z3m']
+
+            # sheath self-impedance
+            Zss_j = zsa + za4 - 2 * zi['z3m']
+
+            # armor self-impedance
+            Zaa_j = za4
+
+            # mutual impedance between the core and sheath
+            Zcs_j = zsa + za4 - zi['z2m'] - 2 * zi['z3m']
+
+            # mutual impedance between the core and armor
+            Zca_j = za4 - zi['z3m']
+
+            # mutual impedance between the sheath and armor
+            Zsa_j = Zca_j
+
+            # impedance matrix of the jth phase of SCC cable. Eq. (2.8) [2]
+            Zij = np.array([[Zcc_j, Zcs_j, Zca_j],
+                            [Zcs_j, Zss_j, Zsa_j],
+                            [Zca_j, Zsa_j, Zaa_j]])
+            
+        # 2. SCC with core, core_insulation, sheath, sheath_insulation, armor
+        elif 'armor_outer_radius' in self.model.scc:
+            pass
+
+        # 3. SCC with core, core_insulation, sheath, sheath_insulation
+        elif 'sheath_insulation_outer_radius' in self.model.scc:
+            zcs = zi['zcs']['z11'] + zi['zcs']['z12'] + zi['zcs']['z2i']
+            zs3 = zi['zs3']['z20'] + zi['zs3']['z23'] 
+            
+            Zcc_j = zcs + zs3 - 2 * zi['z2m']   # core self-impedance
+            Zss_j = zs3                         # sheath self-impedance
+            Zcs_j = zs3 - zi['z2m']             # mutual impedance between the core and sheath
+            
+            # impedance matrix of the j-th phase of SCC cable. Eq. (2.11) [2]
+            Zij = np.array([[Zcc_j, Zcs_j],
+                            [Zcs_j, Zss_j]])
+            
+        # 4. SCC with core, core_insulation, sheath
+        if 'sheath_outer_radius' in self.model.scc:
+            pass
+
+        # 5. SCC with core, core_insulation
+        elif 'core_insulation_outer_radius' in self.model.scc:
+            # core self-impedance
+            Zcc_j = zi['zcs']['z11'] + zi['zcs']['z12']
+
+            # impedance matrix of the j-th phase of SCC cable. Eq. (2.13) [2]
+            Zij = np.array([[Zcc_j]])
+
+        # 6. SCC with core
+        elif 'core_outer_radius' in self.model.scc:
+            # impedance matrix of the j-th phase of SCC cable.
+            Zij = np.array([[zi['zcs']['z11']]])
+
+        else:
+            raise ValueError("Invalid SCC configuration. Please check the conductor layers.")
+        
+        # --- Construct the full system matrices using the Kronecker product ---
+
+        # The full internal impedance matrix [Zi] is a block diagonal matrix,
+        # with the single-cable matrix [Zij] on its diagonal.
+        Zi = np.kron(np.identity(N), Zij)
+
+        # The full earth-return impedance matrix [Z0] is a block matrix.
+        # Each (j,k) block is an (M x M) matrix filled with the scalar z0_jk[j,k],
+        # where M is the number of conductors per cable.
+        Z0 = np.kron(z0_jk, np.ones((M, M)))
+
+        # Series Impedance Matrix
+        Zs = Zi + Z0
 
         # # Currents and Voltages Propagation Constants Matrix
         # gamma_i = linalg.sqrtm(ysh @ zs)
@@ -480,5 +561,9 @@ class PerUnitParameters:
         # }
 
         return {
-            'zg': zg,
+            'internal_impedance_matrix': Zi,
+            'earth-return_impedance_matrix': Z0,
+            'earth-return_admittance_matrix': np.zeros_like(Z0),  # Placeholder for future implementation
+            'series_impedance_matrix': Zs,
         }
+     

@@ -4,7 +4,6 @@ import time
 import copy
 import pandas as pd
 from tabulate import tabulate
-import numpy as np
 from pathlib import Path
 import matplotlib.pyplot as plt
 

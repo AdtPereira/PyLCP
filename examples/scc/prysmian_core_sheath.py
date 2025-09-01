@@ -33,12 +33,12 @@ REFERENCES:
 import os
 import sys
 import time
-import copy
 import numpy as np
 import pandas as pd
 import scipy.constants as sc
 import matplotlib.pyplot as plt
 from pathlib import Path
+from tabulate import tabulate
 
 # RAIZ DO PROJETO E DIRETÓRIOS
 try:
@@ -71,9 +71,10 @@ class PrysmianModelPlotter:
     A highly refactored class to handle plotting for the Xue model results.
     It uses a configuration-driven approach to generate complex subplot figures.
     """
-    def __init__(self, mtl_model, freq, pul, p=0, q=0):
+    def __init__(self, mtl_model, freq, pul, discrete_pul, p=0, q=0):
         self.freq_data = freq
         self.pul_data = pul
+        self.discrete_pul = discrete_pul
         self.p = p
         self.q = q
         self.f = self.freq_data['Analytically']
@@ -156,7 +157,7 @@ class PrysmianModelPlotter:
         fig.suptitle(config['suptitle'], fontsize=12, y=0.98)
 
         for series in config['series_to_plot']:
-            zg_raw = np.array([item['zg'][self.p, self.q] for item in self.pul_data[series['key']]])
+            zg_raw = np.array([item['ground_return_impedance'][self.p, self.q] for item in self.pul_data[series['key']]])
             rg = np.real(zg_raw) 
             lg = np.imag(zg_raw) / (2 * np.pi * self.f) * 1e6  # Inductance in mH/km
             style = {'label': series['label'], 'color': series['color'], 'linestyle': series['linestyle'], 'linewidth': series['linewidth']}
@@ -484,6 +485,85 @@ class PrysmianModelPlotter:
         ax2.set_title(config['inductance_title'])
         plt.tight_layout(rect=[0, 0, 1, 0.96])
 
+    def log_matricial_pul_parameters(self):
+        """
+        Generates and prints a terminal log report of the calculated PUL parameters
+        in a mathematical matrix format: [Z] = [R] + j[X].
+
+        Args:
+            pul_parameters (dict): The dictionary containing the calculated parameters,
+                                with frequencies as keys.
+        """
+        # Define the matrices to be included in the report
+        
+        def _matrix_to_string(matrix: np.ndarray) -> str:
+            """
+            Formats a NumPy matrix into a multi-line string for display.
+            Example:
+            [ 1.2345e+01  -2.3456e-02]
+            [ 3.4567e-03   4.5678e+04]
+            """
+            lines = []
+            num_rows = matrix.shape[0]
+            # Format each number with fixed width for alignment
+            s_rows = [[f"{val:11.4e}" for val in row] for row in matrix]
+            
+            for i, row in enumerate(s_rows):
+                s_row = "  ".join(row)
+                # Add brackets to the first and last lines
+                # prefix = " [" if i == 0 else "  "
+                # suffix = "]" if i == num_rows - 1 else ""
+                # lines.append(f"{prefix}{s_row}{suffix}")
+                lines.append(s_row)        
+            return "\n".join(lines)
+
+        param_mapping = {
+            '[Zi]': 'internal_impedance_matrix',
+            '[Z0]': 'earth-return_impedance_matrix',
+            '[Zs]': 'series_impedance_matrix',
+            # '[Y_shunt]': 'ysh', # Uncomment to include shunt admittance
+        }
+
+        print("\n--- Per-Unit-Length (PUL) Parameters Report ---")
+        
+        # Iterate through the frequencies and their corresponding data
+        for freq, params in sorted(self.discrete_pul.items()):
+            print("\n" + "="*80)
+            print(f"Frequency: {freq:,.0f} Hz")
+            print("="*80)
+            
+            # Iterate over the defined matrices
+            for name, key in param_mapping.items():
+                if key in params:
+                    matrix = params[key]  # Values are in base SI units (Ohm/m)
+                    
+                    # Determine units
+                    if 'Z' in name:
+                        unit = "[Ω/m]"
+                    elif 'Y' in name:
+                        unit = "[S/m]"
+                    else:
+                        unit = ""
+
+                    # Format the real and imaginary parts of the matrix into strings
+                    r_lines = _matrix_to_string(matrix.real).split('\n')
+                    x_lines = _matrix_to_string(matrix.imag).split('\n')                
+                    num_rows = len(r_lines)
+                    middle_row_idx = num_rows // 2
+                    
+                    print("") 
+                    for i in range(num_rows):
+                        # Center the matrix name, operator, and units on the middle row
+                        name_part = f"{name} = " if i == middle_row_idx else " " * (len(name) + 3)
+                        op_part = " + j ".center(7) if i == middle_row_idx else " " * 7
+                        unit_part = f" {unit}" if i == middle_row_idx else ""
+                        
+                        # Print the combined line
+                        print(f"{name_part}{r_lines[i]}{op_part}{x_lines[i]}{unit_part}")
+                    print("") 
+
+        print("\n" + "="*80)
+
 if __name__ == "__main__":
     st = time.time()
     frequency = {'Analytically': np.logspace(1, 7, num=100)}
@@ -505,24 +585,24 @@ if __name__ == "__main__":
     pul_parameters = {key: [] for key in scenarios}
     for f in frequency['Analytically']:
         for key, params in scenarios.items():
-            # Internal Parameters
             if key == 'internal':
-                pul_parameters[key].append(
-                    PerUnitParameters(params['mtl'], f).internal_parameters_by_bessel()
-                )
-            
-            # Ground Return Parameters
+                # Internal Parameters
+                pul_parameters[key].append(PerUnitParameters(params['mtl'], f).internal_parameters_by_bessel())
             else:
-                pul_parameters[key].append(
-                    PerUnitParameters(params['mtl'], f).ground_return_parameters(form=params['form'])
-                )
+                # Ground Return Parameters
+                pul_parameters[key].append(PerUnitParameters(params['mtl'], f).ground_return_parameters(zg_form=params['form']))
+
+    discrete_pul_parameters = {}
+    for f in [1e2, 1e4, 1e5]:
+        discrete_pul_parameters[f] = PerUnitParameters(mtl_model, f).pul_extended_theory(zg_form='ametani')
 
     print(f"End of the routine! Time spent on simulation: {(time.time() - st):.1f} seconds.\n")
-    plotter = PrysmianModelPlotter(mtl_model, frequency, pul_parameters)
+    plotter = PrysmianModelPlotter(mtl_model, frequency, pul_parameters, discrete_pul_parameters)
     plotter.core_parameters()
     plotter.sheath_parameters()   
     plotter.core_sheath_internal_impedance_matrix() 
     plotter.core_sheath_internal_parameters()
     plotter.ground_return_impedance()
+    # plotter.log_matricial_pul_parameters()
     MTLRepresentation(mtl_model, units='millimeter').ground_return_systems()
     plt.show()

@@ -64,7 +64,34 @@ class MulticonductorTransmissionLine:
         # Número de coeficientes harmônicos de Fourier por condutor
         self.NF = self.NF_List[self.idx_ref]
 
-    # Define the surfaces for the MTL
+    def _count_scc_and_conductors(self):
+        """
+        Counts the number of (sc) cables (N) and conductors per cable (M)
+        based on the provided data structure.
+        """
+        # 1. Filter to get only active conductors
+        active_conductors = [
+            v for k, v in self.mtl.items()
+            if isinstance(k, int) and v.get('line_type') == 'active'
+        ]
+
+        if not active_conductors:
+            return 0, 0
+
+        # 2. Count the number of cables (N) by finding unique center points
+        center_points = [cond['center_point'] for cond in active_conductors]
+        num_cables = len(set(center_points))
+
+        # 3. Count conductors per cable (M)
+        total_active_conductors = len(active_conductors)
+        
+        if num_cables > 0:
+            conductors_per_cable = total_active_conductors // num_cables
+        else:
+            conductors_per_cable = 0
+
+        return num_cables, conductors_per_cable
+
     def _define_mtl_surfaces(self):
         """
         Defines the surfaces for all conductors and their insulations,

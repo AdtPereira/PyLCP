@@ -130,111 +130,187 @@ class MTLRepresentation:
 
     def ground_return_systems(self):
         """
-        This function plots a simplified schematic of a single-core buried cable,
-        including any defined insulation layers around the conductors.
-        The burial depth 'h' is graphically represented as h = 3*r_max, where r_max
-        is the largest radius of the cable's outer layer, including insulation.
+        Generates and displays a schematic plot for ground-return systems 
+        (e.g., buried cables or overhead lines).
+        
+        This method acts as a coordinator, delegating tasks to specialized
+        helper methods for plotting, annotation, and finalization.
         """
-        _, ax = plt.subplots(figsize=(8, 6))
+        # 1. Initialization
+        _, ax = plt.subplots(figsize=(16, 6)) # Increased figsize for better layout
+        used_labels = set()
 
-        core = None
-        for conductor in self.model.mtl.values():
-            if conductor.get('line_type') == 'active':
-                core = conductor
-                break
-                
-        if not core:
-            print("Error: Could not find an 'active' conductor.")
+        # 2. Calculate schematic parameters based on the model
+        params = self._calculate_schematic_parameters()
+        if not params['core_conductor']:
+            print("Error: Could not find an 'active' conductor in the model.")
             return
 
+        # 3. Plot each cable in the transmission line system
+        for conductor_data in self.model.mtl.values():
+            self._plot_single_cable(ax, conductor_data, params, used_labels)
+
+        # 4. Add schematic annotations and finalize the plot
+        self._draw_schematic_annotations(ax, params)
+        self._finalize_ground_return_plot(ax, params['title'])
+
+    def _calculate_schematic_parameters(self):
+        """
+        Calculates key parameters required for plotting the schematic.
+        
+        Returns:
+            dict: A dictionary containing parameters like max_radius, h_factor,
+                  title, and the primary core conductor data.
+        """
+        core_conductor = next((c for c in self.model.mtl.values() if c.get('line_type') == 'active'), None)
+        
         max_radius = 0
-        for conductor in self.model.mtl.values():
-            if 'radius' in conductor:
-                current_outer_radius = conductor['radius'][1]
-                if 'insulation' in conductor and conductor['insulation'] is not None:
-                    current_outer_radius += conductor['insulation']['thickness']
-                if current_outer_radius > max_radius:
-                    max_radius = current_outer_radius
+        if core_conductor:
+            for c in self.model.mtl.values():
+                radius = c['radius'][1]
+                if 'insulation' in c and c['insulation'] is not None:
+                    radius += c['insulation']['thickness']
+                if radius > max_radius:
+                    max_radius = radius
         
         if self.model.mtl_type == 'overhead':
-            mtl_title = 'Overhead Transmission Line'
+            title = 'Overhead Transmission Line'
             h_factor = 5
-        elif self.model.mtl_type == 'scc':
-            mtl_title = 'Buried Single-Core Cable'
-            h_factor = - 3
+        else: # Default to buried cable
+            title = 'Buried Single-Core Cable'
+            h_factor = -3
 
-        center_point = np.array([core['center_point'][0], h_factor * max_radius]) * self.scale_factor
+        return {
+            'core_conductor': core_conductor,
+            'max_radius': max_radius,
+            'h_factor': h_factor,
+            'title': title
+        }
 
-        # --- Plot Conductor and Insulation Layers ---
-        for conductor in sorted(self.model.mtl.values(), key=lambda c: c.get('radius', [0,0])[1]):
-            if 'radius' not in conductor:
-                continue
-            
-            outer_radius = conductor['radius'][1] * self.scale_factor
-            thickness = outer_radius - conductor['radius'][0] * self.scale_factor
-            label = conductor.get('conductor_name', 'Conductor')
-            color = self.color_map.get(label, self.color_map['default'])
-            
-            if thickness > 0:
-                ax.add_patch(Wedge(center_point, outer_radius, 0, 360, width=thickness, edgecolor='black', facecolor=color, linestyle='solid', label=label))
-            
-            else:
-                ax.add_patch(Circle(center_point, outer_radius, fill=True, edgecolor='black', facecolor=color, label=label))
-            
-            if 'insulation' in conductor and conductor['insulation'] is not None:
-                ins_data = conductor['insulation']
-                ins_thickness = ins_data['thickness'] * self.scale_factor
-                ins_outer_radius = outer_radius + ins_thickness
-                ins_label = ins_data.get('type', 'Insulation')
-                ins_color = self.color_map.get(ins_data.get('type'), self.color_map['insulation'])
-                ax.add_patch(Wedge(center_point, ins_outer_radius, 0, 360, width=ins_thickness, edgecolor='black', facecolor=ins_color, linestyle='solid', label=ins_label))
-
-        # Draw the vertical dimension line with arrows at both ends
-        dim_x_arrow = center_point[0] + (max_radius * self.scale_factor) * 1.5
-        ax.annotate('', xy=(dim_x_arrow, 0), xycoords='data', xytext=(dim_x_arrow, center_point[1]),
-            textcoords='data', arrowprops=dict(arrowstyle='<->', color='black', shrinkA=0, shrinkB=0, lw=1)
-        )
-
-        # 2. Add the text label next to the dimension line
-        real_h = self.model.surfaces[0]['center_point'][1]
-        label_text = f'h = {real_h:.2f} m'
-        ax.text(dim_x_arrow, center_point[1] / 2, label_text, ha='center', va='center',
-            fontsize=9, bbox=dict(boxstyle='square,pad=0.3', fc='white', ec='none', alpha=0.8)
-        )
-
-        # --- Finalize Plot and Add Schematic Ground ---
-        ax.axhline(y=0, color='darkgreen', linestyle=':', linewidth=1.5, label='Ground Level')
-        ax.relim()
-        ax.autoscale_view()
-
-        # 3. Manually calculate margins and set final, explicit limits
-        tight_xlim = ax.get_xlim()
-        x_margin = (tight_xlim[1] - tight_xlim[0]) * 0.45
-        final_xmin = tight_xlim[0] - x_margin
-        final_xmax = tight_xlim[1] + x_margin
+    def _plot_single_cable(self, ax, conductor_data, params, used_labels):
+        """
+        Plots a single cable with all its constituent layers (conductor, insulation).
         
-        ax.set_xlim(final_xmin, final_xmax)
-        tight_ylim = ax.get_ylim()
-        y_margin = (tight_ylim[1] - tight_ylim[0]) * 0.2
-        final_ymin = tight_ylim[0] - y_margin
-        final_ymax = tight_ylim[1] + y_margin
-        ax.set_ylim(final_ymin, final_ymax)
+        Args:
+            ax (matplotlib.axes.Axes): The axes to plot on.
+            conductor_data (dict): The data dictionary for one conductor.
+            params (dict): The pre-calculated schematic parameters.
+            used_labels (set): A set of labels already used in the legend.
+        """
+        # Calculate the schematic center point for this specific cable
+        center_point = np.array([
+            conductor_data['center_point'][0], 
+            params['h_factor'] * params['max_radius']
+        ]) * self.scale_factor
+        
+        # Plot the main conductor body
+        outer_radius_m = conductor_data['radius'][1]
+        thickness_m = outer_radius_m - conductor_data['radius'][0]
+        label = conductor_data.get('conductor_name', 'Conductor')
+        color = self.color_map.get(label, self.color_map['default'])
+        
+        self._plot_cable_layer(
+            ax, center_point, outer_radius_m, thickness_m,
+            color, label, used_labels
+        )
+        
+        # Plot the insulation layer if it exists
+        if 'insulation' in conductor_data and conductor_data['insulation'] is not None:
+            ins_data = conductor_data['insulation']
+            ins_label = ins_data.get('type', 'Insulation')
+            ins_color = self.color_map.get(ins_label, self.color_map['insulation'])
+            
+            self._plot_cable_layer(
+                ax, center_point, outer_radius_m + ins_data['thickness'],
+                ins_data['thickness'], ins_color, ins_label, used_labels
+            )
 
-        # 4. Apply other plot settings
+    def _plot_cable_layer(self, ax, center, outer_radius_m, thickness_m, color, label, used_labels):
+        """
+        Plots a single cylindrical layer of a cable (as a Circle or Wedge).
+        Handles the logic for avoiding duplicate legend entries.
+        """
+        # Apply scaling
+        outer_radius = outer_radius_m * self.scale_factor
+        thickness = thickness_m * self.scale_factor
+        
+        # Determine if the label should be added to the legend
+        label_to_plot = label if label not in used_labels else None
+        if label_to_plot:
+            used_labels.add(label_to_plot)
+            
+        # A thickness of 0 implies a solid core
+        if thickness < 1e-9 * self.scale_factor: # Use a small tolerance for floating point
+            patch = Circle(center, outer_radius, fill=True, edgecolor='black', 
+                           facecolor=color, label=label_to_plot)
+        else:
+            patch = Wedge(center, outer_radius, 0, 360, width=thickness, 
+                          edgecolor='black', facecolor=color, linestyle='solid',
+                          label=label_to_plot)
+        ax.add_patch(patch)
+
+    def _draw_schematic_annotations(self, ax, params):
+        """
+        Draws annotations like the ground level, depth dimension line, and
+        surrounding medium text.
+        """
+        core_center_x = params['core_conductor']['center_point'][0]
+        schematic_y = (params['h_factor'] * params['max_radius']) * self.scale_factor
+        
+        # Dimension line for burial depth 'h'
+        # Ensure zorder is high enough to be visible above the ground fill
+        dim_x_arrow = (core_center_x + params['max_radius'] * 2.5) * self.scale_factor
+        ax.annotate('', xy=(dim_x_arrow, 0), xycoords='data', 
+                    xytext=(dim_x_arrow, schematic_y), textcoords='data',
+                    arrowprops=dict(arrowstyle='<->', color='black', lw=1, zorder=3)) # Zorder increased
+        
+        real_h = abs(params['core_conductor']['center_point'][1])
+        label_text = f'h = {real_h:.2f} m'
+        # Adjust text position and zorder
+        ax.text(dim_x_arrow, schematic_y / 2, label_text, 
+                ha='center', va='center', fontsize=9, zorder=3, # Zorder increased
+                bbox=dict(boxstyle='square,pad=0.3', fc='white', ec='none', alpha=0.8)) # Added background for clarity
+
+        # Ground level line
+        ax.axhline(y=0, color='darkgreen', linestyle=':', linewidth=1.5, zorder=2) # Zorder for line
+
+    def _finalize_ground_return_plot(self, ax, title):
+        """
+        Applies final settings to the plot, including limits, labels,
+        backgrounds, and legend formatting.
+        """
         ax.set_aspect('equal', 'box')
         ax.set_xlabel(f'x ({self.label_unit})')
         ax.set_ylabel('')
-        ax.grid(True, linestyle='--', linewidth=0.5, zorder=0)
-        ax.set_title(mtl_title)
-        handles, labels = ax.get_legend_handles_labels()
-        ax.legend(handles=handles[::-1], labels=labels[::-1], loc='upper right')
         ax.set_yticks([])
+        ax.set_title(title)
+        ax.grid(True, linestyle='--', linewidth=0.5, zorder=0)
 
-        # 5. Fill background and place text using the final limits
-        ax.fill_between([final_xmin, final_xmax], final_ymin, 0, color='saddlebrown', alpha=0.2)        
-        plot_height = final_ymax - final_ymin
-        text_x = final_xmin + (final_xmax - final_xmin) * 0.05
-        y_offset = plot_height * 0.03
-        ax.text(text_x, +y_offset, 'Air ($\\varepsilon_0$, $\\mu_0$)', verticalalignment='bottom', fontsize=10, style='italic')
-        ax.text(text_x, -y_offset, 'Ground ($\\varepsilon_1$, $\\mu_1$, $\\sigma_1$)', verticalalignment='top', fontsize=10, style='italic')    
-      
+        # Set plot limits with generous margins
+        ax.relim()
+        ax.autoscale_view()
+        xlim = ax.get_xlim()
+        ylim = ax.get_ylim()
+        x_margin = (xlim[1] - xlim[0]) * 0.2
+        y_margin = (ylim[1] - ylim[0]) * 0.2
+        ax.set_xlim(xlim[0] - x_margin, xlim[1] + x_margin)
+        ax.set_ylim(ylim[0] - y_margin, ylim[1] + y_margin)
+        
+        final_xlim = ax.get_xlim()
+        final_ylim = ax.get_ylim()
+        
+        # Add background fills and text
+        ax.fill_between(final_xlim, final_ylim[0], 0, color='saddlebrown', alpha=0.2, zorder=1)
+        
+        text_x = final_xlim[0] + (final_xlim[1] - final_xlim[0]) * 0.05
+        y_offset = (final_ylim[1] - final_ylim[0]) * 0.03
+        ax.text(text_x, y_offset, 'Air ($\\varepsilon_0$, $\\mu_0$)', va='bottom', fontsize=10, style='italic', zorder=4)
+        ax.text(text_x, -y_offset, 'Ground ($\\varepsilon_1$, $\\mu_1$, $\\sigma_1$)', va='top', fontsize=10, style='italic', zorder=4)
+
+        # Format legend: create it first, then set its zorder.
+        handles, labels = ax.get_legend_handles_labels()
+        if handles: # Only create a legend if there are items to display
+            unique_labels = dict(zip(labels, handles))
+            legend = ax.legend(unique_labels.values(), unique_labels.keys(), 
+                            loc='center left', bbox_to_anchor=(1.02, 0.5))
+            legend.set_zorder(5) # Set zorder on the legend object itself

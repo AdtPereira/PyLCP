@@ -112,7 +112,7 @@ class DeContiModelPlotter:
         fig.suptitle(config['suptitle'], fontsize=12, y=0.98)
 
         for series in config['series_to_plot']:
-            zg_raw = np.array([item['zg'][self.p, self.q] for item in self.pul_data[series['key']]])
+            zg_raw = np.array([item['ground_return_impedance'][self.p, self.q] for item in self.pul_data[series['key']]])
             rg = np.real(zg_raw) 
             lg = np.imag(zg_raw) / (2 * np.pi * self.f) * 1e6  # Inductance in mH/km
             style = {'label': series['label'], 'color': series['color'], 'linestyle': series['linestyle'], 'linewidth': series['linewidth']}
@@ -238,7 +238,7 @@ if __name__ == "__main__":
     for f in frequency['Analytically']:
         for key, params in scenarios.items():
             pul_parameters[key].append(
-                PerUnitParameters(params['mtl'], f).ground_return_parameters(form=params['form'])
+                PerUnitParameters(params['mtl'], f).ground_return_parameters(zg_form=params['form'])
             )
 
     print(f"End of the routine! Time spent on simulation: {(time.time() - st):.2f} seconds.\n")
