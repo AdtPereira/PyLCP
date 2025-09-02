@@ -196,7 +196,7 @@ class LimaModelPlotter:
 
 if __name__ == "__main__":
     st = time.time()
-    frequency = {'Analytically': np.logspace(0, 10, num=100)}
+    frequency = {'Analytically': np.logspace(0, 10, num=140)}
 
     # --- Data-Driven Calculation Setup ---
     pul_parameters = {}

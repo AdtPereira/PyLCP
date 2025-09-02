@@ -311,6 +311,5 @@ class MTLRepresentation:
         handles, labels = ax.get_legend_handles_labels()
         if handles: # Only create a legend if there are items to display
             unique_labels = dict(zip(labels, handles))
-            legend = ax.legend(unique_labels.values(), unique_labels.keys(), 
-                            loc='center left', bbox_to_anchor=(1.02, 0.5))
+            legend = ax.legend(unique_labels.values(), unique_labels.keys(), loc='best')
             legend.set_zorder(5) # Set zorder on the legend object itself

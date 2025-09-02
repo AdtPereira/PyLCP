@@ -218,7 +218,6 @@ class PerUnitParameters:
         # Earth wave number - Equation (2.15) [1]
         self.k_earth2 = - self.jw * self.mu1 * (self.sigma_1 + self.jw * self.e1)
 
-    # 2.2.1 Impedance of Single-core Coaxial Cable (SC Cable) [2]
     def internal_parameters_by_bessel(self):
         """
         Calculates the internal impedance matrix [zi] for a single-core cable (SCC)
@@ -250,14 +249,15 @@ class PerUnitParameters:
         z11, z12 = (None,) * 2
         z2i, z20, z23, z2m = (None,) * 4
         z3i, z30, z34, z3m = (None,) * 4
+        pcj, psj, paj = (None,) * 3
 
-        # --- z11: internal impedance of core outer surface ---
         if 'core_outer_radius' in scc:
             rho1, mu1 = scc['core_resistivity'], scc['core_permeability']
             r1, r2 = scc['core_inner_radius'], scc['core_outer_radius']
             m_core = np.sqrt(s * mu1 / rho1)
             x1, x2 = m_core * r1, m_core * r2
 
+            # --- z11: internal impedance of core outer surface ---
             # Case 1: Solid core (r1 = 0)
             if np.isclose(r1, 0):
                 with np.errstate(divide='ignore', invalid='ignore'):
@@ -274,13 +274,17 @@ class PerUnitParameters:
                 with np.errstate(divide='ignore', invalid='ignore'):
                     z11 = (s * mu1 / two_pi) * (1 / (x2 * D1)) * N1 if not (np.isclose(x2, 0) or np.isclose(D1, 0)) else np.complex(0, np.inf)
 
-        # --- z12: Core outer insulator impedance ---
         if 'core_insulation_outer_radius' in scc:
             mui1 = scc['core_insulation_permeability']
+            ei1 = scc['core_insulation_permittivity']
             r3 = scc['core_insulation_outer_radius']
+            
+            # --- z12: Core outer insulator impedance ---
             z12 = (s * mui1 / two_pi) * np.log(r3 / r2) if not np.isclose(r3, r2) else 0
-        
-        # --- Sheath Impedance (z20, z2i, z2m) ---
+
+            # --- pcj: self-core potential coefficient ---
+            pcj = (1 / (two_pi * ei1)) * np.log(r3 / r2) if not np.isclose(r3, r2) else 0
+
         if 'sheath_outer_radius' in scc:
             rho2, mu2 = scc['sheath_resistivity'], scc['sheath_permeability']
             r3, r4 = scc['sheath_inner_radius'], scc['sheath_outer_radius']
@@ -307,13 +311,17 @@ class PerUnitParameters:
             with np.errstate(divide='ignore', invalid='ignore'):
                 z20 = (s * mu2 / two_pi) * (1 / (x4 * D2)) * N20 if not (np.isclose(x4, 0) or np.isclose(D2, 0)) else np.complex(0, np.inf)
 
-        # --- z23: Sheath outer insulator impedance ---
         if 'sheath_insulation_outer_radius' in scc:
             mui2 = scc['sheath_insulation_permeability']
+            ei2 = scc['sheath_insulation_permittivity']
             r5 = scc['sheath_insulation_outer_radius']
+            
+            # --- z23: Sheath outer insulator impedance ---
             z23 = (s * mui2 / two_pi) * np.log(r5 / r4) if not np.isclose(r5, r4) else 0
 
-        # --- Armor Impedances (z3i, z30) ---
+            # --- psj: self-sheath potential coefficient ---
+            psj = (1 / (two_pi * ei2)) * np.log(r5 / r4) if not np.isclose(r5, r4) else 0
+
         if 'armor_outer_radius' in scc:
             rho3, mu3 = scc['armor_resistivity'], scc['armor_permeability']
             r5, r6 = scc['armor_inner_radius'], scc['armor_outer_radius']
@@ -340,26 +348,31 @@ class PerUnitParameters:
             with np.errstate(divide='ignore', invalid='ignore'):
                 z30 = (s * mu3 / two_pi) * (1 / (x6 * D3)) * N30 if not (np.isclose(x6, 0) or np.isclose(D3, 0)) else np.complex(0, np.inf)
 
-        # --- z34: armor outer insulator impedance ---
         if 'armor_insulation_outer_radius' in scc:
             mui3 = scc['armor_insulation_permeability']
+            ei3 = scc['armor_insulation_permittivity']
             r7 = scc['armor_insulation_outer_radius']
+            
+            # --- z34: armor outer insulator impedance ---
             z34 = (s * mui3 / two_pi) * np.log(r7/r6) if not np.isclose(r7, r6) else 0
 
+            # --- paj: armor potential coefficient ---
+            paj = (1 / (two_pi * ei3)) * np.log(r7 / r6) if not np.isclose(r7, r6) else 0
+
         return {
-            'zcs': {'z11': z11, 'z12': z12, 'z2i': z2i},    # Eq. (2.10a) [2]
-            'zsa': {'z20': z20, 'z23': z23, 'z3i': z3i},    # Eq. (2.10b) [2]
-            'za4': {'z30': z30, 'z34': z34},                # Eq. (2.10c) [2]
-            'zs3': {'z20': z20, 'z23': z23},                # Eq. (2.12a) [2]
-            'z2m': z2m,                                     # sheath mutual impedance
-            'z3m': z3m                                      # armor mutual impedance
+            'zcs': {'z11': z11, 'z12': z12, 'z2i': z2i},        # Eq. (2.10a) [2]
+            'zsa': {'z20': z20, 'z23': z23, 'z3i': z3i},        # Eq. (2.10b) [2]
+            'za4': {'z30': z30, 'z34': z34},                    # Eq. (2.10c) [2]
+            'zs3': {'z20': z20, 'z23': z23},                    # Eq. (2.12a) [2]
+            'z2m': z2m,                                         # sheath mutual impedance
+            'z3m': z3m,                                         # armor mutual impedance
+            'potentials': {'pcj': pcj, 'psj': psj, 'paj': paj}  # potential coefficients
         }
     
-    # 3.3.2.2 Earth-return impedance and admittance formulas based on quasi-TEM assumption [1]
     def ground_return_parameters(self, zg_form='magalhaes_xue', yg_form='magalhaes_xue'):
         """
-        This method calculates the impedance matrix and potential coefficient matrix 
-        of the earth return path.
+        This method calculates the Earth-return impedance and admittance formulas
+        based on quasi-TEM assumption # 3.3.2.2 [1]
         """
         N = self.num_sc_cables
         S1c = np.zeros((N, N), dtype=complex)
@@ -433,50 +446,44 @@ class PerUnitParameters:
             pg = self.jw_2pi_sg * (K0_jke_dnm - K0_jke_Dnm + S2c)
             yg = self.jw * lu_solve(lu_factor(pg), np.identity(N))
 
-        # Vance Approximation Expression
-        if yg_form in ['vance']:
-            yg = -k_earth2 * lu_solve(lu_factor(zg), np.identity(N))
-
         return {
-            'ground_return_impedance': zg,
-            'ground_return_potential_coefficient': pg,
+            'earth-return_impedance_matrix': zg,
+            'earth-return_potential_coefficient': pg,
+            'k_earth2': k_earth2
         }
     
-    def pul_extended_theory(self, zg_form='magalhaes_xue', yg_form='magalhaes_xue'):
+    def quasi_tem_pul(self, zij, zg_form='magalhaes_xue', yg_form='magalhaes_xue'):
         """
         This method calculates the per-unit-length parameters of a single-core cable (SCC)
         using the extended theory for multilayered cables with earth return.
         """
         N, M = self.num_sc_cables, self.num_conductors_per_scc
 
-        # Internal Impedance elements
-        zi = self.internal_parameters_by_bessel()
-
         # earth-return impedance and admittance between the jth and kth cables.
         earth_return = self.ground_return_parameters(zg_form, yg_form)
-        z0_jk = earth_return['ground_return_impedance']
-        # y0_jk = earth_return['ground_return_potential_coefficient']
+        z0_jk = earth_return['earth-return_impedance_matrix']
+        pg_jk = earth_return['earth-return_potential_coefficient']
 
         # 1. SCC with core, core_insulation, sheath, sheath_insulation, armor, armor_insulation
         if 'armor_insulation_outer_radius' in self.model.scc:
-            zcs = zi['zcs']['z11'] + zi['zcs']['z12'] + zi['zcs']['z2i']
-            zsa = zi['zsa']['z20'] + zi['zsa']['z23'] + zi['zsa']['z3i']
-            za4 = zi['za4']['z30'] + zi['za4']['z34']
+            zcs = zij['zcs']['z11'] + zij['zcs']['z12'] + zij['zcs']['z2i']
+            zsa = zij['zsa']['z20'] + zij['zsa']['z23'] + zij['zsa']['z3i']
+            za4 = zij['za4']['z30'] + zij['za4']['z34']
 
             # core self-impedance
-            Zcc_j = zcs + zsa + za4 - 2 * zi['z2m'] - 2 * zi['z3m']
+            Zcc_j = zcs + zsa + za4 - 2 * zij['z2m'] - 2 * zij['z3m']
 
             # sheath self-impedance
-            Zss_j = zsa + za4 - 2 * zi['z3m']
+            Zss_j = zsa + za4 - 2 * zij['z3m']
 
             # armor self-impedance
             Zaa_j = za4
 
             # mutual impedance between the core and sheath
-            Zcs_j = zsa + za4 - zi['z2m'] - 2 * zi['z3m']
+            Zcs_j = zsa + za4 - zij['z2m'] - 2 * zij['z3m']
 
             # mutual impedance between the core and armor
-            Zca_j = za4 - zi['z3m']
+            Zca_j = za4 - zij['z3m']
 
             # mutual impedance between the sheath and armor
             Zsa_j = Zca_j
@@ -486,23 +493,34 @@ class PerUnitParameters:
                             [Zcs_j, Zss_j, Zsa_j],
                             [Zca_j, Zsa_j, Zaa_j]])
             
+            # cable internal potential coefficient matrix. Eq. (2.19) [2]
+            pcj, psj, paj = zij['potentials']['pcj'], zij['potentials']['psj'], zij['potentials']['paj']
+            Pij = np.array([[pcj + psj + paj, psj + paj, paj],
+                            [      psj + paj, psj + paj, paj],
+                            [            paj,       paj, paj]])
+            
         # 2. SCC with core, core_insulation, sheath, sheath_insulation, armor
         elif 'armor_outer_radius' in self.model.scc:
             pass
 
         # 3. SCC with core, core_insulation, sheath, sheath_insulation
         elif 'sheath_insulation_outer_radius' in self.model.scc:
-            zcs = zi['zcs']['z11'] + zi['zcs']['z12'] + zi['zcs']['z2i']
-            zs3 = zi['zs3']['z20'] + zi['zs3']['z23'] 
+            zcs = zij['zcs']['z11'] + zij['zcs']['z12'] + zij['zcs']['z2i']
+            zs3 = zij['zs3']['z20'] + zij['zs3']['z23'] 
             
-            Zcc_j = zcs + zs3 - 2 * zi['z2m']   # core self-impedance
+            Zcc_j = zcs + zs3 - 2 * zij['z2m']   # core self-impedance
             Zss_j = zs3                         # sheath self-impedance
-            Zcs_j = zs3 - zi['z2m']             # mutual impedance between the core and sheath
+            Zcs_j = zs3 - zij['z2m']             # mutual impedance between the core and sheath
             
             # impedance matrix of the j-th phase of SCC cable. Eq. (2.11) [2]
             Zij = np.array([[Zcc_j, Zcs_j],
                             [Zcs_j, Zss_j]])
             
+            # cable internal potential coefficient matrix. Eq. (2.19) [2]
+            pcj, psj = zij['potentials']['pcj'], zij['potentials']['psj']
+            Pij = np.array([[pcj + psj, psj],
+                            [      psj, psj]])
+
         # 4. SCC with core, core_insulation, sheath
         if 'sheath_outer_radius' in self.model.scc:
             pass
@@ -510,21 +528,22 @@ class PerUnitParameters:
         # 5. SCC with core, core_insulation
         elif 'core_insulation_outer_radius' in self.model.scc:
             # core self-impedance
-            Zcc_j = zi['zcs']['z11'] + zi['zcs']['z12']
+            Zcc_j = zij['zcs']['z11'] + zij['zcs']['z12']
 
             # impedance matrix of the j-th phase of SCC cable. Eq. (2.13) [2]
             Zij = np.array([[Zcc_j]])
 
+            # cable internal potential coefficient matrix. Eq. (2.19) [2]
+            Pij = np.array([[zij['potentials']['pcj']]])
+
         # 6. SCC with core
         elif 'core_outer_radius' in self.model.scc:
             # impedance matrix of the j-th phase of SCC cable.
-            Zij = np.array([[zi['zcs']['z11']]])
+            Zij = np.array([[zij['zcs']['z11']]])
 
         else:
             raise ValueError("Invalid SCC configuration. Please check the conductor layers.")
         
-        # --- Construct the full system matrices using the Kronecker product ---
-
         # The full internal impedance matrix [Zi] is a block diagonal matrix,
         # with the single-cable matrix [Zij] on its diagonal.
         Zi = np.kron(np.identity(N), Zij)
@@ -537,33 +556,55 @@ class PerUnitParameters:
         # Series Impedance Matrix
         Zs = Zi + Z0
 
-        # # Currents and Voltages Propagation Constants Matrix
-        # gamma_i = linalg.sqrtm(ysh @ zs)
-        # gamma_v = linalg.sqrtm(zs @ ysh)
+        # The full internal cable internal potential coefficient matrix [Pi] is a
+        # block diagonal matrix. The single-cable matrix [Pij] is on its diagonal.
+        Pi = np.kron(np.identity(N), Pij)
+        
+        # Shunt Admittance Matrix for PEC soil, Ye = jw * Pi^-1
+        Ye = self.jw * lu_solve(lu_factor(Pi), np.identity(Pi.shape[0]))
 
-        # # Inverse of Y using LU decomposition
-        # # Solve the system Y * Y_inv = I to find Y_inv
-        # y_inverse = linalg.lu_solve(linalg.lu_factor(ysh), np.identity(ysh.shape[0]))
+        # Ground-return Admittance Matrix Form.
+        # if yg_form in ['vance']:
+        #     k_earth2 = earth_return['k_earth2']
+        #     Yg = -k_earth2 * lu_solve(lu_factor(Z0), np.identity(N))
+        #     Ysh = np.linalg.inv(np.linalg.inv(Ye) + np.linalg.inv(Yg))
+        if yg_form in ['ametani']:
+            Yg = np.zeros_like(Ye)
+            Ysh = Ye
+        else:
+            # Ground-return Admittance Matrix inclusion
+            # The full earth-return admittance matrix [Yg] is a block matrix.
+            # Each (j,k) block is an (M x M) matrix filled with the scalar yg_jk[j,k],
+            # where M is the number of conductors per cable.
+            Pe = np.kron(pg_jk, np.ones((M, M)))            
 
-        # # Inverse of Z using LU decomposition
-        # # Solve the system Z * Z_inv = I to find Z_inv
-        # z_inverse = linalg.lu_solve(linalg.lu_factor(zs), np.identity(zs.shape[0]))
+            # Shunt Admittance Matrix. Eq. (2.4) [2]
+            # The admittance matrix of a cable system is evaluated from the potential
+            # coefficient matrix
+            P = Pi + Pe
+            Ysh = self.jw * lu_solve(lu_factor(P), np.identity(P.shape[0]))
+        
+            # --- START OF MODIFICATION ---
+            # The ground admittance matrix Yg cannot be calculated directly via Yg = jw * Pe^-1
+            # because the earth potential matrix Pe is singular.
+            # Instead, we calculate it indirectly using the parallel admittance formula:
+            # Yg = (Ysh^-1 - Ye^-1)^-1
 
-        # # Characteristic impedance Zc = Y_inv * sqrt(Y*Z)
-        # zc = y_inverse @ gamma_i 
+            # Inverses of Ysh and Ye
+            # Ysh_inv = lu_solve(lu_factor(Ysh), np.identity(Ysh.shape[0]))
+            # Ye_inv = lu_solve(lu_factor(Ye), np.identity(Ye.shape[0]))
 
-        # # Characteristic admittance Yc = Z_inv * sqrt(Z*Y)
-        # yc = z_inverse @ gamma_v
+            # Subtract the inverses. This is equivalent to Pe / jw
+            # Yg_inv = Ysh_inv - Ye_inv
 
-        # return {
-        #     'zi': zi, 'ze': ze, 'zg': zg, 'zs': zs, 'ysh': ysh,
-        #     'gamma_i': gamma_i, 'gamma_v': gamma_v, 'zc': zc, 'yc': yc
-        # }
-
+            # Step 4: Invert the result to get Yg
+            # Yg = lu_solve(lu_factor(Yg_inv), np.identity(Yg_inv.shape[0]))            
+            
         return {
             'internal_impedance_matrix': Zi,
             'earth-return_impedance_matrix': Z0,
-            'earth-return_admittance_matrix': np.zeros_like(Z0),  # Placeholder for future implementation
+            'earth-return_admittance_matrix': np.zeros_like(Ye),
             'series_impedance_matrix': Zs,
+            'shunt_admittance_matrix': Ysh,
         }
      

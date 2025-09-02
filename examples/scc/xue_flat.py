@@ -7,28 +7,17 @@ obtidos por ambas as metodologias.
 Este arquivo é parte do projeto PyLCP, que é um pacote Python para análise de linhas de transmissão.
 
 REFERENCES:
-[1] PATEL, Utkarsh R. A Surface Admittance Approach For Fast Calculation of the 
-    Series Impedance of Cables Including Skin, Proximity, and Ground Return Effects.
-    2014. University of Toronto, Graduate Department of The Edward S. Rogers Sr. 
-    Department of Electrical & Computer Engineering. 
+[1] XUE, Haoyan. General Formulation and Accurate Evaluation of Earth-Return Parameters
+    for Overhead / Underground Cables. PhD thesis, Department of Electrical Engineering,
+    École Polytechnique de Montréal, Université de Montréal, August 2018. 
 
-[2] U. R. Patel, B. Gustavsen and P. Triverio, "An Equivalent Surface Current Approach
-    for the Computation of the Series Impedance of Power Cables with Inclusion of Skin
-    and Proximity Effects," in IEEE Transactions on Power Delivery, vol. 28, no. 4, pp.
-    2474-2482, Oct. 2013, doi: 10.1109/TPWRD.2013.2267098.
+[2] A. Ametani, T. Ohno and N. Nagaoka, Cable System Transients: Theory, Modeling and 
+    Simulation, Wiley-IEEE Press, 2015.
 
-[3] U. R. Patel, B. Gustavsen and P. Triverio, "Application of the MoM-SO Method for 
-    Accurate Impedance Calculation of Single-Core Cables Enclosed by a Conducting Pipe," 
-    Proc. International Conference on Power Systems Transients (IPST 2013), Vancouver, 
-    Canada July 18-20, 2013. https://www.ipstconf.org/Proc_IPST2013.php
+[3] A. De Conti, N. Duarte and R. Alipio, "Closed-Form Expressions for the Calculation of the 
+    Ground-Return Impedance and Admittance of Underground Cables," in IEEE Transactions on Power 
+    Delivery, vol. 38, no. 4, pp. 2891-2900, Aug. 2023, doi: 10.1109/TPWRD.2023.3264614.
 
-[4] A. Ametani, "A General Formulation of Impedance and Admittance of Cables," in IEEE
-    Transactions on Power Apparatus and Systems, vol. PAS-99, no. 3, pp. 902-910, May
-    1980, doi: 10.1109/TPAS.1980.319718.
-
-[5] A. Ametani, "Wave Propagation Characteristics of Cables," in IEEE Transactions on
-    Power Apparatus and Systems, vol. PAS-99, no. 2, pp. 499-505, March 1980, 
-    doi: 10.1109/TPAS.1980.319685.
 """
 import os
 import sys
@@ -67,25 +56,24 @@ except ImportError as e:
     print(f"Erro ao importar módulos: {e}")
     sys.exit(1)
 
-class XueModelPlotter:
+class ModelPlotter:
     """
     A highly refactored class to handle plotting for the Xue model results.
     It uses a configuration-driven approach to generate complex subplot figures.
     """
-    def __init__(self, mtl_model, freq, pul, p=1, q=1):
+    def __init__(self, mtl_model, freq, pul):
         self.freq_data = freq
         self.pul_data = pul
-        self.p = p
-        self.q = q
         self.f = self.freq_data['Analytically']
         self.w = 2 * np.pi * self.f
-        self.ro = mtl_model.surfaces[0]['radius']
-        self.h1 = mtl_model.surfaces[0]['center_point'][1]
 
         self.xue_series = [
             {'key': 'p100',      'label': r'$\rho_e=100 \;\Omega m, \epsilon_r=1$',  'color': 'black', 'linestyle': '-'},
             {'key': 'p100_er20', 'label': r'$\rho_e=100 \;\Omega m, \epsilon_r=20$', 'color': 'black', 'linestyle': '--'},
-            {'key': 'p500',      'label': r'$\rho_e=500 \;\Omega m, \epsilon_r=1$', 'color': 'black', 'linestyle': '-.'}
+            {'key': 'p500',      'label': r'$\rho_e=500 \;\Omega m, \epsilon_r=1$',  'color': 'black', 'linestyle': '-.'},
+            # {'key': 'p100_deconti',      'label': '', 'color': 'red', 'linestyle': ':'},
+            # {'key': 'p100_er20_deconti', 'label': '', 'color': 'red', 'linestyle': ':'},
+            # {'key': 'p500_deconti',      'label': '', 'color': 'red', 'linestyle': ':'}
         ]
 
         self.nakagawa_carson_series = [
@@ -106,8 +94,30 @@ class XueModelPlotter:
                 'suptitle': 'Figure 4.19: P.u.l. Self-impedance of phase - a sheath with Magalhães/Xue formulation [1]',
                 'resistance_title': 'P.u.l. series resistance',
                 'inductance_title': 'P.u.l. series inductance',
+                'p': 1,
+                'q': 1,
                 'x_lim': {'resistance': (1E4, 1E7), 'inductance': (1E4, 1E7)},
                 'y_lim': {'resistance': (1E0, 1E5), 'inductance': (0.5, 2.0)},
+                'series_to_plot': self.xue_series
+            },
+            'fig421': {
+                'suptitle': 'Figure 4.21: P.u.l. Mutual impedance between phase - a and phase - b sheaths with Magalhães/Xue formulation [1]',
+                'resistance_title': 'P.u.l. series resistance',
+                'inductance_title': 'P.u.l. series inductance',
+                'p': 1,
+                'q': 3,
+                'x_lim': {'resistance': (1E4, 1E7), 'inductance': (1E4, 1E7)},
+                'y_lim': {'resistance': (1E0, 1E5), 'inductance': (0.0, 1.5)},
+                'series_to_plot': self.xue_series
+            },
+            'fig423': {
+                'suptitle': 'Figure 4.23: P.u.l. Self-admittance of phase - a sheath with Magalhães/Xue formulation [1]',
+                'conductance_title': 'P.u.l. shunt conductance',
+                'capacitance_title': 'P.u.l. shunt capacitance',
+                'p': 1,
+                'q': 1,
+                'x_lim': {'conductance': (1E3, 1E7), 'capacitance': (1E3, 1E7)},
+                'y_lim': {'conductance': (0.0, 20), 'capacitance': (0.0, 3.0)},
                 'series_to_plot': self.xue_series
             },
         }
@@ -118,11 +128,12 @@ class XueModelPlotter:
         and series inductance (right) based on a configuration key.
         """
         config = self.plot_configs[config_key]
+        p, q = config['p'], config['q']
         fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5), sharey=False)
         fig.suptitle(config['suptitle'], fontsize=12, y=0.98)
 
         for series in config['series_to_plot']:
-            zs = np.array([item['series_impedance_matrix'][self.p, self.q] for item in self.pul_data[series['key']]])
+            zs = np.array([item['series_impedance_matrix'][p, q] for item in self.pul_data[series['key']]])
             rs = np.real(zs) * 1e3  # Resistance in Ohm/km
             ls = np.imag(zs) / (2 * np.pi * self.f) * 1e6  # Inductance in mH/km
             style = {'label': series['label'], 'color': series['color'], 'linestyle': series['linestyle']}
@@ -136,7 +147,7 @@ class XueModelPlotter:
         ax1.set_ylim(config['y_lim']['resistance'])
         ax1.legend(fontsize='small')
         ax1.set_xlabel('Frequency (Hz)')
-        ax1.set_ylabel(r'$Rs_{22} \, (\Omega/km)$')
+        ax1.set_ylabel(fr'$Rs_{{{p+1}{q+1}}} \, (\Omega/km)$')
         ax1.grid(True, which='both', linestyle='--', linewidth=0.5)
         ax1.set_title(config['resistance_title'])
 
@@ -146,7 +157,7 @@ class XueModelPlotter:
         ax2.set_ylim(config['y_lim']['inductance'])
         ax2.legend(fontsize='small')
         ax2.set_xlabel('Frequency (Hz)')
-        ax2.set_ylabel(r'$Ls_{22} \, (mH/km)$')
+        ax2.set_ylabel(fr'$Ls_{{{p+1}{q+1}}} \, (mH/km)$')
         ax2.grid(True, which='both', linestyle='--', linewidth=0.5)
         ax2.set_title(config['inductance_title'])
         plt.tight_layout(rect=[0, 0, 1, 0.96])
@@ -157,45 +168,47 @@ class XueModelPlotter:
         and shunt capacitance (right) based on a configuration key.
         """
         config = self.plot_configs[config_key]
+        p, q = config['p'], config['q']
         fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5), sharey=False)
         fig.suptitle(config['suptitle'], fontsize=12, y=0.98)
 
         for series in config['series_to_plot']:
-            ysh_raw = np.array([item['ysh'][self.p, self.q] for item in self.pul_data[series['key']]])
-            cond = np.real(ysh_raw) * 1e3  # Conductance in S/km
-            cap = np.imag(ysh_raw) / (2 * np.pi * self.f) * 1e12  # Capacitance in nF/km
+            ysh = np.array([item['shunt_admittance_matrix'][p, q] for item in self.pul_data[series['key']]])
+            g_pq = np.real(ysh) * 1e3  # Conductance in S/km
+            c_pq = np.imag(ysh) / (2 * np.pi * self.f) * 1e9  # Capacitance in uF/km
             style = {'label': series['label'], 'color': series['color'], 'linestyle': series['linestyle']}
-            ax1.plot(self.f, cond, **style)
-            ax2.plot(self.f, cap, **style)
+            ax1.plot(self.f, g_pq, **style)
+            ax2.plot(self.f, c_pq, **style)
 
         # Configure left subplot (Conductance)
         ax1.set_xscale('log')
-        ax1.set_xlim(1E3, 1E9)
+        ax1.set_xlim(config['x_lim']['conductance'])
         ax1.set_ylim(config['y_lim']['conductance'])
         ax1.legend(fontsize='small')
         ax1.set_xlabel('Frequency (Hz)')
-        ax1.set_ylabel(r'$G \, (S/km)$')
+        ax1.set_ylabel(fr'$G_{{{p+1}{q+1}}} \, (S/km)$')
         ax1.grid(True, which='both', linestyle='--', linewidth=0.5)
         ax1.set_title(config['conductance_title'])
 
         # Configure right subplot (Capacitance)
         ax2.set_xscale('log')
-        ax2.set_xlim(1E3, 1E9)
+        ax2.set_xlim(config['x_lim']['capacitance'])
         ax2.set_ylim(config['y_lim']['capacitance'])
         ax2.legend(fontsize='small')
         ax2.set_xlabel('Frequency (Hz)')
-        ax2.set_ylabel(r'$C \, (nF/km)$')
+        ax2.set_ylabel(fr'$C_{{{p+1}{q+1}}} \, (\mu F/km)$')
         ax2.grid(True, which='both', linestyle='--', linewidth=0.5)
         ax2.set_title(config['capacitance_title'])
         plt.tight_layout(rect=[0, 0, 1, 0.96])
 
     def _plot_propagation_constant_subplots(self, config_key):
         config = self.plot_configs[config_key]
+        p, q = config['p'], config['q']
         fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5), sharey=False)
         fig.suptitle(config['suptitle'], fontsize=12, y=0.98)
 
         for series in config['series_to_plot']:
-            gamma_v = np.array([item['gamma_v'][self.p, self.q] for item in self.pul_data[series['key']]])
+            gamma_v = np.array([item['gamma_v'][p, q] for item in self.pul_data[series['key']]])
             alfa = gamma_v.real * 1e3
             phase_vel = self.w / gamma_v.imag / sc.c
             style = {'label': series['label'], 'color': series['color'], 'linestyle': series['linestyle']}
@@ -228,9 +241,17 @@ class XueModelPlotter:
         """Plots the data corresponding to Figure 4.19 from the reference."""
         self._plot_impedance_subplots('fig419')
 
+    def plot_fig421(self):
+        """Plots the data corresponding to Figure 4.21 from the reference."""
+        self._plot_impedance_subplots('fig421')
+
+    def plot_fig423(self):
+        """Plots the data corresponding to Figure 4.23 from the reference."""
+        self._plot_admittance_subplots('fig423')
+
 if __name__ == "__main__":
     st = time.time()
-    frequency = {'Analytically': np.logspace(1, 7, num=100)}
+    frequency = {'Analytically': np.logspace(3, 7, num=40)}
 
     # Define models for different physical scenarios
     mtl_model_a = MulticonductorTransmissionLine(MODEL)
@@ -248,18 +269,27 @@ if __name__ == "__main__":
         'p100':      {'mtl': mtl_model_a, 'zg_form': 'magalhaes_xue', 'yg_form': 'magalhaes_xue'},
         'p100_er20': {'mtl': mtl_model_b, 'zg_form': 'magalhaes_xue', 'yg_form': 'magalhaes_xue'},
         'p500':      {'mtl': mtl_model_c, 'zg_form': 'magalhaes_xue', 'yg_form': 'magalhaes_xue'},
+        # 'p100_deconti':      {'mtl': mtl_model_a, 'zg_form': 'deconti', 'yg_form': 'deconti'},
+        # 'p100_er20_deconti': {'mtl': mtl_model_b, 'zg_form': 'deconti', 'yg_form': 'deconti'},
+        # 'p500_deconti':      {'mtl': mtl_model_c, 'zg_form': 'deconti', 'yg_form': 'deconti'},
     }
     
     pul_parameters = {key: [] for key in scenarios}
     for f in frequency['Analytically']:
+        # Internal Impedance elements
+        zij = PerUnitParameters(mtl_model_a, f).internal_parameters_by_bessel()
+
+        # Ground-return elements
         for key, params in scenarios.items():
             pul = PerUnitParameters(params['mtl'], f)
             pul_parameters[key].append(
-                pul.pul_extended_theory(zg_form=params['zg_form'], yg_form=params['yg_form'])
+                pul.quasi_tem_pul(zij, zg_form=params['zg_form'], yg_form=params['yg_form'])
             )
 
     print(f"End of the routine! Time spent on simulation: {(time.time() - st):.1f} seconds.\n")
-    plotter = XueModelPlotter(mtl_model_a, frequency, pul_parameters)
+    plotter = ModelPlotter(mtl_model_a, frequency, pul_parameters)
     plotter.plot_fig419()
+    plotter.plot_fig421()
+    plotter.plot_fig423()
     MTLRepresentation(mtl_model_a, units='millimeter').ground_return_systems()
     plt.show()
