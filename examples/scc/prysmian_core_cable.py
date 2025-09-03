@@ -60,7 +60,7 @@ try:
     from mtl_main.models_scc import PRYSMIAN_138kV_CORE_CABLE as MODEL
     from mtl_main.graphics import MTLRepresentation
     from mtl_main.source import MulticonductorTransmissionLine
-    from analytical_formulation.scc import PerUnitParameters
+    from analytical_formulation.scc import InternalPerUnitParameters, PerUnitParameters
     print("Módulos e modelo de dados importados com sucesso.") 
 except ImportError as e:
     print(f"Erro ao importar módulos: {e}")
@@ -231,14 +231,14 @@ if __name__ == "__main__":
         for key, params in scenarios.items():
             # Internal Parameters
             if key == 'internal':
-                pul_parameters[key].append(
-                    PerUnitParameters(params['mtl'], f).internal_parameters_by_bessel()
-                )
+                pul = InternalPerUnitParameters(params['mtl'], f)
+                pul_parameters[key].append(pul.parameters_by_bessel())
             
             # Ground Return Parameters
             else:
+                pul = PerUnitParameters(params['mtl'], f)
                 pul_parameters[key].append(
-                    PerUnitParameters(params['mtl'], f).ground_return_parameters(zg_form=params['zg_form'])
+                    pul.ground_return_parameters(zg_form=params['zg_form'])
                 )
 
     print(f"End of the routine! Time spent on simulation: {(time.time() - st):.1f} seconds.\n")

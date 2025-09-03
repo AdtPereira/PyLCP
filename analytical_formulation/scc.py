@@ -186,39 +186,17 @@ def sommerfeld_quasi_tem_approx_admittance(hnm, dnm, ke2, ka2, type_form='gauss_
 
     return Sn
 
-class PerUnitParameters:    
+class InternalPerUnitParameters:    
     """ This class calculates PUL parameters using an MTL geometry model. """
 
     def __init__(self, model: MulticonductorTransmissionLine, f: float):
-        # MTL Geometry Model
         self.model = model
         self.num_sc_cables, self.num_conductors_per_scc = model._count_scc_and_conductors()
 
-        # Soil Relative Permittivity
-        self.e1 = model.mtl_ref[0]['relative_permittivity'] * sc.epsilon_0
-
-        # Soil conductivity (S/m)
-        self.sigma_1 = model.mtl_ref[0]['conductivity']
-
-        # Soil Relative Permeability
-        self.mu1 = model.mtl_ref[0]['relative_permeability'] * sc.mu_0
-
-        # Soil resistivity (ohm.m)
-        self.rho_1 = 1 / self.sigma_1
-
         # Angular frequency (rad/s)
         self.jw = 1j * 2 * np.pi * f
-        self.jw_mu0_2pi = self.jw * sc.mu_0 / (2 * np.pi)
-        self.jw_2pi_e0 = self.jw * 2 * np.pi * sc.epsilon_0
-        self.jw_2pi_sg = self.jw / (2 * np.pi * (self.sigma_1 + self.jw * self.e1))
 
-        # Air wave number - Equation (2.15) [1]
-        self.k_air2 = - self.jw * sc.mu_0 * self.jw * sc.epsilon_0
-
-        # Earth wave number - Equation (2.15) [1]
-        self.k_earth2 = - self.jw * self.mu1 * (self.sigma_1 + self.jw * self.e1)
-
-    def internal_parameters_by_bessel(self):
+    def parameters_by_bessel(self):
         """
         Calculates the internal impedance matrix [zi] for a single-core cable (SCC)
         with a core, sheath, and optional armor and jacket.
@@ -368,7 +346,156 @@ class PerUnitParameters:
             'z3m': z3m,                                         # armor mutual impedance
             'potentials': {'pcj': pcj, 'psj': psj, 'paj': paj}  # potential coefficients
         }
-    
+
+    def internal_matrices(self):
+        """
+        This method calculates the per-unit-length parameters of a single-core cable (SCC)
+        using the extended theory for multilayered cables with earth return.
+        """
+        N, M = self.num_sc_cables, self.num_conductors_per_scc
+        zij = self.parameters_by_bessel()
+
+        # 1. SCC with core, core_insulation, sheath, sheath_insulation, armor, armor_insulation
+        if 'armor_insulation_outer_radius' in self.model.scc:
+            zcs = zij['zcs']['z11'] + zij['zcs']['z12'] + zij['zcs']['z2i']
+            zsa = zij['zsa']['z20'] + zij['zsa']['z23'] + zij['zsa']['z3i']
+            za4 = zij['za4']['z30'] + zij['za4']['z34']
+
+            # core self-impedance
+            Zcc_j = zcs + zsa + za4 - 2 * zij['z2m'] - 2 * zij['z3m']
+
+            # sheath self-impedance
+            Zss_j = zsa + za4 - 2 * zij['z3m']
+
+            # armor self-impedance
+            Zaa_j = za4
+
+            # mutual impedance between the core and sheath
+            Zcs_j = zsa + za4 - zij['z2m'] - 2 * zij['z3m']
+
+            # mutual impedance between the core and armor
+            Zca_j = za4 - zij['z3m']
+
+            # mutual impedance between the sheath and armor
+            Zsa_j = Zca_j
+
+            # impedance matrix of the jth phase of SCC cable. Eq. (2.8) [2]
+            Zij = np.array([[Zcc_j, Zcs_j, Zca_j],
+                            [Zcs_j, Zss_j, Zsa_j],
+                            [Zca_j, Zsa_j, Zaa_j]])
+            
+            # cable internal potential coefficient matrix. Eq. (2.19) [2]
+            pcj, psj, paj = zij['potentials']['pcj'], zij['potentials']['psj'], zij['potentials']['paj']
+            Pij = np.array([[pcj + psj + paj, psj + paj, paj],
+                            [      psj + paj, psj + paj, paj],
+                            [            paj,       paj, paj]])
+            
+        # 2. SCC with core, core_insulation, sheath, sheath_insulation, armor
+        elif 'armor_outer_radius' in self.model.scc:
+            pass
+
+        # 3. SCC with core, core_insulation, sheath, sheath_insulation
+        elif 'sheath_insulation_outer_radius' in self.model.scc:
+            zcs = zij['zcs']['z11'] + zij['zcs']['z12'] + zij['zcs']['z2i']
+            zs3 = zij['zs3']['z20'] + zij['zs3']['z23'] 
+            
+            Zcc_j = zcs + zs3 - 2 * zij['z2m']   # core self-impedance
+            Zss_j = zs3                          # sheath self-impedance
+            Zcs_j = zs3 - zij['z2m']             # mutual impedance between the core and sheath
+            
+            # impedance matrix of the j-th phase of SCC cable. Eq. (2.11) [2]
+            Zij = np.array([[Zcc_j, Zcs_j],
+                            [Zcs_j, Zss_j]])
+            
+            # cable internal potential coefficient matrix. Eq. (2.19) [2]
+            pcj, psj = zij['potentials']['pcj'], zij['potentials']['psj']
+            Pij = np.array([[pcj + psj, psj],
+                            [      psj, psj]])
+
+        # 4. SCC with core, core_insulation, sheath
+        elif 'sheath_outer_radius' in self.model.scc:
+            zcs = zij['zcs']['z11'] + zij['zcs']['z12'] + zij['zcs']['z2i']
+            z20 = zij['zs3']['z20'] 
+            
+            Zcc_j = zcs + z20 - 2 * zij['z2m']   # core self-impedance
+            Zss_j = z20                          # internal impedance of sheath outer surface
+            Zcs_j = z20 - zij['z2m']             # mutual impedance between the core and sheath
+
+            # impedance matrix of the j-th phase of SCC cable. Eq. (2.11) [2]
+            Zij = np.array([[Zcc_j, Zcs_j],
+                            [Zcs_j, Zss_j]])
+            
+            # cable internal potential coefficient matrix. Eq. (2.19) [2]
+            Pij = np.array([[zij['potentials']['pcj']]])
+
+        # 5. SCC with core, core_insulation
+        elif 'core_insulation_outer_radius' in self.model.scc:
+            # core self-impedance
+            Zcc_j = zij['zcs']['z11'] + zij['zcs']['z12']
+
+            # impedance matrix of the j-th phase of SCC cable. Eq. (2.13) [2]
+            Zij = np.array([[Zcc_j]])
+
+            # cable internal potential coefficient matrix. Eq. (2.19) [2]
+            Pij = np.array([[zij['potentials']['pcj']]])
+
+        # 6. SCC with core
+        elif 'core_outer_radius' in self.model.scc:
+            # impedance matrix of the j-th phase of SCC cable.
+            Zij = np.array([[zij['zcs']['z11']]])
+
+        else:
+            raise ValueError("Invalid SCC configuration. Please check the conductor layers.")
+        
+        # The full internal impedance matrix [Zi] is a block diagonal matrix,
+        # with the single-cable matrix [Zij] on its diagonal.
+        Zi = np.kron(np.identity(N), Zij)
+
+        # The full internal cable internal potential coefficient matrix [Pi] is a
+        # block diagonal matrix. The single-cable matrix [Pij] is on its diagonal.
+        Pi = np.kron(np.identity(N), Pij)
+        
+        # Shunt Admittance Matrix, Ye = jw * Pi^-1
+        Ye = self.jw * lu_solve(lu_factor(Pi), np.identity(Pi.shape[0]))
+
+        return {
+            'impedance_matrix': Zi,
+            'shunt_admittance_matrix': Ye,
+            'potential_coefficient_matrix': Pi,
+        }
+
+class PerUnitParameters:    
+    """ This class calculates PUL parameters using an MTL geometry model. """
+
+    def __init__(self, model: MulticonductorTransmissionLine, f: float):
+        # MTL Geometry Model
+        self.model = model
+        self.num_sc_cables, self.num_conductors_per_scc = model._count_scc_and_conductors()
+
+        # Soil Relative Permittivity
+        self.e1 = model.mtl_ref[0]['relative_permittivity'] * sc.epsilon_0
+
+        # Soil conductivity (S/m)
+        self.sigma_1 = model.mtl_ref[0]['conductivity']
+
+        # Soil Relative Permeability
+        self.mu1 = model.mtl_ref[0]['relative_permeability'] * sc.mu_0
+
+        # Soil resistivity (ohm.m)
+        self.rho_1 = 1 / self.sigma_1
+
+        # Angular frequency (rad/s)
+        self.jw = 1j * 2 * np.pi * f
+        self.jw_mu0_2pi = self.jw * sc.mu_0 / (2 * np.pi)
+        self.jw_2pi_e0 = self.jw * 2 * np.pi * sc.epsilon_0
+        self.jw_2pi_sg = self.jw / (2 * np.pi * (self.sigma_1 + self.jw * self.e1))
+
+        # Air wave number - Equation (2.15) [1]
+        self.k_air2 = - self.jw * sc.mu_0 * self.jw * sc.epsilon_0
+
+        # Earth wave number - Equation (2.15) [1]
+        self.k_earth2 = - self.jw * self.mu1 * (self.sigma_1 + self.jw * self.e1)
+
     def ground_return_parameters(self, zg_form='magalhaes_xue', yg_form='magalhaes_xue'):
         """
         This method calculates the Earth-return impedance and admittance formulas
@@ -451,8 +578,8 @@ class PerUnitParameters:
             'earth-return_potential_coefficient': pg,
             'k_earth2': k_earth2
         }
-    
-    def quasi_tem_pul(self, zij, zg_form='magalhaes_xue', yg_form='magalhaes_xue'):
+
+    def quasi_tem_pul(self, pul_internal, zg_form='magalhaes_xue', yg_form='magalhaes_xue'):
         """
         This method calculates the per-unit-length parameters of a single-core cable (SCC)
         using the extended theory for multilayered cables with earth return.
@@ -464,89 +591,102 @@ class PerUnitParameters:
         z0_jk = earth_return['earth-return_impedance_matrix']
         pg_jk = earth_return['earth-return_potential_coefficient']
 
-        # 1. SCC with core, core_insulation, sheath, sheath_insulation, armor, armor_insulation
-        if 'armor_insulation_outer_radius' in self.model.scc:
-            zcs = zij['zcs']['z11'] + zij['zcs']['z12'] + zij['zcs']['z2i']
-            zsa = zij['zsa']['z20'] + zij['zsa']['z23'] + zij['zsa']['z3i']
-            za4 = zij['za4']['z30'] + zij['za4']['z34']
+        # # 1. SCC with core, core_insulation, sheath, sheath_insulation, armor, armor_insulation
+        # if 'armor_insulation_outer_radius' in self.model.scc:
+        #     zcs = zij['zcs']['z11'] + zij['zcs']['z12'] + zij['zcs']['z2i']
+        #     zsa = zij['zsa']['z20'] + zij['zsa']['z23'] + zij['zsa']['z3i']
+        #     za4 = zij['za4']['z30'] + zij['za4']['z34']
 
-            # core self-impedance
-            Zcc_j = zcs + zsa + za4 - 2 * zij['z2m'] - 2 * zij['z3m']
+        #     # core self-impedance
+        #     Zcc_j = zcs + zsa + za4 - 2 * zij['z2m'] - 2 * zij['z3m']
 
-            # sheath self-impedance
-            Zss_j = zsa + za4 - 2 * zij['z3m']
+        #     # sheath self-impedance
+        #     Zss_j = zsa + za4 - 2 * zij['z3m']
 
-            # armor self-impedance
-            Zaa_j = za4
+        #     # armor self-impedance
+        #     Zaa_j = za4
 
-            # mutual impedance between the core and sheath
-            Zcs_j = zsa + za4 - zij['z2m'] - 2 * zij['z3m']
+        #     # mutual impedance between the core and sheath
+        #     Zcs_j = zsa + za4 - zij['z2m'] - 2 * zij['z3m']
 
-            # mutual impedance between the core and armor
-            Zca_j = za4 - zij['z3m']
+        #     # mutual impedance between the core and armor
+        #     Zca_j = za4 - zij['z3m']
 
-            # mutual impedance between the sheath and armor
-            Zsa_j = Zca_j
+        #     # mutual impedance between the sheath and armor
+        #     Zsa_j = Zca_j
 
-            # impedance matrix of the jth phase of SCC cable. Eq. (2.8) [2]
-            Zij = np.array([[Zcc_j, Zcs_j, Zca_j],
-                            [Zcs_j, Zss_j, Zsa_j],
-                            [Zca_j, Zsa_j, Zaa_j]])
+        #     # impedance matrix of the jth phase of SCC cable. Eq. (2.8) [2]
+        #     Zij = np.array([[Zcc_j, Zcs_j, Zca_j],
+        #                     [Zcs_j, Zss_j, Zsa_j],
+        #                     [Zca_j, Zsa_j, Zaa_j]])
             
-            # cable internal potential coefficient matrix. Eq. (2.19) [2]
-            pcj, psj, paj = zij['potentials']['pcj'], zij['potentials']['psj'], zij['potentials']['paj']
-            Pij = np.array([[pcj + psj + paj, psj + paj, paj],
-                            [      psj + paj, psj + paj, paj],
-                            [            paj,       paj, paj]])
+        #     # cable internal potential coefficient matrix. Eq. (2.19) [2]
+        #     pcj, psj, paj = zij['potentials']['pcj'], zij['potentials']['psj'], zij['potentials']['paj']
+        #     Pij = np.array([[pcj + psj + paj, psj + paj, paj],
+        #                     [      psj + paj, psj + paj, paj],
+        #                     [            paj,       paj, paj]])
             
-        # 2. SCC with core, core_insulation, sheath, sheath_insulation, armor
-        elif 'armor_outer_radius' in self.model.scc:
-            pass
+        # # 2. SCC with core, core_insulation, sheath, sheath_insulation, armor
+        # elif 'armor_outer_radius' in self.model.scc:
+        #     pass
 
-        # 3. SCC with core, core_insulation, sheath, sheath_insulation
-        elif 'sheath_insulation_outer_radius' in self.model.scc:
-            zcs = zij['zcs']['z11'] + zij['zcs']['z12'] + zij['zcs']['z2i']
-            zs3 = zij['zs3']['z20'] + zij['zs3']['z23'] 
+        # # 3. SCC with core, core_insulation, sheath, sheath_insulation
+        # elif 'sheath_insulation_outer_radius' in self.model.scc:
+        #     zcs = zij['zcs']['z11'] + zij['zcs']['z12'] + zij['zcs']['z2i']
+        #     zs3 = zij['zs3']['z20'] + zij['zs3']['z23'] 
             
-            Zcc_j = zcs + zs3 - 2 * zij['z2m']   # core self-impedance
-            Zss_j = zs3                         # sheath self-impedance
-            Zcs_j = zs3 - zij['z2m']             # mutual impedance between the core and sheath
+        #     Zcc_j = zcs + zs3 - 2 * zij['z2m']   # core self-impedance
+        #     Zss_j = zs3                          # sheath self-impedance
+        #     Zcs_j = zs3 - zij['z2m']             # mutual impedance between the core and sheath
             
-            # impedance matrix of the j-th phase of SCC cable. Eq. (2.11) [2]
-            Zij = np.array([[Zcc_j, Zcs_j],
-                            [Zcs_j, Zss_j]])
+        #     # impedance matrix of the j-th phase of SCC cable. Eq. (2.11) [2]
+        #     Zij = np.array([[Zcc_j, Zcs_j],
+        #                     [Zcs_j, Zss_j]])
             
-            # cable internal potential coefficient matrix. Eq. (2.19) [2]
-            pcj, psj = zij['potentials']['pcj'], zij['potentials']['psj']
-            Pij = np.array([[pcj + psj, psj],
-                            [      psj, psj]])
+        #     # cable internal potential coefficient matrix. Eq. (2.19) [2]
+        #     pcj, psj = zij['potentials']['pcj'], zij['potentials']['psj']
+        #     Pij = np.array([[pcj + psj, psj],
+        #                     [      psj, psj]])
 
-        # 4. SCC with core, core_insulation, sheath
-        if 'sheath_outer_radius' in self.model.scc:
-            pass
+        # # 4. SCC with core, core_insulation, sheath
+        # elif 'sheath_outer_radius' in self.model.scc:
+        #     zcs = zij['zcs']['z11'] + zij['zcs']['z12'] + zij['zcs']['z2i']
+        #     z20 = zij['zs3']['z20'] 
+            
+        #     Zcc_j = zcs + z20 - 2 * zij['z2m']   # core self-impedance
+        #     Zss_j = z20                          # internal impedance of sheath outer surface
+        #     Zcs_j = z20 - zij['z2m']             # mutual impedance between the core and sheath
 
-        # 5. SCC with core, core_insulation
-        elif 'core_insulation_outer_radius' in self.model.scc:
-            # core self-impedance
-            Zcc_j = zij['zcs']['z11'] + zij['zcs']['z12']
+        #     # impedance matrix of the j-th phase of SCC cable. Eq. (2.11) [2]
+        #     Zij = np.array([[Zcc_j, Zcs_j],
+        #                     [Zcs_j, Zss_j]])
 
-            # impedance matrix of the j-th phase of SCC cable. Eq. (2.13) [2]
-            Zij = np.array([[Zcc_j]])
+        # # 5. SCC with core, core_insulation
+        # elif 'core_insulation_outer_radius' in self.model.scc:
+        #     # core self-impedance
+        #     Zcc_j = zij['zcs']['z11'] + zij['zcs']['z12']
 
-            # cable internal potential coefficient matrix. Eq. (2.19) [2]
-            Pij = np.array([[zij['potentials']['pcj']]])
+        #     # impedance matrix of the j-th phase of SCC cable. Eq. (2.13) [2]
+        #     Zij = np.array([[Zcc_j]])
 
-        # 6. SCC with core
-        elif 'core_outer_radius' in self.model.scc:
-            # impedance matrix of the j-th phase of SCC cable.
-            Zij = np.array([[zij['zcs']['z11']]])
+        #     # cable internal potential coefficient matrix. Eq. (2.19) [2]
+        #     Pij = np.array([[zij['potentials']['pcj']]])
 
-        else:
-            raise ValueError("Invalid SCC configuration. Please check the conductor layers.")
+        # # 6. SCC with core
+        # elif 'core_outer_radius' in self.model.scc:
+        #     # impedance matrix of the j-th phase of SCC cable.
+        #     Zij = np.array([[zij['zcs']['z11']]])
+
+        # else:
+        #     raise ValueError("Invalid SCC configuration. Please check the conductor layers.")
         
-        # The full internal impedance matrix [Zi] is a block diagonal matrix,
-        # with the single-cable matrix [Zij] on its diagonal.
-        Zi = np.kron(np.identity(N), Zij)
+        # # The full internal impedance matrix [Zi] is a block diagonal matrix,
+        # # with the single-cable matrix [Zij] on its diagonal.
+        # Zi = np.kron(np.identity(N), Zij)
+
+        Zi = pul_internal['impedance_matrix']
+        Ye = pul_internal['shunt_admittance_matrix']
+        Pi = pul_internal['potential_coefficient_matrix']
 
         # The full earth-return impedance matrix [Z0] is a block matrix.
         # Each (j,k) block is an (M x M) matrix filled with the scalar z0_jk[j,k],
@@ -558,10 +698,10 @@ class PerUnitParameters:
 
         # The full internal cable internal potential coefficient matrix [Pi] is a
         # block diagonal matrix. The single-cable matrix [Pij] is on its diagonal.
-        Pi = np.kron(np.identity(N), Pij)
+        # Pi = np.kron(np.identity(N), Pij)
         
         # Shunt Admittance Matrix for PEC soil, Ye = jw * Pi^-1
-        Ye = self.jw * lu_solve(lu_factor(Pi), np.identity(Pi.shape[0]))
+        # Ye = self.jw * lu_solve(lu_factor(Pi), np.identity(Pi.shape[0]))
 
         # Ground-return Admittance Matrix Form.
         # if yg_form in ['vance']:
@@ -607,4 +747,4 @@ class PerUnitParameters:
             'series_impedance_matrix': Zs,
             'shunt_admittance_matrix': Ysh,
         }
-     
+      

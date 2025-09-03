@@ -23,12 +23,10 @@ import os
 import sys
 import time
 import numpy as np
-import pandas as pd
 import copy
 import scipy.constants as sc
 import matplotlib.pyplot as plt
 from pathlib import Path
-from tabulate import tabulate
 
 # RAIZ DO PROJETO E DIRETÓRIOS
 try:
@@ -50,7 +48,7 @@ try:
     from mtl_main.models_scc import XUE_FLAT_ARRANGEMENT as MODEL
     from mtl_main.graphics import MTLRepresentation
     from mtl_main.source import MulticonductorTransmissionLine
-    from analytical_formulation.scc import PerUnitParameters
+    from analytical_formulation.scc import InternalPerUnitParameters, PerUnitParameters
     print("Módulos e modelo de dados importados com sucesso.") 
 except ImportError as e:
     print(f"Erro ao importar módulos: {e}")
@@ -277,13 +275,13 @@ if __name__ == "__main__":
     pul_parameters = {key: [] for key in scenarios}
     for f in frequency['Analytically']:
         # Internal Impedance elements
-        zij = PerUnitParameters(mtl_model_a, f).internal_parameters_by_bessel()
+        internal = InternalPerUnitParameters(mtl_model_a, f)
 
         # Ground-return elements
         for key, params in scenarios.items():
             pul = PerUnitParameters(params['mtl'], f)
-            pul_parameters[key].append(
-                pul.quasi_tem_pul(zij, zg_form=params['zg_form'], yg_form=params['yg_form'])
+            pul_parameters[key].append(pul.quasi_tem_pul(
+                internal.internal_matrices(), zg_form=params['zg_form'], yg_form=params['yg_form'])
             )
 
     print(f"End of the routine! Time spent on simulation: {(time.time() - st):.1f} seconds.\n")

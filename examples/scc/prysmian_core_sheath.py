@@ -34,11 +34,8 @@ import os
 import sys
 import time
 import numpy as np
-import pandas as pd
-import scipy.constants as sc
 import matplotlib.pyplot as plt
 from pathlib import Path
-from tabulate import tabulate
 
 # RAIZ DO PROJETO E DIRETÓRIOS
 try:
@@ -60,7 +57,7 @@ try:
     from mtl_main.models_scc import PRYSMIAN_138kV_CORE_SHEATH as MODEL
     from mtl_main.graphics import MTLRepresentation
     from mtl_main.source import MulticonductorTransmissionLine
-    from analytical_formulation.scc import PerUnitParameters
+    from analytical_formulation.scc import InternalPerUnitParameters, PerUnitParameters
     print("Módulos e modelo de dados importados com sucesso.") 
 except ImportError as e:
     print(f"Erro ao importar módulos: {e}")
@@ -533,19 +530,24 @@ if __name__ == "__main__":
     pul_parameters = {key: [] for key in scenarios}
     for f in frequency['Analytically']:
         for key, params in scenarios.items():
-            pul = PerUnitParameters(params['mtl'], f)
+            # Internal Parameters
             if key == 'internal':
-                # Internal Parameters
-                pul_parameters[key].append(pul.internal_parameters_by_bessel())
+                pul = InternalPerUnitParameters(params['mtl'], f)
+                pul_parameters[key].append(pul.parameters_by_bessel())
+            
+            # Ground Return Parameters
             else:
-                # Ground Return Parameters
-                pul_parameters[key].append(pul.ground_return_parameters(zg_form=params['zg_form']))
+                pul = PerUnitParameters(params['mtl'], f)
+                pul_parameters[key].append(
+                    pul.ground_return_parameters(zg_form=params['zg_form'])
+                )
 
     discrete_pul_parameters = {}
     for f in [1e2, 1e4, 1e5]:
         pul = PerUnitParameters(mtl_model, f)
-        zij = pul.internal_parameters_by_bessel()
-        discrete_pul_parameters[f] = pul.quasi_tem_pul(zij, zg_form='ametani', yg_form='ametani')
+        internal = InternalPerUnitParameters(mtl_model, f)
+        discrete_pul_parameters[f] = pul.quasi_tem_pul(
+            internal.internal_matrices(), zg_form='ametani', yg_form='ametani')
 
     print(f"End of the routine! Time spent on simulation: {(time.time() - st):.1f} seconds.\n")
     plotter = ModelPlotter(mtl_model, frequency, pul_parameters, discrete_pul_parameters)

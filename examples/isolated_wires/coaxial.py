@@ -57,15 +57,16 @@ try:
     from mtl_main.models_wires import COAXIAL_CABLE as MODEL
     from mtl_main.graphics import MTLRepresentation
     from mtl_main.source import MulticonductorTransmissionLine
-    from analytical_formulation.isolated_wires import CoaxialCable, Ametani
+    from analytical_formulation.isolated_wires import CoaxialCable
     from mom_so.quasi_static_green import QuasiStatic
     from mom_so.lossless_medium import HomogeneousLosslessMedium, LosslessPostProcessing
+    from analytical_formulation.scc import InternalPerUnitParameters
     print("Módulos e modelo de dados importados com sucesso.") 
 except ImportError as e:
     print(f"Erro ao importar módulos: {e}")
     sys.exit(1)
 
-def run_analytical_simulation(mtl, frequencies):
+def analytical_simulation(mtl_model, coaxial_model, frequencies):
     """
     Executa a simulação analítica da impedância da linha de transmissão.
 
@@ -79,17 +80,18 @@ def run_analytical_simulation(mtl, frequencies):
     """
     print("Iniciando rotina analítica...")
     analytical_data = {}    
-    coaxial = CoaxialCable(mtl)
-    ametani = Ametani(mtl)
-
     for freq in frequencies:
-        zs = coaxial.pul_parameters(freq)
-        l_ext = coaxial.external_inductance()
-        z11, z12, z22 = ametani.impedance_two_layered_conductor(freq)
+        zs = coaxial_model.pul_parameters(freq)
+        le = coaxial_model.external_inductance()
+
+        # Internal Impedance elements
+        pul =  InternalPerUnitParameters(mtl_model, freq)
+        Zi = pul.internal_matrices()['impedance_matrix']
+        z11, z12, z22 = Zi[0, 0], Zi[0, 1], Zi[1, 1]
 
         analytical_data[freq] = {
             'zs': zs,
-            'le': l_ext,
+            'le': le,
             'rs': np.real(zs),
             'ls': np.imag(zs) / (2 * np.pi * freq),
             'r11': np.real(z11),
@@ -102,7 +104,7 @@ def run_analytical_simulation(mtl, frequencies):
 
     return analytical_data
 
-def run_momso_simulation(mtl, frequencies):
+def mom_so_simulation(mtl, frequencies):
     """
     Executa a simulação da impedância usando o Método dos Momentos (MoM-SO).
 
@@ -235,9 +237,10 @@ if __name__ == "__main__":
 
     # Rotinas Analítica e MoM-SO
     mtl_model = MulticonductorTransmissionLine(MODEL)
-    FREQUENCY = {'ana': np.logspace(0, 5.9, num=200), 'mom': np.logspace(0, 5.9, num=30)}    
-    analytical_data = run_analytical_simulation(MODEL, FREQUENCY['ana'])
-    momso_data = run_momso_simulation(MODEL, FREQUENCY['mom'])
+    coaxial_model = CoaxialCable(MODEL)
+    FREQUENCY = {'ana': np.logspace(0, 5.99, num=200), 'mom': np.logspace(0, 5.99, num=30)}    
+    analytical_data = analytical_simulation(mtl_model, coaxial_model, FREQUENCY['ana'])
+    momso_data = mom_so_simulation(MODEL, FREQUENCY['mom'])
 
     print(f"\nRotinas de cálculo finalizadas! Tempo de simulação: {(time.time() - st):.2f} segundos.")
     plot_results(FREQUENCY, analytical_data, momso_data)

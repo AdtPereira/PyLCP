@@ -11,7 +11,7 @@ SCRIPTS_TO_RUN = [
     os.path.join("examples", "scc", "deconti_single_model.py"),
     os.path.join("examples", "scc", "prysmian_core_cable.py"),
     os.path.join("examples", "scc", "prysmian_core_sheath.py"),
-    os.path.join("examples", "scc", "xue_flat.py"),
+    os.path.join("examples", "scc", "xue_flat_model.py"),
 ]
 
 def main():

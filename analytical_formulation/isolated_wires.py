@@ -328,7 +328,7 @@ class CoaxialCable(MulticonductorTransmissionLine):
 
         return zs
 
-
+# Obsolete. Substitute with scc.InternalPerUnitParameters class
 class Ametani(MulticonductorTransmissionLine):
     """ This class contains the analytical formulation of the system. """
 
