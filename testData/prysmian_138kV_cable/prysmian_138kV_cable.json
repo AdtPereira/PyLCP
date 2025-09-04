@@ -1,0 +1,32 @@
+{
+  "arrangement": {
+    "burial_depth_m": 1.7,
+    "spacing_m": null
+  },
+  "soil": {
+    "conductivity_S_per_m": 0.001,
+    "relative_permittivity": 1.0
+  },
+  "cable_definition": {
+    "core": {
+      "inner_radius_m": 0.0,
+      "outer_radius_m": 0.012975,
+      "conductivity_S_per_m": 5.168618E7,
+      "insulation": {
+        "type": "XLPE",
+        "thickness_m": 0.019340,
+        "relative_permittivity": 2.963538
+      }
+    },
+    "sheath": {
+      "inner_radius_m": 0.032315,
+      "outer_radius_m": 0.035315,
+      "conductivity_S_per_m": 4.545454E6,
+      "insulation": {
+        "type": "HDPE",
+        "thickness_m": 0.004,
+        "relative_permittivity": 2.3
+      }
+    }
+  }
+}

@@ -531,6 +531,7 @@ class PerUnitParameters:
 
         S1c = np.zeros((self.num_freq, N, N), dtype=complex)
         S2c = np.zeros((self.num_freq, N, N), dtype=complex)
+        pg = np.zeros((self.num_freq, N, N), dtype=complex)
 
         # Wedepohl e Wilcox Approximation Expression
         if zg_form in ['wedepohl']:

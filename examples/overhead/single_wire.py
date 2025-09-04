@@ -28,7 +28,7 @@ try:
     from mtl_main.graphics import MTLRepresentation
     from mtl_main.source import MulticonductorTransmissionLine
     from mtl_main.utils import *
-    from analytical_formulation.overhead_lines import PerUnitParameters
+    from analytical_forms.overhead_lines import PerUnitParameters
     print("Módulos e modelo de dados importados com sucesso.")
 except ImportError as e:
     print(f"Erro ao importar módulos: {e}")

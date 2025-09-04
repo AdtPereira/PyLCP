@@ -60,7 +60,7 @@ try:
     from mtl_main.models_scc import BARE_SINGLE_WIRE as MODEL
     from mtl_main.graphics import MTLRepresentation
     from mtl_main.source import MulticonductorTransmissionLine
-    from analytical_formulation.scc import PerUnitParameters
+    from analytical_forms.scc import PerUnitParameters
     print("Módulos e modelo de dados importados com sucesso.") 
 except ImportError as e:
     print(f"Erro ao importar módulos: {e}")
@@ -76,8 +76,8 @@ class ModelPlotter:
         self.pul_data = pul
         self.f = self.freq_data['Analytically']
         self.w = 2 * np.pi * self.f
-        self.ro = mtl_model.surfaces[0]['radius']
-        self.h1 = mtl_model.surfaces[0]['center_point'][1]
+        # self.ro = mtl_model.surfaces[0]['radius']
+        # self.h1 = mtl_model.surfaces[0]['center_point'][1]
 
         self.nakagawa_series = [
             {'key': 'magalhaes_xue', 'label': 'Magalhães/Xue',  'color': 'black', 'linestyle': '-', 'linewidth': 2},

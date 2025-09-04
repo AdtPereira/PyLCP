@@ -5,7 +5,7 @@
   },
   "soil": {
     "conductivity_S_per_m": 0.01,
-    "relative_permittivity": 1.0
+    "relative_permittivity": 10.0
   },
   "cable_definition": {
     "core": {

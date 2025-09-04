@@ -57,7 +57,7 @@ try:
     from mtl_main.models_scc import PRYSMIAN_138kV_CORE_SHEATH as MODEL
     from mtl_main.graphics import MTLRepresentation
     from mtl_main.source import MulticonductorTransmissionLine
-    from analytical_formulation.scc import InternalPerUnitParameters, PerUnitParameters
+    from analytical_forms.scc import InternalPerUnitParameters, PerUnitParameters
     print("Módulos e modelo de dados importados com sucesso.") 
 except ImportError as e:
     print(f"Erro ao importar módulos: {e}")

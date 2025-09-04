@@ -6,10 +6,10 @@ import subprocess
 import sys
 import os
 
-# --- CHANGE 1: Use module notation instead of file paths ---
 SCRIPTS_TO_RUN = [
     "testData.pipe_trefoil_patel.pipe_trefoil_patel",
     "testData.scc_flat_xue.scc_flat_xue",
+    "testData.scc_single_wire.scc_single_wire",
 ]
 
 def main():

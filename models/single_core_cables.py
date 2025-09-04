@@ -2,119 +2,158 @@
 """
 This script provides a parametric method to generate the MODEL dictionary 
 for a flat arrangement of single-core cables, based on input parameters 
-typically loaded from a JSON file like 'scc_flat_xue.json'.
+typically loaded from a JSON file.
+This version dynamically handles the presence or absence of cable layers.
 """
 
 import json
 
-def three_phase_flat_model(
+def _add_conductor_to_model(MODEL, conductor_id, center_point, layer_data, layer_name):
+    """
+    Helper function to add a single conductor layer (core, sheath, or armor) to the MODEL.
+    It dynamically handles the presence of insulation.
+    """
+    insulation_data = layer_data.get('insulation')
+    insulation_dict = None  # Default to no insulation
+
+    if insulation_data:
+        insulation_dict = {
+            'name': f"{layer_name}_insulation",
+            'type': insulation_data.get('type', 'insulation'),
+            'center_point': center_point,
+            'thickness': insulation_data['thickness_m'],
+            'relative_permittivity': insulation_data['relative_permittivity'],
+            'fourier_order': 0,
+            'relative_permeability': 1.0,
+        }
+
+    MODEL[conductor_id] = {
+        'line_id': conductor_id,
+        'conductor_name': layer_name,
+        'line_type': 'active',
+        'line_return': 0,
+        'center_point': center_point,
+        'radius': [layer_data['inner_radius_m'], layer_data['outer_radius_m']],
+        'conductivity': layer_data['conductivity_S_per_m'],
+        'insulation': insulation_dict,
+        'subconductors': None,
+        'conductor_layers': None,
+        'relative_permeability': 1.0,
+        'relative_permittivity': 1.0,
+        'relative_permittivity_out': 1.0,
+        'potential_to_infinity': 1.0,
+        'fourier_order': 0,
+    }
+    return conductor_id + 1
+
+def single_phase_model(
     input_json: dict, 
     show_model: bool = False
 ) -> dict:
     """
-    Generates a parametric model dictionary for a flat arrangement of SCC cables.
-
-    Args:
-        input_json (dict): A dictionary containing the cable's physical definition 
-                            (core, insulation, sheath, jacket); cable layout 
-                            (burial depth, spacing); and soil properties.
-        show_model (bool): If True, prints the generated MODEL dictionary.
-
-    Returns:
-        dict: The complete MODEL dictionary for the simulation.
+    Generates a parametric model for a single SCC cable, dynamically
+    building it based on the layers defined in the JSON.
     """
-    # Cable Layers
-    core = input_json['cable_definition']['core']
-    core_insulation = input_json['cable_definition']['core']['insulation']
-    sheath = input_json['cable_definition']['sheath']
-    sheath_insulation = input_json['cable_definition']['sheath']['insulation']
+    # Safely get cable definition components
+    cable_def = input_json.get('cable_definition', {})
+    core = cable_def.get('core')
+    sheath = cable_def.get('sheath')
+    armor = cable_def.get('armor')
 
-    # Positions for the three cables in a flat arrangement
+    # Positions for the cable
     depth = input_json['arrangement']['burial_depth_m']
-    spacing = input_json['arrangement']['spacing_m']
     c1 = (0.0, -depth)
-    c2 = (spacing, -depth)
-    c3 = (2 * spacing, -depth)
     
-    # --- 3. Build the MODEL dictionary ---
+    # Build the base MODEL dictionary
     MODEL = {
-        'name': 'XUE_FLAT_ARRANGEMENT',
+        'name': input_json.get('name', 'SINGLE_PHASE_SCC'),
         'type': 'scc',
-        'note': 'A parametric Xue flat arrangement cable model based on Fig. 4.18 (a) [Xue 2018]',
+        'note': input_json.get('note', 'A parametric single-phase SCC model.'),
         'idx_ref_conductor': 0,
         0: {
             'line_id': 0,
             'conductor_name': 'soil',
             'line_type': 'return',
             'line_return': None,
-            'conductivity': input_json['soil'].get('conductivity_S_per_m', 0.01),
+            'conductivity': input_json['soil']['conductivity_S_per_m'],
             'relative_permeability': 1.0,
-            'relative_permittivity': input_json['soil'].get('relative_permittivity', 1.0),
+            'relative_permittivity': input_json['soil']['relative_permittivity'],
             'relative_permittivity_out': 1.0,
         },
     }
 
-    # Loop through the cable positions to create the conductors
+    # Dynamically add conductors based on what's defined in the JSON
     conductor_id = 1
-    for center_point in [c1, c2, c3]:
-        # Core conductor
-        MODEL[conductor_id] = {
-            'line_id': conductor_id,
-            'conductor_name': 'core',
-            'line_type': 'active',
-            'line_return': 0,
-            'center_point': center_point,
-            'radius': [core['inner_radius_m'], core['outer_radius_m']],
-            'conductivity': core['conductivity_S_per_m'],
-            'insulation': {
-                'name': 'primary_insulation',
-                'type': 'XLPE',
-                'center_point': center_point,
-                'thickness': core_insulation['thickness_m'],
-                'relative_permittivity': core_insulation['relative_permittivity'],
-                'fourier_order': 0,
-                'relative_permeability': 1.0,
-            },
-            'subconductors': None,
-            'conductor_layers': None,
-            'relative_permeability': 1.0,
-            'relative_permittivity': 1.0,
-            'relative_permittivity_out': 1.0,
-            'potential_to_infinity': 1.0,
-            'fourier_order': 0,
-        }
-        conductor_id += 1
+    for center_point in [c1]:
+        if core:
+            conductor_id = _add_conductor_to_model(MODEL, conductor_id, center_point, core, 'core')
         
-        # Sheath conductor
-        MODEL[conductor_id] = {
-            'line_id': conductor_id,
-            'conductor_name': 'sheath',
-            'line_type': 'active',
-            'line_return': 0,
-            'center_point': center_point,
-            'radius': [sheath['inner_radius_m'], sheath['outer_radius_m']],
-            'conductivity': sheath['conductivity_S_per_m'],
-            'insulation': {
-                'name': 'secondary_insulation',
-                'type': 'HDPE',
-                'center_point': center_point,
-                'thickness': sheath_insulation['thickness_m'],
-                'relative_permittivity': sheath_insulation['relative_permittivity'],
-                'fourier_order': 0,
-                'relative_permeability': 1.0,
-            },
-            'subconductors': None,
-            'conductor_layers': None,
-            'relative_permeability': 1.0,
-            'relative_permittivity': 1.0,
-            'relative_permittivity_out': 1.0,
-            'potential_to_infinity': 1.0,
-            'fourier_order': 0,
-        }
-        conductor_id += 1
+        if sheath:
+            conductor_id = _add_conductor_to_model(MODEL, conductor_id, center_point, sheath, 'sheath')
+            
+        if armor:
+            conductor_id = _add_conductor_to_model(MODEL, conductor_id, center_point, armor, 'armor')
 
     if show_model:
-        print("\n--- Generated SCC Flat Arrangement MODEL Dictionary ---")
+        print("\n--- Generated Dynamic SCC MODEL Dictionary ---")
+        print(json.dumps(MODEL, indent=2, default=str))
+        print("---------------------------------------------------\n")
+
+    return MODEL
+
+def three_phase_flat_model(
+    input_json: dict, 
+    show_model: bool = False
+) -> dict:
+    """
+    Generates a parametric model for a three-phase flat arrangement, dynamically
+    building each cable based on the layers defined in the JSON.
+    """
+    # Safely get cable definition components
+    cable_def = input_json.get('cable_definition', {})
+    core = cable_def.get('core')
+    sheath = cable_def.get('sheath')
+    armor = cable_def.get('armor')
+
+    # Positions for the three cables
+    depth = input_json['arrangement']['burial_depth_m']
+    spacing = input_json['arrangement']['spacing_m']
+    c1 = (0.0, -depth)
+    c2 = (spacing, -depth)
+    c3 = (2 * spacing, -depth)
+    
+    # Build the base MODEL dictionary
+    MODEL = {
+        'name': input_json.get('name', 'THREE_PHASE_FLAT_SCC'),
+        'type': 'scc',
+        'note': input_json.get('note', 'A parametric three-phase flat SCC model.'),
+        'idx_ref_conductor': 0,
+        0: {
+            'line_id': 0,
+            'conductor_name': 'soil',
+            'line_type': 'return',
+            'line_return': None,
+            'conductivity': input_json['soil']['conductivity_S_per_m'],
+            'relative_permeability': 1.0,
+            'relative_permittivity': input_json['soil']['relative_permittivity'],
+            'relative_permittivity_out': 1.0,
+        },
+    }
+
+    # Loop through cable positions and dynamically add conductors
+    conductor_id = 1
+    for center_point in [c1, c2, c3]:
+        if core:
+            conductor_id = _add_conductor_to_model(MODEL, conductor_id, center_point, core, 'core')
+        
+        if sheath:
+            conductor_id = _add_conductor_to_model(MODEL, conductor_id, center_point, sheath, 'sheath')
+            
+        if armor:
+            conductor_id = _add_conductor_to_model(MODEL, conductor_id, center_point, armor, 'armor')
+
+    if show_model:
+        print("\n--- Generated Dynamic SCC MODEL Dictionary ---")
         print(json.dumps(MODEL, indent=2, default=str))
         print("---------------------------------------------------\n")
 

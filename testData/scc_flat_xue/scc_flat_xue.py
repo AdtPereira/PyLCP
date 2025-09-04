@@ -21,11 +21,11 @@ except IndexError:
 # --- Import custom modules ---
 try:
     from utils.case_utils import load_json_parameters
-    from .plotter import ModelPlotter
+    from analyzer.PlotterModels import XueModels
     from models import single_core_cables as scc 
     from mtl_main.graphics import MTLRepresentation
     from mtl_main.source import MulticonductorTransmissionLine
-    from analytical_formulation.scc_vector import InternalPerUnitParameters, PerUnitParameters
+    from analytical_forms.scc_vector import InternalPerUnitParameters, PerUnitParameters
     print("Core modules imported successfully.")
 except ImportError as e:
     print(f"Error importing modules: {e}")
@@ -62,7 +62,6 @@ def main():
     print("Calculating internal parameters for all frequencies...")
     #    This returns a dictionary of 3D matrices (e.g., shape (40, 6, 6)).
     internal = InternalPerUnitParameters(mtl_model_a, pul_data['frequencies'])
-    pul_internal = internal.internal_matrices()
     print("Internal parameters calculated.")
 
     # 2. Loop through scenarios to calculate ground-return effects.
@@ -70,11 +69,11 @@ def main():
         print(f"Calculating scenario: {key}...")
         pul = PerUnitParameters(value['mtl'], pul_data['frequencies'])
         pul_data[key] = pul.quasi_tem_pul(
-            pul_internal, zg_form=value['zg_form'], yg_form=value['yg_form']
+            internal.internal_matrices(), zg_form=value['zg_form'], yg_form=value['yg_form']
         )
     
     print(f"End of the routine! Time spent on simulation: {(time.time() - st):.1f} seconds.\n")
-    plotter = ModelPlotter(pul_data)
+    plotter = XueModels(pul_data)
     plotter.plot_fig419()
     plotter.plot_fig421()
     plotter.plot_fig423()

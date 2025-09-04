@@ -50,7 +50,7 @@ try:
     from mtl_main.models_scc import DECONTI_FLAT_ARRANGEMENT as MODEL
     from mtl_main.graphics import MTLRepresentation
     from mtl_main.source import MulticonductorTransmissionLine
-    from analytical_formulation.scc import PerUnitParameters
+    from analytical_forms.scc import PerUnitParameters
     print("Módulos e modelo de dados importados com sucesso.") 
 except ImportError as e:
     print(f"Erro ao importar módulos: {e}")
@@ -69,7 +69,7 @@ class ModelPlotter:
         self.ro = mtl_model.surfaces[0]['radius']
         self.h1 = mtl_model.surfaces[0]['center_point'][1]
 
-        self.comparison_series = [
+        self.paper_2023 = [
             {'key': 'p100',   'label': r'$\rho_e=100 \;\Omega m$',  'color': 'black', 'linestyle': '-', 'marker': 'o'},
             {'key': 'p1000',  'label': r'$\rho_e=1000 \;\Omega m$', 'color': 'black', 'linestyle': '-', 'marker': 's'},
             {'key': 'p10000', 'label': r'$\rho_e=10000 \;\Omega m$','color': 'black', 'linestyle': '-', 'marker': '^'},
@@ -87,7 +87,7 @@ class ModelPlotter:
                 'q': 0,
                 'x_lim': {'norm': (1E4, 1E7), 'angle': (1E4, 1E7)},
                 'y_lim': {'norm': (0, 25), 'angle': (20, 90)},
-                'series_to_plot': self.comparison_series
+                'series_to_plot': self.paper_2023
             },
             'potential': {
                 'suptitle': r"Flat arrangement's mutual ground-return potential coefficients for $\varepsilon_{r1} = 10$",
@@ -97,11 +97,11 @@ class ModelPlotter:
                 'q': 0,
                 'x_lim': {'norm': (1E4, 1E7), 'angle': (1E4, 1E7)},
                 'y_lim': {'norm': (0, 14), 'angle': (-90, 90)},
-                'series_to_plot': self.comparison_series
+                'series_to_plot': self.paper_2023
             },            
         }
 
-    def _plot_impedance_subplots(self, config_key):
+    def _impedance_subplots(self, config_key):
         config = self.plot_configs[config_key]
         p, q = config['p'], config['q']
         fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5), sharey=False)
@@ -135,7 +135,7 @@ class ModelPlotter:
         ax2.set_title(config['angle_title'])
         plt.tight_layout(rect=[0, 0, 1, 0.96])
 
-    def _plot_potential_subplots(self, config_key):
+    def _potential_subplots(self, config_key):
         config = self.plot_configs[config_key]
         p, q = config['p'], config['q']
         fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5), sharey=False)
@@ -169,13 +169,13 @@ class ModelPlotter:
         ax2.set_title(config['angle_title'])
         plt.tight_layout(rect=[0, 0, 1, 0.96])
 
-    def plot_impedance_comparison(self):
+    def impedance_comparison(self):
         """Plots the data corresponding to Figure 3 from the reference."""
-        self._plot_impedance_subplots('impedance')
+        self._impedance_subplots('impedance')
 
-    def plot_potential_comparison(self):
+    def potential_comparison(self):
         """Plots the data corresponding to Figure 6 from the reference."""
-        self._plot_potential_subplots('potential')
+        self._potential_subplots('potential')
 
 if __name__ == "__main__":
     st = time.time()
@@ -210,7 +210,7 @@ if __name__ == "__main__":
 
     print(f"End of the routine! Time spent on simulation: {(time.time() - st):.1f} seconds.\n")
     plotter = ModelPlotter(mtl_model_a, frequency, pul_parameters)
-    plotter.plot_impedance_comparison()
-    plotter.plot_potential_comparison()
+    plotter.impedance_comparison()
+    plotter.potential_comparison()
     MTLRepresentation(mtl_model_a, units='millimeter').ground_return_systems()
     plt.show()

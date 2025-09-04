@@ -27,7 +27,7 @@ try:
     from mtl_main.models_wires import SINGLE_WIRE_R10_LIMA as MODEL
     from mtl_main.graphics import MTLRepresentation
     from mtl_main.source import MulticonductorTransmissionLine
-    from analytical_formulation.overhead_lines import PerUnitParameters
+    from analytical_forms.overhead_lines import PerUnitParameters
     print("Modules and data model imported successfully.")
 except ImportError as e:
     print(f"Error importing modules: {e}")

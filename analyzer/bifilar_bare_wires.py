@@ -9,7 +9,7 @@ from mtl_main.utils import *
 from mtl_main.graphics import MTLRepresentation
 from mtl_main.source import MulticonductorTransmissionLine
 from mtl_paul.py_fortran import FortranRunner
-from analytical_formulation.isolated_wires import WiresHomogeneousMedia
+from analytical_forms.isolated_wires import WiresHomogeneousMedia
 from mom_so.quasi_static_green import QuasiStatic
 from mom_so.lossless_medium import HomogeneousLosslessMedium, LosslessPostProcessing
 from mom.bare_wire_systems import MulticonductorBareWireSystems

@@ -57,10 +57,10 @@ try:
     from mtl_main.models_wires import COAXIAL_CABLE as MODEL
     from mtl_main.graphics import MTLRepresentation
     from mtl_main.source import MulticonductorTransmissionLine
-    from analytical_formulation.isolated_wires import CoaxialCable
+    from analytical_forms.isolated_wires import CoaxialCable
     from mom_so.quasi_static_green import QuasiStatic
     from mom_so.lossless_medium import HomogeneousLosslessMedium, LosslessPostProcessing
-    from analytical_formulation.scc import InternalPerUnitParameters
+    from analytical_forms.scc import InternalPerUnitParameters
     print("Módulos e modelo de dados importados com sucesso.") 
 except ImportError as e:
     print(f"Erro ao importar módulos: {e}")
