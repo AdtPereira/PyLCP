@@ -19,16 +19,16 @@ class MTLRepresentation:
     def __init__(self, model: MulticonductorTransmissionLine, units='meter'):        
         self.model = model
         unit_info = UNITS_DATA.get(units, UNITS_DATA['meter'])
-        self.scale_factor = unit_info['scale']
+        self.unit_factor = unit_info['scale']
         self.label_unit = unit_info['label']
         self.color_map = {
-            'default': 'darkgrey',
-            'core': 'darkgrey',
-            'sheath': 'darkblue',
-            'insulation': 'cyan',
+            'default': 'grey',
+            'insulation': 'yellow',
+            'core': 'darkgray',
+            'sheath': 'darkgreen',
             'XLPE': 'lightblue',
             'HDPE': 'lightgreen',
-            'jacket': 'black'
+            'pipe': 'lightgrey',
         }
 
     def _finalize_plot(self, ax, title=""):
@@ -54,12 +54,12 @@ class MTLRepresentation:
         _, ax = plt.subplots(figsize=(8, 5))   
 
         for conductor in reversed(self.model.mtl.values()):
-            conductor_radius = conductor['radius'][1] * self.scale_factor
-            conductor_center = np.array(conductor['center_point']) * self.scale_factor
+            conductor_radius = conductor['radius'][1] * self.unit_factor
+            conductor_center = np.array(conductor['center_point']) * self.unit_factor
 
             if 'insulation' in conductor and conductor['insulation'] is not None:
-                center = np.array(conductor['insulation']['center_point']) * self.scale_factor
-                thickness = conductor['insulation']['thickness'] * self.scale_factor
+                center = np.array(conductor['insulation']['center_point']) * self.unit_factor
+                thickness = conductor['insulation']['thickness'] * self.unit_factor
                 outer_radius = conductor_radius + thickness
                 ax.add_patch(Wedge(center, outer_radius, 0, 360, width=thickness, edgecolor='black', facecolor='lightblue', linestyle='solid'))
 
@@ -87,10 +87,10 @@ class MTLRepresentation:
         _, ax = plt.subplots(figsize=(8, 5))
         
         # --- Define Radii and Center (applying scale factor) ---
-        center = np.array(core['center_point']) * self.scale_factor        
-        core_outer_radius = core['radius'][1] * self.scale_factor
-        sheath_inner_radius = sheath['radius'][0] * self.scale_factor
-        sheath_outer_radius = sheath['radius'][1] * self.scale_factor
+        center = np.array(core['center_point']) * self.unit_factor        
+        core_outer_radius = core['radius'][1] * self.unit_factor
+        sheath_inner_radius = sheath['radius'][0] * self.unit_factor
+        sheath_outer_radius = sheath['radius'][1] * self.unit_factor
 
         # --- Plotting from outside to inside ---
 
@@ -128,6 +128,31 @@ class MTLRepresentation:
         # --- Final plot adjustments ---
         self._finalize_plot(ax, title='Coaxial Cable Cross-Section')
 
+    def isolated_systems(self):
+        """
+        Generates and displays a schematic plot for isolated systems 
+        (e.g., single-core cables, pipe-type cables).
+        
+        This method acts as a coordinator, delegating tasks to specialized
+        helper methods for plotting, annotation, and finalization.
+        """
+        # 1. Initialization
+        _, ax = plt.subplots(figsize=(12, 6))
+        used_labels = set()
+
+        # 2. Calculate schematic parameters based on the model
+        params = self._calculate_schematic_parameters()
+        if not params['core_conductor']:
+            print("Error: Could not find an 'active' conductor in the model.")
+            return
+
+        # 3. Plot each cable in the transmission line system
+        for conductor_data in self.model.mtl.values():
+            self._plot_single_cable(ax, conductor_data, params, used_labels)
+
+        # 4. Add schematic annotations and finalize the plot
+        self._finalize_isolated_plot(ax, params['title'])
+
     def ground_return_systems(self):
         """
         Generates and displays a schematic plot for ground-return systems 
@@ -148,7 +173,7 @@ class MTLRepresentation:
 
         # 3. Plot each cable in the transmission line system
         for conductor_data in self.model.mtl.values():
-            self._plot_single_cable(ax, conductor_data, params, used_labels)
+            self._plot_scaled_single_cable(ax, conductor_data, params, used_labels)
 
         # 4. Add schematic annotations and finalize the plot
         self._draw_schematic_annotations(ax, params)
@@ -176,9 +201,15 @@ class MTLRepresentation:
         if self.model.mtl_type == 'overhead':
             title = 'Overhead Transmission Line'
             h_factor = 5
-        else: # Default to buried cable
+        elif self.model.mtl_type == 'scc':
             title = 'Buried Single-Core Cable'
-            h_factor = -3
+            h_factor = -2
+        elif self.model.mtl_type == 'pipe':
+            title = 'Pipe-Type Cable'
+            h_factor = 1
+        else: 
+            title = 'Buried Single-Core Cable'
+            h_factor = -2
 
         return {
             'core_conductor': core_conductor,
@@ -200,8 +231,46 @@ class MTLRepresentation:
         # Calculate the schematic center point for this specific cable
         center_point = np.array([
             conductor_data['center_point'][0], 
+            conductor_data['center_point'][1]
+        ]) * self.unit_factor
+        
+        # Plot the main conductor body
+        outer_radius_m = conductor_data['radius'][1]
+        thickness_m = outer_radius_m - conductor_data['radius'][0]
+        label = conductor_data.get('conductor_name', 'Conductor')
+        color = self.color_map.get(label, self.color_map['default'])
+        
+        self._plot_cable_layer(
+            ax, center_point, outer_radius_m, thickness_m,
+            color, label, used_labels
+        )
+        
+        # Plot the insulation layer if it exists
+        if 'insulation' in conductor_data and conductor_data['insulation'] is not None:
+            ins_data = conductor_data['insulation']
+            ins_label = ins_data.get('type', 'Insulation')
+            ins_color = self.color_map.get(ins_label, self.color_map['insulation'])
+            
+            self._plot_cable_layer(
+                ax, center_point, outer_radius_m + ins_data['thickness'],
+                ins_data['thickness'], ins_color, ins_label, used_labels
+            )
+
+    def _plot_scaled_single_cable(self, ax, conductor_data, params, used_labels):
+        """
+        Plots a single cable with all its constituent layers (conductor, insulation).
+        
+        Args:
+            ax (matplotlib.axes.Axes): The axes to plot on.
+            conductor_data (dict): The data dictionary for one conductor.
+            params (dict): The pre-calculated schematic parameters.
+            used_labels (set): A set of labels already used in the legend.
+        """
+        # Calculate the schematic center point for this specific cable
+        center_point = np.array([
+            conductor_data['center_point'][0], 
             params['h_factor'] * params['max_radius']
-        ]) * self.scale_factor
+        ]) * self.unit_factor
         
         # Plot the main conductor body
         outer_radius_m = conductor_data['radius'][1]
@@ -231,8 +300,8 @@ class MTLRepresentation:
         Handles the logic for avoiding duplicate legend entries.
         """
         # Apply scaling
-        outer_radius = outer_radius_m * self.scale_factor
-        thickness = thickness_m * self.scale_factor
+        outer_radius = outer_radius_m * self.unit_factor
+        thickness = thickness_m * self.unit_factor
         
         # Determine if the label should be added to the legend
         label_to_plot = label if label not in used_labels else None
@@ -240,7 +309,7 @@ class MTLRepresentation:
             used_labels.add(label_to_plot)
             
         # A thickness of 0 implies a solid core
-        if thickness < 1e-9 * self.scale_factor: # Use a small tolerance for floating point
+        if thickness < 1e-9 * self.unit_factor: # Use a small tolerance for floating point
             patch = Circle(center, outer_radius, fill=True, edgecolor='black', 
                            facecolor=color, label=label_to_plot)
         else:
@@ -255,24 +324,24 @@ class MTLRepresentation:
         surrounding medium text.
         """
         core_center_x = params['core_conductor']['center_point'][0]
-        schematic_y = (params['h_factor'] * params['max_radius']) * self.scale_factor
+        schematic_y = (params['h_factor'] * params['max_radius']) * self.unit_factor
         
         # Dimension line for burial depth 'h'
-        # Ensure zorder is high enough to be visible above the ground fill
-        dim_x_arrow = (core_center_x + params['max_radius'] * 2.5) * self.scale_factor
+        dim_x_arrow = (core_center_x + params['max_radius'] * 2.5) * self.unit_factor
         ax.annotate('', xy=(dim_x_arrow, 0), xycoords='data', 
                     xytext=(dim_x_arrow, schematic_y), textcoords='data',
-                    arrowprops=dict(arrowstyle='<->', color='black', lw=1, zorder=3)) # Zorder increased
+                    arrowprops=dict(arrowstyle='<->', color='black', lw=1, zorder=3))
         
         real_h = abs(params['core_conductor']['center_point'][1])
         label_text = f'h = {real_h:.2f} m'
+        
         # Adjust text position and zorder
         ax.text(dim_x_arrow, schematic_y / 2, label_text, 
-                ha='center', va='center', fontsize=9, zorder=3, # Zorder increased
-                bbox=dict(boxstyle='square,pad=0.3', fc='white', ec='none', alpha=0.8)) # Added background for clarity
+                ha='center', va='center', fontsize=9, zorder=3,
+                bbox=dict(boxstyle='square,pad=0.3', fc='white', ec='none', alpha=0.8))
 
         # Ground level line
-        ax.axhline(y=0, color='darkgreen', linestyle=':', linewidth=1.5, zorder=2) # Zorder for line
+        ax.axhline(y=0, color='darkgreen', linestyle=':', linewidth=1.5, zorder=2)
 
     def _finalize_ground_return_plot(self, ax, title):
         """
@@ -309,7 +378,43 @@ class MTLRepresentation:
 
         # Format legend: create it first, then set its zorder.
         handles, labels = ax.get_legend_handles_labels()
-        if handles: # Only create a legend if there are items to display
+        if handles: 
             unique_labels = dict(zip(labels, handles))
             legend = ax.legend(unique_labels.values(), unique_labels.keys(), loc='best')
-            legend.set_zorder(5) # Set zorder on the legend object itself
+            legend.set_zorder(5)
+
+    def _finalize_isolated_plot(self, ax, title):
+        """
+        Applies final settings to the plot, including limits, labels,
+        backgrounds, and legend formatting.
+        """
+        ax.set_aspect('equal', 'box')
+        ax.set_xlabel(f'x ({self.label_unit})')
+        ax.set_ylabel('')
+        ax.set_yticks([])
+        ax.set_title(title)
+        ax.grid(True, linestyle='--', linewidth=0.5, zorder=0)
+
+        # Set plot limits with generous margins
+        ax.relim()
+        ax.autoscale_view()
+        xlim = ax.get_xlim()
+        ylim = ax.get_ylim()
+        x_margin = (xlim[1] - xlim[0]) * 0.2
+        y_margin = (ylim[1] - ylim[0]) * 0.2
+        ax.set_xlim(xlim[0] - x_margin, xlim[1] + x_margin)
+        ax.set_ylim(ylim[0] - y_margin, ylim[1] + y_margin)
+        
+        final_xlim = ax.get_xlim()
+        final_ylim = ax.get_ylim()
+        
+        text_x = final_xlim[0] + (final_xlim[1] - final_xlim[0]) * 0.05
+        y_offset = (final_ylim[1] - final_ylim[0]) * 0.35
+        ax.text(text_x, y_offset, 'Air ($\\varepsilon_0$, $\\mu_0$)', va='bottom', fontsize=10, style='italic', zorder=4)
+
+        # Format legend: create it first, then set its zorder.
+        handles, labels = ax.get_legend_handles_labels()
+        if handles: 
+            unique_labels = dict(zip(labels, handles))
+            legend = ax.legend(unique_labels.values(), unique_labels.keys(), loc='best')
+            legend.set_zorder(5)

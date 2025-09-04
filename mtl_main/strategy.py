@@ -412,8 +412,9 @@ def mtl_strategy_factory(mtl_type: str) -> MTLStrategy:
         'coated_wires': CableStrategy,
         'bare_wires': CableStrategy,
         'coaxial': OverheadCableStrategy,
-        'scc': SingleCoreCableStrategy,
         'overhead': OverheadLineStrategy,
+        'scc': SingleCoreCableStrategy,
+        'pipe': CableStrategy,
     }
     
     strategy_class = strategies.get(mtl_type)

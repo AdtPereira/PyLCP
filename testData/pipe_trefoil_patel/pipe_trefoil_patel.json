@@ -1,0 +1,14 @@
+{
+  "core_radius_mm": 10.0,
+  "core_conductivity": 5.8e7,
+  "insulation_thickness_mm": 4.0,
+  "insulation_rel_permittivity": 2.3,
+  "screen_thickness_mm": 0.2,
+  "screen_conductivity": 5.8e7,
+  "jacket_thickness_mm": 2.0,
+  "jacket_rel_permittivity": 2.3,
+  "pipe_outer_diameter_mm": 100.0,
+  "pipe_thickness_mm": 5.0,
+  "pipe_conductivity": 1.0e7,
+  "pipe_rel_permeability": 100.0
+}
