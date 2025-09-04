@@ -1,5 +1,5 @@
 {
-    "name": "DECONTI_FLAT_ARRANGEMENT",
+    "case_name": "scc_deConti_flat",
     "type": "scc",
     "note": "An DECONTI flat arrangement cable Fig. 4.18 (a) [Xue 2018]",
     "idx_ref_conductor": 0,

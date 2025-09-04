@@ -282,7 +282,7 @@ if __name__ == "__main__":
     for f in frequency['Analytically']:
         for key, params in scenarios.items():
             pul_parameters[key].append(
-                PerUnitParameters(params['mtl'], f).pul_extended_theory(form=params['form'])
+                PerUnitParameters(params['mtl'], f).pul_quasi_tem(form=params['form'])
             )
 
     print(f"End of the routine! Time spent on simulation: {(time.time() - st):.2f} seconds.\n")

@@ -87,7 +87,7 @@ if __name__ == "__main__":
     pul_parameters = {}
     mtl = MulticonductorTransmissionLine(MODEL)
     for f in frequency['Analytically']:
-        pul_parameters[f] = PerUnitParameters(mtl, f).pul_extended_theory(form='deri')
+        pul_parameters[f] = PerUnitParameters(mtl, f).pul_quasi_tem(form='deri')
 
     print(f"End of the routine! Time spent on simulation: {(time.time() - st):.2f} seconds.\n")
     log_pul_parameters(pul_parameters)

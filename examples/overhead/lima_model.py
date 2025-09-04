@@ -223,12 +223,12 @@ if __name__ == "__main__":
         for key, model_data in soil_conductivities.items():
             pul_instance = PerUnitParameters(MulticonductorTransmissionLine(model_data), f)
             for form_key in models_to_run_soil_variant:
-                pul_parameters[form_key][key].append(pul_instance.pul_extended_theory(form=form_key))
+                pul_parameters[form_key][key].append(pul_instance.pul_quasi_tem(form=form_key))
         
         # Calculate models with default soil
         pul_default = PerUnitParameters(MulticonductorTransmissionLine(MODEL), f)
         for form_key in models_to_run_single:
-            pul_parameters[form_key].append(pul_default.pul_extended_theory(form=form_key))
+            pul_parameters[form_key].append(pul_default.pul_quasi_tem(form=form_key))
 
     print(f"End of the routine! Time spent on simulation: {(time.time() - st):.2f} seconds.\n")
 

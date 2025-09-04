@@ -1,5 +1,6 @@
-DECONTI_FLAT_ARRANGEMENT = {
-    'name': 'DECONTI_FLAT_ARRANGEMENT',
+# -*- coding: utf-8 -*-
+MODEL = {
+    'name': 'scc_deConti_flat',
     'type': 'scc',
     'note': 'An DECONTI flat arrangement cable Fig. 4.18 (a) [Xue 2018]',
     'idx_ref_conductor': 0,

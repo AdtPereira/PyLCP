@@ -497,7 +497,7 @@ class PerUnitParameters:
         Zg = self.earth_return_impedance(type_form='carson')
         return -self.k_earth2 * np.linalg.inv(Zg)
 
-    def pul_extended_theory(self, form='nakagawa'):
+    def pul_quasi_tem(self, form='nakagawa'):
         """ This method calculates the impedance matrix of the earth return path. """
         N = len(self.model.surfaces)
         S1 = np.zeros((N, N), dtype=complex)

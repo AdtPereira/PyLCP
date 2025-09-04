@@ -7,10 +7,10 @@ import sys
 import os
 
 SCRIPTS_TO_RUN = [
-    os.path.join("examples", "overhead_lines", "internal_parameters.py"),
-    os.path.join("examples", "overhead_lines", "lima_model.py"),
-    os.path.join("examples", "overhead_lines", "single_wire.py"),
-    os.path.join("examples", "overhead_lines", "xue_model.py"),
+    os.path.join("examples", "overhead", "internal_parameters.py"),
+    os.path.join("examples", "overhead", "lima_model.py"),
+    os.path.join("examples", "overhead", "single_wire.py"),
+    os.path.join("examples", "overhead", "xue_model.py"),
 ]
 
 def main():

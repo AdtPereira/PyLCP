@@ -232,15 +232,15 @@ class RibbonCoatedCablesPULParameters:
         """
         Executa a simulação usando o PyTulip e processa os resultados.
         """
+        print("\n============  pyTulip Simulation  ===========")
         if self.tulip_runner is None:
             self._prepare_tulip_runner()
 
+        self.tulip_runner.run()
+        
         if not self.tulip_runner.output_filepath.is_file():
             print(f"Error: Output file '{self.tulip_runner.output_filepath.name}' was not generated.")
             return
-
-        print("\n============  pyTulip Simulation  ===========")
-        self.tulip_runner.run()
         
         print("\n--- Accessing Results ---")
         if self.tulip_runner.C_matrix is not None:

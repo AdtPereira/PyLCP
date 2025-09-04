@@ -3,3 +3,7 @@ __pycache__/
 *.pyc
 *.IN
 *.DAT
+*.log
+
+Results/
+logs/
