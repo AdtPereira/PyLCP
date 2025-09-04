@@ -686,6 +686,141 @@ class InternalPerUnitParameters:
             'potential_coefficient_matrix': Pi,
         }
 
+class PerUnitParametersVector:
+    """
+    This class calculates vector-frequency PUL parameters using an MTL geometry model,
+    including earth-return effects.
+    """
+
+    def __init__(self, model: MulticonductorTransmissionLine, f: np.ndarray):
+        """
+        Initializes the vectorized calculator.
+
+        Args:
+            model (MulticonductorTransmissionLine): The MTL geometry model.
+            f (np.ndarray): A NumPy array of frequencies to be calculated.
+        """
+        # MTL Geometry Model
+        self.model = model
+        self.num_sc_cables, self.num_conductors_per_scc = model._count_scc_and_conductors()
+        
+        self.f = np.asarray(f)
+        self.num_freq = len(self.f)
+
+        # Soil Relative Permittivity
+        self.e1 = model.mtl_ref[0]['relative_permittivity'] * sc.epsilon_0
+        # Soil conductivity (S/m)
+        self.sigma_1 = model.mtl_ref[0]['conductivity']
+        # Soil Relative Permeability
+        self.mu1 = model.mtl_ref[0]['relative_permeability'] * sc.mu_0
+        # Soil resistivity (ohm.m)
+        self.rho_1 = 1 / self.sigma_1
+
+        # Angular frequency (rad/s) is now a vector
+        self.jw = 1j * 2 * np.pi * self.f
+        self.jw_mu0_2pi = self.jw * sc.mu_0 / (2 * np.pi)
+        self.jw_2pi_e0 = self.jw * 2 * np.pi * sc.epsilon_0
+        self.jw_2pi_sg = self.jw / (2 * np.pi * (self.sigma_1 + self.jw * self.e1))
+
+        # Wave numbers are now vectors
+        self.k_air2 = -self.jw * sc.mu_0 * self.jw * sc.epsilon_0
+        self.k_earth2 = -self.jw * self.mu1 * (self.sigma_1 + self.jw * self.e1)
+
+    def ground_return_parameters(self, zg_form='magalhaes_xue', yg_form='magalhaes_xue'):
+        """
+        Calculates Earth-return parameters over a vector of frequencies.
+        """
+        N = self.num_sc_cables
+        d_matrix = self.model.d_matrix_ground_return
+        D_matrix = self.model.D_matrix_ground_return
+
+        k_air2, k_earth2 = self.k_air2, self.k_earth2
+
+        # Adjust wave numbers based on the formulation
+        if zg_form in ['sunde', 'deconti_sunde']:
+            k_air2 = np.zeros_like(self.f, dtype=complex)
+        elif zg_form in ['pollaczek', 'ametani', 'saad', 'wedepohl']:
+            k_air2 = np.zeros_like(self.f, dtype=complex)
+            k_earth2 = -self.jw * self.mu1 * self.sigma_1
+
+        # The arguments to ss.kv will broadcast correctly.
+        # k_earth2 is (num_freq,), d_matrix is (N, N).
+        # Result of sqrt() * d_matrix is (num_freq, N, N)
+        # ss.kv operates element-wise, returning a (num_freq, N, N) array.
+        arg_d = 1j * np.sqrt(k_earth2)[:, np.newaxis, np.newaxis] * d_matrix
+        arg_D = 1j * np.sqrt(k_earth2)[:, np.newaxis, np.newaxis] * D_matrix
+        K0_jke_dnm = ss.kv(0, arg_d)
+        K0_jke_Dnm = ss.kv(0, arg_D)
+
+        S1c = np.zeros((self.num_freq, N, N), dtype=complex)
+        S2c = np.zeros((self.num_freq, N, N), dtype=complex)
+        
+        # Integral expressions are also vectorized thanks to the custom Gauss-Legendre function
+        if zg_form in ['magalhaes_xue', 'sunde', 'pollaczek', 'ametani']:
+            for n in range(N):
+                for m in range(N):
+                    hnm = self.model.vertical_separation_matrix[n, m]
+                    dnm = self.model.horizontal_separation_matrix[n, m]
+                    
+                    if zg_form == 'ametani':
+                        S1c[:, n, m] = 2 * sommerfeld_ametani_approx(hnm, dnm, ke2=k_earth2)
+                    else:
+                        S1c[:, n, m] = 2 * sommerfeld_quasi_tem_approx_impedance(hnm, dnm, ke2=k_earth2, ka2=k_air2)
+                        if yg_form in ['magalhaes_xue']:
+                            S2c[:, n, m] = 2 * sommerfeld_quasi_tem_approx_admittance(hnm, dnm, ke2=k_earth2, ka2=k_air2)
+            
+            # Use broadcasting for element-wise multiplication with the jw vectors
+            zg = self.jw_mu0_2pi[:, np.newaxis, np.newaxis] * (K0_jke_dnm - K0_jke_Dnm + S1c)
+            pg = self.jw_2pi_sg[:, np.newaxis, np.newaxis] * (K0_jke_dnm - K0_jke_Dnm + S2c)
+
+        # Handle other formulations if needed (deconti, etc.)
+        # ...
+
+        return {'earth-return_impedance_matrix': zg, 'earth-return_potential_coefficient': pg}
+
+    def quasi_tem_pul(self, pul_internal, zg_form='magalhaes_xue', yg_form='magalhaes_xue'):
+        """
+        Assembles the final PUL matrices for a vector of frequencies.
+        """
+        N, M = self.num_sc_cables, self.num_conductors_per_scc
+        num_total_conductors = N * M
+
+        earth_return = self.ground_return_parameters(zg_form, yg_form)
+        z0_jk = earth_return['earth-return_impedance_matrix']  # Shape (num_freq, N, N)
+        pg_jk = earth_return['earth-return_potential_coefficient'] # Shape (num_freq, N, N)
+
+        Zi = pul_internal['impedance_matrix'] # Shape (num_freq, N*M, N*M)
+        Pi = pul_internal['potential_coefficient_matrix'] # Shape (N*M, N*M)
+
+        # Loop to build the block matrix for each frequency
+        ones_MM = np.ones((M, M))
+        Z0 = np.zeros_like(Zi, dtype=complex)
+        Pe = np.zeros_like(Zi, dtype=complex)
+        for i in range(self.num_freq):
+            Z0[i, :, :] = np.kron(z0_jk[i, :, :], ones_MM)
+            Pe[i, :, :] = np.kron(pg_jk[i, :, :], ones_MM)
+
+        # Series impedance is a simple element-wise addition
+        Zs = Zi + Z0
+        
+        # Shunt Admittance Matrix calculation
+        # Pi is 2D, Pe is 3D. Use broadcasting to add them.
+        P = Pi[np.newaxis, :, :] + Pe
+        
+        # The linear solve must be looped over the frequency axis
+        Ysh = np.zeros_like(P, dtype=complex)
+        identity_matrix = np.identity(num_total_conductors)
+        for i in range(self.num_freq):
+            lu, piv = lu_factor(P[i, :, :])
+            Ysh[i, :, :] = self.jw[i] * lu_solve((lu, piv), identity_matrix)
+
+        return {
+            'internal_impedance_matrix': Zi,
+            'earth-return_impedance_matrix': Z0,
+            'series_impedance_matrix': Zs,
+            'shunt_admittance_matrix': Ysh,
+        }
+
 class PerUnitParameters:    
     """ This class calculates PUL parameters using an MTL geometry model. """
 
