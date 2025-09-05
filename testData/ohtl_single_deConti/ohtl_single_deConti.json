@@ -1,0 +1,22 @@
+{
+  "type": "overhead",
+  "note": "An DE CONTI buried bare-wire. Ref.: Example xx, p.xxx, 2021",
+  "arrangement": {
+    "height_m": 10.0,
+    "spacing_m": null
+  },
+  "soil": {
+    "conductivity_S_per_m": 0.005,
+    "relative_permittivity": 5.0
+  },
+  "cable_definition": {
+    "core": {
+      "inner_radius_m": 0.0,
+      "outer_radius_m": 0.0005,
+      "conductivity_S_per_m": 5.8E7,
+      "insulation": null
+    },
+    "sheath": null,
+    "armor": null
+  }
+}

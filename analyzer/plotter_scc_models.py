@@ -6,11 +6,18 @@ class PrysmianModels:
     A highly refactored class to handle plotting for the Xue model results.
     It uses a configuration-driven approach to generate complex subplot figures.
     """
-    def __init__(self, pul_parameters, discrete_pul_parameters):
+    def __init__(self, pul_parameters, discrete_pul_data):
         self.pul_data = pul_parameters
-        self.discrete_pul = discrete_pul_parameters
+        # --- Lógica para dados discretos ---
+        self.discrete_pul_data = discrete_pul_data
+        self.discrete_frequencies = discrete_pul_data.get('frequencies', [])
+        
+        # --- Lógica para dados de plotagem (vetorizados) ---
         self.f = pul_parameters['frequencies']
         self.w = 2 * np.pi * self.f
+        if 'internal' in pul_parameters:
+            self.internal_data = self.pul_data['internal']
+
         self.rho_1 = 1000
         self.epsr_1 = 1.0
 
@@ -287,13 +294,103 @@ class PrysmianModels:
 
     #     print("\n" + "="*80)
 
+    # def log_matricial_pul_parameters(self, scale_units=True):
+    #     """
+    #     Generates and prints a terminal log report from the discrete PUL parameters.
+    #     It iterates through the specified frequencies and scenarios.
+    #     """
+    #     def _matrix_to_string(matrix: np.ndarray) -> str:
+    #         # ... (função auxiliar sem alteração) ...
+    #         lines = []
+    #         s_rows = [[f"{val:11.4e}" for val in row] for row in matrix]
+    #         for row in s_rows:
+    #             lines.append("  ".join(row))
+    #         return "\n".join(lines)
+
+    #     def _print_real_matrix(name: str, matrix_data: np.ndarray, unit: str):
+    #         # ... (função auxiliar sem alteração) ...
+    #         lines = _matrix_to_string(matrix_data).split('\n')
+    #         num_rows = len(lines)
+    #         middle_row_idx = num_rows // 2
+            
+    #         print("") 
+    #         for i in range(num_rows):
+    #             name_part = f"{name} = " if i == middle_row_idx else " " * (len(name) + 3)
+    #             unit_part = f" {unit}" if i == middle_row_idx else ""
+    #             print(f"{name_part}{lines[i]}{unit_part}")
+    #         print("") 
+
+    #     param_mapping = {
+    #         '[Zi]': 'internal_impedance_matrix',
+    #         '[Z0]': 'earth-return_impedance_matrix',
+    #         '[Yg]': 'earth-return_admittance_matrix',
+    #         '[Zs]': 'series_impedance_matrix',
+    #         '[Ysh]': 'shunt_admittance_matrix',
+    #     }
+
+    #     print("\n--- Per-Unit-Length (PUL) Parameters Report (Discrete Frequencies) ---")
+        
+    #     if not self.discrete_pul:
+    #         print("No discrete data provided for logging.")
+    #         return
+
+    #     # Itera sobre as frequências discretas (100, 10k, 100k)
+    #     for freq, scenarios_at_freq in sorted(self.discrete_pul.items()):
+    #         print("\n" + "="*80)
+    #         print(f"Frequency: {freq:,.0f} Hz")
+    #         print("="*80)
+    #         w = 2 * np.pi * freq
+
+    #         # Itera sobre os cenários (p100, deconti, etc.) para essa frequência
+    #         for scenario_key, params in scenarios_at_freq.items():
+    #             print(f"\n--- Scenario: {scenario_key} ---")
+                
+    #             # Itera sobre as matrizes (Zs, Ysh, etc.) para esse cenário
+    #             for name, matrix_key in param_mapping.items():
+    #                 if matrix_key in params:
+    #                     matrix = params[matrix_key]
+                        
+    #                     # (Lógica de impressão das matrizes, sem alteração)
+    #                     if 'Z' in name: unit = "[Ohm/m]"
+    #                     elif 'Y' in name: unit = "[S/m]"
+    #                     else: unit = ""
+
+    #                     r_lines = _matrix_to_string(matrix.real).split('\n')
+    #                     x_lines = _matrix_to_string(matrix.imag).split('\n')
+    #                     num_rows = len(r_lines)
+    #                     middle_row_idx = num_rows // 2
+                        
+    #                     print("") 
+    #                     for i in range(num_rows):
+    #                         name_part = f"{name} = " if i == middle_row_idx else " " * (len(name) + 3)
+    #                         op_part = " + j ".center(7) if i == middle_row_idx else " " * 7
+    #                         unit_part = f" {unit}" if i == middle_row_idx else ""
+    #                         print(f"{name_part}{r_lines[i]}{op_part}{x_lines[i]}{unit_part}")
+    #                     print("") 
+                        
+    #                     if name == '[Zs]':
+    #                         l_matrix = (matrix.imag / w)
+    #                         l_unit = '[H/m]'
+    #                         if scale_units:
+    #                             l_matrix *= 1e6
+    #                             l_unit = '[uH/m]'
+    #                         _print_real_matrix('[L]', l_matrix, l_unit)
+
+    #                     if name == '[Ysh]':
+    #                         c_matrix = (matrix.imag / w)
+    #                         c_unit = '[F/m]'
+    #                         if scale_units:
+    #                             c_matrix *= 1e12
+    #                             c_unit = '[pF/m]'
+    #                         _print_real_matrix('[C]', c_matrix, c_unit)
+    #     print("\n" + "="*80)
+
     def log_matricial_pul_parameters(self, scale_units=True):
         """
-        Generates and prints a terminal log report from the discrete PUL parameters.
-        It iterates through the specified frequencies and scenarios.
+        Generates a terminal log report by slicing the discrete vectorized results.
         """
         def _matrix_to_string(matrix: np.ndarray) -> str:
-            # ... (função auxiliar sem alteração) ...
+            # ... (função auxiliar sem alteração)
             lines = []
             s_rows = [[f"{val:11.4e}" for val in row] for row in matrix]
             for row in s_rows:
@@ -301,7 +398,7 @@ class PrysmianModels:
             return "\n".join(lines)
 
         def _print_real_matrix(name: str, matrix_data: np.ndarray, unit: str):
-            # ... (função auxiliar sem alteração) ...
+            # ... (função auxiliar sem alteração)
             lines = _matrix_to_string(matrix_data).split('\n')
             num_rows = len(lines)
             middle_row_idx = num_rows // 2
@@ -323,61 +420,61 @@ class PrysmianModels:
 
         print("\n--- Per-Unit-Length (PUL) Parameters Report (Discrete Frequencies) ---")
         
-        if not self.discrete_pul:
-            print("No discrete data provided for logging.")
+        if not self.discrete_frequencies:
+            print("No discrete frequencies found for logging.")
             return
 
-        # Itera sobre as frequências discretas (100, 10k, 100k)
-        for freq, scenarios_at_freq in sorted(self.discrete_pul.items()):
+        # Itera sobre as frequências discretas e seus índices
+        for i, freq in enumerate(self.discrete_frequencies):
             print("\n" + "="*80)
             print(f"Frequency: {freq:,.0f} Hz")
             print("="*80)
             w = 2 * np.pi * freq
 
-            # Itera sobre os cenários (p100, deconti, etc.) para essa frequência
-            for scenario_key, params in scenarios_at_freq.items():
-                print(f"\n--- Scenario: {scenario_key} ---")
-                
-                # Itera sobre as matrizes (Zs, Ysh, etc.) para esse cenário
-                for name, matrix_key in param_mapping.items():
-                    if matrix_key in params:
-                        matrix = params[matrix_key]
-                        
-                        # (Lógica de impressão das matrizes, sem alteração)
-                        if 'Z' in name: unit = "[Ohm/m]"
-                        elif 'Y' in name: unit = "[S/m]"
-                        else: unit = ""
+            # Como os dados discretos representam um único cenário, não há laço de cenário
+            # Itera sobre as matrizes (Zs, Ysh, etc.)
+            for name, matrix_key in param_mapping.items():
+                if matrix_key in self.discrete_pul_data:
+                    # Fatia a matriz 3D para obter a matriz 2D da frequência atual
+                    matrix_3d = self.discrete_pul_data[matrix_key]
+                    matrix = matrix_3d[i, :, :]
+                    
+                    # (Lógica de impressão das matrizes, sem alteração)
+                    if 'Z' in name: unit = "[Ohm/m]"
+                    elif 'Y' in name: unit = "[S/m]"
+                    else: unit = ""
 
-                        r_lines = _matrix_to_string(matrix.real).split('\n')
-                        x_lines = _matrix_to_string(matrix.imag).split('\n')
-                        num_rows = len(r_lines)
-                        middle_row_idx = num_rows // 2
-                        
-                        print("") 
-                        for i in range(num_rows):
-                            name_part = f"{name} = " if i == middle_row_idx else " " * (len(name) + 3)
-                            op_part = " + j ".center(7) if i == middle_row_idx else " " * 7
-                            unit_part = f" {unit}" if i == middle_row_idx else ""
-                            print(f"{name_part}{r_lines[i]}{op_part}{x_lines[i]}{unit_part}")
-                        print("") 
-                        
-                        if name == '[Zs]':
-                            l_matrix = (matrix.imag / w)
-                            l_unit = '[H/m]'
-                            if scale_units:
-                                l_matrix *= 1e6
-                                l_unit = '[uH/m]'
-                            _print_real_matrix('[L]', l_matrix, l_unit)
+                    r_lines = _matrix_to_string(matrix.real).split('\n')
+                    x_lines = _matrix_to_string(matrix.imag).split('\n')
+                    num_rows = len(r_lines)
+                    middle_row_idx = num_rows // 2
+                    
+                    print("") 
+                    for i_row in range(num_rows):
+                        name_part = f"{name} = " if i_row == middle_row_idx else " " * (len(name) + 3)
+                        op_part = " + j ".center(7) if i_row == middle_row_idx else " " * 7
+                        unit_part = f" {unit}" if i_row == middle_row_idx else ""
+                        print(f"{name_part}{r_lines[i_row]}{op_part}{x_lines[i_row]}{unit_part}")
+                    print("")
+                    
+                    if name == '[Zs]':
+                        l_matrix = (matrix.imag / w)
+                        # ... (resto da lógica de L e C sem alteração)
+                        l_unit = '[H/m]'
+                        if scale_units:
+                            l_matrix *= 1e6
+                            l_unit = '[uH/m]'
+                        _print_real_matrix('[L]', l_matrix, l_unit)
 
-                        if name == '[Ysh]':
-                            c_matrix = (matrix.imag / w)
-                            c_unit = '[F/m]'
-                            if scale_units:
-                                c_matrix *= 1e12
-                                c_unit = '[pF/m]'
-                            _print_real_matrix('[C]', c_matrix, c_unit)
+                    if name == '[Ysh]':
+                        c_matrix = (matrix.imag / w)
+                        c_unit = '[F/m]'
+                        if scale_units:
+                            c_matrix *= 1e12
+                            c_unit = '[pF/m]'
+                        _print_real_matrix('[C]', c_matrix, c_unit)
         print("\n" + "="*80)
-        
+
 class DeContiModels:
     """
     A highly refactored class to handle plotting for the Xue model results.

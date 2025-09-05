@@ -143,134 +143,6 @@ class InternalPerUnitParameters:
         # Angular frequency (rad/s) is now a vector
         self.jw = 1j * 2 * np.pi * self.f
 
-    # def parameters_by_bessel(self):
-    #     """
-    #     Calculates the internal impedance matrix components for a single-core cable (SCC)
-    #     over a vector of frequencies.
-
-    #     The method uses formulas for tubular conductors, which involve modified
-    #     Bessel functions, to account for skin and proximity effects within the
-    #     conductors. The use of NumPy and SciPy's vectorized functions allows
-    #     for efficient calculation across all frequencies simultaneously.
-
-    #     The returned impedance components (z11, z2m, etc.) are NumPy arrays,
-    #     where each element corresponds to a frequency in the input vector `f`.
-
-    #     Reference: A. Ametani, T. Ohno and N. Nagaoka, Cable System Transients: Theory, Modeling and
-    #                Simulation, Wiley-IEEE Press, 2015.
-    #     """
-    #     s = self.jw
-    #     scc = self.model.scc
-    #     two_pi = 2 * np.pi
-
-    #     # --- Initialize all impedance components ---
-    #     # Note: Most of these will become NumPy arrays after calculation.
-    #     z11, z12 = (None,) * 2
-    #     z2i, z20, z23, z2m = (None,) * 4
-    #     z3i, z30, z34, z3m = (None,) * 4
-    #     pcj, psj, paj = (None,) * 3 # Potential coefficients are frequency-independent
-
-    #     if 'core_outer_radius' in scc:
-    #         rho1, mu1 = scc['core_resistivity'], scc['core_permeability']
-    #         r1, r2 = scc['core_inner_radius'], scc['core_outer_radius']
-    #         m_core = np.sqrt(s * mu1 / rho1)
-    #         x1, x2 = m_core * r1, m_core * r2
-
-    #         # --- z11: internal impedance of core outer surface ---
-    #         # Case 1: Solid core (r1 = 0)
-    #         if np.isclose(r1, 0):
-    #             with np.errstate(divide='ignore', invalid='ignore'):
-    #                 # The operation is vectorized. Result is an array.
-    #                 z11 = (m_core * rho1 / (two_pi * r2)) * (ss.iv(0, x2) / ss.iv(1, x2))
-    #                 # Handle cases where x2 is close to zero (e.g., at f=0)
-    #                 if z11.ndim > 0:
-    #                     z11[np.isclose(x2, 0)] = np.complex(0, np.inf)
-    #                 elif np.isclose(x2, 0):
-    #                     z11 = np.complex(0, np.inf)
-
-    #         # Case 2: Tubular core (r1 > 0)
-    #         else:
-    #             # All Bessel functions are vectorized and operate on array 'x1' and 'x2'
-    #             D1 = ss.iv(1, x2) * ss.kv(1, x1) - ss.iv(1, x1) * ss.kv(1, x2)
-    #             N1 = ss.iv(0, x2) * ss.kv(1, x1) + ss.kv(0, x2) * ss.iv(1, x1)
-
-    #             with np.errstate(divide='ignore', invalid='ignore'):
-    #                 z11 = (s * mu1 / two_pi) * (1 / (x2 * D1)) * N1
-    #                 if z11.ndim > 0:
-    #                     z11[np.isclose(x2, 0) | np.isclose(D1, 0)] = np.complex(0, np.inf)
-    #                 elif np.isclose(x2, 0) or np.isclose(D1, 0):
-    #                     z11 = np.complex(0, np.inf)
-
-    #     if 'core_insulation_outer_radius' in scc:
-    #         mui1 = scc['core_insulation_permeability']
-    #         ei1 = scc['core_insulation_permittivity']
-    #         r3 = scc['core_insulation_outer_radius']
-            
-    #         # --- z12: Core outer insulator impedance ---
-    #         z12 = (s * mui1 / two_pi) * np.log(r3 / r2) if not np.isclose(r3, r2) else 0
-
-    #         # --- pcj: self-core potential coefficient (frequency independent) ---
-    #         pcj = (1 / (two_pi * ei1)) * np.log(r3 / r2) if not np.isclose(r3, r2) else 0
-
-    #     # ... (The same vectorization pattern applies to sheath and armor) ...
-    #     # The logic remains identical, NumPy handles the array operations automatically.
-
-    #     if 'sheath_outer_radius' in scc:
-    #         rho2, mu2 = scc['sheath_resistivity'], scc['sheath_permeability']
-    #         r3, r4 = scc['sheath_inner_radius'], scc['sheath_outer_radius']
-    #         m_sheath = np.sqrt(s * mu2 / rho2)
-    #         x3, x4 = m_sheath * r3, m_sheath * r4
-    #         D2 = ss.iv(1, x4) * ss.kv(1, x3) - ss.iv(1, x3) * ss.kv(1, x4)
-    #         with np.errstate(divide='ignore', invalid='ignore'):
-    #             z2m = rho2 / (two_pi * r3 * r4 * D2)
-    #         N2i = ss.iv(0, x3) * ss.kv(1, x4) + ss.kv(0, x3) * ss.iv(1, x4)
-    #         with np.errstate(divide='ignore', invalid='ignore'):
-    #             z2i = (s * mu2 / two_pi) * (1 / (x3 * D2)) * N2i
-    #         N20 = ss.iv(0, x4) * ss.kv(1, x3) + ss.kv(0, x4) * ss.iv(1, x3)
-    #         with np.errstate(divide='ignore', invalid='ignore'):
-    #             z20 = (s * mu2 / two_pi) * (1 / (x4 * D2)) * N20
-
-    #     if 'sheath_insulation_outer_radius' in scc:
-    #         mui2 = scc['sheath_insulation_permeability']
-    #         ei2 = scc['sheath_insulation_permittivity']
-    #         r5 = scc['sheath_insulation_outer_radius']
-    #         z23 = (s * mui2 / two_pi) * np.log(r5 / r4) if not np.isclose(r5, r4) else 0
-    #         psj = (1 / (two_pi * ei2)) * np.log(r5 / r4) if not np.isclose(r5, r4) else 0
-
-    #     if 'armor_outer_radius' in scc:
-    #         rho3, mu3 = scc['armor_resistivity'], scc['armor_permeability']
-    #         r5, r6 = scc['armor_inner_radius'], scc['armor_outer_radius']
-    #         m_armor = np.sqrt(s * mu3 / rho3)
-    #         x5, x6 = m_armor * r5, m_armor * r6
-    #         D3 = ss.iv(1, x6) * ss.kv(1, x5) - ss.iv(1, x5) * ss.kv(1, x6)
-    #         with np.errstate(divide='ignore', invalid='ignore'):
-    #             z3m = rho3 / (two_pi * r5 * r6 * D3)
-    #         N3 = ss.iv(0, x5) * ss.kv(1, x6) + ss.kv(0, x5) * ss.iv(1, x6)
-    #         with np.errstate(divide='ignore', invalid='ignore'):
-    #             z3i = (s * mu3 / two_pi) * (1 / (x5 * D3)) * N3
-    #         N30 = ss.iv(0, x6) * ss.kv(1, x5) + ss.kv(0, x6) * ss.iv(1, x5)
-    #         with np.errstate(divide='ignore', invalid='ignore'):
-    #             z30 = (s * mu3 / two_pi) * (1 / (x6 * D3)) * N30
-
-    #     if 'armor_insulation_outer_radius' in scc:
-    #         mui3 = scc['armor_insulation_permeability']
-    #         ei3 = scc['armor_insulation_permittivity']
-    #         r7 = scc['armor_insulation_outer_radius']
-    #         z34 = (s * mui3 / two_pi) * np.log(r7/r6) if not np.isclose(r7, r6) else 0
-    #         paj = (1 / (two_pi * ei3)) * np.log(r7 / r6) if not np.isclose(r7, r6) else 0
-
-    #     return {
-    #         'zcs': {'z11': z11, 'z12': z12, 'z2i': z2i},
-    #         'zsa': {'z20': z20, 'z23': z23, 'z3i': z3i},
-    #         'za4': {'z30': z30, 'z34': z34},
-    #         'zs3': {'z20': z20, 'z23': z23},
-    #         'z2m': z2m,
-    #         'z3m': z3m,
-    #         'potentials': {'pcj': pcj, 'psj': psj, 'paj': paj}
-    #     }
-
-    # In analytical_formulation/scc.py, inside the InternalPerUnitParametersVector class
-
     def parameters_by_bessel(self):
         """
         Calculates the internal impedance matrix components for a single-core cable (SCC)
@@ -332,8 +204,6 @@ class InternalPerUnitParameters:
             r3 = scc['core_insulation_outer_radius']
             z12 = (s * mui1 / two_pi) * np.log(r3 / r2) if not np.isclose(r3, r2) else 0
             pcj = (1 / (two_pi * ei1)) * np.log(r3 / r2) if not np.isclose(r3, r2) else 0
-
-        # ... (o resto do método permanece o mesmo) ...
 
         if 'sheath_outer_radius' in scc:
             rho2, mu2 = scc['sheath_resistivity'], scc['sheath_permeability']
@@ -597,7 +467,11 @@ class PerUnitParameters:
             zg = self.jw_mu0_2pi[:, np.newaxis, np.newaxis] * (K0_jke_dnm - K0_jke_Dnm + S1c)
             pg = self.jw_2pi_sg[:, np.newaxis, np.newaxis] * (K0_jke_dnm - K0_jke_Dnm + S2c)
 
-        return {'earth-return_impedance_matrix': zg, 'earth-return_potential_coefficient': pg}
+        return {
+            'earth-return_impedance_matrix': zg,
+            'earth-return_potential_coefficient': pg,
+            'k_earth2': k_earth2,
+        }
 
     def quasi_tem_pul(self, pul_internal, zg_form='magalhaes_xue', yg_form='magalhaes_xue'):
         """
@@ -611,6 +485,7 @@ class PerUnitParameters:
         pg_jk = earth_return['earth-return_potential_coefficient'] # Shape (num_freq, N, N)
 
         Zi = pul_internal['impedance_matrix'] # Shape (num_freq, N*M, N*M)
+        Ye = pul_internal['shunt_admittance_matrix'] # Shape (num_freq, N*M, N*M)
         Pi = pul_internal['potential_coefficient_matrix'] # Shape (N*M, N*M)
 
         # Loop to build the block matrix for each frequency
@@ -623,7 +498,7 @@ class PerUnitParameters:
 
         # Series impedance is a simple element-wise addition
         Zs = Zi + Z0
-        
+
         # Shunt Admittance Matrix calculation
         # Pi is 2D, Pe is 3D. Use broadcasting to add them.
         P = Pi[np.newaxis, :, :] + Pe

@@ -51,7 +51,7 @@ except IndexError:
 # --- Import custom modules ---
 try:
     from utils.case_utils import load_json_parameters
-    from analyzer.PlotterModels import PrysmianModels
+    from analyzer.plotter_scc_models import PrysmianModels
     from models import single_core_cables as scc 
     from mtl_main.graphics import MTLRepresentation
     from mtl_main.source import MulticonductorTransmissionLine
@@ -99,32 +99,15 @@ def main():
 
     # --- DISCRETE CALCULATION FOR LOGGING ---
     discrete_frequencies = [1e2, 1e4, 1e5]
-    pul_data_discrete = {} # Inicia um dicionário vazio para os resultados
 
     print("\nCalculating discrete points for logging...")
-
-    # 1. Calcula os parâmetros para todos os pontos discretos de uma vez
-    internal_calc_discrete = InternalPerUnitParameters(mtl_model, discrete_frequencies)
-    pul_internal_discrete = internal_calc_discrete.internal_matrices()
-
-    pul_calc_discrete = PerUnitParameters(mtl_model, discrete_frequencies)
-    
-    # Vamos calcular um único cenário para o log, por exemplo 'ametani'
-    # O resultado é um dicionário com matrizes 3D
-    results_ametani_discrete = pul_calc_discrete.quasi_tem_pul(
+    internal_discrete = InternalPerUnitParameters(mtl_model, discrete_frequencies)
+    pul_internal_discrete = internal_discrete.internal_matrices()
+    pul_discrete = PerUnitParameters(mtl_model, discrete_frequencies)
+    pul_data_discrete = pul_discrete.quasi_tem_pul(
         pul_internal_discrete, zg_form='ametani', yg_form='ametani'
     )
-
-    # 2. "Desempilha" os resultados 3D no formato que o logger espera
-    #    formato: {frequência: {cenário: {parâmetros}}}
-    for i, freq in enumerate(discrete_frequencies):
-        pul_data_discrete[freq] = {}
-        pul_data_discrete[freq]['ametani'] = {}
-        
-        # Itera sobre as matrizes 3D e fatia a matriz 2D da frequência atual
-        for key, matrix3d in results_ametani_discrete.items():
-            pul_data_discrete[freq]['ametani'][key] = matrix3d[i, :, :]
-
+    pul_data_discrete['frequencies'] = discrete_frequencies
     print("Discrete calculation for logging finished.")
 
     print(f"End of the routine! Time spent on simulation: {(time.time() - st):.1f} seconds.\n")

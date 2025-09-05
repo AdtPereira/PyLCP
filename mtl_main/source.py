@@ -42,7 +42,12 @@ class MulticonductorTransmissionLine:
 
         mtl_input = copy.deepcopy(mtl)
         self.mtl_type = mtl_input.get('type', 'unknown')
-        self.idx_ref = mtl_input.get('idx_ref_conductor', 0)      
+        self.idx_ref = mtl_input.get('idx_ref_conductor', 0)  
+
+        # MULTICONDUCTOR TRANSMISSION LINES PARAMETERS
+        self.mu = None
+        self.sigma = None
+        self.epsilon = None    
 
         # Delegate preprocessing and validation to the strategy
         strategy = mtl_strategy_factory(self.mtl_type)
@@ -63,6 +68,7 @@ class MulticonductorTransmissionLine:
 
         # Número de coeficientes harmônicos de Fourier por condutor
         self.NF = self.NF_List[self.idx_ref]
+        
 
     def _count_scc_and_conductors(self):
         """

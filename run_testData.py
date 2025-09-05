@@ -7,9 +7,12 @@ import sys
 import os
 
 SCRIPTS_TO_RUN = [
+    "testData.ohtl_single_deConti.ohtl_single_deConti",
     "testData.pipe_trefoil_patel.pipe_trefoil_patel",
+    "testData.scc_flat_deConti.scc_flat_deConti",
     "testData.scc_flat_xue.scc_flat_xue",
-    "testData.scc_single_wire.scc_single_wire",
+    "testData.scc_prysmian_138kV.scc_prysmian_138kV",
+    "testData.scc_single_deConti.scc_single_deConti",
 ]
 
 def main():
