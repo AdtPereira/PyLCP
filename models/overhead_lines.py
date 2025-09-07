@@ -40,7 +40,7 @@ def _add_conductor_to_model(MODEL, conductor_id, center_point, layer_data, layer
         'conductor_layers': None,
         'relative_permeability': 1.0,
         'relative_permittivity': 1.0,
-        'external_conductance': 0.0,
+        'external_conductance': layer_data.get('external_conductance_S_per_m', 0.0),
         'relative_permittivity_out': 1.0,
         'potential_to_infinity': 1.0,
         'fourier_order': 0,

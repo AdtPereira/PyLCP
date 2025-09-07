@@ -24,8 +24,8 @@ try:
     from models import overhead_lines
     from mtl_main.graphics import MTLRepresentation
     from mtl_main.source import MulticonductorTransmissionLine
-    from analytical_forms.overhead_lines_vector import InternalPerUnitParameters
-    from analyzer.plotter_ohtl_models import InternalLinesModels
+    from analytical_forms.overhead_lines import InternalPerUnitParameters
+    from analyzer.plotter_deConti_models import InternalLinesModels
     print("Core modules imported successfully.")
 except ImportError as e:
     print(f"Error importing modules: {e}")
@@ -68,10 +68,10 @@ def main():
 
     print(f"End of simulations! Time spent: {(time.time() - st):.1f} seconds.\n")
     plotter = InternalLinesModels(pul_data, pul_data_tubular, mtl_solid)
-    plotter.solid_conductors_characteristics()
+    plotter.internal_solid_conductors()
     plotter.internal_impedance()
     plotter.nahman_holt_comparison()
-    plotter.tubular_characteristics()
+    plotter.internal_tubular_characteristics()
     MTLRepresentation(mtl_solid, units='millimeter').ground_return_systems()
     MTLRepresentation(mtl_tubular, units='millimeter').ground_return_systems()
     plt.show()    

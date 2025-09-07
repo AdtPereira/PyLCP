@@ -473,7 +473,7 @@ class PerUnitParameters:
             'k_earth2': k_earth2,
         }
 
-    def quasi_tem_pul(self, pul_internal, zg_form='magalhaes_xue', yg_form='magalhaes_xue'):
+    def quasi_tem_approximation(self, pul_internal, zg_form='magalhaes_xue', yg_form='magalhaes_xue'):
         """
         Assembles the final PUL matrices for a vector of frequencies.
         """

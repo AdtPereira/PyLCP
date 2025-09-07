@@ -21,11 +21,11 @@ except IndexError:
 # --- Import custom modules ---
 try:
     from utils.case_utils import load_json_parameters
-    from analyzer.plotter_scc_models import XueModels
+    from analyzer.plotter_xue_models import XueModels
     from models import single_core_cables as scc 
     from mtl_main.graphics import MTLRepresentation
     from mtl_main.source import MulticonductorTransmissionLine
-    from analytical_forms.scc_vector import InternalPerUnitParameters, PerUnitParameters
+    from analytical_forms.single_core_cable import InternalPerUnitParameters, PerUnitParameters
     print("Core modules imported successfully.")
 except ImportError as e:
     print(f"Error importing modules: {e}")
@@ -60,7 +60,6 @@ def main():
 
     # 1. Calculate internal parameters ONCE, as the cable geometry is the same for all scenarios.
     print("Calculating internal parameters for all frequencies...")
-    #    This returns a dictionary of 3D matrices (e.g., shape (40, 6, 6)).
     internal = InternalPerUnitParameters(mtl_model_a, pul_data['frequencies'])
     print("Internal parameters calculated.")
 
@@ -68,7 +67,7 @@ def main():
     for key, value in scenarios.items():
         print(f"Calculating scenario: {key}...")
         pul = PerUnitParameters(value['mtl'], pul_data['frequencies'])
-        pul_data[key] = pul.quasi_tem_pul(
+        pul_data[key] = pul.quasi_tem_approximation(
             internal.internal_matrices(), zg_form=value['zg_form'], yg_form=value['yg_form']
         )
     

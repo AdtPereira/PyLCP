@@ -48,6 +48,10 @@ class MulticonductorTransmissionLine:
         self.mu = None
         self.sigma = None
         self.epsilon = None    
+        self.d_matrix_ground_return = None
+        self.D_matrix_ground_return = None
+        self.vertical_separation_matrix = None
+        self.horizontal_separation_matrix = None
 
         # Delegate preprocessing and validation to the strategy
         strategy = mtl_strategy_factory(self.mtl_type)

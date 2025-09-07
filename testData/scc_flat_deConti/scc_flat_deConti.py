@@ -21,11 +21,11 @@ except IndexError:
 # --- Import custom modules ---
 try:
     from utils.case_utils import load_json_parameters
-    from analyzer.plotter_scc_models import DeContiModels
+    from analyzer.plotter_deConti_models import DeContiModels
     from models import single_core_cables as scc 
     from mtl_main.graphics import MTLRepresentation
     from mtl_main.source import MulticonductorTransmissionLine
-    from analytical_forms.scc_vector import PerUnitParameters
+    from analytical_forms.single_core_cable import PerUnitParameters
     print("Core modules imported successfully.")
 except ImportError as e:
     print(f"Error importing modules: {e}")

@@ -1,13 +1,10 @@
-# File: run_all.py
-# Placed at the root of the PyLCP project.
-# Purpose: To sequentially run all example scripts to verify they work correctly.
-
 import subprocess
 import sys
-import os
 
 SCRIPTS_TO_RUN = [
     "testData.ohtl_single_deConti.ohtl_single_deConti",
+    "testData.ohtl_single_lima.ohtl_single_lima",
+    "testData.ohtl_single_xue.ohtl_single_xue",
     "testData.pipe_trefoil_patel.pipe_trefoil_patel",
     "testData.scc_flat_deConti.scc_flat_deConti",
     "testData.scc_flat_xue.scc_flat_xue",

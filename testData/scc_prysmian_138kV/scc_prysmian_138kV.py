@@ -51,11 +51,11 @@ except IndexError:
 # --- Import custom modules ---
 try:
     from utils.case_utils import load_json_parameters
-    from analyzer.plotter_scc_models import PrysmianModels
+    from analyzer.plotter_prysmian_models import PrysmianModels
     from models import single_core_cables as scc 
     from mtl_main.graphics import MTLRepresentation
     from mtl_main.source import MulticonductorTransmissionLine
-    from analytical_forms.scc_vector import InternalPerUnitParameters, PerUnitParameters
+    from analytical_forms.single_core_cable import InternalPerUnitParameters, PerUnitParameters
     print("Core modules imported successfully.")
 except ImportError as e:
     print(f"Error importing modules: {e}")
@@ -101,11 +101,10 @@ def main():
     discrete_frequencies = [1e2, 1e4, 1e5]
 
     print("\nCalculating discrete points for logging...")
-    internal_discrete = InternalPerUnitParameters(mtl_model, discrete_frequencies)
-    pul_internal_discrete = internal_discrete.internal_matrices()
-    pul_discrete = PerUnitParameters(mtl_model, discrete_frequencies)
-    pul_data_discrete = pul_discrete.quasi_tem_pul(
-        pul_internal_discrete, zg_form='ametani', yg_form='ametani'
+    internal = InternalPerUnitParameters(mtl_model, discrete_frequencies)
+    pul = PerUnitParameters(mtl_model, discrete_frequencies)
+    pul_data_discrete = pul.quasi_tem_approximation(
+        internal.internal_matrices(), zg_form='ametani', yg_form='ametani'
     )
     pul_data_discrete['frequencies'] = discrete_frequencies
     print("Discrete calculation for logging finished.")

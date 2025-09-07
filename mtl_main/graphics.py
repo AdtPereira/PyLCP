@@ -19,6 +19,7 @@ class MTLRepresentation:
     def __init__(self, model: MulticonductorTransmissionLine, units='meter'):        
         self.model = model
         unit_info = UNITS_DATA.get(units, UNITS_DATA['meter'])
+        self.num_conductors, _ = model._count_scc_and_conductors()
         self.unit_factor = unit_info['scale']
         self.label_unit = unit_info['label']
         self.color_map = {
@@ -162,7 +163,7 @@ class MTLRepresentation:
         helper methods for plotting, annotation, and finalization.
         """
         # 1. Initialization
-        _, ax = plt.subplots(figsize=(16, 6)) # Increased figsize for better layout
+        _, ax = plt.subplots(figsize=(12, 5))
         used_labels = set()
 
         # 2. Calculate schematic parameters based on the model
@@ -177,7 +178,12 @@ class MTLRepresentation:
 
         # 4. Add schematic annotations and finalize the plot
         self._draw_schematic_annotations(ax, params)
-        self._finalize_ground_return_plot(ax, params['title'])
+
+        if self.num_conductors > 2:
+            x_margin_scale = 0.2
+        else:
+            x_margin_scale = 2.0
+        self._finalize_ground_return_plot(ax, params['title'], x_margin_scale)
 
     def _calculate_schematic_parameters(self):
         """
@@ -200,7 +206,7 @@ class MTLRepresentation:
         
         if self.model.mtl_type == 'overhead':
             title = 'Overhead Transmission Line'
-            h_factor = 5
+            h_factor = 8
         elif self.model.mtl_type == 'scc':
             title = 'Buried Single-Core Cable'
             h_factor = -2
@@ -343,7 +349,7 @@ class MTLRepresentation:
         # Ground level line
         ax.axhline(y=0, color='darkgreen', linestyle=':', linewidth=1.5, zorder=2)
 
-    def _finalize_ground_return_plot(self, ax, title):
+    def _finalize_ground_return_plot(self, ax, title, x_margin_scale = 2.0):
         """
         Applies final settings to the plot, including limits, labels,
         backgrounds, and legend formatting.
@@ -360,11 +366,10 @@ class MTLRepresentation:
         ax.autoscale_view()
         xlim = ax.get_xlim()
         ylim = ax.get_ylim()
-        x_margin = (xlim[1] - xlim[0]) * 0.2
+        x_margin = (xlim[1] - xlim[0]) * x_margin_scale
         y_margin = (ylim[1] - ylim[0]) * 0.2
         ax.set_xlim(xlim[0] - x_margin, xlim[1] + x_margin)
         ax.set_ylim(ylim[0] - y_margin, ylim[1] + y_margin)
-        
         final_xlim = ax.get_xlim()
         final_ylim = ax.get_ylim()
         
@@ -400,11 +405,10 @@ class MTLRepresentation:
         ax.autoscale_view()
         xlim = ax.get_xlim()
         ylim = ax.get_ylim()
-        x_margin = (xlim[1] - xlim[0]) * 0.2
+        x_margin = (xlim[1] - xlim[0]) * 2.0
         y_margin = (ylim[1] - ylim[0]) * 0.2
         ax.set_xlim(xlim[0] - x_margin, xlim[1] + x_margin)
         ax.set_ylim(ylim[0] - y_margin, ylim[1] + y_margin)
-        
         final_xlim = ax.get_xlim()
         final_ylim = ax.get_ylim()
         
