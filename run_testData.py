@@ -2,6 +2,7 @@ import subprocess
 import sys
 
 SCRIPTS_TO_RUN = [
+    "testData.isolated_coax.isolated_coax",
     "testData.ohtl_single_deConti.ohtl_single_deConti",
     "testData.ohtl_single_lima.ohtl_single_lima",
     "testData.ohtl_single_xue.ohtl_single_xue",

@@ -1,0 +1,22 @@
+{
+  "name": "Isolated Coaxial Cable",
+  "note": "An isolated coaxial cable with air insulation. Patel (2014) model.",
+  "reference": {
+    "name": "sheath",
+    "inner_radius_m": 0.0395,
+    "outer_radius_m": 0.0440,
+    "conductivity_S_per_m": 5.8E7
+  },
+  "cable_definition": {
+    "core": {
+      "inner_radius_m": 0.0,
+      "outer_radius_m": 0.0220,
+      "conductivity_S_per_m": 5.8E7,
+      "insulation": {
+        "type": "Air",
+        "thickness_m": 0.0175,
+        "relative_permittivity": 1.0
+      }
+    }
+  }
+}

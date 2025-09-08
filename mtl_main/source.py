@@ -48,6 +48,8 @@ class MulticonductorTransmissionLine:
         self.mu = None
         self.sigma = None
         self.epsilon = None    
+        self.num_sc_cables = None
+        self.num_conductors_per_scc = None
         self.d_matrix_ground_return = None
         self.D_matrix_ground_return = None
         self.vertical_separation_matrix = None
@@ -59,7 +61,8 @@ class MulticonductorTransmissionLine:
         strategy.validate(self.mtl, self.mtl_ref, mtl_input)
 
         # Delegate calculation of type-specific properties
-        strategy.apply_properties(self, self.mtl)
+        strategy.apply_mtl_ref_properties(self, mtl_input)
+        strategy.apply_mtl_properties(self, self.mtl)
 
         # Conductor surfaces dictionary
         self._define_mtl_surfaces()
@@ -71,36 +74,35 @@ class MulticonductorTransmissionLine:
         self.N = sum(self.NF_List)
 
         # Número de coeficientes harmônicos de Fourier por condutor
-        self.NF = self.NF_List[self.idx_ref]
+        self.NF = self.NF_List[self.idx_ref]        
+
+    # def _count_scc_and_conductors(self):
+    #     """
+    #     Counts the number of (sc) cables (N) and conductors per cable (M)
+    #     based on the provided data structure.
+    #     """
+    #     # 1. Filter to get only active conductors
+    #     active_conductors = [
+    #         v for k, v in self.mtl.items()
+    #         if isinstance(k, int) and v.get('line_type') == 'active'
+    #     ]
+
+    #     if not active_conductors:
+    #         return 0, 0
+
+    #     # 2. Count the number of cables (N) by finding unique center points
+    #     center_points = [cond['center_point'] for cond in active_conductors]
+    #     num_cables = len(set(center_points))
+
+    #     # 3. Count conductors per cable (M)
+    #     total_active_conductors = len(active_conductors)
         
+    #     if num_cables > 0:
+    #         conductors_per_cable = total_active_conductors // num_cables
+    #     else:
+    #         conductors_per_cable = 0
 
-    def _count_scc_and_conductors(self):
-        """
-        Counts the number of (sc) cables (N) and conductors per cable (M)
-        based on the provided data structure.
-        """
-        # 1. Filter to get only active conductors
-        active_conductors = [
-            v for k, v in self.mtl.items()
-            if isinstance(k, int) and v.get('line_type') == 'active'
-        ]
-
-        if not active_conductors:
-            return 0, 0
-
-        # 2. Count the number of cables (N) by finding unique center points
-        center_points = [cond['center_point'] for cond in active_conductors]
-        num_cables = len(set(center_points))
-
-        # 3. Count conductors per cable (M)
-        total_active_conductors = len(active_conductors)
-        
-        if num_cables > 0:
-            conductors_per_cable = total_active_conductors // num_cables
-        else:
-            conductors_per_cable = 0
-
-        return num_cables, conductors_per_cable
+    #     return num_cables, conductors_per_cable
 
     def _define_mtl_surfaces(self):
         """

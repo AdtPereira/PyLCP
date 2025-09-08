@@ -46,8 +46,7 @@ class DeContiModels:
                 'suptitle': r"Flat arrangement's mutual ground-return impedance for $\varepsilon_{r1} = 10$",
                 'norm_title': 'Absolute Impedance',
                 'angle_title': 'Angle of Impedance',
-                'p': 2,
-                'q': 0,
+                'p': 2, 'q': 0,
                 'x_lim': {'norm': (1E4, 1E7), 'angle': (1E4, 1E7)},
                 'y_lim': {'norm': (0, 25), 'angle': (20, 90)},
                 'series_to_plot': self.paper_2023
@@ -56,8 +55,7 @@ class DeContiModels:
                 'suptitle': r"Flat arrangement's mutual ground-return potential coefficients for $\varepsilon_{r1} = 10$",
                 'norm_title': 'Absolute Value',
                 'angle_title': 'Angle of Potential Coefficient',
-                'p': 2,
-                'q': 0,
+                'p': 2, 'q': 0,
                 'x_lim': {'norm': (1E4, 1E7), 'angle': (1E4, 1E7)},
                 'y_lim': {'norm': (0, 14), 'angle': (-90, 90)},
                 'series_to_plot': self.paper_2023

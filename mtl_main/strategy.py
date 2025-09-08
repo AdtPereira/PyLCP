@@ -19,8 +19,16 @@ class MTLStrategy(ABC):
         Performs specific validations for the MTL type.
         """
         pass
+    
+    def apply_mtl_ref_properties(self, context, mtl_ref: dict) -> None:
+        """
+        Calculates and applies type-specific properties directly to the context object.
+        The 'context' is an instance of MulticonductorTransmissionLine.
+        """
+        # Default implementation does nothing
+        pass
 
-    def apply_properties(self, context, mtl_data: dict) -> None:
+    def apply_mtl_properties(self, context, mtl: dict) -> None:
         """
         Calculates and applies type-specific properties directly to the context object.
         The 'context' is an instance of MulticonductorTransmissionLine.
@@ -247,7 +255,38 @@ class SingleCoreCableStrategy(MTLStrategy):
         # assert mtl_data[0]['line_type'] == 'return', "Conductor with index '0' must be the return path for cables."
         # assert idx_ref in mtl_data, f"The reference conductor index {idx_ref} must be in the MTL dictionary."
 
-    def apply_properties(self, context, mtl: dict) -> None:
+    def _count_scc_and_conductors(self, mtl_input: dict) -> tuple:
+        """
+        Counts the number of (sc) cables (N) and conductors per cable (M)
+        based on the provided data structure.
+        """
+        # 1. Filter to get only active conductors
+        active_conductors = [
+            v for k, v in mtl_input.items()
+            if isinstance(k, int) and v.get('line_type') == 'active'
+        ]
+
+        if not active_conductors:
+            return 0, 0
+
+        # 2. Count the number of cables (N) by finding unique center points
+        num_cables = len(set([cond['center_point'] for cond in active_conductors]))
+
+        # 3. Count conductors per cable (M)
+        total_active_conductors = len(active_conductors)
+        
+        if num_cables > 0:
+            conductors_per_cable = total_active_conductors // num_cables
+        else:
+            conductors_per_cable = 0
+
+        return num_cables, conductors_per_cable
+    
+    def apply_mtl_ref_properties(self, context, mtl_input: dict) -> None:
+        # Number of single core cables (N) and conductors per cable (M)
+        context.num_sc_cables, context.num_conductors_per_scc = self._count_scc_and_conductors(mtl_input)
+
+    def apply_mtl_properties(self, context, mtl: dict) -> None:
         """
         Calculates and applies overhead-line-specific distance matrices to the MTL object
         by delegating the calculation to a static helper method.
@@ -261,15 +300,6 @@ class SingleCoreCableStrategy(MTLStrategy):
 
         # Extract and apply SCC geometric parameters
         context.scc = MTLStrategy._extract_scc_parameters(mtl)
-
-        # # Soil Relative Permittivity
-        # context.e1 = model.mtl_ref[0]['relative_permittivity'] * sc.epsilon_0
-
-        # # Soil conductivity (S/m)
-        # context.sigma_1 = model.mtl_ref[0]['conductivity']
-
-        # # Soil Relative Permeability
-        # context.mu1 = model.mtl_ref[0]['relative_permeability'] * sc.mu_0
 
         # Conductors Permeability [np.array]
         context.mu = np.array([sc.mu_0 * conductor['relative_permeability'] for conductor in mtl.values()]) 
@@ -289,7 +319,7 @@ class CableStrategy(MTLStrategy):
     def preprocess_mtl_data(self, mtl_input: dict) -> dict:
         # For cables, we expect integer keys starting from 0.
         mtl =  {key: value for key, value in mtl_input.items() if isinstance(key, int)}
-        mtl_ref = {key: value for key, value in mtl_input.items() if key == 0 and value.get('line_type') == 'return' and value.get('conductor_name') == 'soil'}
+        mtl_ref = {key: value for key, value in mtl_input.items() if key == 0 and value.get('line_type') == 'return'}
         return mtl, mtl_ref
 
     def validate(self, mtl: dict,  mtl_ref: dict, mtl_input: dict):
@@ -301,7 +331,35 @@ class CableStrategy(MTLStrategy):
         assert mtl[0]['line_type'] == 'return', "Conductor with index '0' must be the return path for cables."
         # assert idx_ref in mtl_data, f"The reference conductor index {idx_ref} must be in the MTL dictionary."
 
-    def apply_properties(self, context, mtl: dict) -> None:
+    def _count_scc_and_conductors_plus_ref(self, mtl_input: dict) -> tuple:
+        """
+        Counts the number of (sc) cables (N) and conductors per cable (M)
+        based on the provided data structure, including the reference conductor.
+        """
+        # 1. Filter to get only active conductors
+        all_conductors = [v for k, v in mtl_input.items() if isinstance(k, int)]
+
+        if not all_conductors:
+            return 0, 0
+
+        # 2. Count the number of cables (N) by finding unique center points
+        num_cables = len(set([cond['center_point'] for cond in all_conductors]))
+
+        # 3. Count conductors per cable (M)
+        total_active_conductors = len(all_conductors)
+        
+        if num_cables > 0:
+            conductors_per_cable = total_active_conductors // num_cables
+        else:
+            conductors_per_cable = 0
+
+        return num_cables, conductors_per_cable
+    
+    def apply_mtl_ref_properties(self, context, mtl_input: dict) -> None:
+        # Number of single core cables (N) and conductors per cable (M)
+        context.num_sc_cables, context.num_conductors_per_scc = self._count_scc_and_conductors_plus_ref(mtl_input)
+
+    def apply_mtl_properties(self, context, mtl: dict) -> None:
         """Applies cable-specific distance properties to the MTL object."""
         # 1. Delegate the complex calculation to the static method
         distances = MTLStrategy._conductors_center_distance_matrix(mtl)
@@ -309,6 +367,9 @@ class CableStrategy(MTLStrategy):
         context.x_pq = distances['x_pq']
         context.y_pq = distances['y_pq']
         context.theta_pq = distances['theta_pq']
+
+        # Extract and apply SCC geometric parameters
+        context.scc = MTLStrategy._extract_scc_parameters(mtl)
 
         # Conductors Permeability [np.array]
         context.mu = np.array([sc.mu_0 * conductor['relative_permeability'] for conductor in mtl.values()]) 
@@ -340,7 +401,7 @@ class OverheadCableStrategy(MTLStrategy):
         assert mtl[0]['line_type'] == 'return', "Conductor with index '0' must be the return path for cables."
         # assert idx_ref in mtl_data, f"The reference conductor index {idx_ref} must be in the MTL dictionary."
 
-    def apply_properties(self, context, mtl: dict) -> None:
+    def apply_mtl_properties(self, context, mtl: dict) -> None:
         """Applies cable-specific distance properties to the MTL object."""
         # 1. Delegate the complex calculation to the static method
         distances = MTLStrategy._conductors_center_distance_matrix(mtl)
@@ -382,7 +443,38 @@ class OverheadLineStrategy(MTLStrategy):
         # assert mtl_data[0]['line_type'] == 'return', "Conductor with index '0' must be the return path for cables."
         # assert idx_ref in mtl_data, f"The reference conductor index {idx_ref} must be in the MTL dictionary."
 
-    def apply_properties(self, context, mtl: dict) -> None:
+    def _count_scc_and_conductors(self, mtl_ref: dict) -> tuple:
+        """
+        Counts the number of (sc) cables (N) and conductors per cable (M)
+        based on the provided data structure.
+        """
+        # 1. Filter to get only active conductors
+        active_conductors = [
+            v for k, v in mtl_ref.items()
+            if isinstance(k, int) and v.get('line_type') == 'active'
+        ]
+
+        if not active_conductors:
+            return 0, 0
+
+        # 2. Count the number of cables (N) by finding unique center points
+        num_cables = len(set([cond['center_point'] for cond in active_conductors]))
+
+        # 3. Count conductors per cable (M)
+        total_active_conductors = len(active_conductors)
+        
+        if num_cables > 0:
+            conductors_per_cable = total_active_conductors // num_cables
+        else:
+            conductors_per_cable = 0
+
+        return num_cables, conductors_per_cable
+    
+    def apply_mtl_ref_properties(self, context, mtl_ref: dict) -> None:
+        # Number of single core cables (N) and conductors per cable (M)
+        context.num_sc_cables, context.num_conductors_per_scc = self._count_scc_and_conductors(mtl_ref)
+
+    def apply_mtl_properties(self, context, mtl: dict) -> None:
         """
         Calculates and applies overhead-line-specific distance matrices to the MTL object
         by delegating the calculation to a static helper method.
@@ -411,7 +503,7 @@ def mtl_strategy_factory(mtl_type: str) -> MTLStrategy:
     strategies = {
         'coated_wires': CableStrategy,
         'bare_wires': CableStrategy,
-        'coaxial': OverheadCableStrategy,
+        'coaxial': CableStrategy,
         'overhead': OverheadLineStrategy,
         'scc': SingleCoreCableStrategy,
         'pipe': CableStrategy,

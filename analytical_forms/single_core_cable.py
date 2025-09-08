@@ -119,6 +119,34 @@ def sommerfeld_quasi_tem_approx_admittance(hnm, dnm, ke2, ka2, type_form='gauss_
 
     return Sn
 
+def coth(x):
+    """
+    Calculates the hyperbolic cotangent of x element-wise.
+
+    The function is defined as: coth(x) = 1 / tanh(x)
+
+    Args:
+        x (float or numpy.ndarray): The input value or array.
+
+    Returns:
+        float or numpy.ndarray: The hyperbolic cotangent of the input.
+    """
+    return 1 / np.tanh(x)
+
+def cosech(x):
+    """
+    Calculates the hyperbolic cosecant of x element-wise.
+
+    The function is defined as: cosech(x) = 1 / sinh(x)
+
+    Args:
+        x (float or numpy.ndarray): The input value or array.
+
+    Returns:
+        float or numpy.ndarray: The hyperbolic cosecant of the input.
+    """
+    return 1 / np.sinh(x)
+
 class InternalPerUnitParameters:
     """
     This class calculates vector-frequency PUL parameters using an MTL geometry model.
@@ -134,7 +162,7 @@ class InternalPerUnitParameters:
             f (np.ndarray): A NumPy array of frequencies to be calculated.
         """
         self.model = model
-        self.num_sc_cables, self.num_conductors_per_scc = model._count_scc_and_conductors()
+        # self.num_sc_cables, self.num_conductors_per_scc = model._count_scc_and_conductors()
         
         # Store the frequency array
         self.f = np.asarray(f)
@@ -259,7 +287,141 @@ class InternalPerUnitParameters:
             'potentials': {'pcj': pcj, 'psj': psj, 'paj': paj}
         }
 
-    def internal_matrices(self):
+    def parameters_approximation(self):
+        """
+        Calculates the internal impedance matrix components for a single-core cable (SCC)
+        over a vector of frequencies.
+
+        The method uses formulas for tubular conductors, which involve modified
+        Bessel functions, to account for skin and proximity effects within the
+        conductors. The use of NumPy and SciPy's vectorized functions allows
+        for efficient calculation across all frequencies simultaneously.
+
+        The returned impedance components (z11, z2m, etc.) are NumPy arrays,
+        where each element corresponds to a frequency in the input vector `f`.
+
+        Reference: A. Ametani, T. Ohno and N. Nagaoka, Cable System Transients: Theory, Modeling and
+                    Simulation, Wiley-IEEE Press, 2015.
+        """
+        s = self.jw
+        scc = self.model.scc
+        two_pi = 2 * np.pi
+
+        # --- Initialize all impedance components ---
+        z11, z12 = (None,) * 2
+        z2i, z20, z23, z2m = (None,) * 4
+        z3i, z30, z34, z3m = (None,) * 4
+        pcj, psj, paj = (None,) * 3
+
+        if 'core_outer_radius' in scc:
+            rho1, mu1 = scc['core_resistivity'], scc['core_permeability']
+            r1, r2 = scc['core_inner_radius'], scc['core_outer_radius']
+            m_core = np.sqrt(s * mu1 / rho1)
+            x1, x2 = m_core * r1, m_core * r2
+
+            # --- z11: internal impedance of core outer surface ---
+            if np.isclose(r1, 0):
+                with np.errstate(divide='ignore', invalid='ignore'):
+                    z11 = (m_core * rho1 / (two_pi * r2)) * coth(0.777 * x2) + 0.356 * rho1 / (np.pi * r2**2)
+                    
+                    invalid_mask = np.isclose(x2, 0) | np.isnan(x2)
+                    if z11.ndim > 0:
+                        z11[invalid_mask] = complex(np.inf, np.inf)
+                    elif invalid_mask:
+                        z11 = complex(np.inf, np.inf)
+            else:
+                with np.errstate(divide='ignore', invalid='ignore'):
+                    D1 = ss.iv(1, x2) * ss.kv(1, x1) - ss.iv(1, x1) * ss.kv(1, x2)
+                    N1 = ss.iv(0, x2) * ss.kv(1, x1) + ss.kv(0, x2) * ss.iv(1, x1)
+                    z11 = (s * mu1 / two_pi) * (1 / (x2 * D1)) * N1
+                    
+                    # Create a mask for invalid conditions (nan or near-zero denominator)
+                    invalid_mask = np.isnan(D1) | np.isclose(D1, 0)
+                    if z11.ndim > 0:
+                        z11[invalid_mask] = complex(np.inf, np.inf)
+                    elif invalid_mask:
+                        z11 = complex(np.inf, np.inf)
+
+        if 'core_insulation_outer_radius' in scc:
+            mui1 = scc['core_insulation_permeability']
+            ei1 = scc['core_insulation_permittivity']
+            r3 = scc['core_insulation_outer_radius']
+
+            # --- z12: core outer insulator impedance ---
+            z12 = (s * mui1 / two_pi) * np.log(r3 / r2) if not np.isclose(r3, r2) else 0
+
+            # --- pcj: core outer insulator potential coefficient ---
+            pcj = (1 / (two_pi * ei1)) * np.log(r3 / r2) if not np.isclose(r3, r2) else 0
+
+        if 'sheath_outer_radius' in scc:
+            rho2, mu2 = scc['sheath_resistivity'], scc['sheath_permeability']
+            r3, r4 = scc['sheath_inner_radius'], scc['sheath_outer_radius']
+            m_sheath = np.sqrt(s * mu2 / rho2)
+            pm = rho2 * m_sheath
+                        
+            # --- z2m: sheath mutual impedance ---
+            with np.errstate(divide='ignore', invalid='ignore'):
+                z2m = pm / (np.pi * (r3 + r4)) * cosech(m_sheath * (r4 - r3))
+            
+            # --- z2i: internal impedance of sheath inner surface ---
+            with np.errstate(divide='ignore', invalid='ignore'):
+                z2i = pm / (two_pi * r3) * coth(m_sheath * (r4 - r3)) - rho2 / (two_pi * r3 * (r3 + r4))
+            
+            # --- z20: internal impedance of sheath outer surface ---
+            with np.errstate(divide='ignore', invalid='ignore'):
+                z20 = pm / (two_pi * r4) * coth(m_sheath * (r4 - r3)) + rho2 / (two_pi * r4 * (r3 + r4))
+
+        if 'sheath_insulation_outer_radius' in scc:
+            mui2 = scc['sheath_insulation_permeability']
+            ei2 = scc['sheath_insulation_permittivity']
+            r5 = scc['sheath_insulation_outer_radius']
+            
+            # --- z23: sheath outer insulator impedance ---
+            z23 = (s * mui2 / two_pi) * np.log(r5 / r4) if not np.isclose(r5, r4) else 0
+
+            # --- psj: sheath outer insulator potential coefficient ---
+            psj = (1 / (two_pi * ei2)) * np.log(r5 / r4) if not np.isclose(r5, r4) else 0
+
+        if 'armor_outer_radius' in scc:
+            rho3, mu3 = scc['armor_resistivity'], scc['armor_permeability']
+            r5, r6 = scc['armor_inner_radius'], scc['armor_outer_radius']
+            m_armor = np.sqrt(s * mu3 / rho3)
+            pm = rho3 * m_armor
+            
+            # --- z3m: armor mutual impedance ---
+            with np.errstate(divide='ignore', invalid='ignore'):
+                z3m = pm / (np.pi * (r5 + r6)) * cosech(m_armor * (r6 - r5))
+            
+            # --- z3i: internal impedance of armor inner surface ---
+            with np.errstate(divide='ignore', invalid='ignore'):
+                z3i = pm / (two_pi * r5) * coth(m_armor * (r6 - r5)) - rho3 / (two_pi * r5 * (r5 + r6))
+
+            # --- z30: internal impedance of armor outer surface ---
+            with np.errstate(divide='ignore', invalid='ignore'):
+                z30 = pm / (two_pi * r6) * coth(m_armor * (r6 - r5)) + rho3 / (two_pi * r6 * (r5 + r6))
+
+        if 'armor_insulation_outer_radius' in scc:
+            mui3 = scc['armor_insulation_permeability']
+            ei3 = scc['armor_insulation_permittivity']
+            r7 = scc['armor_insulation_outer_radius']
+            
+            # --- z34: armor outer insulator impedance ---
+            z34 = (s * mui3 / two_pi) * np.log(r7/r6) if not np.isclose(r7, r6) else 0
+
+            # --- paj: armor outer insulator potential coefficient ---
+            paj = (1 / (two_pi * ei3)) * np.log(r7 / r6) if not np.isclose(r7, r6) else 0
+
+        return {
+            'zcs': {'z11': z11, 'z12': z12, 'z2i': z2i},
+            'zsa': {'z20': z20, 'z23': z23, 'z3i': z3i},
+            'za4': {'z30': z30, 'z34': z34},
+            'zs3': {'z20': z20, 'z23': z23},
+            'z2m': z2m,
+            'z3m': z3m,
+            'potentials': {'pcj': pcj, 'psj': psj, 'paj': paj}
+        }
+
+    def internal_matrices(self, internal_form='approximation'):
         """
         Assembles the full internal impedance [Zi] and shunt admittance [Ye] matrices
         for all specified frequencies.
@@ -269,36 +431,104 @@ class InternalPerUnitParameters:
                   'impedance_matrix' (Zi) and 'shunt_admittance_matrix' (Ye) are
                   3D NumPy arrays with shape (num_frequencies, num_total_conductors, num_total_conductors).
         """
-        N, M = self.num_sc_cables, self.num_conductors_per_scc
+        N, M = self.model.num_sc_cables, self.model.num_conductors_per_scc
         num_total_conductors = N * M
-        zij = self.parameters_by_bessel()
         
-        # This part remains the same, but the variables are now 1D NumPy arrays
-        # representing the value for each frequency.
-        # --- (SCC configuration logic from original code) ---
+        if internal_form == 'bessel':
+            zij = self.parameters_by_bessel()
+        elif internal_form == 'approximation':
+            zij = self.parameters_approximation()
+        else:
+            raise ValueError("Invalid internal_form. Choose 'bessel' or 'approximation'.")
+        
+        # 1. SCC with core, core_insulation, sheath, sheath_insulation, armor, armor_insulation
         if 'armor_insulation_outer_radius' in self.model.scc:
             zcs = zij['zcs']['z11'] + zij['zcs']['z12'] + zij['zcs']['z2i']
             zsa = zij['zsa']['z20'] + zij['zsa']['z23'] + zij['zsa']['z3i']
             za4 = zij['za4']['z30'] + zij['za4']['z34']
+            
+            # core self-impedance
             Zcc_j = zcs + zsa + za4 - 2 * zij['z2m'] - 2 * zij['z3m']
+            
+            # sheath self-impedance
             Zss_j = zsa + za4 - 2 * zij['z3m']
+            
+            # armor self-impedance
             Zaa_j = za4
+            
+            # mutual impedance between the core and sheath
             Zcs_j = zsa + za4 - zij['z2m'] - 2 * zij['z3m']
+            
+            # mutual impedance between the core and armor
             Zca_j = za4 - zij['z3m']
+            
+            # mutual impedance between the sheath and armor
             Zsa_j = Zca_j
-            Zij_values = np.array([[Zcc_j, Zcs_j, Zca_j], [Zcs_j, Zss_j, Zsa_j], [Zca_j, Zsa_j, Zaa_j]])
+            
+            # impedance matrix of the jth phase of SCC cable. Eq. (2.8) [2]
+            Zij_values = np.array([[Zcc_j, Zcs_j, Zca_j],
+                                   [Zcs_j, Zss_j, Zsa_j],
+                                   [Zca_j, Zsa_j, Zaa_j]])
+            
+            # cable internal potential coefficient matrix. Eq. (2.19) [2]
             pcj, psj, paj = zij['potentials']['pcj'], zij['potentials']['psj'], zij['potentials']['paj']
-            Pij = np.array([[pcj + psj + paj, psj + paj, paj], [psj + paj, psj + paj, paj], [paj, paj, paj]])
+            Pij = np.array([[pcj + psj + paj, psj + paj, paj],
+                            [      psj + paj, psj + paj, paj],
+                            [            paj,       paj, paj]])
+            
+        # 2. SCC with core, core_insulation, sheath, sheath_insulation, armor
+        elif 'armor_outer_radius' in self.model.scc:
+            pass
+        
+        # 3. SCC with core, core_insulation, sheath, sheath_insulation
         elif 'sheath_insulation_outer_radius' in self.model.scc:
             zcs = zij['zcs']['z11'] + zij['zcs']['z12'] + zij['zcs']['z2i']
             zs3 = zij['zs3']['z20'] + zij['zs3']['z23']
-            Zcc_j = zcs + zs3 - 2 * zij['z2m']
-            Zss_j = zs3
-            Zcs_j = zs3 - zij['z2m']
-            Zij_values = np.array([[Zcc_j, Zcs_j], [Zcs_j, Zss_j]])
+            
+            Zcc_j = zcs + zs3 - 2 * zij['z2m']  # core self-impedance
+            Zss_j = zs3                         # sheath self-impedance
+            Zcs_j = zs3 - zij['z2m']            # mutual impedance between the core and sheath
+            
+            # impedance matrix of the j-th phase of SCC cable. Eq. (2.11) [2] 
+            Zij_values = np.array([[Zcc_j, Zcs_j],
+                                   [Zcs_j, Zss_j]])
+            
+            # cable internal potential coefficient matrix. Eq. (2.19) [2]
             pcj, psj = zij['potentials']['pcj'], zij['potentials']['psj']
             Pij = np.array([[pcj + psj, psj], [psj, psj]])
-        # ... (add other elif conditions as in the original code) ...
+        
+        # 4. SCC with core, core_insulation, sheath
+        elif 'sheath_outer_radius' in self.model.scc:
+            zcs = zij['zcs']['z11'] + zij['zcs']['z12'] + zij['zcs']['z2i']
+            z20 = zij['zs3']['z20'] 
+            
+            Zcc_j = zcs + z20 - 2 * zij['z2m']   # core self-impedance
+            Zss_j = z20                          # internal impedance of sheath outer surface
+            Zcs_j = z20 - zij['z2m']             # mutual impedance between the core and sheath
+
+            # impedance matrix of the j-th phase of SCC cable. Eq. (2.11) [2]
+            Zij_values = np.array([[Zcc_j, Zcs_j],
+                                   [Zcs_j, Zss_j]])
+            
+            # cable internal potential coefficient matrix. Eq. (2.19) [2]
+            Pij = np.array([[zij['potentials']['pcj']]])
+
+        # 5. SCC with core, core_insulation
+        elif 'core_insulation_outer_radius' in self.model.scc:
+            # core self-impedance
+            Zcc_j = zij['zcs']['z11'] + zij['zcs']['z12']
+
+            # impedance matrix of the j-th phase of SCC cable. Eq. (2.13) [2]
+            Zij_values = np.array([[Zcc_j]])
+
+            # cable internal potential coefficient matrix. Eq. (2.19) [2]
+            Pij = np.array([[zij['potentials']['pcj']]])
+
+        # 6. SCC with core
+        elif 'core_outer_radius' in self.model.scc:
+            # impedance matrix of the j-th phase of SCC cable.
+            Zij_values = np.array([[zij['zcs']['z11']]])
+
         else:
             raise ValueError("Invalid SCC configuration. Please check the conductor layers.")
 
@@ -326,9 +556,9 @@ class InternalPerUnitParameters:
         Ye = self.jw[:, np.newaxis, np.newaxis] * inv_Pi
 
         return {
-            'impedance_matrix': Zi, # 3D Array: (freq, cond, cond)
-            'shunt_admittance_matrix': Ye, # 3D Array: (freq, cond, cond)
-            'potential_coefficient_matrix': Pi, # 2D Array (freq-independent)
+            'impedance_matrix': Zi,                 # 3D Array: (freq, cond, cond)
+            'shunt_admittance_matrix': Ye,          # 3D Array: (freq, cond, cond)
+            'potential_coefficient_matrix': Pi,     # 2D Array (freq-independent)
         }
 
 class PerUnitParameters:
@@ -347,7 +577,7 @@ class PerUnitParameters:
         """
         # MTL Geometry Model
         self.model = model
-        self.num_sc_cables, self.num_conductors_per_scc = model._count_scc_and_conductors()
+        # self.num_sc_cables, self.num_conductors_per_scc = model._count_scc_and_conductors()
         
         self.f = np.asarray(f)
         self.num_freq = len(self.f)
@@ -375,7 +605,7 @@ class PerUnitParameters:
         """
         Calculates Earth-return parameters over a vector of frequencies.
         """
-        N = self.num_sc_cables
+        N, M = self.model.num_sc_cables, self.model.num_conductors_per_scc
         d_matrix = self.model.d_matrix_ground_return
         D_matrix = self.model.D_matrix_ground_return
         hnm = self.model.vertical_separation_matrix
@@ -477,7 +707,7 @@ class PerUnitParameters:
         """
         Assembles the final PUL matrices for a vector of frequencies.
         """
-        N, M = self.num_sc_cables, self.num_conductors_per_scc
+        N, M = self.model.num_sc_cables, self.model.num_conductors_per_scc
         num_total_conductors = N * M
 
         earth_return = self.ground_return_parameters(zg_form, yg_form)

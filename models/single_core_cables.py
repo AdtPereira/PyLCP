@@ -14,7 +14,8 @@ def _add_conductor_to_model(MODEL, conductor_id, center_point, layer_data, layer
     It dynamically handles the presence of insulation.
     """
     insulation_data = layer_data.get('insulation')
-    insulation_dict = None  # Default to no insulation
+    # Default to no insulation
+    insulation_dict = None
 
     if insulation_data:
         insulation_dict = {
@@ -23,8 +24,8 @@ def _add_conductor_to_model(MODEL, conductor_id, center_point, layer_data, layer
             'center_point': center_point,
             'thickness': insulation_data['thickness_m'],
             'relative_permittivity': insulation_data['relative_permittivity'],
-            'fourier_order': 0,
             'relative_permeability': 1.0,
+            'fourier_order': 0,
         }
 
     MODEL[conductor_id] = {
@@ -35,8 +36,8 @@ def _add_conductor_to_model(MODEL, conductor_id, center_point, layer_data, layer
         'center_point': center_point,
         'radius': [layer_data['inner_radius_m'], layer_data['outer_radius_m']],
         'conductivity': layer_data['conductivity_S_per_m'],
-        'insulation': insulation_dict,
         'subconductors': None,
+        'insulation': insulation_dict,
         'conductor_layers': None,
         'relative_permeability': 1.0,
         'relative_permittivity': 1.0,
@@ -45,6 +46,65 @@ def _add_conductor_to_model(MODEL, conductor_id, center_point, layer_data, layer
         'fourier_order': 0,
     }
     return conductor_id + 1
+
+def isolated_coaxial_cable(
+    input_json: dict, 
+    show_model: bool = False
+) -> dict:
+    """
+    Generates a parametric model for a single SCC cable, dynamically
+    building it based on the layers defined in the JSON.
+    """
+    # Safely get cable definition components
+    cable_def = input_json.get('cable_definition', {})
+    cable_ref = input_json.get('reference', {})
+    core = cable_def.get('core')
+    sheath = cable_def.get('sheath')
+    armor = cable_def.get('armor')
+
+    # Build the base MODEL dictionary
+    MODEL = {
+        'name': input_json.get('name', 'SINGLE_PHASE_SCC'),
+        'type': 'coaxial',
+        'note': input_json.get('note', 'A parametric single-phase SCC model.'),
+        'idx_ref_conductor': 0,
+        0: {
+            'line_id': 0,
+            'conductor_name': cable_ref.get('name', 'sheath'),
+            'line_type': 'return',
+            'line_return': None,
+            'center_point': (0.0, 0.0),
+            'radius': [cable_ref['inner_radius_m'], cable_ref['outer_radius_m']],
+            'conductivity': cable_ref['conductivity_S_per_m'],
+            'subconductors': None,
+            'insulation': None,
+            'conductor_layers': None,
+            'relative_permeability': 1.0,
+            'relative_permittivity': 1.0,
+            'relative_permittivity_out': 1.0,
+            'potential_to_infinity': -1.0,
+            'fourier_order': 0,
+        },
+    }
+
+    # Dynamically add conductors based on what's defined in the JSON
+    conductor_id = 1
+    for center_point in [(0.0, 0.0)]:
+        if core:
+            conductor_id = _add_conductor_to_model(MODEL, conductor_id, center_point, core, 'core')
+        
+        if sheath:
+            conductor_id = _add_conductor_to_model(MODEL, conductor_id, center_point, sheath, 'sheath')
+            
+        if armor:
+            conductor_id = _add_conductor_to_model(MODEL, conductor_id, center_point, armor, 'armor')
+
+    if show_model:
+        print("\n--- Generated Dynamic SCC MODEL Dictionary ---")
+        print(json.dumps(MODEL, indent=2, default=str))
+        print("---------------------------------------------------\n")
+
+    return MODEL
 
 def single_phase_model(
     input_json: dict, 

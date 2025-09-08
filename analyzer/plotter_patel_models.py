@@ -1,0 +1,74 @@
+import numpy as np
+import matplotlib.pyplot as plt
+from utils.case_utils import *
+
+class PatelModels:
+    """
+    A highly refactored class to handle plotting for the Xue model results.
+    It uses a configuration-driven approach to generate complex subplot figures.
+    """
+    def __init__(self, pul_parameters):
+        self.pul_data = pul_parameters
+        self.f = pul_parameters['frequencies']['analytical']
+        self.f_mom = pul_parameters['frequencies']['numerical']
+        self.w = 2 * np.pi * self.f
+
+    def series_impedance_matrix(self):
+        """
+        Generic method to create a 1x2 subplot for series resistance (left)
+        and series inductance (right) based on a configuration key.
+        """
+        w = 2 * np.pi * self.f
+        r_factor = 1e3  # Convert Ohm/m to Ohm/km
+        l_factor = 1e6  # Convert H/m to mH/km
+
+        # config = self.plot_configs[config_key]
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5), sharey=False)
+        fig.suptitle('Fig. 2.6: P.u.l. series impedance of a coaxial cable [Patel, 2014]', fontsize=12)
+
+        # for series in config['series_to_plot']:
+        zcs = self.pul_data['internal_parameters']['zcs']
+        mom_data = self.pul_data['numerical']
+        rs_mom = [data['rs'][0, 0] * r_factor for data in mom_data.values()]
+        ls_mom = [data['ls'][0, 0] * l_factor for data in mom_data.values()]
+
+        z11 = zcs['z11']        # internal impedance of core outer surface
+        z12 = zcs['z12']        # core outer insulator impedance
+        z2i = zcs['z2i']        # internal impedance of sheath inner surface
+        zcs = z11 + z12 + z2i   # Equivalent single conductor impedance. Eq. (2.10a) [AMETANI, 2015]
+
+        # Resistance in Ohm/km
+        ax1.scatter(self.f_mom, rs_mom, label='MoM-SO', marker='o', facecolors='none', edgecolors='k', s=20, zorder=1)
+        ax1.plot(self.f, np.real(z11) * r_factor, label=r'$R_{11}$: internal resistance of core outer surface', linestyle=':', color='black', linewidth=2) 
+        ax1.plot(self.f, np.real(z12) * r_factor, label=r'$R_{12}$: core outer insulator resistance', linestyle=':', color='darkgreen', linewidth=2) 
+        ax1.plot(self.f, np.real(z2i) * r_factor, label=r'$R_{2i}$: internal resistance of sheath inner surface', linestyle=':', color='darkblue', linewidth=2) 
+        ax1.plot(self.f, np.real(zcs) * r_factor, label=r'$R_{cs}=R_{11}+R_{12}+R_{2i}$ [1]', linestyle='--', color='red', linewidth=1.0)
+
+        # Inductance in mH/km
+        ax2.scatter(self.f_mom, ls_mom, label='MoM-SO', marker='o', facecolors='none', edgecolors='k', s=20, zorder=1)
+        ax2.plot(self.f, np.imag(z11) / w * l_factor, label=r'$L_{11}$: internal inductance of core outer surface', linestyle=':', color='black', linewidth=2) 
+        ax2.plot(self.f, np.imag(z12) / w * l_factor, label=r'$L_{12}$: core outer insulator inductance', linestyle=':', color='darkgreen', linewidth=2) 
+        ax2.plot(self.f, np.imag(z2i) / w * l_factor, label=r'$L_{2i}$: internal inductance of sheath inner surface', linestyle=':', color='darkblue', linewidth=2) 
+        ax2.plot(self.f,  np.imag(zcs) / w * l_factor, label=r'$L_{cs}=L_{11}+L_{12}+L_{2i}$ [1]', linestyle='--', color='red', linewidth=1.0)
+
+        # Configure left subplot (Resistance)
+        ax1.set_xscale('log')
+        ax1.set_yscale('log')
+        ax1.set_xlim(1e0, 1e6)
+        ax1.set_ylim(1e-2, 1e1)
+        ax1.legend(fontsize='small')
+        ax1.set_xlabel('Frequency (Hz)')
+        ax1.set_ylabel(r'$R_s \, (\Omega/km)$')
+        ax1.grid(True, which='both', linestyle='--', linewidth=0.5)
+        ax1.set_title('Series Resistance, $R_{cs}$')
+
+        # Configure right subplot (Inductance)
+        ax2.set_xscale('log')
+        ax2.set_xlim(1e0, 1e6)
+        ax2.set_ylim(0, 0.2)
+        ax2.legend(fontsize='small')
+        ax2.set_xlabel('Frequency (Hz)')
+        ax2.set_ylabel(r'$L_s$ (mH/km)')
+        ax2.grid(True, which='both', linestyle='--', linewidth=0.5)
+        ax2.set_title('Series Inductance, $L_{cs}$')
+        plt.tight_layout(rect=[0, 0, 1, 0.96])

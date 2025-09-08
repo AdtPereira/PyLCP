@@ -236,164 +236,95 @@ class WiresHomogeneousMedia(MulticonductorTransmissionLine):
         return mu * epsilon * lu_solve(lu_factor(L), I)
 
 
-# 4.2.2 Per-Unit-Length Inductance and Capacitance for Wire-Type Lines [4]
-class CoaxialCable(MulticonductorTransmissionLine):
-    """ This class contains the analytical formulation of the system. """
+# # 4.2.2 Per-Unit-Length Inductance and Capacitance for Wire-Type Lines [4]
+# class CoaxialCable(MulticonductorTransmissionLine):
+#     """ This class contains the analytical formulation of the system. """
 
-    def __init__(self, mtl):
-        """
-        Initialize the AnalyticalFormulation class.
+#     def __init__(self, mtl):
+#         """
+#         Initialize the AnalyticalFormulation class.
 
-        Parameters:
-        conductor (list): List of dictionaries containing the properties of the conductors.
-        frequency (float): The frequency of the system.
-        """
-        super().__init__(mtl)
+#         Parameters:
+#         conductor (list): List of dictionaries containing the properties of the conductors.
+#         frequency (float): The frequency of the system.
+#         """
+#         super().__init__(mtl)
 
-        # Coaxial Cable radii
-        for key, conductor in self.mtl.items():
-            if isinstance(key, int):  # Ensures the key is an integer
-                if conductor['conductor_name'] == 'core':
-                    self.a = conductor['radius'][1]
-                elif conductor['conductor_name'] == 'sheath':
-                    self.b, self.c = conductor['radius']
+#         # Coaxial Cable radii
+#         for key, conductor in self.mtl.items():
+#             if isinstance(key, int):  # Ensures the key is an integer
+#                 if conductor['conductor_name'] == 'core':
+#                     self.a = conductor['radius'][1]
+#                 elif conductor['conductor_name'] == 'sheath':
+#                     self.b, self.c = conductor['radius']
 
-    # Equation 2.70 [1] and 4.51 [4]
-    def external_inductance(self):
-        """ Calculate the external inductance for a lossless coaxial cable, L'. """
-        return self.mu[0] / (2 * np.pi) * np.log(self.b / self.a)
+#     # Equation 2.70 [1] and 4.51 [4]
+#     def external_inductance(self):
+#         """ Calculate the external inductance for a lossless coaxial cable, L'. """
+#         return self.mu[0] / (2 * np.pi) * np.log(self.b / self.a)
 
-    # Equation 2.71 [1]
-    def internal_impedance(self, frequency):
-        """ Calculate the internal impedance of the inner conductor Za (omega). """
-        # Angular frequency, rad/s [float]
-        jw = 1j * 2 * np.pi * frequency
+#     # Equation 2.71 [1]
+#     def internal_impedance(self, frequency):
+#         """ Calculate the internal impedance of the inner conductor Za (omega). """
+#         # Angular frequency, rad/s [float]
+#         jw = 1j * 2 * np.pi * frequency
 
-        # Propagation Constant [np.array]
-        gamma = np.sqrt(jw * self.mu[0] * self.sigma)
+#         # Propagation Constant [np.array]
+#         gamma = np.sqrt(jw * self.mu[0] * self.sigma)
 
-        # Propagation Constant of the inner conductor
-        gama_a = gamma[0] * self.a
+#         # Propagation Constant of the inner conductor
+#         gama_a = gamma[0] * self.a
 
-        # Intrinsic Impedance of the inner conductor
-        eta = np.sqrt(jw * self.mu[0] / self.sigma)[0]
+#         # Intrinsic Impedance of the inner conductor
+#         eta = np.sqrt(jw * self.mu[0] / self.sigma)[0]
 
-        # Internal Impedance of the inner conductor
-        za = eta / (2 * np.pi * self.a) * iv(0, gama_a) / iv(1, gama_a)
+#         # Internal Impedance of the inner conductor
+#         za = eta / (2 * np.pi * self.a) * iv(0, gama_a) / iv(1, gama_a)
 
-        return za
+#         return za
 
-    # Equation 2.72 [1]
-    def external_impedance(self, frequency):
-        """ Calculate the external impedance of the inner conductor Zb (omega). """
-        # Angular frequency, rad/s [float]
-        jw = 1j * 2 * np.pi * frequency
+#     # Equation 2.72 [1]
+#     def external_impedance(self, frequency):
+#         """ Calculate the external impedance of the inner conductor Zb (omega). """
+#         # Angular frequency, rad/s [float]
+#         jw = 1j * 2 * np.pi * frequency
 
-        # Propagation Constant [np.array]
-        gamma = np.sqrt(jw * self.mu[0] * self.sigma)
+#         # Propagation Constant [np.array]
+#         gamma = np.sqrt(jw * self.mu[0] * self.sigma)
 
-        # Propagation Constant of the inner conductor
-        gama_b = gamma[0] * self.b
-        gama_c = gamma[0] * self.c
+#         # Propagation Constant of the inner conductor
+#         gama_b = gamma[0] * self.b
+#         gama_c = gamma[0] * self.c
 
-        # Intrinsic Impedance of the inner conductor
-        eta = np.sqrt(jw * self.mu[0] / self.sigma)[0]
+#         # Intrinsic Impedance of the inner conductor
+#         eta = np.sqrt(jw * self.mu[0] / self.sigma)[0]
 
-        numerator = iv(0, gama_b) * kv(1, gama_c) + (kv(0, gama_b) * iv(1, gama_c))
-        denominator = iv(1, gama_c) * kv(1, gama_b) - (iv(1, gama_b) * kv(1, gama_c))
+#         numerator = iv(0, gama_b) * kv(1, gama_c) + (kv(0, gama_b) * iv(1, gama_c))
+#         denominator = iv(1, gama_c) * kv(1, gama_b) - (iv(1, gama_b) * kv(1, gama_c))
 
-        # External Impedance of the inner conductor
-        zb = eta / (2 * np.pi * self.b) * numerator / denominator
+#         # External Impedance of the inner conductor
+#         zb = eta / (2 * np.pi * self.b) * numerator / denominator
 
-        return zb
+#         return zb
 
-    # Equation (2.69) [1]
-    def pul_parameters(self, frequency):
-        """
-        This function calculates the series resistance of the system using 
-        the high frequency approximation.
+#     # Equation (2.69) [1]
+#     def pul_parameters(self, frequency):
+#         """
+#         This function calculates the series resistance of the system using 
+#         the high frequency approximation.
 
-        Returns:
-            tuple: A tuple containing the high frequency resistance, external inductance, 
-            and matrix impedance.
-        """
-        # Angular frequency, rad/s [float]
-        jw = 1j * 2 * np.pi * frequency
+#         Returns:
+#             tuple: A tuple containing the high frequency resistance, external inductance, 
+#             and matrix impedance.
+#         """
+#         # Angular frequency, rad/s [float]
+#         jw = 1j * 2 * np.pi * frequency
 
-        # Matrix Impedance, z (Ω/m)
-        l_ext = self.external_inductance()
-        za = self.internal_impedance(frequency)
-        zb = self.external_impedance(frequency)
-        zs = jw * l_ext + za + zb
+#         # Matrix Impedance, z (Ω/m)
+#         l_ext = self.external_inductance()
+#         za = self.internal_impedance(frequency)
+#         zb = self.external_impedance(frequency)
+#         zs = jw * l_ext + za + zb
 
-        return zs
+#         return zs
 
-# Obsolete. Substitute with scc.InternalPerUnitParameters class
-class Ametani(MulticonductorTransmissionLine):
-    """ This class contains the analytical formulation of the system. """
-
-    def __init__(self, mtl):
-        """
-        Initialize the AnalyticalFormulation class.
-
-        Parameters:
-        conductor (list): List of dictionaries containing the properties of the conductors.
-        frequency (float): The frequency of the system.
-        """
-        super().__init__(mtl)
-
-        # Call the function to configure the parameters
-        for key, conductor in self.mtl.items():
-            if isinstance(key, int):  # Ensures the key is an integer
-                if conductor['conductor_name'] == 'core':
-                    self.a, self.b = conductor['radius']
-                elif conductor['conductor_name'] == 'sheath':
-                    self.b_prime, self.c = conductor['radius']
-
-    def parameter_m(self, frequency, mu, sigma):
-        """ Calculate the parameter m for the two-layered conductor. """
-        # Angular frequency, rad/s [float]
-        jw = 1j * 2 * np.pi * frequency
-        return np.sqrt(jw * mu * sigma)
-
-    def impedance_two_layered_conductor(self, frequency):
-        """ Calculate the impedance of a two-layered conductor. """
-        # Angular frequency, rad/s [float]
-        jw = 1j * 2 * np.pi * frequency
-
-        # Intermediate variables
-        m1 = self.parameter_m(frequency, self.mu[0], self.sigma[0])
-        m2 = self.parameter_m(frequency, self.mu[1], self.sigma[1])
-        x1 = m1 * self.a
-        x2 = m1 * self.b
-        x3 = m2 * self.b_prime
-        x4 = m2 * self.c
-
-        # Intermediate variables A, B, E, F, R
-        aa = kv(1, x1) * iv(0, x2) + iv(1, x1) * kv(0, x2)
-        bb = kv(1, x1) * iv(1, x2) - iv(1, x1) * kv(1, x2)
-        ee = iv(0, x3) * kv(1, x4) + kv(0, x3) * iv(1, x4)
-        ff = kv(1, x3) * iv(1, x4) - iv(1, x3) * kv(1, x4)
-        rr = kv(1, x3) * iv(0, x4) + iv(1, x3) * kv(0, x4)
-
-        # Calculating z10, z2i, z2m, z20, z12
-        rho1 = 1 / self.sigma[0]
-        rho2 = 1 / self.sigma[1]
-
-        # Solid conductor case
-        if x1 == 0:
-            z10 = (m1 * rho1 / (2 * np.pi * self.b)) * iv(0, x2) / iv(1, x2)
-        else:
-            z10 = (m1 * rho1 / (2 * np.pi * self.b)) * aa / bb
-
-        z2i = (m2 * rho2 / (2 * np.pi * self.b_prime)) * ee / ff
-        z2m = rho2 / (2 * np.pi * self.b_prime * self.c * ff)
-        z20 = (m2 * rho2 / (2 * np.pi * self.c)) * rr / ff
-        z12 = jw * (self.mu[0] / 2 / np.pi) * np.log(self.b_prime / self.b)
-
-        # Calculating Z11, Z12, Z22
-        zz22 = z20
-        zz12 = zz22 - z2m
-        zz11 = z10 + z12 + z2i - z2m + zz12
-
-        return zz11, zz12, zz22

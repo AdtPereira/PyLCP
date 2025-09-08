@@ -19,7 +19,8 @@ class MTLRepresentation:
     def __init__(self, model: MulticonductorTransmissionLine, units='meter'):        
         self.model = model
         unit_info = UNITS_DATA.get(units, UNITS_DATA['meter'])
-        self.num_conductors, _ = model._count_scc_and_conductors()
+        active_conductors = [v for k, v in self.model.mtl.items()]
+        self.num_sc_cables = len(set([cond['center_point'] for cond in active_conductors]))
         self.unit_factor = unit_info['scale']
         self.label_unit = unit_info['label']
         self.color_map = {
@@ -179,7 +180,7 @@ class MTLRepresentation:
         # 4. Add schematic annotations and finalize the plot
         self._draw_schematic_annotations(ax, params)
 
-        if self.num_conductors > 2:
+        if self.num_sc_cables > 2:
             x_margin_scale = 0.2
         else:
             x_margin_scale = 2.0
