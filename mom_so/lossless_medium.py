@@ -359,12 +359,6 @@ class LosslessPostProcessing(MTL):
     def __init__(self, mtl):
         super().__init__(mtl)
 
-        # # Line ID [list] [int]
-        # self.line_id = [conductor['line_id'] for conductor in self.mtl]
-
-        # # Active lines [list] [int]
-        # self.active_lines = [line for line in self.mtl if line['line_type'] == 'active']
-
         # Lista de todos os line_id's presentes no sistema.
         self.line_id = [conductor['line_id'] for conductor in self.mtl.values()]
 

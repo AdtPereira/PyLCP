@@ -20,8 +20,8 @@ except IndexError:
 
 # --- Import custom modules ---
 try:
-    from utils.case_utils import load_json_parameters
-    from analyzer.plotter_xue_models import XueModels
+    from utils.case_utils import *
+    from plotter.xue_models import XueModels
     from models import single_core_cables as scc 
     from mtl_main.graphics import MTLRepresentation
     from mtl_main.source import MulticonductorTransmissionLine

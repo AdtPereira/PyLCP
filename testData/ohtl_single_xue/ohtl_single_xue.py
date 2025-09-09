@@ -25,7 +25,7 @@ try:
     from mtl_main.graphics import MTLRepresentation
     from mtl_main.source import MulticonductorTransmissionLine
     from analytical_forms.overhead_lines import InternalPerUnitParameters, PerUnitParameters
-    from analyzer.plotter_xue_models import XueModels
+    from plotter.xue_models import XueModels
     print("Core modules imported successfully.")
 except ImportError as e:
     print(f"Error importing modules: {e}")

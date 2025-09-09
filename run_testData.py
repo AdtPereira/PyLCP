@@ -2,8 +2,13 @@ import subprocess
 import sys
 
 SCRIPTS_TO_RUN = [
+    "testData.isolated_bifilar_pymon.isolated_bifilar_pymon",
+    "testData.isolated_bifilar_s21.isolated_bifilar_s21",
+    "testData.isolated_bifilar_s40.isolated_bifilar_s40",
     "testData.isolated_coax.isolated_coax",
+    "testData.isolated_ribbon_s50.isolated_ribbon_s50",
     "testData.ohtl_single_deConti.ohtl_single_deConti",
+    "testData.ohtl_single_deConti_deri.ohtl_single_deConti_deri",
     "testData.ohtl_single_lima.ohtl_single_lima",
     "testData.ohtl_single_xue.ohtl_single_xue",
     "testData.pipe_trefoil_patel.pipe_trefoil_patel",

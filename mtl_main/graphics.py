@@ -3,13 +3,7 @@ import matplotlib.pyplot as plt
 from matplotlib.patches import Circle, Wedge
 
 from mtl_main.source import MulticonductorTransmissionLine
-
-UNITS_DATA = {
-    'meter':      {'scale': 1,       'label': 'm'},
-    'centimeter': {'scale': 100,     'label': 'cm'},
-    'millimeter': {'scale': 1000,    'label': 'mm'},
-    'mil':        {'scale': 39370.1, 'label': 'mil'},
-}
+from utils.case_utils import UNITS_DATA
 
 class MTLRepresentation:
     """ 

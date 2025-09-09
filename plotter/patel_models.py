@@ -58,7 +58,7 @@ class PatelModels:
         ax1.set_ylim(1e-2, 1e1)
         ax1.legend(fontsize='small')
         ax1.set_xlabel('Frequency (Hz)')
-        ax1.set_ylabel(r'$R_s \, (\Omega/km)$')
+        ax1.set_ylabel(r'$R_{cs}$ $(\Omega/km)$')
         ax1.grid(True, which='both', linestyle='--', linewidth=0.5)
         ax1.set_title('Series Resistance, $R_{cs}$')
 
@@ -68,7 +68,7 @@ class PatelModels:
         ax2.set_ylim(0, 0.2)
         ax2.legend(fontsize='small')
         ax2.set_xlabel('Frequency (Hz)')
-        ax2.set_ylabel(r'$L_s$ (mH/km)')
+        ax2.set_ylabel(r'$L_{cs}$ (mH/km)')
         ax2.grid(True, which='both', linestyle='--', linewidth=0.5)
         ax2.set_title('Series Inductance, $L_{cs}$')
         plt.tight_layout(rect=[0, 0, 1, 0.96])

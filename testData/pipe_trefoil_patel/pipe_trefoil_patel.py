@@ -20,11 +20,10 @@ except IndexError:
 
 # --- Import custom modules ---
 try:
-    # Utility to load parameters from the .json file
+    from utils.case_utils import *
     from models import pipe_type 
     from mtl_main.graphics import MTLRepresentation
     from mtl_main.source import MulticonductorTransmissionLine
-    from utils.case_utils import load_json_parameters
     print("Core modules imported successfully.")
 except ImportError as e:
     print(f"Error importing modules: {e}")

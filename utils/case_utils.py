@@ -8,6 +8,13 @@ import scipy.special as ss
 from pathlib import Path
 from typing import Optional
 
+UNITS_DATA = {
+    'meter':      {'scale': 1,       'label': 'm'},
+    'centimeter': {'scale': 100,     'label': 'cm'},
+    'millimeter': {'scale': 1000,    'label': 'mm'},
+    'mil':        {'scale': 39370.1, 'label': 'mil'},
+}
+
 def complex_formatter(x):
     """ Format complex numbers in scientific notation."""
     if x == 0:

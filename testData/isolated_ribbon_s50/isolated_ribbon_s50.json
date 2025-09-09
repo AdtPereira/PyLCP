@@ -1,0 +1,21 @@
+{
+  "type": "coated_wires",
+  "name": "Isolated Ribbon coated-wire line s50",
+  "note": "Original Paul (2008) problem",
+  "arrangement": {
+    "unit": "mil",
+    "type": "ribbon",
+    "num_conductors": 3,
+    "spacing": 50,
+    "fourier_order": 4,
+    "idx_ref_conductor": 0
+  },
+  "conductor": {
+    "outer_radius": 7.50,
+    "conductivity_S_per_m": 5.952381E7,
+    "insulation": {
+      "thickness": 10.0,
+      "relative_permittivity": 3.5
+      }
+    }
+}

@@ -1,0 +1,21 @@
+{
+  "type": "coated_wires",
+  "name": "Isolated Bifilar coated-wire line s40",
+  "note": "Modified Clements (1974) problem with conductor radii rw = 10mm and spacing s = 40 mm",
+  "arrangement": {
+    "unit": "meter",
+    "type": "flat",
+    "num_conductors": 2,
+    "spacing": 0.040,
+    "fourier_order": 10,
+    "idx_ref_conductor": 0
+  },
+  "conductor": {
+    "outer_radius": 0.010,
+    "conductivity_S_per_m": 5.952381E7,
+    "insulation": {
+        "thickness": 0.010,
+        "relative_permittivity": 3.0
+    }
+  }
+}

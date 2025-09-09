@@ -20,8 +20,8 @@ except IndexError:
 
 # --- Import custom modules ---
 try:
-    from utils.case_utils import load_json_parameters
-    from analyzer.plotter_deConti_models import DeContiModels
+    from utils.case_utils import *
+    from plotter.deConti_models import DeContiModels
     from models import single_core_cables as scc 
     from mtl_main.graphics import MTLRepresentation
     from mtl_main.source import MulticonductorTransmissionLine

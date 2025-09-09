@@ -11,9 +11,8 @@ from mtl_main.source import MulticonductorTransmissionLine
 from mtl_paul.py_fortran import FortranRunner
 from analytical_forms.isolated_wires import WiresHomogeneousMedia
 from mom_so.quasi_static_green import QuasiStatic
-from mom_so.lossless_medium import HomogeneousLosslessMedium, LosslessPostProcessing
+from mom_so.lossless_medium_vector import HomogeneousLosslessMedium, LosslessPostProcessing
 from mom.bare_wire_systems import MulticonductorBareWireSystems
-
 
 class BifilarBareWirePULParameters:
     """
@@ -280,20 +279,34 @@ class BifilarBareWirePULParameters:
         """
         print("\n=============   MoM-SO HomogeneousLosslessMedium   =============")
 
-        green_matrix = QuasiStatic(self.mtl_copy).green_matrix()
-        post_processor = LosslessPostProcessing(self.mtl_copy)
+        mtl_model = MulticonductorTransmissionLine(self.mtl_copy)
+        numerical_freqs = self.freq_range['mom']
 
-        for freq in self.freq_range['mom']:
-            mom_so = HomogeneousLosslessMedium(self.mtl_copy, freq)
-            zs = post_processor.z_total(mom_so.z_partial(green_matrix))
-            general_cap = mom_so.generalized_capacitance_matrix(green_matrix)
-            maxwell_cap = mom_so.maxwellian_capacitance_matrix(general_cap)
+        # The Green's matrix is frequency-independent
+        green_matrix = QuasiStatic(mtl_model).green_matrix()
+        
+        # Instantiate the model ONCE with the full array of numerical frequencies
+        mom_so = HomogeneousLosslessMedium(mtl_model, numerical_freqs)
+        post_processor = LosslessPostProcessing(mtl_model)
+
+        # Calculate partial impedance for all frequencies
+        z_partial_stack = mom_so.z_partial(green_matrix)
+        
+        # Calculate total series impedance for all frequencies
+        zs_stack = post_processor.z_total(z_partial_stack)
+        
+        # Calculate series resistance and inductance for all frequencies
+        rs_stack = post_processor.rs_matrix(zs_stack)
+        ls_stack = post_processor.ls_matrix(zs_stack, numerical_freqs)
+        general_cap = mom_so.generalized_capacitance_matrix(green_matrix)
+        maxwell_cap = mom_so.maxwellian_capacitance_matrix(general_cap)
             
+        for i, freq in enumerate(numerical_freqs):
             self.mom_so_data[freq] = {
-                'zs':   zs,
-                'rs':   self.r_factor * post_processor.rs_matrix(zs).item(),
-                'ls':   self.l_factor * post_processor.ls_matrix(zs, freq).item(),
-                'c':    self.c_factor * np.real(maxwell_cap.item()),
+                'zs': zs_stack[i].item(),
+                'rs': rs_stack[i].item() * self.r_factor,
+                'ls': ls_stack[i].item() * self.l_factor,
+                'c': np.real(maxwell_cap.item()) * self.c_factor,
             }
 
         if green_matrix.shape[0] < 6:
@@ -349,8 +362,8 @@ class BifilarBareWirePULParameters:
             self._prepare_fortran_runner(mtl_local)
             self.runner.run_fortran(self.fortran_base_params)
 
-            green_matrix = QuasiStatic(mtl_local).green_matrix()
-            mom_so = HomogeneousLosslessMedium(mtl_local, frequency=0)
+            green_matrix = QuasiStatic(mtl_model).green_matrix()
+            mom_so = HomogeneousLosslessMedium(mtl_model, frequencies=np.array([0]))
             gen_cap = mom_so.generalized_capacitance_matrix(green_matrix)
             capacitance = mom_so.maxwellian_capacitance_matrix(gen_cap)
 
@@ -389,8 +402,8 @@ class BifilarBareWirePULParameters:
             mom_bare_wires.run_simulation()
 
             # === MoM-SO Instance ===
-            green_matrix = QuasiStatic(temp_mtl).green_matrix()
-            mom_so = HomogeneousLosslessMedium(temp_mtl, frequency=0)
+            green_matrix = QuasiStatic(mom_bare_wires_model).green_matrix()
+            mom_so = HomogeneousLosslessMedium(mom_bare_wires_model, frequencies=np.array([0]))
             general_cap = mom_so.generalized_capacitance_matrix(green_matrix)
             maxwell_cap = mom_so.maxwellian_capacitance_matrix(general_cap)
             
@@ -466,6 +479,7 @@ class BifilarBareWirePULParameters:
             analytical (dict): Dicionário com os resultados da simulação analítica.
             mom_so (dict): Dicionário com os resultados da simulação MoM-SO.
         """
+        
         capacitante_data = {
             'mom':      {'data': (self.freq_range.get('mom'), [data['c']        for data in self.mom_data.values()]),        'label': 'MoM'},
             'ribbon':   {'data': (self.freq_range.get('mom'), [data['c']        for data in self.ribbon_data.values()]),     'label': 'RIBBON.FOR'},

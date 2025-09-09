@@ -48,6 +48,7 @@ class MulticonductorTransmissionLine:
         self.mu = None
         self.sigma = None
         self.epsilon = None    
+        self.epsilon_out = None    
         self.num_sc_cables = None
         self.num_conductors_per_scc = None
         self.d_matrix_ground_return = None

@@ -25,7 +25,7 @@ try:
     from mtl_main.graphics import MTLRepresentation
     from mtl_main.source import MulticonductorTransmissionLine
     from analytical_forms.overhead_lines import InternalPerUnitParameters
-    from analyzer.plotter_deConti_models import InternalLinesModels
+    from plotter.deConti_models import InternalLinesModels
     print("Core modules imported successfully.")
 except ImportError as e:
     print(f"Error importing modules: {e}")

@@ -153,7 +153,7 @@ class InternalPerUnitParameters:
     The calculations are vectorized over the frequency axis for efficiency.
     """
 
-    def __init__(self, model: MulticonductorTransmissionLine, f: np.ndarray):
+    def __init__(self, model: MulticonductorTransmissionLine, frequencies: np.ndarray):
         """
         Initializes the vectorized calculator.
 
@@ -165,7 +165,7 @@ class InternalPerUnitParameters:
         # self.num_sc_cables, self.num_conductors_per_scc = model._count_scc_and_conductors()
         
         # Store the frequency array
-        self.f = np.asarray(f)
+        self.f = np.asarray(frequencies)
         self.num_freq = len(self.f)
 
         # Angular frequency (rad/s) is now a vector

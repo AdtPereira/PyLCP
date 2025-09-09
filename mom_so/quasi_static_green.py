@@ -16,11 +16,13 @@ REFERENCES:
 import math
 import numpy as np
 from scipy.integrate import quad
-from mtl_main.source import MulticonductorTransmissionLine as MTL
+from mtl_main.source import MulticonductorTransmissionLine
 
-
-class QuasiStatic(MTL):
+class QuasiStatic():
     """ This class contains the Quasi-Static Green's matrix G of the system. """
+
+    def __init__(self, model: MulticonductorTransmissionLine):
+        self.model = model
 
     # Auxiliary Vector distance [np.array]
     # Equation B.29 [1]
@@ -56,8 +58,8 @@ class QuasiStatic(MTL):
             """ This function calculates the integrand of the function f_n(theta) """
 
             fn = 0
-            rp = self.contour_vector_position(self.surfaces, theta, p)
-            rq = self.contour_vector_position(self.surfaces, theta_prime, q)
+            rp = self.model.contour_vector_position(self.model.surfaces, theta, p)
+            rq = self.model.contour_vector_position(self.model.surfaces, theta_prime, q)
             R = np.linalg.norm(rp - rq)
 
             if R != 0:
@@ -110,12 +112,12 @@ class QuasiStatic(MTL):
         """
 
         # Surfaces radii [float]
-        ap = self.surfaces[p]['radius']
-        aq = self.surfaces[q]['radius']
+        ap = self.model.surfaces[p]['radius']
+        aq = self.model.surfaces[q]['radius']
 
         # Auxiliary vector of distances and angles [np.array]
         # PAG. 125 [1]
-        dqp, x_qp, y_qp, theta_qp = self.distance_vector_dqp(self.surfaces, p, self.surfaces, q)
+        dqp, x_qp, y_qp, theta_qp = self.distance_vector_dqp(self.model.surfaces, p, self.model.surfaces, q)
 
         # Auxiliary variable alfa [int]
         # PAG. 126 [1]
@@ -279,7 +281,7 @@ class QuasiStatic(MTL):
 
         # Auxiliary vector of distances and angles [np.array]
         # PAG. 125 [1]
-        dqp, xqp, yqp, theta_qp = self.distance_vector_dqp(self.surfaces, p, self.surfaces, q)
+        dqp, xqp, yqp, theta_qp = self.distance_vector_dqp(self.model.surfaces, p, self.model.surfaces, q)
 
         # Green's function G_{n',0}^{p,q} [float]
         if p != q and n == 0:
@@ -330,20 +332,20 @@ class QuasiStatic(MTL):
         """ Computes the full Green's matrix for the given set of conductors """
 
         # Define the full Green's matrix
-        g_matrix = np.zeros((self.N, self.N), dtype=complex)
+        g_matrix = np.zeros((self.model.N, self.model.N), dtype=complex)
 
         # Create an offset array to keep track of the starting index for each block
-        offsets = np.cumsum([0] + [2 * Np['fourier_order'] + 1 for Np in self.surfaces[:-1]])
+        offsets = np.cumsum([0] + [2 * Np['fourier_order'] + 1 for Np in self.model.surfaces[:-1]])
 
         # Number of conductor surfaces [int]
-        ns = len(self.surfaces)
+        ns = len(self.model.surfaces)
 
         for p in range(ns):
             # Offset for the p-th conductor [int]
             off_p = offsets[p]
 
             # Number of surface points for the p-th surface [int]
-            Np = self.surfaces[p]['fourier_order']
+            Np = self.model.surfaces[p]['fourier_order']
 
             for q in range(ns):
 
@@ -351,7 +353,7 @@ class QuasiStatic(MTL):
                 off_q = offsets[q]
 
                 # Number of surface points for the q-th surface [int]
-                Nq = self.surfaces[q]['fourier_order']
+                Nq = self.model.surfaces[q]['fourier_order']
 
                 for n_prime in range(-Np, Np + 1):
                     for n in range(-Nq, Nq + 1):
