@@ -41,55 +41,46 @@ def main():
     mtl_model = MulticonductorTransmissionLine(model)
 
     # --- VECTORIZED CALCULATION ---
-    # Define the frequency arrays
     analytical_freqs = np.logspace(0, 6, num=200)
     numerical_freqs = np.logspace(0, 6, num=40)
     
+    # Analytical Formulation (Ametani et al., 2015)
+    print("Calculating internal parameters for all frequencies...")
+    internal = InternalPerUnitParameters(mtl_model, analytical_freqs)
+    
+    # MoM-SO formulation (Patel, 2014)
+    print("Iniciando rotina numérica vetorizada (MoM-SO)...")
+    green_matrix = QuasiStatic(mtl_model).green_matrix()
+    mom_so = HomogeneousLosslessMedium(mtl_model, numerical_freqs)
+    post_processor = LosslessPostProcessing(mtl_model)
+    z_partial_stack = mom_so.z_partial(green_matrix)    # Partial impedance matrix
+    zs_stack = post_processor.z_total(z_partial_stack)  # Total series impedance matrix
+    
+    # Populate the pul_data dictionary 
     pul_data = {
-        'frequencies': {
-            'analytical': analytical_freqs,
-            'numerical': numerical_freqs
+        'analytical': {
+            "frequencies": analytical_freqs,
+            "internal_parameters": {
+                "bessel": internal.parameters_by_bessel(),
+                "approximation": internal.parameters_approximation()
+            },
+            "internal_impedance_matrix": {
+                "bessel": internal.internal_matrices(internal_form='bessel')['impedance_matrix'],
+                "approximation": internal.internal_matrices(internal_form='approximation')['impedance_matrix']
+            }
+        },
+        'numerical': {
+            "frequencies": numerical_freqs,
+            "partial_impedance_matrix": z_partial_stack,
+            "series_impedance_matrix": zs_stack,
+            "series_resistance_matrix": post_processor.rs_matrix(zs_stack),
+            "series_inductance_matrix": post_processor.ls_matrix(zs_stack, numerical_freqs)
         }
     }
 
-    # 1. Calculate internal parameters ONCE, as the cable geometry is the same for all scenarios.
-    print("Calculating internal parameters for all frequencies...")
-    internal = InternalPerUnitParameters(mtl_model, analytical_freqs)
-    pul_data['internal_parameters'] = internal.parameters_by_bessel()
-    pul_data['internal_parameters'] = internal.parameters_approximation()
-    print("Internal parameters calculated.")
-
-    # 2. Perform numerical calculation for all frequencies at once.
-    print("Iniciando rotina numérica vetorizada (MoM-SO)...")
-    
-    # The Green's matrix is frequency-independent
-    green_matrix = QuasiStatic(mtl_model).green_matrix()
-    
-    # Instantiate the model ONCE with the full array of numerical frequencies
-    mom_so = HomogeneousLosslessMedium(mtl_model, numerical_freqs)
-    post_processor = LosslessPostProcessing(mtl_model)
-
-    # Calculate partial impedance for all frequencies
-    z_partial_stack = mom_so.z_partial(green_matrix)
-    
-    # Calculate total series impedance for all frequencies
-    zs_stack = post_processor.z_total(z_partial_stack)
-    
-    # Calculate series resistance and inductance for all frequencies
-    rs_stack = post_processor.rs_matrix(zs_stack)
-    ls_stack = post_processor.ls_matrix(zs_stack, numerical_freqs)
-
-    # 3. Populate the pul_data dictionary in the expected format for the plotter
-    pul_data['numerical'] = {}
-    for i, freq in enumerate(numerical_freqs):
-        pul_data['numerical'][freq] = {
-            'zs': zs_stack[i],
-            'rs': rs_stack[i],
-            'ls': ls_stack[i]
-        }
-
     print(f"End of the routine! Time spent on simulation: {(time.time() - st):.1f} seconds.\n")
     plotter = PatelModels(pul_data)
+    plotter.internal_impedance_matrix()
     plotter.series_impedance_matrix()
     MTLRepresentation(mtl_model, units='millimeter').isolated_coaxial_cables()
     plt.show()    

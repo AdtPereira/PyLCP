@@ -2,7 +2,7 @@ import subprocess
 import sys
 
 SCRIPTS_TO_RUN = [
-    "testData.hdpe_single_lafaia.hdpe_single_lafaia",
+    "testData.hdpe_225kV_2000mm2.hdpe_225kV_2000mm2",
     "testData.isolated_bifilar_pymon.isolated_bifilar_pymon",
     "testData.isolated_bifilar_s21.isolated_bifilar_s21",
     "testData.isolated_bifilar_s40.isolated_bifilar_s40",
@@ -13,9 +13,9 @@ SCRIPTS_TO_RUN = [
     "testData.ohtl_single_lima.ohtl_single_lima",
     "testData.ohtl_single_xue.ohtl_single_xue",
     "testData.pipe_trefoil_patel.pipe_trefoil_patel",
+    "testData.scc_138kV_prysmian.scc_138kV_prysmian",
     "testData.scc_flat_deConti.scc_flat_deConti",
     "testData.scc_flat_xue.scc_flat_xue",
-    "testData.scc_prysmian_138kV.scc_prysmian_138kV",
     "testData.scc_single_deConti.scc_single_deConti",
 ]
 

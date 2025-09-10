@@ -1,0 +1,56 @@
+{
+  "type": "HDPE",
+  "name": "225 kV XLPE underground single-core cable under HDPE tube",
+  "note": "An Lafaia et al. (2018) 225 kV XLPE underground cable model.",
+  "arrangement": {
+    "unit": "meter",
+    "type": "single",
+    "num_conductors": 1,
+    "burial_depth": 1.0,
+    "spacing": null,
+    "fourier_order": 4,
+    "idx_ref_conductor": 0
+  },
+  "soil": {
+    "conductivity_S_per_m": 0.01,
+    "relative_permittivity": 10.0
+  },
+  "cable_definition": {
+    "core": {
+      "inner_radius": 0.0,
+      "outer_radius": 0.0284,
+      "conductivity_S_per_m": 5.681818e7,
+      "insulation": {
+        "type": "core insulation",
+        "thickness": 0.0280,
+        "relative_permittivity": 2.5,
+        "delta_tangent": 0.0008
+      },
+      "enclosure": null
+    },
+    "sheath": {
+      "inner_radius": 0.0564,
+      "outer_radius": 0.0572,
+      "conductivity_S_per_m": 3.521127e7,
+      "insulation": {
+        "type": "outer insulation",
+        "thickness": 0.005,
+        "relative_permittivity": 2.5,
+        "delta_tangent": 0.001
+      },
+      "enclosure": {
+        "type": "HDPE",
+        "inner_radius": 0.09925,
+        "outer_radius": 0.11250,
+        "relative_permittivity": 2.5,
+        "delta_tangent": 0.001,
+        "insulation": {
+          "type": "air",
+          "thickness": null,
+          "relative_permittivity": 1.0
+        }
+      }
+    }
+  }
+}
+

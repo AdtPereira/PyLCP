@@ -22,13 +22,17 @@ class MTLRepresentation:
             'XLPE': 'lightblue',
             'sheath': 'darkgreen',
             'HDPE': 'lightgreen',
-            'enclosure': 'darkgray', # Renamed for clarity in plot
+            'core insulation': 'lightblue',
+            'outer insulation': 'lightyellow',
+            'insulation': 'white',
+            'enclosure': 'darkgray',
             'soil': 'tan',
-            'air_gap': 'white', # New color for air
-            'default': 'lightgray',
-            'insulation': 'lightcoral',
+            'air_gap': 'white',
             'return': 'brown',
-        }        
+            'default': 'lightgray'
+        }
+        
+        self.figsize = (12, 5)
 
     def _finalize_plot(self, ax, title=""):
         """Applies final settings to a matplotlib axes object."""
@@ -50,7 +54,7 @@ class MTLRepresentation:
         """
         This function plots the geometry of wires with insulating coating.
         """
-        _, ax = plt.subplots(figsize=(8, 5))   
+        _, ax = plt.subplots(figsize=self.figsize)   
 
         for conductor in reversed(self.model.mtl.values()):
             conductor_radius = conductor['radius'][1] * self.unit_factor
@@ -83,7 +87,7 @@ class MTLRepresentation:
         core = self.model.mtl[1]
 
         # Create the plot and axes
-        _, ax = plt.subplots(figsize=(8, 5))
+        _, ax = plt.subplots(figsize=self.figsize)
         
         # --- Define Radii and Center (applying scale factor) ---
         center = np.array(core['center_point']) * self.unit_factor        
@@ -136,7 +140,7 @@ class MTLRepresentation:
         helper methods for plotting, annotation, and finalization.
         """
         # 1. Initialization
-        _, ax = plt.subplots(figsize=(12, 6))
+        _, ax = plt.subplots(figsize=self.figsize)
         used_labels = set()
 
         # 2. Calculate schematic parameters based on the model
@@ -161,7 +165,7 @@ class MTLRepresentation:
         helper methods for plotting, annotation, and finalization.
         """
         # 1. Initialization
-        _, ax = plt.subplots(figsize=(12, 5))
+        _, ax = plt.subplots(figsize=self.figsize)
         used_labels = set()
 
         # 2. Calculate schematic parameters based on the model

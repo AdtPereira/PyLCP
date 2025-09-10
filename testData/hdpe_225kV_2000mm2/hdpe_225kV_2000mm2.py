@@ -21,7 +21,6 @@ except IndexError:
 # --- Import custom modules ---
 try:
     from utils.case_utils import *
-    from models import pipe_type 
     from mtl_main.graphics import MTLRepresentation
     from mtl_main.source import MulticonductorTransmissionLine
     from models.scc import SingleCoreCableModelGenerator
@@ -51,6 +50,5 @@ def main():
     MTLRepresentation(mtl_model, units='millimeter').ground_return_systems()
     plt.show()
     
-
 if __name__ == "__main__":
     main()

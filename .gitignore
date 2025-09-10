@@ -4,6 +4,7 @@ __pycache__/
 *.IN
 *.DAT
 *.log
+*.mph
 
 Results/
 logs/
