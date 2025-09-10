@@ -22,7 +22,7 @@ except IndexError:
 try:
     from utils.case_utils import *
     from plotter.deConti_models import DeContiModels
-    from models import single_core_cables as scc 
+    from models.scc import SingleCoreCableModelGenerator
     from mtl_main.graphics import MTLRepresentation
     from mtl_main.source import MulticonductorTransmissionLine
     from analytical_forms.single_core_cable import PerUnitParameters
@@ -35,7 +35,8 @@ def main():
     """ Main function to run the simulation and plotting using vectorized calculations. """
     st = time.time()    
     input_json = load_json_parameters(__file__, show_content=True)
-    model = scc.three_phase_flat_model(input_json)
+    model_generator = SingleCoreCableModelGenerator(input_json)
+    model = model_generator.generate_underground_model(show_model=True)
     
     # Define models for different physical scenarios
     flat_model = copy.deepcopy(model)

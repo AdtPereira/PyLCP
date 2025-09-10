@@ -12,7 +12,6 @@ from mtl_paul.py_fortran import FortranRunner
 from analytical_forms.isolated_wires import WiresHomogeneousMedia
 from mom.coated_wire_systems import MulticonductorCoatedWireSystems
 
-
 class BifilarCoatedWirePULParameters:
     """
     Encapsula a lógica para executar e analisar o estudo de convergência
@@ -47,6 +46,7 @@ class BifilarCoatedWirePULParameters:
         self.c_factor = 1e12  # F/m to nF/km
         self.l_factor = 1e6   # H/m to mH/km
         self.r_factor = 1e3   # Ohm/m to Ohm/km
+        self.figsize = (12, 5)
         self.pt1 = 63
         self.pt2 = 10
 
@@ -377,7 +377,7 @@ class BifilarCoatedWirePULParameters:
             'analytical':   {'data': (self.freq_range.get('ana'), [data['ls']           for data in self.srw_data.values()]), 'label': '$\ell_s$'},
         }
 
-        fig, ax = plt.subplots(figsize=(8, 5))
+        fig, ax = plt.subplots(figsize=self.figsize)
         self._configure_plot_appearance(ax, 'Series Inductance p.u.l. (mH/km)', inductance_data, yscale='linear')
         plt.tight_layout()
 
@@ -401,7 +401,7 @@ class BifilarCoatedWirePULParameters:
             'bifilar':  {'data': (self.freq_range.get('ana'), [data['c_approx'] for data in self.srw_data.values()]), 'label': 'Bifilar (Approx.)'},
         }
 
-        fig, ax = plt.subplots(figsize=(8, 5))
+        fig, ax = plt.subplots(figsize=self.figsize)
         self._configure_plot_appearance(ax, 'Capacitance p.u.l. (nF/km)', capacitante_data, yscale='linear')
         plt.tight_layout()
 
@@ -426,7 +426,7 @@ class BifilarCoatedWirePULParameters:
             'approx':       {'data': (self.srw_ratios.get('ana'), [data['c_approx']     for data in self.srw_data.values()]),     'label': 'Approx.'},
         }
 
-        fig, ax = plt.subplots(figsize=(8, 5))
+        fig, ax = plt.subplots(figsize=self.figsize)
         for key, data in capacitante_data.items():
             freq, value = data['data']
             label = data['label']
@@ -476,7 +476,7 @@ class BifilarCoatedWirePULParameters:
             return
 
         plt.style.use('default')
-        fig, ax = plt.subplots(figsize=(8, 5))
+        fig, ax = plt.subplots(figsize=self.figsize)
 
         # Plotagem dos dados do FORTRAN
         fortran_nf_axis = self.results_df.index + 1
@@ -530,7 +530,7 @@ class BifilarCoatedWirePULParameters:
 
         plt.style.use('default')
         # Cria uma figura com dois subplots (1 linha, 2 colunas)
-        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5), sharey=True)
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=self.figsize, sharey=True)
         # fig.suptitle('')
 
         fortran_nf_axis = self.results_df.index + 1
@@ -596,7 +596,7 @@ class BifilarCoatedWirePULParameters:
             return
 
         plt.style.use('default')
-        fig, ax = plt.subplots(figsize=(8, 5))
+        fig, ax = plt.subplots(figsize=self.figsize)
         fortran_nf_axis = self.results_df.index + 1
         python_nf_axis = 2 * self.results_df.index + 1
         max_nf_fortran = fortran_nf_axis.max()

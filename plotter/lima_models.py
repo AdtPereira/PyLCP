@@ -17,6 +17,8 @@ class LimaModels:
         self.pul_data = pul_parameters
         self.f = pul_parameters['frequencies']
         self.w = 2 * np.pi * self.f
+
+        self.figsize = (12, 5)
         
         suptitle_suffix = (
             'of the single overhead line\n'
@@ -103,7 +105,7 @@ class LimaModels:
     def _propagation_constant_subplots(self, config_key):
         config = self.plot_configs[config_key]
         p, q = config['p'], config['q']
-        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5), sharey=False)
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=self.figsize, sharey=False)
         fig.suptitle(config['suptitle'], fontsize=12, y=0.98)
 
         for series in config['series_to_plot']:
@@ -137,7 +139,7 @@ class LimaModels:
     def _characteristic_impedance_subplots(self, config_key):
         config = self.plot_configs[config_key]
         p, q = config['p'], config['q']
-        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5), sharey=False)
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=self.figsize, sharey=False)
         fig.suptitle(config['suptitle'], fontsize=12, y=0.98)
 
         for series in config['series_to_plot']:

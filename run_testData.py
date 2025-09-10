@@ -2,6 +2,7 @@ import subprocess
 import sys
 
 SCRIPTS_TO_RUN = [
+    "testData.hdpe_single_lafaia.hdpe_single_lafaia",
     "testData.isolated_bifilar_pymon.isolated_bifilar_pymon",
     "testData.isolated_bifilar_s21.isolated_bifilar_s21",
     "testData.isolated_bifilar_s40.isolated_bifilar_s40",

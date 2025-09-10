@@ -28,50 +28,63 @@ import numpy as np
 import scipy.constants as sc
 from scipy.special import jv, jvp, h1vp, h2vp
 from scipy.linalg import lu_factor, lu_solve, inv
-from mtl_main.source import MulticonductorTransmissionLine as MTL
+from mtl_main.source import MulticonductorTransmissionLine
 
+class HomogeneousLosslessMedium():
+    """
+    This class contains the frequency-dependent parameters of the system.
+    It is designed to perform vectorized calculations over an array of frequencies.
+    """
 
-class HomogeneousLosslessMedium(MTL):
-    """ This class contains the frequency-dependent parameters of the system. """
+    def __init__(self, model: MulticonductorTransmissionLine, frequencies: np.ndarray):
+        self.model = model
 
-    def __init__(self, mtl, frequency):
-        super().__init__(mtl)
+        # Ensure frequencies is a numpy array
+        self.frequencies = np.asarray(frequencies)
+        
+        # Angular frequency [np.ndarray of shape (n_freqs,)]
+        self.w = 2 * np.pi * self.frequencies
 
-        # Angular frequency [float]
-        self.w = 2 * np.pi * frequency
+        # To enable broadcasting, we reshape frequency-dependent arrays to (n_freqs, 1)
+        # and conductor-dependent arrays to (1, n_conductors).
+        w_col = self.w[:, np.newaxis]
+        mu_row = self.model.mu[np.newaxis, :]
+        epsilon_row = self.model.epsilon[np.newaxis, :]
+        sigma_row = self.model.sigma[np.newaxis, :]
+        epsilon_out_row = self.model.epsilon_out[np.newaxis, :]
 
-        # Conductors wave-number [float]
-        self.k = np.sqrt(self.w * self.mu * (self.w * self.epsilon - 1j * self.sigma))
+        # Conductors wave-number [np.ndarray of shape (n_freqs, n_conductors)]
+        self.k = np.sqrt(w_col * mu_row * (w_col * epsilon_row - 1j * sigma_row))
 
-        # Free-space wave-number [float]
-        self.kout = self.w * np.sqrt(self.mu * self.epsilon_out)
+        # Free-space wave-number [np.ndarray of shape (n_freqs, n_conductors)]
+        self.kout = w_col * np.sqrt(mu_row * epsilon_out_row)
 
     # Surface admittance operator [np.array]
     # Equation (2.20) [1]
+    # CHANGED: Now returns a vector of results, one for each frequency.
     def ynp_for_solid(self, n, p):
         """
         This method calculates the surface admittance operator for a solid conductor, Yn(p).
-
-        Parameters:
-            n (int): The order of the Bessel function.
-            p (int): The index of the conductor.
-
-        Returns:
-            list: The surface admittance operator Yn_p.
+        It is vectorized to compute for all frequencies at once.
         """
-        outer_radius = np.array([c['radius'][1] for c in self.mtl.values()])
+        outer_radius = np.array([c['radius'][1] for c in self.model.mtl.values()])
 
-        k_ap = self.k[p] * outer_radius[p]
-        k0_ap = self.kout[p] * outer_radius[p]
-        mu = self.mu[p]
+        # k and kout are now 2D arrays (freqs, conductors). We select the column for conductor p.
+        k_ap = self.k[:, p] * outer_radius[p]
+        k0_ap = self.kout[:, p] * outer_radius[p]
+        mu = self.model.mu[p]
         n = np.abs(n)
+        
+        # scipy.special functions are ufuncs and work element-wise on numpy arrays.
         term_1 = k_ap * jvp(n, k_ap) / mu / jv(n, k_ap)
         term_2 = k0_ap * jvp(n, k0_ap) / sc.mu_0 / jv(n, k0_ap)
 
-        return 2 * np.pi / 1j / self.w * (term_1 - term_2)
+        # self.w is a 1D array, so the operation is vectorized.
+        return 2 * np.pi / (1j * self.w) * (term_1 - term_2)
 
     # chi_n function [int]
     # Equation (11) [3]
+    # NOTE: This function is naturally vectorized as scipy special functions operate element-wise.
     def chi_n(self, n, alfa, beta):
         """
         This function calculates the qui_n function.
@@ -90,7 +103,7 @@ class HomogeneousLosslessMedium(MTL):
         term_2 = h2vp(n, beta) * h1vp(n, alfa, 0)
         return beta * (term_1 - term_2)
 
-    # mu_n function [int]
+    # eme_n function [int]
     # Equation (12) [3]
     def eme_n(self, n, alfa, beta):
         """
@@ -113,51 +126,36 @@ class HomogeneousLosslessMedium(MTL):
     # Surface admittance operator for hollow conductors [np.array]
     # Equation (2.31) [1]
     # Equation (10) [3]
+    # CHANGED: Now returns a 2x2 matrix where each element is a vector of results.
     def ynp_for_hollow(self, n, cp):
-        """
-        This method calculates the surface admittance operator 
-        for a hollow conductor, Yn(p).
-
-        Parameters:
-            n (int): The order of the Bessel function.
-            p (int): The index of the conductor.
-
-        Returns:
-            list: The surface admittance operator Yn_p.
-        """
-
-        # inner and outer radii [float]
-        inner_radius = np.array([c['radius'][0] for c in self.mtl.values()])
-        outer_radius = np.array([c['radius'][1] for c in self.mtl.values()])
+        inner_radius = np.array([c['radius'][0] for c in self.model.mtl.values()])
+        outer_radius = np.array([c['radius'][1] for c in self.model.mtl.values()])
         ap = outer_radius[cp]
         bp = inner_radius[cp]
 
-        # Bessel arguments [float]
-        kap = self.k[cp] * ap
-        kbp = self.k[cp] * bp
-        kout_ap = self.kout[cp] * ap
-        kout_bp = self.kout[cp] * bp
+        # Arguments are now 1D arrays of shape (n_freqs,)
+        kap = self.k[:, cp] * ap
+        kbp = self.k[:, cp] * bp
+        kout_ap = self.kout[:, cp] * ap
+        kout_bp = self.kout[:, cp] * bp
 
-        # Permeability of the medium [float]
-        mu = self.mu[cp]
+        mu = self.model.mu[cp]
 
-        # Matrix elements [float]
-        #try:
+        # Matrix elements will be 1D arrays
         y11_n = self.chi_n(n, kap, kbp) / self.eme_n(n, kap, kbp) / mu - (
             self.chi_n(n, kout_ap, kout_bp) / self.eme_n(n, kout_ap, kout_bp) / sc.mu_0)
-
         y12_n = self.chi_n(n, kout_bp, kout_bp) / self.eme_n(n, kout_ap, kout_bp) / sc.mu_0 - (
             self.chi_n(n, kbp, kbp) / self.eme_n(n, kap, kbp) / mu)
-
         y21_n = self.chi_n(n, kout_ap, kout_ap) / self.eme_n(n, kout_ap, kout_bp) / sc.mu_0 - (
             self.chi_n(n, kap, kap) / self.eme_n(n, kap, kbp) / mu)
-
         y22_n = self.chi_n(n, kbp, kap) / self.eme_n(n, kap, kbp) / mu - (
             self.chi_n(n, kout_bp, kout_ap) / self.eme_n(n, kout_ap, kout_bp) / sc.mu_0)
 
-        # Matrix ynp [np.array]
+        # Stacking results to get a (2, 2, n_freqs) matrix
         matrix = np.array([[y11_n, y12_n], [y21_n, y22_n]])
-        return 2 * np.pi / 1j / self.w * matrix
+        
+        # Reshape self.w for broadcasting
+        return (2 * np.pi / (1j * self.w))[:, np.newaxis, np.newaxis] * np.transpose(matrix, (2, 0, 1))
 
     # Matrix U [np.array]
     # Equation (2.39) [1]
@@ -165,12 +163,12 @@ class HomogeneousLosslessMedium(MTL):
         """ This function calculates the matrix U."""
 
         # Initialize U matrix with zeros
-        u_mtx = np.zeros((self.N, len(self.mtl.values())))
+        u_mtx = np.zeros((self.model.N, len(self.model.mtl.values())))
 
         # Initialize row index
         row_index = 0
 
-        for p, conductor in enumerate(self.mtl.values()):
+        for p, conductor in enumerate(self.model.mtl.values()):
 
             # Number of surface points for the p-conductor
             surf_points = conductor['fourier_order']
@@ -201,64 +199,83 @@ class HomogeneousLosslessMedium(MTL):
 
     # Matrix Ys [np.array]
     # Equation (2.38) [1]
+    # CHANGED: Now builds a 3D matrix Ys of shape (n_freqs, N, N)
     def ys_matrix(self):
         """
-        Fill the Ys matrix based on p (conductor), n (order of filling), and conductor type.
-
-        Parameters:
-        p (int): Conductor
-        n_max (int): Maximum order of filling
-        conductor_type (str): Type of conductor ('solid' or 'hollow')
-
-        Returns:
-        np.ndarray: Ys matrix
+        Builds the block-diagonal Ys matrix for all frequencies at once.
+        The resulting matrix has the shape (n_frequencies, N, N).
         """
-
-        blocks = []
-
-        for p, conductor in enumerate(self.mtl.values()):
-            Np = conductor['fourier_order'] # pylint: disable=invalid-name
-
-            if conductor['radius'][0] == 0:
-                for n in range(-Np, Np + 1):
-                    ynp = np.array([[self.ynp_for_solid(n, p)]])
-                    blocks.append(ynp)
-
-            elif conductor['radius'][0] > 0:
-                for n in range(-Np, Np + 1):
-                    ynp = self.ynp_for_hollow(n, p)
-                    blocks.append(ynp)
-
+        n_freqs = len(self.frequencies)
+        ys_3d = np.zeros((n_freqs, self.model.N, self.model.N), dtype=np.complex128)
+        
+        current_idx = 0
+        for p, conductor in enumerate(self.model.mtl.values()):
+            Np = conductor['fourier_order']
+            
+            if conductor['radius'][0] == 0:  # Solid conductor
+                block_size = 1
+                num_blocks = 2 * Np + 1
+                for n_idx, n in enumerate(range(-Np, Np + 1)):
+                    ynp_vec = self.ynp_for_solid(n, p) # shape (n_freqs,)
+                    start = current_idx + n_idx
+                    # Assign the vector to the diagonal for all frequencies
+                    ys_3d[:, start, start] = ynp_vec
+                current_idx += num_blocks
+            
+            elif conductor['radius'][0] > 0:  # Hollow conductor
+                block_size = 2
+                num_blocks = 2 * Np + 1
+                for n_idx, n in enumerate(range(-Np, Np + 1)):
+                    # ynp_mat has shape (n_freqs, 2, 2)
+                    ynp_mat = self.ynp_for_hollow(n, p)
+                    start = current_idx + n_idx * block_size
+                    end = start + block_size
+                    # Assign the 2x2 block for all frequencies
+                    ys_3d[:, start:end, start:end] = ynp_mat
+                current_idx += num_blocks * block_size
+                
             else:
-                raise ValueError(
-                    "Unknown conductor type. Use 'solid' or 'hollow'.")
+                raise ValueError("Unknown conductor type.")
 
-        return self.create_diagonal_matrix(blocks)
+        return ys_3d
 
     # Matrix Z [np.array]
     # Equation (2.61) [1]
+    # CHANGED: Now loops internally over frequencies because lu_solve is not vectorized.
     def z_partial(self, green_matrix):
         """
-        This function calculates the matrix Z.
-
-        The matrix Z is the impedance matrix of the system.
-
+        Calculates the partial impedance matrix Z for all frequencies.
+        
+        NOTE: A loop is necessary here because scipy.linalg.lu_solve does not
+        support solving a stack of matrices in a vectorized manner.
+        
         Returns:
-        numpy.ndarray: The matrix Z.
+            np.ndarray: A 3D array of shape (n_frequencies, n_conductors, n_conductors).
         """
+        n_freqs = len(self.frequencies)
+        n_conds = len(self.model.mtl.values())
+        
+        # Pre-calculate frequency-dependent and independent matrices
+        ys = self.ys_matrix() # 3D: (n_freqs, N, N)
+        u = self.u_matrix()   # 2D: (N, n_conds)
+        jwu0 = 1j * self.w * sc.mu_0 # 1D: (n_freqs,)
+        
+        # Pre-allocate result array
+        z_partial_stack = np.zeros((n_freqs, n_conds, n_conds), dtype=np.complex128)
+        
+        # Loop over each frequency
+        for i in range(n_freqs):
+            # Slicing the 3D matrix to get the 2D matrix for the i-th frequency
+            ys_slice = ys[i, :, :]
+            jwu0_scalar = jwu0[i]
+            
+            matrix = np.eye(self.model.N) - jwu0_scalar * (ys_slice @ green_matrix)
+            lu, piv = lu_factor(matrix)
 
-        jwu0 = 1j * self.w * sc.mu_0
-        ys = self.ys_matrix()
-        u = self.u_matrix()
-
-        # Perform LU factorization of the matrix M
-        matrix = np.eye(self.N) - jwu0 * (ys @ green_matrix)
-        lu, piv = lu_factor(matrix)
-
-        # Solve the linear system Mx = b for Ys
-        solution = lu_solve((lu, piv), ys @ u)
-
-        return u.T @ solution
+            solution = lu_solve((lu, piv), ys_slice @ u)
+            z_partial_stack[i, :, :] = u.T @ solution
+            
+        return z_partial_stack
 
     # Generalized Capacitance Matrix [np.array]
     def generalized_capacitance_matrix(self, green_matrix):
@@ -290,80 +307,54 @@ class HomogeneousLosslessMedium(MTL):
         uT_gInv_u = u.T @ lu_solve(lu_factor(green_matrix), u)
 
         # Generalized Capacitance Matrix [1]
-        return - self.epsilon[0] * uT_gInv_u
+        return -1 * self.model.epsilon[0] * uT_gInv_u
 
     # Maxwellian Capacitance Matrix [np.array]
-    def maxwellian_capacitance_matrix(self, generalized_capacitance_matrix):
-        """
-        Calcula a matriz de capacitância física (n x n) a partir da matriz de
-        capacitância generalizada ((n+1) x (n+1)), seguindo a Eq. 5.21 de Clayton Paul.
+    def maxwellian_capacitance_matrix(self, generalized_capacitance_matrix: np.ndarray) -> np.ndarray:
+            """
+            Calculates the physical (Maxwellian) capacitance matrix from the
+            generalized matrix using a vectorized approach based on Eq. 5.21 of Clayton Paul.
 
-        A fórmula implementada é:
-        C_ij = c_ij - ( (soma da linha i de c) * (soma da coluna j de c) ) / (soma total de c)
+            The formula C_ij = c_ij - ( (sum of row i) * (sum of col j) ) / (total sum of c)
+            is implemented using NumPy slicing and outer product for efficiency.
+            """
+            gc = generalized_capacitance_matrix
 
-        Onde 'c' é a matriz generalizada e 'C' é a matriz física resultante.
-        Assume-se que o condutor de índice 0 da matriz generalizada é o de referência
-        e está sendo eliminado.
+            # --- Input validation ---
+            assert isinstance(gc, np.ndarray), "Input must be a NumPy array."
+            total_sum = np.sum(gc)
+            assert total_sum != 0, "The total sum of the generalized matrix cannot be zero."
+            assert gc.ndim == 2 and gc.shape[0] == gc.shape[1], "Input must be a square 2D matrix."
+            assert gc.shape[0] >= 2, "The generalized matrix must be at least 2x2."
 
-        Args:
-            matriz_generalizada (np.ndarray): A matriz de capacitância generalizada
-                                            simétrica de ordem (n+1) x (n+1).
-
-        Returns:
-            np.ndarray: A matriz de capacitância física de ordem n x n.
+            # --- Vectorized Calculation ---
             
-        Raises:
-            ValueError: Se a matriz de entrada não for quadrada ou se a soma de
-                        seus elementos for zero.
-        """
+            # Extract the submatrix c_ij (excluding the reference conductor at index 0)
+            c_ij_submatrix = gc[1:, 1:]
 
-        gc = generalized_capacitance_matrix
+            # Calculate sum of rows and columns, excluding the reference conductor
+            row_sums = np.sum(gc, axis=1)[1:]
+            col_sums = np.sum(gc, axis=0)[1:]
 
-        # --- Validação da entrada com assert ---
-        assert isinstance(gc, np.ndarray), "A entrada deve ser um array NumPy."
-        assert np.sum(gc) != 0, "A soma total dos elementos da matriz generalizada não pode ser zero."
-        assert gc.ndim == 2, "A entrada deve ser uma matriz 2D (array de 2 dimensões)."
-        assert gc.shape[0] == gc.shape[1], "A entrada deve ser uma matriz quadrada."
-        assert gc.shape[0] >= 2, "A matriz generalizada deve ser de ordem mínima 2x2."
+            # Calculate the outer product of the row and column sums to create the adjustment matrix
+            adjustment_matrix = np.outer(row_sums, col_sums) / total_sum
+            
+            # Apply the formula in a single vectorized operation
+            matrix_c = c_ij_submatrix - adjustment_matrix
 
-        # Ordem da matriz generalizada (N = n+1)
-        N = gc.shape[0]
+            return matrix_c
 
-        # 2. Numerador: Soma de cada linha e de cada coluna
-        # Para uma matriz simétrica, as somas das linhas e colunas são iguais.
-        row_sum = np.sum(gc, axis=1)     # axis=1 soma ao longo das colunas
-        column_sum = np.sum(gc, axis=0)  # axis=0 soma ao longo das linhas
-
-        # assert np.equal(row_sum, column_sum).all(), "As somas das linhas e colunas devem ser iguais."
-
-        # Inicializa a matriz de capacitância física n x n com zeros
-        matrix_c = np.zeros((N - 1, N - 1), dtype=gc.dtype)
-
-        # Itera sobre os índices da matriz física (de 1 a n na matriz original)
-        # Condutor de índice 0 é o de referência e não é incluído na matriz física
-        for i in range(1, N):
-            for j in range(1, N):
-                c_ij = gc[i, j]
-                row_i_sum = row_sum[i]
-                column_j_sum = column_sum[j]
-                
-                # Eq. 5.21 [2]
-                matrix_c[i - 1, j - 1] = c_ij - (row_i_sum * column_j_sum) / np.sum(gc)
-
-        return matrix_c
-
-
-class LosslessPostProcessing(MTL):
+class LosslessPostProcessing():
     """ This class contains the post-processing parameters for the system. """
 
-    def __init__(self, mtl):
-        super().__init__(mtl)
+    def __init__(self, model: MulticonductorTransmissionLine):
+        self.model = model
 
         # Lista de todos os line_id's presentes no sistema.
-        self.line_id = [conductor['line_id'] for conductor in self.mtl.values()]
+        self.line_id = [conductor['line_id'] for conductor in self.model.mtl.values()]
 
         # Lista de dicionários dos condutores que são do tipo 'active'.
-        self.active_lines = [line for line in self.mtl.values() if line['line_type'] == 'active']
+        self.active_lines = [line for line in self.model.mtl.values() if line['line_type'] == 'active']
 
     # Incident Matrix Q [np.array]
     # Equation (A.2) [1]
@@ -375,10 +366,10 @@ class LosslessPostProcessing(MTL):
         Reference: PAG. 122 [1]
         """
 
-        matrix_q = np.zeros((len(set(self.line_id)), len(self.mtl)))
+        matrix_q = np.zeros((len(set(self.line_id)), len(self.model.mtl)))
 
         for x in range(len(self.line_id)):
-            for y in range(len(self.mtl)):
+            for y in range(len(self.model.mtl)):
                 if x == self.line_id[y]:
                     matrix_q[x, y] = 1
 
@@ -416,7 +407,6 @@ class LosslessPostProcessing(MTL):
         # print("Incident Matrix S.T: \n", matrix_s_transpose)
         return matrix_s_transpose.T
 
-
     # Matrix Z_line [np.array]
     def z_line_matrix(self, z_partial):
         """
@@ -439,51 +429,49 @@ class LosslessPostProcessing(MTL):
 
         return inv(qz_inv_qt)
 
-
     # Matrix Z_full [np.array]
     # Equation (A.12) [1]
-    def z_total(self, z_partial):
+    # CHANGED: Now loops internally over the frequency dimension of z_partial_stack.
+
+    def z_total(self, z_partial_stack):
         """
-        This function calculates the full impedance matrix Z.
+        Calculates the full impedance matrix Zs for all frequencies.
 
-        The full impedance matrix Z is the impedance matrix of the system.
-
+        Parameters:
+            z_partial_stack (np.ndarray): 3D array of partial impedances from HomogeneousLosslessMedium.
+        
         Returns:
-        numpy.ndarray: The full impedance matrix Z.
+            np.ndarray: A 3D array of shape (n_frequencies, n_active_lines, n_active_lines).
         """
+        n_freqs = z_partial_stack.shape[0]
+        n_active = len(self.active_lines)
+        z_total_stack = np.zeros((n_freqs, n_active, n_active), dtype=np.complex128)
 
         s = self.s_incident_matrix()
         q = self.q_incident_matrix()
 
-        # Perform LU factorization of the Z matrix
-        lu, piv = lu_factor(z_partial)
+        # Loop over each frequency's z_partial matrix
+        for i in range(n_freqs):
+            z_partial_slice = z_partial_stack[i, :, :]
+            lu, piv = lu_factor(z_partial_slice)
+            
+            # This is equivalent to S.T @ inv(Q @ inv(Zp) @ Q.T) @ S
+            # Which simplifies to S.T @ (Q Zp^{-1} Q^T)^{-1} @ S
+            # The calculation seems to be different from the equation reference. Assuming the code is correct:
+            # S.T @ (Q Zp^{-1} Q.T) @ S
+            qz_inv_qt = q @ lu_solve((lu, piv), q.T)
+            z_total_stack[i, :, :] = s.T @ qz_inv_qt @ s
 
-        # Solve the linear system Zx = b for Q^T
-        # Calculate the matrix QZ^{-1}Q^T
-        qz_inv_qt = q @ lu_solve((lu, piv), q.T)
-
-        return s.T @ qz_inv_qt @ s
-    
+        return z_total_stack
 
     # Matriz Rs [np.array]
-    def rs_matrix(self, z_total):
-        """
-        This function calculates the series resistance matrix Rs.
-        The series resistance matrix Rs is the real part of the total series impedance matrix.
-
-        Returns:
-        numpy.ndarray: The series resistance matrix Rs.
-        """
-        return np.real(z_total)
-
+    # NOTE: np.real is vectorized, so no changes needed.
+    def rs_matrix(self, z_total_stack):
+        return np.real(z_total_stack)
 
     # Matriz Ls [np.array]
-    def ls_matrix(self, z_total, frequency):
-        """
-        This function calculates the series inductance matrix Ls.
-        The series inductance matrix Ls is the imaginary part of the total series impedance matrix.
-
-        Returns:
-        numpy.ndarray: The series inductance matrix Ls.
-        """
-        return np.imag(z_total) / (2 * np.pi * frequency)
+    # CHANGED: Now accepts frequencies array for vectorized calculation.
+    def ls_matrix(self, z_total_stack, frequencies):
+        w = 2 * np.pi * np.asarray(frequencies)
+        # Reshape w to (n_freqs, 1, 1) for broadcasting with (n_freqs, N, N) matrix
+        return np.imag(z_total_stack) / w[:, np.newaxis, np.newaxis]

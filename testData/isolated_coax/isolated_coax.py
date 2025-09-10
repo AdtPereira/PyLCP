@@ -25,7 +25,7 @@ try:
     from mtl_main.source import MulticonductorTransmissionLine
     from analytical_forms.single_core_cable import InternalPerUnitParameters
     from mom_so.quasi_static_green import QuasiStatic
-    from mom_so.lossless_medium_vector import HomogeneousLosslessMedium, LosslessPostProcessing
+    from mom_so.lossless_medium import HomogeneousLosslessMedium, LosslessPostProcessing
     print("Core modules imported successfully.")
 except ImportError as e:
     print(f"Error importing modules: {e}")

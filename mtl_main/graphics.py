@@ -18,14 +18,17 @@ class MTLRepresentation:
         self.unit_factor = unit_info['scale']
         self.label_unit = unit_info['label']
         self.color_map = {
-            'default': 'grey',
-            'insulation': 'yellow',
-            'core': 'darkgray',
-            'sheath': 'darkgreen',
+            'core': 'gray',
             'XLPE': 'lightblue',
+            'sheath': 'darkgreen',
             'HDPE': 'lightgreen',
-            'pipe': 'lightgrey',
-        }
+            'enclosure': 'darkgray', # Renamed for clarity in plot
+            'soil': 'tan',
+            'air_gap': 'white', # New color for air
+            'default': 'lightgray',
+            'insulation': 'lightcoral',
+            'return': 'brown',
+        }        
 
     def _finalize_plot(self, ax, title=""):
         """Applies final settings to a matplotlib axes object."""
@@ -196,6 +199,8 @@ class MTLRepresentation:
                 radius = c['radius'][1]
                 if 'insulation' in c and c['insulation'] is not None:
                     radius += c['insulation']['thickness']
+                if 'enclosure' in c and c['enclosure'] is not None:
+                    radius = max(radius, c['enclosure']['outer_radius'])
                 if radius > max_radius:
                     max_radius = radius
         
@@ -268,19 +273,19 @@ class MTLRepresentation:
             used_labels (set): A set of labels already used in the legend.
         """
         # Calculate the schematic center point for this specific cable
-        center_point = np.array([
+        cable_center_point = np.array([
             conductor_data['center_point'][0], 
             params['h_factor'] * params['max_radius']
         ]) * self.unit_factor
         
         # Plot the main conductor body
-        outer_radius_m = conductor_data['radius'][1]
-        thickness_m = outer_radius_m - conductor_data['radius'][0]
+        enc_outer_radius_m  = conductor_data['radius'][1]
+        thickness_m = enc_outer_radius_m  - conductor_data['radius'][0]
         label = conductor_data.get('conductor_name', 'Conductor')
         color = self.color_map.get(label, self.color_map['default'])
         
         self._plot_cable_layer(
-            ax, center_point, outer_radius_m, thickness_m,
+            ax, cable_center_point, enc_outer_radius_m , thickness_m,
             color, label, used_labels
         )
         
@@ -291,9 +296,45 @@ class MTLRepresentation:
             ins_color = self.color_map.get(ins_label, self.color_map['insulation'])
             
             self._plot_cable_layer(
-                ax, center_point, outer_radius_m + ins_data['thickness'],
+                ax, cable_center_point, enc_outer_radius_m  + ins_data['thickness'],
                 ins_data['thickness'], ins_color, ins_label, used_labels
             )
+
+        # Plot the enclosure layer if it exists, adjusting for schematic eccentricity
+        if 'enclosure' in conductor_data and conductor_data['enclosure'] is not None:
+            enc_data = conductor_data['enclosure']
+            enc_label = enc_data.get('type', 'HDPE') # Label is often HDPE
+            enc_color = self.color_map.get(enc_label, self.color_map['enclosure'])
+            
+            enc_outer_radius_m  = enc_data['outer_radius']
+            enc_inner_radius_m = enc_data['inner_radius']
+            enc_thickness_m = enc_data['outer_radius'] - enc_data['inner_radius']
+
+            # --- Eccentricity Adjustment for Scaled Plot ---
+            # 1. Get the real-world centers from the model data.
+            real_cable_center = np.array(conductor_data['center_point'])
+            real_enc_center = np.array(enc_data['center_point'])
+            
+            # 2. Calculate the real offset vector between the enclosure and the cable.
+            offset_vector = real_enc_center - real_cable_center
+            
+            # 3. Apply the scaled offset to the cable's schematic center point.
+            #    This preserves the relative position (eccentricity) in the plot.
+            enc_center_point_schematic = cable_center_point + (offset_vector * self.unit_factor)
+            
+            self._plot_cable_layer(
+                ax, enc_center_point_schematic, enc_outer_radius_m , enc_thickness_m,
+                enc_color, f'{enc_label}_enclosure', used_labels
+            )
+
+            # Represent air gap between cable outer surface and enclosure inner surface
+            # The 'air_gap' is between sheath_outer_radius_m and enc_inner_radius_m,
+            # using the enclosure's center point.
+            # if enc_inner_radius_m > sheath_outer_radius_m: # Only if there's an actual gap
+            #     self._plot_filled_circle(
+            #         ax, enc_center_point_schematic, enc_inner_radius_m,
+            #         self.color_map['air_gap'], 'Air (enclosure)', used_labels, zorder=0 # Below enclosure
+            #     )
 
     def _plot_cable_layer(self, ax, center, outer_radius_m, thickness_m, color, label, used_labels):
         """

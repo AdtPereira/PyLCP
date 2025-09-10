@@ -1,0 +1,320 @@
+# -*- coding: utf-8 -*-
+"""
+This script provides an object-oriented, parametric method to generate 
+the MODEL dictionary for various arrangements of single-core cables.
+
+The CableModelGenerator class takes a JSON-like dictionary as input and 
+can generate models for single-phase, three-phase flat, and isolated 
+coaxial arrangements, dynamically handling the presence or absence of 
+cable layers.
+"""
+
+import json
+from typing import Dict, Any, Tuple, List
+from utils.case_utils import UNITS_DATA
+
+class SingleCoreCableModelGenerator:
+    """
+    A class to generate parametric models for single-core cable arrangements.
+    """
+
+    def __init__(self, input_json: Dict[str, Any]):
+        """
+        Initializes the generator with cable and environmental definitions.
+
+        Args:
+            input_json (Dict[str, Any]): A dictionary containing the definitions
+                                         for the cable, soil, and arrangement.
+        """
+        self.input_data = input_json
+        self.cable_def = self.input_data.get('cable_definition', {})
+        self.soil = self.input_data.get('soil', {})
+        self.arrangement = self.input_data.get('arrangement', {})
+        self.reference = self.input_data.get('reference', {})
+        # The top-level enclosure key is no longer used.
+        # self.enclosure = self.input_data.get('enclosure', {})
+        self.scale_unit = UNITS_DATA[self.arrangement.get('unit', 'meter')]['scale']
+
+        # Cable layer definitions
+        self.core = self.cable_def.get('core')
+        self.sheath = self.cable_def.get('sheath')
+        self.armor = self.cable_def.get('armor')
+
+    def _add_single_layer(self, 
+                          model: Dict[str, Any], 
+                          conductor_id: int, 
+                          center_point: Tuple[float, float], 
+                          layer_data: Dict[str, Any], 
+                          layer_name: str) -> int:
+        """
+        Adds a single conductor layer (e.g., core, sheath) to the model.
+        """
+        insulation_data = layer_data.get('insulation')
+        insulation_dict = None
+
+        if insulation_data:
+            insulation_dict = {
+                'name': f"{layer_name}_insulation",
+                'type': insulation_data.get('type', 'insulation'),
+                'center_point': center_point,
+                'thickness': insulation_data['thickness'],
+                'relative_permittivity': insulation_data['relative_permittivity'],
+                'relative_permeability': 1.0,
+                'fourier_order': 0,
+            }
+
+        model[conductor_id] = {
+            'line_id': conductor_id,
+            'conductor_name': layer_name,
+            'line_type': 'active',
+            'line_return': 0,
+            'center_point': center_point,
+            'radius': [layer_data['inner_radius'], layer_data['outer_radius']],
+            'conductivity': layer_data['conductivity_S_per_m'],
+            'subconductors': None,
+            'insulation': insulation_dict,
+            'conductor_layers': None,
+            'relative_permeability': 1.0,
+            'relative_permittivity': 1.0,
+            'relative_permittivity_out': 1.0,
+            'potential_to_infinity': 1.0,
+            'fourier_order': 0,
+        }
+        return conductor_id + 1
+
+    def _add_cable_conductors(self, 
+                              model: Dict[str, Any], 
+                              conductor_id: int, 
+                              center_point: Tuple[float, float]) -> int:
+        """
+        Adds all defined conductive layers (core, sheath, armor) for a single cable.
+        """
+        if self.core:
+            conductor_id = self._add_single_layer(model, conductor_id, center_point, self.core, 'core')
+        if self.sheath:
+            conductor_id = self._add_single_layer(model, conductor_id, center_point, self.sheath, 'sheath')
+        if self.armor:
+            conductor_id = self._add_single_layer(model, conductor_id, center_point, self.armor, 'armor')
+        return conductor_id
+    
+    @staticmethod
+    def _show_model(model: Dict[str, Any]):
+        """Prints the generated model dictionary in a readable format."""
+        print(f"\n--- Generated Model: {model.get('name', 'N/A')} ---")
+        print(json.dumps(model, indent=2, default=str))
+        print("---------------------------------------------------\n")
+
+    def generate_hdpe_enclosed_model(self, show_model: bool = False) -> Dict[str, Any]:
+        """
+        Generates a model for a cable inside an HDPE enclosure.
+        The enclosure is defined within a conductor in the JSON and is added
+        as a property to that conductor in the final model dictionary.
+        The geometry remains eccentric.
+        """
+        
+        # --- Data Retrieval ---
+        # Find the conductor that defines the enclosure (typically the outermost one).
+        # In this case, it's the sheath.
+        host_conductor_name = 'sheath'
+        host_conductor_data = getattr(self, host_conductor_name)
+        host_insulation = host_conductor_data.get('insulation')
+        enclosure_data = host_conductor_data.get('enclosure')
+
+        if not enclosure_data:
+            raise ValueError(f"Enclosure definition not found within conductor '{host_conductor_name}'.")
+
+        # --- Eccentricity Calculation ---
+        # 1. The cable's center is the reference point, defined by the burial depth.
+        cable_center = (0.0, -self.arrangement['burial_depth'])
+        
+        # 2. The enclosure's center is calculated based on the cable's position.        
+        cable_outer_radius = host_conductor_data['outer_radius'] + (host_insulation['thickness'] if host_insulation else 0)        
+        enclosure_inner_radius = enclosure_data['inner_radius']
+        
+        if cable_outer_radius > enclosure_inner_radius:
+            raise ValueError("Cable does not fit inside the enclosure based on JSON dimensions.")
+
+        vertical_offset = enclosure_inner_radius - cable_outer_radius
+        
+        # 3. The enclosure's center is displaced upwards by the offset.
+        enclosure_center = (cable_center[0], cable_center[1] + vertical_offset)
+
+        # --- Model Generation ---
+        model = {
+            'name': self.input_data.get('name', 'HDPE_Enclosed_SCC_System'),
+            'type': 'scc',
+            'note': 'A parametric model of a cable eccentrically placed inside an HDPE enclosure.',
+            'idx_ref_conductor': 0,
+            0: {
+                'line_id': 0,
+                'conductor_name': 'soil',
+                'line_type': 'return',
+                'line_return': None,
+                'conductivity': self.soil['conductivity_S_per_m'],
+                'relative_permeability': 1.0,
+                'relative_permittivity': self.soil['relative_permittivity'],
+                'relative_permittivity_out': 1.0,
+            },
+        }
+
+        conductor_id = 1
+        # Add the cable conductors (core, sheath) at their reference position
+        conductor_id = self._add_cable_conductors(model, conductor_id, cable_center)
+
+        # --- Inject Enclosure Data into Host Conductor ---
+        # Find the host conductor's entry in the generated model.
+        for k, v in model.items():
+            if isinstance(k, int) and k > 0 and v.get('conductor_name') == host_conductor_name:
+                # Add the enclosure dictionary, including its calculated center point.
+                v['enclosure'] = enclosure_data
+                v['enclosure']['center_point'] = enclosure_center
+                break
+
+        if show_model:
+            self._show_model(model)
+
+        return model
+    
+    def generate_underground_model(self, show_model: bool = False) -> Dict[str, Any]:
+        """
+        Generates a parametric model for underground cables in a flat arrangement.
+        The number of cables and their spacing is determined by the 'arrangement'
+        data provided during initialization.
+        """
+        depth = self.arrangement['burial_depth']
+        num_conductors = self.arrangement.get('num_conductors', 1)
+        # Default spacing to 0 if not specified (for the single conductor case)
+        spacing = self.arrangement.get('spacing', 0) if num_conductors > 1 else 0
+
+        # Dynamically generate center points for any number of conductors
+        center_points = [(i * spacing, -depth) for i in range(num_conductors)]
+        
+        model = {
+            'name': self.input_data.get('name', 'Underground_SCC_System'),
+            'type': 'scc',
+            'note': self.input_data.get('note', 'A parametric underground SCC model.'),
+            'idx_ref_conductor': 0,
+            0: {
+                'line_id': 0,
+                'conductor_name': 'soil',
+                'line_type': 'return',
+                'line_return': None,
+                'conductivity': self.soil['conductivity_S_per_m'],
+                'relative_permeability': 1.0,
+                'relative_permittivity': self.soil['relative_permittivity'],
+                'relative_permittivity_out': 1.0,
+            },
+        }
+
+        conductor_id = 1
+        for cp in center_points:
+            conductor_id = self._add_cable_conductors(model, conductor_id, cp)
+
+        if show_model:
+            self._show_model(model)
+
+        return model
+    
+    def generate_conventional_single_phase(self, show_model: bool = False) -> Dict[str, Any]:
+        """
+        Generates a parametric model for a single buried SCC cable.
+        """
+        depth = self.arrangement['burial_depth']
+        center_points = [(0.0, -depth)]
+        
+        model = {
+            'name': self.input_data.get('name', 'SINGLE_PHASE_SCC'),
+            'type': 'scc',
+            'note': self.input_data.get('note', 'A parametric single-phase SCC model.'),
+            'idx_ref_conductor': 0,
+            0: {
+                'line_id': 0,
+                'conductor_name': 'soil',
+                'line_type': 'return',
+                'line_return': None,
+                'conductivity': self.soil['conductivity_S_per_m'],
+                'relative_permeability': 1.0,
+                'relative_permittivity': self.soil['relative_permittivity'],
+                'relative_permittivity_out': 1.0,
+            },
+        }
+
+        conductor_id = 1
+        for cp in center_points:
+            conductor_id = self._add_cable_conductors(model, conductor_id, cp)
+
+        if show_model:
+            self._show_model(model)
+
+        return model
+
+    def generate_conventional_three_phase_flat(self, show_model: bool = False) -> Dict[str, Any]:
+        """
+        Generates a model for a three-phase flat arrangement of SCC cables.
+        """
+        depth = self.arrangement['burial_depth']
+        spacing = self.arrangement['spacing']
+        center_points = [(0.0, -depth), (spacing, -depth), (2 * spacing, -depth)]
+        
+        model = {
+            'name': self.input_data.get('name', 'THREE_PHASE_FLAT_SCC'),
+            'type': 'scc',
+            'note': self.input_data.get('note', 'A parametric three-phase flat SCC model.'),
+            'idx_ref_conductor': 0,
+            0: {
+                'line_id': 0,
+                'conductor_name': 'soil',
+                'line_type': 'return',
+                'line_return': None,
+                'conductivity': self.soil['conductivity_S_per_m'],
+                'relative_permeability': 1.0,
+                'relative_permittivity': self.soil['relative_permittivity'],
+                'relative_permittivity_out': 1.0,
+            },
+        }
+
+        conductor_id = 1
+        for cp in center_points:
+            conductor_id = self._add_cable_conductors(model, conductor_id, cp)
+
+        if show_model:
+            self._show_model(model)
+
+        return model
+
+    def generate_isolated_coaxial_cable(self, show_model: bool = False) -> Dict[str, Any]:
+        """
+        Generates a model for a single isolated coaxial cable.
+        """
+        model = {
+            'name': self.input_data.get('name', 'ISOLATED_COAXIAL_SCC'),
+            'type': 'coaxial',
+            'note': self.input_data.get('note', 'A parametric isolated coaxial SCC model.'),
+            'idx_ref_conductor': 0,
+            0: {
+                'line_id': 0,
+                'conductor_name': self.reference.get('name', 'sheath'),
+                'line_type': 'return',
+                'line_return': None,
+                'center_point': (0.0, 0.0),
+                'radius': [self.reference['inner_radius'], self.reference['outer_radius']],
+                'conductivity': self.reference['conductivity_S_per_m'],
+                'subconductors': None,
+                'insulation': None,
+                'conductor_layers': None,
+                'relative_permeability': 1.0,
+                'relative_permittivity': 1.0,
+                'relative_permittivity_out': 1.0,
+                'potential_to_infinity': -1.0,
+                'fourier_order': 0,
+            },
+        }
+
+        # For a coaxial cable, there is only one center point at the origin
+        self._add_cable_conductors(model, 1, (0.0, 0.0))
+
+        if show_model:
+            self._show_model(model)
+
+        return model
+

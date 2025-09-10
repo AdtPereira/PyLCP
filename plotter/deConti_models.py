@@ -13,6 +13,8 @@ class DeContiModels:
         self.f = pul_parameters['frequencies']
         self.w = 2 * np.pi * self.f
 
+        self.figsize = (12, 5)
+
         self.comparison = [
             {'key': 'magalhaes_xue', 'label': 'Magalhães/Xue',  'color': 'black', 'linestyle': '-', 'linewidth': 2},
             {'key': 'sunde', 'label': 'Sunde', 'color': 'gray', 'linestyle': ':', 'linewidth': 2},
@@ -69,7 +71,7 @@ class DeContiModels:
         """
         config = self.plot_configs[config_key]
         p, q = config['p'], config['q']
-        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5), sharey=False)
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=self.figsize, sharey=False)
         fig.suptitle(config['suptitle'], fontsize=12, y=0.98)
 
         for series in config['series_to_plot']:
@@ -102,7 +104,7 @@ class DeContiModels:
     def _impedance_subplots(self, config_key):
         config = self.plot_configs[config_key]
         p, q = config['p'], config['q']
-        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5), sharey=False)
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=self.figsize, sharey=False)
         fig.suptitle(config['suptitle'], fontsize=12, y=0.98)
 
         for series in config['series_to_plot']:
@@ -137,7 +139,7 @@ class DeContiModels:
     def _potential_subplots(self, config_key):
         config = self.plot_configs[config_key]
         p, q = config['p'], config['q']
-        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5), sharey=False)
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=self.figsize, sharey=False)
         fig.suptitle(config['suptitle'], fontsize=12, y=0.98)
 
         for series in config['series_to_plot']:

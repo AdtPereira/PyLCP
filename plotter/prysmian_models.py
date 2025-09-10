@@ -19,6 +19,7 @@ class PrysmianModels:
 
         self.rho_1 = 1000
         self.epsr_1 = 1.0
+        self.figsize = (12, 5)
 
         self.nakagawa_series = [
             {'key': 'magalhaes_xue', 'label': 'Magalhães/Xue',  'color': 'black', 'linestyle': '-', 'linewidth': 2},
@@ -88,7 +89,7 @@ class PrysmianModels:
     def _plot_generic_impedance(self, config_key, impedance_data):
         """Generic plotting function for impedance-like data."""
         config = self.plot_configs[config_key]
-        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5), sharey=False)
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=self.figsize, sharey=False)
         fig.suptitle(config['suptitle'], fontsize=12, y=0.98)
 
         for series_config in config['series_to_plot']:
@@ -172,7 +173,7 @@ class PrysmianModels:
     def _ground_return_impedance_subplots(self, config_key):
         config = self.plot_configs[config_key]
         p, q = config['p'], config['q']
-        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5), sharey=False)
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=self.figsize, sharey=False)
         fig.suptitle(config['suptitle'], fontsize=12, y=0.98)
 
         for series in config['series_to_plot']:

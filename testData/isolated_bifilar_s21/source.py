@@ -11,7 +11,7 @@ from mtl_main.source import MulticonductorTransmissionLine
 from mtl_paul.py_fortran import FortranRunner
 from analytical_forms.isolated_wires import WiresHomogeneousMedia
 from mom_so.quasi_static_green import QuasiStatic
-from mom_so.lossless_medium_vector import HomogeneousLosslessMedium, LosslessPostProcessing
+from mom_so.lossless_medium import HomogeneousLosslessMedium, LosslessPostProcessing
 from mom.bare_wire_systems import MulticonductorBareWireSystems
 
 class BifilarBareWirePULParameters:
@@ -58,6 +58,7 @@ class BifilarBareWirePULParameters:
         self.c_factor = 1e12  # F/m to nF/km
         self.l_factor = 1e6   # H/m to mH/km
         self.r_factor = 1e3   # Ohm/m to Ohm/km
+        self.figsize = (12, 5)
         self.pt1 = 63
         self.pt2 = 10
 
@@ -440,7 +441,7 @@ class BifilarBareWirePULParameters:
             'approx':       {'data': (self.freq_range.get('ana'), [data['rhf'] for data in self.analytical_data.values()]), 'label': '$R_{HF}$'},
         }
 
-        fig, ax = plt.subplots(figsize=(8, 5))
+        fig, ax = plt.subplots(figsize=self.figsize)
         self._configure_plot_appearance(ax, r'Series Resistance p.u.l. ($\Omega$/km)', resistance_data)
         plt.tight_layout()
 
@@ -464,7 +465,7 @@ class BifilarBareWirePULParameters:
             'analytical':   {'data': (self.freq_range.get('ana'), [data['ls']           for data in self.analytical_data.values()]), 'label': '$\ell_s$'},
         }
 
-        fig, ax = plt.subplots(figsize=(8, 5))
+        fig, ax = plt.subplots(figsize=self.figsize)
         self._configure_plot_appearance(ax, 'Series Inductance p.u.l. (mH/km)', inductance_data, yscale='linear')
         plt.tight_layout()
 
@@ -489,7 +490,7 @@ class BifilarBareWirePULParameters:
             'bifilar':  {'data': (self.freq_range.get('ana'), [data['c_approx'] for data in self.analytical_data.values()]), 'label': 'Bifilar (Approx.)'},
         }
 
-        fig, ax = plt.subplots(figsize=(8, 5))
+        fig, ax = plt.subplots(figsize=self.figsize)
         self._configure_plot_appearance(ax, 'Capacitance p.u.l. (nF/km)', capacitante_data, yscale='linear')
         plt.tight_layout()
 
@@ -513,7 +514,7 @@ class BifilarBareWirePULParameters:
             'approx':   {'data': (self.srw_ratios.get('ana'), [data['c_approx'] for data in self.srw_data.values()]),       'label': 'Approx.'},
         }
 
-        fig, ax = plt.subplots(figsize=(8, 5))
+        fig, ax = plt.subplots(figsize=self.figsize)
         for key, data in capacitante_data.items():
             freq, value = data['data']
             label = data['label']
@@ -562,7 +563,7 @@ class BifilarBareWirePULParameters:
             return
 
         plt.style.use('default')
-        _, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5), sharey=True)
+        _, (ax1, ax2) = plt.subplots(1, 2, figsize=self.figsize, sharey=True)
         # fig.suptitle('')
 
         fortran_nf_axis = self.results_df.index + 1
@@ -625,7 +626,7 @@ class BifilarBareWirePULParameters:
             return
 
         plt.style.use('default')
-        fig, ax = plt.subplots(figsize=(8, 5))
+        fig, ax = plt.subplots(figsize=self.figsize)
         fortran_nf_axis = self.results_df.index + 1
         python_nf_axis = 2 * self.results_df.index + 1
         max_nf_fortran = fortran_nf_axis.max()

@@ -13,6 +13,8 @@ class PatelModels:
         self.f_mom = pul_parameters['frequencies']['numerical']
         self.w = 2 * np.pi * self.f
 
+        self.figsize = (12, 5)
+
     def series_impedance_matrix(self):
         """
         Generic method to create a 1x2 subplot for series resistance (left)
@@ -23,7 +25,7 @@ class PatelModels:
         l_factor = 1e6  # Convert H/m to mH/km
 
         # config = self.plot_configs[config_key]
-        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5), sharey=False)
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=self.figsize, sharey=False)
         fig.suptitle('Fig. 2.6: P.u.l. series impedance of a coaxial cable [Patel, 2014]', fontsize=12)
 
         # for series in config['series_to_plot']:

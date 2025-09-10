@@ -13,6 +13,8 @@ class XueModels:
         self.f = pul_parameters['frequencies']
         self.w = 2 * np.pi * self.f
 
+        self.figsize = (12, 5)
+
         self.overhead_line = [
             {'key': 'p100',         'label': r'$\rho_e=100 \;\Omega m, \epsilon_r=1$',  'color': 'black', 'linestyle': '-'},
             {'key': 'p100_er20',    'label': r'$\rho_e=100 \;\Omega m, \epsilon_r=20$', 'color': 'black', 'linestyle': '--'},
@@ -132,7 +134,7 @@ class XueModels:
         """
         config = self.plot_configs[config_key]
         p, q = config['p'], config['q']
-        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5), sharey=False)
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=self.figsize, sharey=False)
         fig.suptitle(config['suptitle'], fontsize=12, y=0.98)
 
         for series in config['series_to_plot']:
@@ -169,7 +171,7 @@ class XueModels:
         """
         config = self.plot_configs[config_key]
         p, q = config['p'], config['q']
-        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5), sharey=False)
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=self.figsize, sharey=False)
         fig.suptitle(config['suptitle'], fontsize=12, y=0.98)
 
         for series in config['series_to_plot']:
@@ -206,7 +208,7 @@ class XueModels:
         """
         config = self.plot_configs[config_key]
         p, q = config['p'], config['q']
-        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5), sharey=False)
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=self.figsize, sharey=False)
         fig.suptitle(config['suptitle'], fontsize=12, y=0.98)
 
         for series in config['series_to_plot']:
@@ -245,7 +247,7 @@ class XueModels:
         """
         config = self.plot_configs[config_key]
         p, q = config['p'], config['q']
-        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5), sharey=False)
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=self.figsize, sharey=False)
         fig.suptitle(config['suptitle'], fontsize=12, y=0.98)
 
         for series in config['series_to_plot']:
@@ -279,7 +281,7 @@ class XueModels:
     def _overhead_propagation_constant_subplots(self, config_key):
         config = self.plot_configs[config_key]
         p, q = config['p'], config['q']
-        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5), sharey=False)
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=self.figsize, sharey=False)
         fig.suptitle(config['suptitle'], fontsize=12, y=0.98)
 
         for series in config['series_to_plot']:
