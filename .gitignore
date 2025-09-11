@@ -4,7 +4,7 @@ __pycache__/
 *.IN
 *.DAT
 *.log
-*.mph
+*.mph.lock
 
 Results/
 logs/

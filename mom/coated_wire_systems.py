@@ -181,7 +181,7 @@ class MulticonductorCoatedWireSystems:
         gc = self.C_generalized
         
         # Supondo que self.model.idx_ref já foi corrigido para 0-base no __init__
-        ref_idx = self.model.idx_ref 
+        ref_idx = self.model.mtl_idx_ref 
 
         # --- Validações ---
         num_conductors = gc.shape[0]

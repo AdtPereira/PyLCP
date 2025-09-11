@@ -58,6 +58,7 @@ def isolated_coaxial_cable(
     # Safely get cable definition components
     cable_def = input_json.get('cable_definition', {})
     cable_ref = input_json.get('reference', {})
+    frequency = input_json.get('frequency', {})
     core = cable_def.get('core')
     sheath = cable_def.get('sheath')
     armor = cable_def.get('armor')
@@ -68,6 +69,7 @@ def isolated_coaxial_cable(
         'type': 'coaxial',
         'note': input_json.get('note', 'A parametric single-phase SCC model.'),
         'idx_ref_conductor': 0,
+        'frequency': frequency,
         0: {
             'line_id': 0,
             'conductor_name': cable_ref.get('name', 'sheath'),

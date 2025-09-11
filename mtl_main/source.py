@@ -28,7 +28,7 @@ import scipy.constants as sc
 from mtl_main.strategy import mtl_strategy_factory
 
 class MulticonductorTransmissionLine:
-    def __init__(self, mtl: Dict):
+    def __init__(self, model: Dict):
         """Initialize the MulticonductorTransmissionLine class.
 
         Key Points
@@ -40,9 +40,10 @@ class MulticonductorTransmissionLine:
         within the class will not affect the original TREFOIL object.
         """
 
-        mtl_input = copy.deepcopy(mtl)
+        mtl_input = copy.deepcopy(model)
         self.mtl_type = mtl_input.get('type', 'unknown')
-        self.idx_ref = mtl_input.get('idx_ref_conductor', 0)  
+        self.mtl_frequency = mtl_input.get('frequency', {})  
+        self.mtl_idx_ref = mtl_input.get('idx_ref_conductor', 0)
 
         # MULTICONDUCTOR TRANSMISSION LINES PARAMETERS
         self.mu = None
@@ -75,7 +76,7 @@ class MulticonductorTransmissionLine:
         self.N = sum(self.NF_List)
 
         # Número de coeficientes harmônicos de Fourier por condutor
-        self.NF = self.NF_List[self.idx_ref]        
+        self.NF = self.NF_List[self.mtl_idx_ref]        
 
     # def _count_scc_and_conductors(self):
     #     """

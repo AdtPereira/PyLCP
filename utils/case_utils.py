@@ -176,3 +176,71 @@ def load_json_parameters(script_file_path, show_content=False):
         print("--------------------------------------\n")
         
     return parameters
+
+def load_comsol_results(script_path: str, comsol_tag: str = 'cmsl_1') -> pd.DataFrame:
+    """
+    Loads COMSOL data by deriving the case name and filename from the script path.
+
+    This acts as a convenient wrapper for `read_comsol_results`, making the
+    main script calls cleaner and more consistent with `load_json_parameters`.
+
+    Args:
+        script_path (str): The path of the calling script (typically __file__).
+        comsol_tag (str): The suffix to append to the case name to form the
+                          .txt filename. Defaults to 'cmsl_1'.
+
+    Returns:
+        pd.DataFrame: A pandas DataFrame with the COMSOL simulation data.
+    """
+    # 1. Extract the 'case_name' from the script's filename (e.g., 'isolated_coax.py' -> 'isolated_coax')
+    case_name = Path(script_path).stem
+
+    # 2. Construct the COMSOL results filename (e.g., 'isolated_coax_cmsl_1.txt')
+    file_name = f"{case_name}_{comsol_tag}.txt"
+
+    # 3. Call the original, more detailed function with the derived names
+    return read_comsol_results(case_name, file_name)
+
+def read_comsol_results(case_name: str, file_name: str, base_dir: str = "testData") -> pd.DataFrame:
+    """
+    Reads complex impedance data from a COMSOL-exported .txt file.
+
+    This version is specifically designed to handle formats where the data
+    is complex (e.g., 'R+Li') and the header is split across commented
+    and non-commented lines.
+    """
+    file_path = Path(base_dir) / case_name / "Results" / file_name
+
+    if not file_path.exists():
+        raise FileNotFoundError(f"The file was not found at the specified path: {file_path}")
+
+    # --- Find the start of the data block ---
+    # We need to skip all metadata lines, including the non-commented header part.
+    data_start_line = 0
+    with open(file_path, 'r', encoding='utf-8') as f:
+        for i, line in enumerate(f):
+            # The first line that starts with a number is considered the start of data.
+            stripped_line = line.strip()
+            if stripped_line and (stripped_line[0].isdigit() or stripped_line[0] == '.'):
+                data_start_line = i
+                break
+
+    # --- Define Column Names Explicitly ---
+    # Due to the ambiguous header format, we define column names manually for robustness.
+    column_names = ['Frequency (Hz)', 'Zs (Ω/m)']
+
+    # --- Read and Process Data ---
+    data_df = pd.read_csv(
+        file_path,
+        header=None,
+        skiprows=data_start_line, # Skip all metadata and header lines
+        sep=r'\s+',
+        names=column_names,
+        engine='python'
+    )
+
+    # Convert the impedance string 'R+Li' into a proper complex number.
+    # COMSOL uses 'i', Python's complex() uses 'j'.
+    data_df['Zs (Ω/m)'] = data_df['Zs (Ω/m)'].str.replace('i', 'j').apply(complex)
+
+    return data_df

@@ -133,7 +133,7 @@ class MulticonductorBareWireSystems:
         num_conductors = gc.shape[0]
         assert num_conductors > 1, "O cálculo da capacitância Maxwelliana requer pelo menos 2 condutores."
         assert hasattr(self.model, 'idx_ref'), "O atributo 'idx_ref' (índice do condutor de referência) não foi encontrado."
-        assert 0 <= self.model.idx_ref < num_conductors, f"O índice de referência self.idx_ref ({self.model.idx_ref}) está fora do intervalo válido [0, {num_conductors-1}]."
+        assert 0 <= self.model.mtl_idx_ref < num_conductors, f"O índice de referência self.idx_ref ({self.model.mtl_idx_ref}) está fora do intervalo válido [0, {num_conductors-1}]."
 
         # --- Etapa 1: Calcular a matriz Maxwelliana completa (NxN) ---
         total_sum = np.sum(gc)
@@ -151,7 +151,7 @@ class MulticonductorBareWireSystems:
         # --- Etapa 2: Reduzir a matriz para (N-1)x(N-1) ---
         # Usa np.delete para remover a linha (axis=0) e a coluna (axis=1)
         # correspondentes ao índice do condutor de referência `self.idx_ref`.
-        self.C_maxwellian = np.delete(np.delete(C_full, self.model.idx_ref, axis=0), self.model.idx_ref, axis=1)
+        self.C_maxwellian = np.delete(np.delete(C_full, self.model.mtl_idx_ref, axis=0), self.model.mtl_idx_ref, axis=1)
 
     def run_simulation(self):
         """

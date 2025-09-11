@@ -164,8 +164,7 @@ class InternalPerUnitParameters:
         self.model = model
         # self.num_sc_cables, self.num_conductors_per_scc = model._count_scc_and_conductors()
         
-        # Store the frequency array
-        self.f = np.asarray(frequencies)
+        self.f = np.asarray(frequencies)  # Ensure f is a NumPy array
         self.num_freq = len(self.f)
 
         # Angular frequency (rad/s) is now a vector
@@ -567,7 +566,7 @@ class PerUnitParameters:
     including earth-return effects.
     """
 
-    def __init__(self, model: MulticonductorTransmissionLine, f: np.ndarray):
+    def __init__(self, model: MulticonductorTransmissionLine, frequencies: np.ndarray):
         """
         Initializes the vectorized calculator.
 
@@ -579,7 +578,7 @@ class PerUnitParameters:
         self.model = model
         # self.num_sc_cables, self.num_conductors_per_scc = model._count_scc_and_conductors()
         
-        self.f = np.asarray(f)
+        self.f = np.asarray(frequencies)
         self.num_freq = len(self.f)
 
         # Soil Relative Permittivity

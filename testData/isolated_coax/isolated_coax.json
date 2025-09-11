@@ -1,6 +1,12 @@
 {
   "name": "Isolated Coaxial Cable",
   "note": "An isolated coaxial cable with air insulation. Patel (2014) model.",
+  "frequency":{
+    "spacing": "log",
+    "min_Hz": 1.0E0,
+    "max_Hz": 1.0E6,
+    "steps_per_decade": 5
+  },
   "reference": {
     "name": "sheath",
     "inner_radius_m": 0.0395,

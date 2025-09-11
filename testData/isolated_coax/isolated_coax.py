@@ -31,6 +31,22 @@ except ImportError as e:
     print(f"Error importing modules: {e}")
     sys.exit(1)
 
+# --- Load COMSOL Data ---
+COMSOL_DATA = None
+try:
+    COMSOL_DATA = load_comsol_results(__file__, comsol_tag='zs_mfec')
+    print("COMSOL data loaded successfully.")
+
+    # Display the first few rows of the loaded data to verify
+    print("--- Data Head ---")
+    print(COMSOL_DATA.head())
+
+    # Display a concise summary of the DataFrame
+    print("\n--- DataFrame Info ---")
+    COMSOL_DATA.info()
+except FileNotFoundError as e:
+    print(f"Warning: COMSOL data file not found. Skipping comparison. Details: {e}")
+
 def main():
     """ Main function to run the simulation and plotting using vectorized calculations. """
     st = time.time()    
@@ -42,20 +58,21 @@ def main():
 
     # --- VECTORIZED CALCULATION ---
     analytical_freqs = np.logspace(0, 6, num=200)
-    numerical_freqs = np.logspace(0, 6, num=40)
-    
+    numerical_freqs = np.logspace(0, 6, num=31)
+
     # Analytical Formulation (Ametani et al., 2015)
     print("Calculating internal parameters for all frequencies...")
     internal = InternalPerUnitParameters(mtl_model, analytical_freqs)
     
     # MoM-SO formulation (Patel, 2014)
-    print("Iniciando rotina numérica vetorizada (MoM-SO)...")
+    print("Vectorized numeric routine (MoM-SO)...")
     green_matrix = QuasiStatic(mtl_model).green_matrix()
     mom_so = HomogeneousLosslessMedium(mtl_model, numerical_freqs)
     post_processor = LosslessPostProcessing(mtl_model)
     z_partial_stack = mom_so.z_partial(green_matrix)    # Partial impedance matrix
     zs_stack = post_processor.z_total(z_partial_stack)  # Total series impedance matrix
-    
+    print(f"End of the routine! Time spent on simulation: {(time.time() - st):.1f} seconds.\n")
+
     # Populate the pul_data dictionary 
     pul_data = {
         'analytical': {
@@ -75,10 +92,10 @@ def main():
             "series_impedance_matrix": zs_stack,
             "series_resistance_matrix": post_processor.rs_matrix(zs_stack),
             "series_inductance_matrix": post_processor.ls_matrix(zs_stack, numerical_freqs)
-        }
+        },
+        'comsol': COMSOL_DATA
     }
 
-    print(f"End of the routine! Time spent on simulation: {(time.time() - st):.1f} seconds.\n")
     plotter = PatelModels(pul_data)
     plotter.internal_impedance_matrix()
     plotter.series_impedance_matrix()

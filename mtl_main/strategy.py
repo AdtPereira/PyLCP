@@ -356,6 +356,7 @@ class CableStrategy(MTLStrategy):
         return num_cables, conductors_per_cable
     
     def apply_mtl_ref_properties(self, context, mtl_input: dict) -> None:
+        
         # Number of single core cables (N) and conductors per cable (M)
         context.num_sc_cables, context.num_conductors_per_scc = self._count_scc_and_conductors_plus_ref(mtl_input)
 
