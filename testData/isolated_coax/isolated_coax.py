@@ -19,8 +19,8 @@ except IndexError:
 # --- Import custom modules ---
 try:
     from utils.case_utils import *
-    from plotter.patel_models import PatelModels
     from models import single_core_cables as scc 
+    from plotter.patel_models import PatelModels
     from mtl_main.graphics import MTLRepresentation
     from mtl_main.source import MulticonductorTransmissionLine
     from analytical_forms.single_core_cable import InternalPerUnitParameters
@@ -32,18 +32,26 @@ except ImportError as e:
     sys.exit(1)
 
 # --- Load COMSOL Data ---
-COMSOL_DATA = None
+COMSOL_DATA = {}
 try:
-    COMSOL_DATA = load_comsol_results(__file__, comsol_tag='zs_mfec')
+    COMSOL_DATA['core_sheath_return'] = load_comsol_results(__file__, comsol_tag='')
+    COMSOL_DATA['core_exc'] = load_comsol_results(__file__, comsol_tag='_core_exc')
+    COMSOL_DATA['sheath_exc'] = load_comsol_results(__file__, comsol_tag='_sheath_exc')
     print("COMSOL data loaded successfully.")
 
-    # Display the first few rows of the loaded data to verify
-    print("--- Data Head ---")
-    print(COMSOL_DATA.head())
+    # # Display the first few rows of the loaded data to verify
+    # print("--- Data Head ---")
+    # print(COMSOL_DATA['core_sheath_return'].head())
 
     # Display a concise summary of the DataFrame
-    print("\n--- DataFrame Info ---")
-    COMSOL_DATA.info()
+    print("\n--- DataFrame Info core_sheath_return---")
+    COMSOL_DATA['core_sheath_return'].info()
+    
+    print("\n--- DataFrame Info core_exc---")    
+    COMSOL_DATA['core_exc'].info()
+
+    print("\n--- DataFrame Info sheath_exc---")
+    COMSOL_DATA['sheath_exc'].info()
 except FileNotFoundError as e:
     print(f"Warning: COMSOL data file not found. Skipping comparison. Details: {e}")
 
@@ -79,7 +87,8 @@ def main():
             "frequencies": analytical_freqs,
             "internal_parameters": {
                 "bessel": internal.parameters_by_bessel(),
-                "approximation": internal.parameters_approximation()
+                "approximation": internal.parameters_approximation(),
+                "hybrid": internal.parameters_hybrid(transition_frequency=1e5)
             },
             "internal_impedance_matrix": {
                 "bessel": internal.internal_matrices(internal_form='bessel')['impedance_matrix'],
@@ -93,12 +102,16 @@ def main():
             "series_resistance_matrix": post_processor.rs_matrix(zs_stack),
             "series_inductance_matrix": post_processor.ls_matrix(zs_stack, numerical_freqs)
         },
-        'comsol': COMSOL_DATA
+        'comsol': {
+            'core_sheath_return': COMSOL_DATA['core_sheath_return'],
+            'core': COMSOL_DATA['core_exc'],
+            'sheath': COMSOL_DATA['sheath_exc']
+        }
     }
 
     plotter = PatelModels(pul_data)
+    plotter.internal_impedance_elements()
     plotter.internal_impedance_matrix()
-    plotter.series_impedance_matrix()
     MTLRepresentation(mtl_model, units='millimeter').isolated_coaxial_cables()
     plt.show()    
 

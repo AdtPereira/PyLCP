@@ -1,6 +1,7 @@
 # root_folder/model/case_utils.py
 """ It is a Python script that contains the main function and a class called User. """
 
+import re
 import json
 import numpy as np
 import pandas as pd
@@ -177,7 +178,7 @@ def load_json_parameters(script_file_path, show_content=False):
         
     return parameters
 
-def load_comsol_results(script_path: str, comsol_tag: str = 'cmsl_1') -> pd.DataFrame:
+def load_comsol_results(script_path: str, comsol_tag: str = '') -> pd.DataFrame:
     """
     Loads COMSOL data by deriving the case name and filename from the script path.
 
@@ -192,55 +193,87 @@ def load_comsol_results(script_path: str, comsol_tag: str = 'cmsl_1') -> pd.Data
     Returns:
         pd.DataFrame: A pandas DataFrame with the COMSOL simulation data.
     """
-    # 1. Extract the 'case_name' from the script's filename (e.g., 'isolated_coax.py' -> 'isolated_coax')
     case_name = Path(script_path).stem
-
-    # 2. Construct the COMSOL results filename (e.g., 'isolated_coax_cmsl_1.txt')
-    file_name = f"{case_name}_{comsol_tag}.txt"
-
-    # 3. Call the original, more detailed function with the derived names
+    file_name = f"{case_name}{comsol_tag}.txt"
+    print(f"Loading COMSOL data {file_name}")
     return read_comsol_results(case_name, file_name)
 
 def read_comsol_results(case_name: str, file_name: str, base_dir: str = "testData") -> pd.DataFrame:
     """
-    Reads complex impedance data from a COMSOL-exported .txt file.
-
-    This version is specifically designed to handle formats where the data
-    is complex (e.g., 'R+Li') and the header is split across commented
-    and non-commented lines.
+    Reads data from a COMSOL-exported .txt file, dynamically parsing
+    column names and their units from the header. This robust version
+    handles single or multi-line headers and automatically cleans column names.
     """
     file_path = Path(base_dir) / case_name / "Results" / file_name
 
     if not file_path.exists():
-        raise FileNotFoundError(f"The file was not found at the specified path: {file_path}")
+        raise FileNotFoundError(f"The specified file was not found: {file_path}")
 
-    # --- Find the start of the data block ---
-    # We need to skip all metadata lines, including the non-commented header part.
-    data_start_line = 0
+    header_lines = []
+    data_lines = []
     with open(file_path, 'r', encoding='utf-8') as f:
-        for i, line in enumerate(f):
-            # The first line that starts with a number is considered the start of data.
-            stripped_line = line.strip()
-            if stripped_line and (stripped_line[0].isdigit() or stripped_line[0] == '.'):
-                data_start_line = i
-                break
+        for line in f:
+            if line.startswith('%'):
+                # Skip metadata lines
+                if not any(keyword in line for keyword in ['Model:', 'Version:', 'Date:', 'Table:']):
+                    header_lines.append(line)
+            elif line.strip():
+                data_lines.append(line.strip())
 
-    # --- Define Column Names Explicitly ---
-    # Due to the ambiguous header format, we define column names manually for robustness.
-    column_names = ['Frequency (Hz)', 'Zs (Ω/m)']
+    # --- 1. Robust Header Parsing with a More General Regex ---
+    full_header_str = ' '.join([h.replace('%', '').strip() for h in header_lines])
+    
+    # This regex is more flexible and finds any text within parentheses,
+    # such as (Hz), (H/m), or (Ω).
+    parts = re.split(r'(\([^)]+\))', full_header_str)
+    
+    column_names = []
+    i = 0
+    # Group the variable name with its unit
+    # Example: ['freq ', '(Hz)', ' r11 ', '(Ω/m)'] -> ['freq (Hz)', 'r11 (Ω/m)']
+    while i < len(parts) - 1:
+        var_name = parts[i].strip()
+        unit = parts[i+1].strip()
+        if var_name:
+            column_names.append(f"{var_name} {unit}")
+        i += 2
+            
+    num_cols = len(column_names)
 
-    # --- Read and Process Data ---
-    data_df = pd.read_csv(
-        file_path,
-        header=None,
-        skiprows=data_start_line, # Skip all metadata and header lines
-        sep=r'\s+',
-        names=column_names,
-        engine='python'
-    )
+    # --- 2. Data Processing and Reshaping ---
+    all_values_str = " ".join(data_lines).split()
+    
+    if len(all_values_str) == 0:
+        raise ValueError("No data found in the file.")
+    
+    if len(all_values_str) % num_cols != 0:
+        raise ValueError(
+            f"Data mismatch: Total values ({len(all_values_str)}) "
+            f"is not a multiple of the number of columns ({num_cols})."
+        )
+    
+    data_array = np.array(all_values_str).reshape(-1, num_cols)
 
-    # Convert the impedance string 'R+Li' into a proper complex number.
-    # COMSOL uses 'i', Python's complex() uses 'j'.
-    data_df['Zs (Ω/m)'] = data_df['Zs (Ω/m)'].str.replace('i', 'j').apply(complex)
+    # --- 3. DataFrame Creation and Generalized Data Type Conversion ---
+    df = pd.DataFrame(data_array, columns=column_names)
 
-    return data_df
+    for col in df.columns:
+        # If any value in the column contains 'i', treat it as complex.
+        # This is more robust than checking units.
+        if df[col].astype(str).str.contains('i').any():
+            df[col] = df[col].str.replace('i', 'j', regex=False).apply(complex)
+        else:
+            df[col] = pd.to_numeric(df[col], errors='coerce')
+
+    # --- 4. Extensible Column Name Cleaning ---
+    clean_names = {}
+    for col in df.columns:
+        new_name = col.lower()
+        # Remove units in parentheses and clean up the name
+        new_name = re.sub(r'\s*\([^)]+\)', '', new_name) # Remove "(unit)"
+        new_name = re.sub(r'[^a-z0-9_]+', '_', new_name) # Replace special chars with underscore
+        new_name = new_name.strip('_') # Clean leading/trailing underscores
+        clean_names[col] = new_name
+    df.rename(columns=clean_names, inplace=True)
+    
+    return df

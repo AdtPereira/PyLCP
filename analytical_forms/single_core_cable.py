@@ -9,6 +9,7 @@ REFERENCES:
 """
 
 import numpy as np
+import copy
 import scipy.special as ss
 import scipy.constants as sc
 from scipy.integrate import quad
@@ -420,7 +421,64 @@ class InternalPerUnitParameters:
             'potentials': {'pcj': pcj, 'psj': psj, 'paj': paj}
         }
 
-    def internal_matrices(self, internal_form='approximation'):
+    def parameters_hybrid(self, transition_frequency):
+        """
+        Calculates internal parameters using a hybrid approach based on a single
+        transition frequency.
+
+        For frequencies below the transition_frequency, the results from the
+        Bessel function formulation (`parameters_by_bessel`) are used.
+        For frequencies at or above the transition_frequency, the results from
+        the high-frequency approximation (`parameters_approximation`) are used.
+
+        This provides a direct way to combine the accuracy of the Bessel model at
+        low frequencies with the numerical stability of the approximation at high
+        frequencies.
+
+        Args:
+            transition_frequency (float): The frequency (in Hz) at which to switch
+                                          from the Bessel model to the approximation model.
+
+        Returns:
+            dict: A dictionary containing the calculated hybrid parameters, with the
+                  same structure as the other methods.
+        """
+        # --- Step 1: Get results from both existing methods ---
+        params_bessel = self.parameters_by_bessel()
+        params_approx = self.parameters_approximation()
+
+        # --- Step 2: Create a boolean mask based on the transition frequency ---
+        # The mask is True for frequencies where the approximation should be used.
+        use_approx_mask = self.f >= transition_frequency
+
+        # --- Step 3: Create the hybrid results dictionary ---
+        # Start with a copy of the Bessel results, then overwrite where necessary.
+        params_hybrid = copy.deepcopy(params_bessel)
+
+        # Iterate through the dictionary keys to apply the hybrid logic.
+        # This approach is general and works for any cable configuration.
+        for key, value in params_bessel.items():
+            if isinstance(value, dict):
+                # Handles nested dictionaries like 'zcs', 'zsa', etc.
+                for sub_key, sub_value in value.items():
+                    # Check if the item is a frequency-dependent numpy array
+                    if isinstance(sub_value, np.ndarray) and sub_value.shape == self.f.shape:
+                        params_hybrid[key][sub_key] = np.where(
+                            use_approx_mask,
+                            params_approx[key][sub_key], # Value if True (use approx)
+                            sub_value                     # Value if False (use bessel)
+                        )
+            elif isinstance(value, np.ndarray) and value.shape == self.f.shape:
+                # Handles top-level items like 'z2m', 'z3m'
+                params_hybrid[key] = np.where(
+                    use_approx_mask,
+                    params_approx[key], # Value if True (use approx)
+                    value               # Value if False (use bessel)
+                )
+        
+        return params_hybrid
+    
+    def internal_matrices(self, internal_form='hybrid'):
         """
         Assembles the full internal impedance [Zi] and shunt admittance [Ye] matrices
         for all specified frequencies.
@@ -437,9 +495,11 @@ class InternalPerUnitParameters:
             zij = self.parameters_by_bessel()
         elif internal_form == 'approximation':
             zij = self.parameters_approximation()
+        elif internal_form == 'hybrid':
+            zij = self.parameters_hybrid(transition_frequency=1e5)
         else:
-            raise ValueError("Invalid internal_form. Choose 'bessel' or 'approximation'.")
-        
+            raise ValueError("Invalid internal_form. Choose 'bessel' or 'approximation' or 'hybrid'.")
+
         # 1. SCC with core, core_insulation, sheath, sheath_insulation, armor, armor_insulation
         if 'armor_insulation_outer_radius' in self.model.scc:
             zcs = zij['zcs']['z11'] + zij['zcs']['z12'] + zij['zcs']['z2i']
