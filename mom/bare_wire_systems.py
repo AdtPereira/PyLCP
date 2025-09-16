@@ -132,7 +132,7 @@ class MulticonductorBareWireSystems:
         assert gc.ndim == 2 and gc.shape[0] == gc.shape[1], "A matriz de capacitância generalizada deve ser quadrada."
         num_conductors = gc.shape[0]
         assert num_conductors > 1, "O cálculo da capacitância Maxwelliana requer pelo menos 2 condutores."
-        assert hasattr(self.model, 'idx_ref'), "O atributo 'idx_ref' (índice do condutor de referência) não foi encontrado."
+        assert hasattr(self.model, 'mtl_idx_ref'), "O atributo 'mtl_idx_ref' (índice do condutor de referência) não foi encontrado."
         assert 0 <= self.model.mtl_idx_ref < num_conductors, f"O índice de referência self.idx_ref ({self.model.mtl_idx_ref}) está fora do intervalo válido [0, {num_conductors-1}]."
 
         # --- Etapa 1: Calcular a matriz Maxwelliana completa (NxN) ---

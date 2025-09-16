@@ -2,6 +2,7 @@
 """ It is a Python script that contains the main function and a class called User. """
 
 import re
+import os
 import json
 import numpy as np
 import pandas as pd
@@ -139,6 +140,34 @@ def verify_kelvin_functions(q = 1.5):
     print("\n[Test 2] Values derived from sqrt(j) * I_1(q * sqrt(j)):")
     print(f"Re[...] = {ber_p_from_bessel:>10.6f} -> Matches ber'(q)? {np.isclose(ber_p_ref, ber_p_from_bessel)}")
     print(f"Im[...] = {bei_p_from_bessel:>10.6f} -> Matches bei'(q)? {np.isclose(bei_p_ref, bei_p_from_bessel)}")
+
+def save_figure_multiformat(fig, results_dir, base_filename, formats=['png', 'pdf']):
+    """
+    Saves a figure to multiple file formats in the case's results directory.
+
+    Args:
+        fig (matplotlib.figure.Figure): The figure object to save.
+        base_filename (str): The base name for the output file, without extension.
+        formats (list, optional): A list of file extensions to save as. 
+                                    Defaults to ['png', 'svg'].
+    """
+    # Loop through each format and save the figure
+    for fmt in formats:
+        # Create the full filename with the current format's extension
+        full_filename = f"{base_filename}.{fmt}"
+        
+        # Create the full path to the results directory
+        file_path = os.path.join(results_dir, full_filename)
+        
+        # Prepare keyword arguments for savefig to handle format-specific options
+        save_kwargs = {'bbox_inches': 'tight'}
+        if fmt == 'png':
+            save_kwargs['dpi'] = 300
+        
+        # Save the figure using the specific options
+        fig.savefig(file_path, **save_kwargs)
+        
+        print(f"Plot saved to {file_path}")
 
 def load_json_parameters(script_file_path, show_content=False):
     """
