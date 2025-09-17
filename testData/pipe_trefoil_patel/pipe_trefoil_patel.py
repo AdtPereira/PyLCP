@@ -15,6 +15,8 @@ try:
     if str(project_root) not in sys.path:
         sys.path.insert(0, str(project_root)) 
     print(f"Project root configured at: {project_root}")
+    case_name = os.path.splitext(os.path.basename(__file__))[0]
+    print(f"Case name identified as: '{case_name}'")
 except IndexError:
     raise RuntimeError("Could not find project root. Ensure the directory structure is correct.")
 
@@ -22,7 +24,7 @@ except IndexError:
 try:
     from utils.case_utils import *
     from models import pipe_type 
-    from mtl_main.graphics import MTLRepresentation
+    from mtl_main.graphics import IsolatedMTLRepresentation
     from mtl_main.source import MulticonductorTransmissionLine
     print("Core modules imported successfully.")
 except ImportError as e:
@@ -48,11 +50,8 @@ def main():
     mtl_model = MulticonductorTransmissionLine(MODEL)
 
     print(f"End of the routine! Time spent on simulation: {(time.time() - st):.1f} seconds.\n")
-    
-    # Visualize the generated geometry
-    MTLRepresentation(mtl_model, units='millimeter').isolated_systems()
-    plt.show()
-    
+    IsolatedMTLRepresentation(mtl_model, case_name, units='millimeter').system_schematic()
+    plt.show()    
 
 if __name__ == "__main__":
     main()

@@ -6,13 +6,15 @@ import numpy as np
 from pathlib import Path
 import matplotlib.pyplot as plt
 
-# --- Configure project root for module imports (sem alteração) ---
+# --- Configure project root for module imports ---
 try:
     os.system('cls' if os.name == 'nt' else 'clear')
     project_root = Path(__file__).resolve().parents[2]
     if str(project_root) not in sys.path:
         sys.path.insert(0, str(project_root)) 
     print(f"Project root configured at: {project_root}")
+    case_name = os.path.splitext(os.path.basename(__file__))[0]
+    print(f"Case name identified as: '{case_name}'")
 except IndexError:
     raise RuntimeError("Could not find project root. Ensure the directory structure is correct.")
 
@@ -32,8 +34,8 @@ def main():
     input_json = load_json_parameters(__file__, show_content=True)
     model = isolated_wires.circular_conductor_wires(input_json, show_model=True)
     
-    # --- Model setup (sem alteração) ---
-    pul = BifilarPul(project_root, model, SUM_MAX=18) 
+    # --- Model setup ---
+    pul = BifilarPul(project_root, case_name, model, SUM_MAX=18) 
     pul.run_single_fortran()
     pul.run_mom_methods()
     pul.run_srw_rates()

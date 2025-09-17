@@ -23,7 +23,7 @@ try:
     from utils.case_utils import *
     from models import single_core_cables as scc 
     from plotter.patel_models import PatelModels
-    from mtl_main.graphics import MTLRepresentation
+    from mtl_main.graphics import IsolatedMTLRepresentation
     from mtl_main.source import MulticonductorTransmissionLine
     from analytical_forms.single_core_cable import InternalPerUnitParameters
     from mom_so.quasi_static_green import QuasiStatic
@@ -118,8 +118,6 @@ def main():
     st = time.time()    
     input_json = load_json_parameters(__file__, show_content=True)
     model = scc.isolated_coaxial_cable(input_json, show_model=True)
-    
-    # --- Model setup (sem alteração) ---
     mtl_model = MulticonductorTransmissionLine(model)
 
     # --- VECTORIZED CALCULATION ---
@@ -138,7 +136,6 @@ def main():
     z_partial_stack = mom_so.z_partial(green_matrix)    # Partial impedance matrix
     zs_stack = post_processor.z_total(z_partial_stack)  # Total series impedance matrix
     verify_constrain_equation(mtl_model)
-    print(f"End of the routine! Time spent on simulation: {(time.time() - st):.1f} seconds.\n")
 
     # Populate the pul_data dictionary 
     pul_data = {
@@ -169,11 +166,12 @@ def main():
         }
     }
 
+    print(f"End of the routine! Time spent on simulation: {(time.time() - st):.1f} seconds.\n")
     plotter = PatelModels(pul_data, case_name)
     plotter.internal_impedance_matrix_js_method()
     plotter.internal_impedance_matrix_energy_method()
     plotter.internal_impedance_elements()
-    MTLRepresentation(mtl_model, units='millimeter').isolated_coaxial_cables()
+    IsolatedMTLRepresentation(mtl_model, case_name, units='millimeter').coaxial_cable()
     plt.show()    
 
 if __name__ == "__main__":

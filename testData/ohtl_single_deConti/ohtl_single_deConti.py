@@ -15,6 +15,8 @@ try:
     if str(project_root) not in sys.path:
         sys.path.insert(0, str(project_root)) 
     print(f"Project root configured at: {project_root}")
+    case_name = os.path.splitext(os.path.basename(__file__))[0]
+    print(f"Case name identified as: '{case_name}'")
 except IndexError:
     raise RuntimeError("Could not find project root. Ensure the directory structure is correct.")
 
@@ -22,7 +24,7 @@ except IndexError:
 try:
     from utils.case_utils import *
     from models import overhead_lines
-    from mtl_main.graphics import MTLRepresentation
+    from mtl_main.graphics import GroundReturnMTLRepresentation
     from mtl_main.source import MulticonductorTransmissionLine
     from analytical_forms.overhead_lines import InternalPerUnitParameters
     from plotter.deConti_models import InternalLinesModels
@@ -72,9 +74,9 @@ def main():
     plotter.internal_impedance()
     plotter.nahman_holt_comparison()
     plotter.internal_tubular_characteristics()
-    MTLRepresentation(mtl_solid, units='millimeter').ground_return_systems()
-    MTLRepresentation(mtl_tubular, units='millimeter').ground_return_systems()
-    plt.show()    
+    GroundReturnMTLRepresentation(mtl_solid, case_name, units='millimeter').system_schematic(base_filename='system_schematic_solid')
+    GroundReturnMTLRepresentation(mtl_tubular, case_name, units='millimeter').system_schematic(base_filename='system_schematic_tubular')
+    plt.show()
 
 if __name__ == "__main__":
     main()

@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Dict, Any
 
 from mtl_main.utils import *
-from mtl_main.graphics import MTLRepresentation
+from mtl_main.graphics import IsolatedMTLRepresentation
 from mtl_main.source import MulticonductorTransmissionLine
 from mtl_paul.py_fortran import FortranRunner
 from analytical_forms.isolated_wires import WiresHomogeneousMedia
@@ -23,7 +23,7 @@ class BifilarBareWirePULParameters:
     how the calculated inductance and capacitance values stabilize. The class facilitates a comparison
     between a Fortran-based simulation (RIBBON.FOR) and a Python-based Method of Moments (MoM) implementation.
     """
-    def __init__(self, project_root: Path, mtl: Dict[str, Any], SUM_MAX: int = 10):
+    def __init__(self, project_root: Path, case_name: str, mtl: Dict[str, Any], SUM_MAX: int = 10):
         """
         Inicializa o analisador de convergência.
 
@@ -35,6 +35,7 @@ class BifilarBareWirePULParameters:
         assert len([key for key in mtl.keys() if isinstance(key, int)]) == 2, "A linha bifilar deve conter exatamente dois condutores."
 
         self.project_root = project_root
+        self.case_name = case_name
         self.mtl_copy = copy.deepcopy(mtl)
         self.freq_range = {'ana': np.logspace(0, 6, num=200), 'mom': np.logspace(0, 6, num=30)}
         self.srw_ratios = {'ana': np.linspace(2.1, 8, num=300), 'mom': np.linspace(2.1, 8, num=40)}
@@ -220,7 +221,7 @@ class BifilarBareWirePULParameters:
         print("\n============== pyMoM MulticonductorBareWireSystems =============")
 
         mtl_model = MulticonductorTransmissionLine(self.mtl_copy)
-        MTLRepresentation(mtl_model, units='millimeter').isolated_wires()
+        IsolatedMTLRepresentation(mtl_model, self.case_name, units='millimeter').wires()
         mom_wires = MulticonductorBareWireSystems(mtl_model)
         mom_wires.run_simulation()
         mom_wires.print_results()

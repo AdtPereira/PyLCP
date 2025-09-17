@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Dict, Any
 
 from mtl_main.utils import *
-from mtl_main.graphics import MTLRepresentation
+from mtl_main.graphics import IsolatedMTLRepresentation
 from mtl_main.source import MulticonductorTransmissionLine
 from mtl_paul.py_fortran import FortranRunner
 from analytical_forms.isolated_wires import WiresHomogeneousMedia
@@ -17,7 +17,7 @@ class BifilarCoatedWirePULParameters:
     Encapsula a lógica para executar e analisar o estudo de convergência
     de capacitância, comparando MoM Python e Fortran.
     """
-    def __init__(self, project_root: Path, mtl: Dict[str, Any], SUM_MAX: int = 10):
+    def __init__(self, project_root: Path, case_name: str, mtl: Dict[str, Any], SUM_MAX: int = 10):
         """
         Inicializa o analisador de convergência.
 
@@ -27,6 +27,7 @@ class BifilarCoatedWirePULParameters:
         """
 
         self.project_root = project_root
+        self.case_name = case_name
         self.mtl_copy = copy.deepcopy(mtl)
         self.freq_range = {'ana': np.logspace(0, 6, num=200), 'mom': np.logspace(0, 6, num=30)}
         self.srw_ratios = {'ana': np.linspace(4.0, 10.0, num=300), 'mom': np.linspace(4.0, 10.0, num=40)}
@@ -235,7 +236,7 @@ class BifilarCoatedWirePULParameters:
 
         print("\n==============      pyMoM TwoCoatedWireSystem      =============")
         coated_wires_model = MulticonductorTransmissionLine(self.mtl_copy)
-        MTLRepresentation(coated_wires_model, units='millimeter').isolated_wires()
+        IsolatedMTLRepresentation(coated_wires_model, self.case_name, units='millimeter').wires()
         coated_wires = MulticonductorCoatedWireSystems(coated_wires_model)
         coated_wires.run_simulation()
         coated_wires.print_results()

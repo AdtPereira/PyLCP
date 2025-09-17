@@ -38,13 +38,15 @@ import numpy as np
 from pathlib import Path
 import matplotlib.pyplot as plt
 
-# --- Configure project root for module imports (sem alteração) ---
+# --- Configure project root for module imports ---
 try:
     os.system('cls' if os.name == 'nt' else 'clear')
     project_root = Path(__file__).resolve().parents[2]
     if str(project_root) not in sys.path:
         sys.path.insert(0, str(project_root)) 
     print(f"Project root configured at: {project_root}")
+    case_name = os.path.splitext(os.path.basename(__file__))[0]
+    print(f"Case name identified as: '{case_name}'")
 except IndexError:
     raise RuntimeError("Could not find project root. Ensure the directory structure is correct.")
 
@@ -53,7 +55,7 @@ try:
     from utils.case_utils import *
     from plotter.prysmian_models import PrysmianModels
     from models.scc import SingleCoreCableModelGenerator
-    from mtl_main.graphics import MTLRepresentation
+    from mtl_main.graphics import GroundReturnMTLRepresentation
     from mtl_main.source import MulticonductorTransmissionLine
     from analytical_forms.single_core_cable import InternalPerUnitParameters, PerUnitParameters
     print("Core modules imported successfully.")
@@ -68,7 +70,7 @@ def main():
     model_generator = SingleCoreCableModelGenerator(input_json)
     model = model_generator.generate_underground_model(show_model=True)
     
-    # --- Model setup (sem alteração) ---
+    # --- Model setup ---
     mtl_model = MulticonductorTransmissionLine(model)
 
     # Define the calculation scenarios
@@ -118,7 +120,7 @@ def main():
     plotter.core_sheath_internal_parameters()
     plotter.ground_return_impedance()
     plotter.log_matricial_pul_parameters()
-    MTLRepresentation(mtl_model, units='centimeter').ground_return_systems()
+    GroundReturnMTLRepresentation(mtl_model, case_name, units='centimeter').system_schematic()
     plt.show()    
 
 if __name__ == "__main__":

@@ -3,9 +3,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 from utils.case_utils import *
 
-class PatelModels:
+class LafaiaModels:
     """
-    A highly refactored class to handle plotting for the Patel model results.
+    A highly refactored class to handle plotting for the Lafaia model results.
     It uses a configuration-driven approach to generate complex subplot figures.
     It also saves the generated figures to a case-specific results directory.
     """
@@ -41,16 +41,17 @@ class PatelModels:
 
         # The slice [:, 0, 0] extracts the (0,0) element for all frequencies.        
         zcs = self.pul_data['analytical']['internal_parameters']['hybrid']['zcs']
-        rs = self.pul_data['numerical']['series_resistance_matrix'][:, 0, 0] 
-        ls = self.pul_data['numerical']['series_inductance_matrix'][:, 0, 0] 
+        # rs = self.pul_data['numerical']['series_resistance_matrix'][:, 0, 0] 
+        # ls = self.pul_data['numerical']['series_inductance_matrix'][:, 0, 0] 
         
         # Equivalent single conductor impedance. Eq. (2.10a) [AMETANI, 2015]
         Zcs = zcs['z11'] + zcs['z12'] + zcs['z2i'] 
 
         if 'comsol' in self.pul_data and self.pul_data['comsol'] is not None:
-            cmsl_data = self.pul_data['comsol']['core_sheath_return']            
-            ax1.scatter(cmsl_data['freq'], cmsl_data['coil_resistance'] * self.r_factor, label='COMSOL (mf)', marker='o', facecolors='black', s=10, zorder=2)
-            ax2.scatter(cmsl_data['freq'], cmsl_data['coil_inductance'] * self.l_factor, label='COMSOL (mf)', marker='o', facecolors='black', s=10, zorder=2)
+            cmsl_data = self.pul_data['comsol']['core_sheath_return'] 
+            w = 2 * np.pi * cmsl_data['freq']
+            ax1.scatter(cmsl_data['freq'], np.real(cmsl_data['coil_impedance']) * self.r_factor, label='COMSOL (mf)', marker='o', facecolors='black', s=10, zorder=2)
+            ax2.scatter(cmsl_data['freq'], np.imag(cmsl_data['coil_impedance']) / w * self.l_factor, label='COMSOL (mf)', marker='o', facecolors='black', s=10, zorder=2)
 
             ax1.scatter(cmsl_data['freq'], cmsl_data['r11'] * self.r_factor, marker='o', facecolors='darkgray', s=10, zorder=3)
             ax2.scatter(cmsl_data['freq'], cmsl_data['l11'] * self.l_factor, marker='o', facecolors='darkgray', s=10, zorder=3)
@@ -60,8 +61,8 @@ class PatelModels:
 
             ax2.scatter(cmsl_data['freq'], cmsl_data['l12'] * self.l_factor, marker='o', facecolors='darkgreen', s=10, zorder=3)
 
-        ax1.scatter(self.f_mom, rs * self.r_factor, label='MoM-SO', marker='o', facecolors='none', edgecolors='k', s=50, zorder=3)
-        ax2.scatter(self.f_mom, ls * self.l_factor, label='MoM-SO', marker='o', facecolors='none', edgecolors='k', s=50, zorder=3)
+        # ax1.scatter(self.f_mom, rs * self.r_factor, label='MoM-SO', marker='o', facecolors='none', edgecolors='k', s=50, zorder=3)
+        # ax2.scatter(self.f_mom, ls * self.l_factor, label='MoM-SO', marker='o', facecolors='none', edgecolors='k', s=50, zorder=3)
         
         ax1.plot(self.f, np.real(zcs['z11']) * self.r_factor, label=r'$R_{11}$: internal resistance of core outer surface', linestyle='--', color='darkgray', linewidth=1.0) 
         ax1.plot(self.f, np.real(zcs['z12']) * self.r_factor, label=r'$R_{12}$: core outer insulator resistance', linestyle='--', color='green', linewidth=1.0) 
@@ -82,7 +83,7 @@ class PatelModels:
         ax1.set_xlabel('Frequency (Hz)')
         ax1.set_ylabel(r'$R_{cs}$ $(\Omega/km)$')
         ax1.grid(True, which='both', linestyle='--', linewidth=0.5)
-        ax1.set_title('Internal Resistance, $R_{cs}$')
+        ax1.set_title(r'Internal Resistance, $R_{cs}$')
 
         # Configure right subplot (Inductance)
         ax2.set_xscale('log')
@@ -92,7 +93,7 @@ class PatelModels:
         ax2.set_xlabel('Frequency (Hz)')
         ax2.set_ylabel(r'$L_{cs}$ (mH/km)')
         ax2.grid(True, which='both', linestyle='--', linewidth=0.5)
-        ax2.set_title('Internal Inductance, $L_{cs}$')
+        ax2.set_title(r'Internal Inductance, $L_{cs}$')
         plt.tight_layout(rect=[0, 0, 1, 0.96])
         save_figure_multiformat(fig, self.results_dir, base_filename='patel_internal_impedance_elements')
 
@@ -147,17 +148,17 @@ class PatelModels:
         ax1.set_xlabel('Frequency (Hz)')
         ax1.set_ylabel(r'$[R]$ $(\Omega/km)$')
         ax1.grid(True, which='both', linestyle='--', linewidth=0.5)
-        ax1.set_title('Internal Resistance, $R_{cs}$')
+        ax1.set_title(r'Internal Resistance, $R$')
 
         # Configure right subplot (Inductance)
         ax2.set_xscale('log')
         ax2.set_xlim(1e0, 1e6)
-        ax2.set_ylim(0, 0.2)
+        ax2.set_ylim(0, 0.35)
         # ax2.legend(fontsize='small')
         ax2.set_xlabel('Frequency (Hz)')
         ax2.set_ylabel(r'$[L]$ (mH/km)')
         ax2.grid(True, which='both', linestyle='--', linewidth=0.5)
-        ax2.set_title('Internal Inductance, $L_{cs}$')
+        ax2.set_title(r'Internal Inductance, $L$')
         plt.tight_layout(rect=[0, 0, 1, 0.96])
         save_figure_multiformat(fig, self.results_dir, base_filename='patel_internal_impedance_matrix_js_method')
 
@@ -173,8 +174,12 @@ class PatelModels:
             core_exc = self.pul_data['comsol']['core']
             sheath_exc = self.pul_data['comsol']['sheath']
 
-            ax1.scatter(core_exc['freq'], (core_exc['r11']+core_exc['r2i']) * self.r_factor, label='mf.r11+mf.r2i (Core Exc.)', marker='o', edgecolor='black', facecolors='none', s=30)
-            ax2.scatter(core_exc['freq'], (core_exc['l11']+core_exc['l2i']+core_exc['l12']) * self.l_factor, label='mf.L11+mf.L2i+mf.L12 (Core Exc.)', marker='o', edgecolor='black', facecolors='none', s=30)
+            ax1.scatter(core_exc['freq'],
+                         (core_exc['r11']+core_exc['r2i']) * self.r_factor,
+                         label='mf.r11+mf.r2i (Core Exc.)', marker='o', edgecolor='black', facecolors='none', s=30)
+            ax2.scatter(core_exc['freq'],
+                         (core_exc['l11']+core_exc['l2i']+core_exc['l12']+core_exc['l13']) * self.l_factor,
+                         label='mf.L11+mf.L2i+mf.L12+mf.L13 (Core Exc.)', marker='o', edgecolor='black', facecolors='none', s=30)
 
             ax1.scatter(core_exc['freq'], 0.5 * core_exc['r2i'] * self.r_factor, label='mf.r2i (Core Exc.)', marker='o', edgecolor='darkgreen', facecolors='none', s=12)
             ax2.scatter(core_exc['freq'], 0.5 * core_exc['l2i'] * self.l_factor, label='mf.L2i (Core Exc.)', marker='o', edgecolor='darkgreen', facecolors='none', s=12)
@@ -204,17 +209,17 @@ class PatelModels:
         ax1.set_xlabel('Frequency (Hz)')
         ax1.set_ylabel(r'$[R]$ $(\Omega/km)$')
         ax1.grid(True, which='both', linestyle='--', linewidth=0.5)
-        ax1.set_title('Internal Resistance, $R_{cs}$')
+        ax1.set_title(r'Internal Resistance, $R$')
 
         # Configure right subplot (Inductance)
         ax2.set_xscale('log')
         ax2.set_xlim(1e0, 1e6)
-        ax2.set_ylim(0, 0.2)
+        ax2.set_ylim(0, 0.35)
         ax2.legend(fontsize='small')
         ax2.set_xlabel('Frequency (Hz)')
         ax2.set_ylabel(r'$[L]$ (mH/km)')
         ax2.grid(True, which='both', linestyle='--', linewidth=0.5)
-        ax2.set_title('Internal Inductance, $L_{cs}$')
+        ax2.set_title(r'Internal Inductance, $L$')
         plt.tight_layout(rect=[0, 0, 1, 0.96])
         save_figure_multiformat(fig, self.results_dir, base_filename='patel_internal_impedance_matrix_energy_method')
 

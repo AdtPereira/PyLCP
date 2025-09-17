@@ -5,6 +5,7 @@ __pycache__/
 *.DAT
 *.log
 *.mph.lock
+*.mph
 
 Results/
 logs/
