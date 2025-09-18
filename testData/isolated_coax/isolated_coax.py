@@ -171,7 +171,7 @@ def main():
     plotter.internal_impedance_matrix_js_method()
     plotter.internal_impedance_matrix_energy_method()
     plotter.internal_impedance_elements()
-    IsolatedMTLRepresentation(mtl_model, case_name, units='millimeter').coaxial_cable()
+    IsolatedMTLRepresentation(mtl_model, case_name, units='millimeter').system_schematic()
     plt.show()    
 
 if __name__ == "__main__":

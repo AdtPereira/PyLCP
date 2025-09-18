@@ -494,7 +494,7 @@ def trefoil_asymmetric_model(
         conductor_id += 1
 
     if show_model:
-        print("\n--- Generated MODEL Dictionary ---")
+        print("\n--- Generated ASYMMETRIC MODEL Dictionary ---")
         print(json.dumps(MODEL, indent=2, default=str))
         print("--------------------------------\n")
 

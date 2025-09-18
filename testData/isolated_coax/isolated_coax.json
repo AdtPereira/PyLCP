@@ -1,4 +1,5 @@
 {
+  "type": "coaxial",
   "name": "Isolated Coaxial Cable",
   "note": "An isolated coaxial cable with air insulation. Patel (2014) model.",
   "frequency":{
@@ -19,7 +20,7 @@
       "outer_radius_m": 0.022,
       "conductivity_S_per_m": 5.8E7,
       "insulation": {
-        "type": "Air",
+        "type": "air",
         "thickness_m": 0.0175,
         "relative_permittivity": 1.0
       }

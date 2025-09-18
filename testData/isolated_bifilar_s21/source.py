@@ -221,7 +221,7 @@ class BifilarBareWirePULParameters:
         print("\n============== pyMoM MulticonductorBareWireSystems =============")
 
         mtl_model = MulticonductorTransmissionLine(self.mtl_copy)
-        IsolatedMTLRepresentation(mtl_model, self.case_name, units='millimeter').wires()
+        IsolatedMTLRepresentation(mtl_model, self.case_name, units='millimeter').system_schematic()
         mom_wires = MulticonductorBareWireSystems(mtl_model)
         mom_wires.run_simulation()
         mom_wires.print_results()

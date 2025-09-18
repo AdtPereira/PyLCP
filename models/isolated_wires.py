@@ -29,6 +29,7 @@ def _add_conductor_to_model(MODEL, input_json, conductor_id):
     if insulation_data:
         insulation_dict = {
             'name': f"primary_insulation",
+            'type': insulation_data.get('type', 'XLPE'),
             'center_point': (x_coordinate, 0.0),
             'thickness': insulation_data['thickness'] / scale_unit,
             'relative_permittivity': insulation_data['relative_permittivity'],

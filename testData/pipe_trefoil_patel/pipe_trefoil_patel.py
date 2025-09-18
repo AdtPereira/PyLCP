@@ -36,13 +36,11 @@ def main():
     Main function to run the simulation and plotting.
     """
     st = time.time()    
-    
-    # 1. Load parameters from the sibling .in.json file
     parameters = load_json_parameters(__file__, show_content=True)
     
     # 2. Generate the MODEL dictionary by calling the parametric function
     # The ** operator unpacks the dictionary into keyword arguments
-    MODEL = pipe_type.trefoil_symmetric_model(**parameters, show_model=True)
+    # MODEL = pipe_type.trefoil_symmetric_model(**parameters, show_model=True)
     MODEL = pipe_type.trefoil_asymmetric_model(**parameters, show_model=True)
 
     # The rest of the simulation runs as before

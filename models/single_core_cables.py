@@ -66,7 +66,7 @@ def isolated_coaxial_cable(
     # Build the base MODEL dictionary
     MODEL = {
         'name': input_json.get('name', 'SINGLE_PHASE_SCC'),
-        'type': 'coaxial',
+        'type': input_json.get('type', 'coaxial'),
         'note': input_json.get('note', 'A parametric single-phase SCC model.'),
         'idx_ref_conductor': 0,
         'frequency': frequency,

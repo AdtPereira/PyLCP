@@ -236,7 +236,7 @@ class BifilarCoatedWirePULParameters:
 
         print("\n==============      pyMoM TwoCoatedWireSystem      =============")
         coated_wires_model = MulticonductorTransmissionLine(self.mtl_copy)
-        IsolatedMTLRepresentation(coated_wires_model, self.case_name, units='millimeter').wires()
+        IsolatedMTLRepresentation(coated_wires_model, self.case_name, units='millimeter').system_schematic()
         coated_wires = MulticonductorCoatedWireSystems(coated_wires_model)
         coated_wires.run_simulation()
         coated_wires.print_results()
