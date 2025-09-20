@@ -23,7 +23,7 @@
       "insulation": {
         "type": "core insulation",
         "thickness": 0.0280,
-        "relative_permittivity": 2.5,
+        "relative_permittivity": 2.3,
         "delta_tangent": 0.0008
       },
       "enclosure": null
@@ -35,14 +35,14 @@
       "insulation": {
         "type": "outer insulation",
         "thickness": 0.005,
-        "relative_permittivity": 2.5,
+        "relative_permittivity": 2.3,
         "delta_tangent": 0.001
       },
       "enclosure": {
         "type": "HDPE",
         "inner_radius": 0.09925,
         "outer_radius": 0.11250,
-        "relative_permittivity": 2.5,
+        "relative_permittivity": 2.3,
         "delta_tangent": 0.001,
         "insulation": {
           "type": "air",

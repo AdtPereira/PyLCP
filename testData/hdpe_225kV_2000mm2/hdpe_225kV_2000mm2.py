@@ -38,9 +38,10 @@ except ImportError as e:
 # --- Load COMSOL Data ---
 COMSOL_DATA = {}
 try:
-    COMSOL_DATA['core_sheath_return'] = load_comsol_results(__file__, comsol_tag='')
     COMSOL_DATA['core_exc'] = load_comsol_results(__file__, comsol_tag='_core_exc')
+    COMSOL_DATA['core_sheath'] = load_comsol_results(__file__, comsol_tag='_core_sheath')
     COMSOL_DATA['sheath_exc'] = load_comsol_results(__file__, comsol_tag='_sheath_exc')
+    COMSOL_DATA['shunt_params'] = load_comsol_results(__file__, comsol_tag='_shunt_params')
     print("COMSOL data loaded successfully.")
 
     # Display the first few rows of the loaded data to verify
@@ -48,15 +49,14 @@ try:
     print(COMSOL_DATA['core_exc'].head())
 
     # Display a concise summary of the DataFrame
-    print("\n--- DataFrame Info core_sheath_return---")
-    COMSOL_DATA['core_sheath_return'].info()
-    
     print("\n--- DataFrame Info core_exc---")    
     COMSOL_DATA['core_exc'].info()
-
-    # Display a concise summary of the DataFrame
+    print("\n--- DataFrame Info core_sheath---")
+    COMSOL_DATA['core_sheath'].info() 
     print("\n--- DataFrame Info sheath_exc---")    
     COMSOL_DATA['sheath_exc'].info()
+    print("\n--- DataFrame Info shunt_params---")    
+    COMSOL_DATA['shunt_params'].info()
 except FileNotFoundError as e:
     print(f"Warning: COMSOL data file not found. Skipping comparison. Details: {e}")
 
@@ -97,10 +97,10 @@ def main():
                 "approximation": internal.parameters_approximation(),
                 "hybrid": internal.parameters_hybrid(transition_frequency=1e5)
             },
-            "internal_impedance_matrix": {
-                "bessel": internal.internal_matrices(internal_form='bessel')['impedance_matrix'],
-                "approximation": internal.internal_matrices(internal_form='approximation')['impedance_matrix'],
-                "hybrid": internal.internal_matrices(internal_form='hybrid')['impedance_matrix']
+            "internal_matrices": {
+                "bessel": internal.internal_matrices(internal_form='bessel'),
+                "approximation": internal.internal_matrices(internal_form='approximation'),
+                "hybrid": internal.internal_matrices(internal_form='hybrid')
             }
         },
         'numerical': {
@@ -110,11 +110,7 @@ def main():
             # "series_resistance_matrix": post_processor.rs_matrix(zs_stack),
             # "series_inductance_matrix": post_processor.ls_matrix(zs_stack, numerical_freqs)
         },
-        'comsol': {
-            'core_sheath_return': COMSOL_DATA['core_sheath_return'],
-            'core': COMSOL_DATA['core_exc'],
-            'sheath': COMSOL_DATA['sheath_exc']
-        }
+        'comsol': COMSOL_DATA,
     }
 
     print(f"End of the routine! Time spent on simulation: {(time.time() - st):.1f} seconds.\n")
@@ -122,6 +118,7 @@ def main():
     plotter.internal_impedance_matrix_js_method()
     plotter.internal_impedance_matrix_energy_method()
     plotter.internal_impedance_elements()
+    plotter.internal_admittance_elements()
     GroundReturnMTLRepresentation(mtl_model, case_name, units='millimeter').system_schematic()    
     plt.show()
     

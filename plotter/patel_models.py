@@ -24,8 +24,9 @@ class PatelModels:
         self.f_mom = pul_data['numerical']['frequencies']
         self.w = 2 * np.pi * self.f
         self.figsize = (12, 5)
-        self.r_factor = 1e3  # Convert Ohm/m to Ohm/km
-        self.l_factor = 1e6  # Convert H/m to mH/km
+        self.r_factor = 1e3   # Convert Ohm/m to Ohm/km
+        self.l_factor = 1e6   # Convert H/m to mH/km
+        self.c_factor = 1e12  # Convert F/m to nF/km
 
         # Assumes the script is run from the project's root directory.
         self.results_dir = os.path.join('testData', self.case_name, 'Results')
@@ -40,7 +41,7 @@ class PatelModels:
         fig.suptitle('Fig. 2.6: P.u.l. series impedance of a coaxial cable with sheath path return [Patel, 2014]', fontsize=12)
 
         # The slice [:, 0, 0] extracts the (0,0) element for all frequencies.        
-        zcs = self.pul_data['analytical']['internal_parameters']['hybrid']['zcs']
+        zcs = self.pul_data['analytical']['internal_series_parameters']['hybrid']['zcs']
         rs = self.pul_data['numerical']['series_resistance_matrix'][:, 0, 0] 
         ls = self.pul_data['numerical']['series_inductance_matrix'][:, 0, 0] 
         
@@ -105,8 +106,8 @@ class PatelModels:
         fig.suptitle(r'P.u.l. internal impedance matrix of a coaxial cable with $J_s$ Method [Yin, 1990]', fontsize=12)
 
         if 'comsol' in self.pul_data and self.pul_data['comsol'] is not None:
-            core_exc = self.pul_data['comsol']['core']
-            sheath_exc = self.pul_data['comsol']['sheath']
+            core_exc = self.pul_data['comsol']['core_exc']
+            sheath_exc = self.pul_data['comsol']['sheath_exc']
             Vs11 = core_exc['core_coil_voltage']       # Core Voltage source in the core excitation
             Vs12 = core_exc['sheath_coil_voltage']     # Sheath Voltage source in the core excitation
             Vs21 = sheath_exc['core_coil_voltage']     # Core Voltage source in the sheath excitation
@@ -126,7 +127,7 @@ class PatelModels:
             ax2.scatter(sheath_exc['freq'], np.imag(Vs22) / w * self.l_factor, label='mf.VCoil_Sheath (Sheath Exc.)', marker='x', facecolors='darkblue', s=12)
 
         # core self-impedance
-        zi = self.pul_data['analytical']['internal_impedance_matrix']['hybrid']
+        zi = self.pul_data['analytical']['internal_matrices']['hybrid']['impedance_matrix']
         ax1.plot(self.f, np.real(zi[:, 0, 0]) * self.r_factor, label=r'$R_{cc}$: core self-resistance', linestyle='-', color='black', linewidth=1.0) 
         ax2.plot(self.f, np.imag(zi[:, 0, 0]) / self.w * self.l_factor, label=r'$L_{cc}$: core self-inductance', linestyle='-', color='black', linewidth=1.0) 
         
@@ -170,8 +171,8 @@ class PatelModels:
         fig.suptitle(r'P.u.l. internal impedance matrix of a coaxial cable with Loss-Energy Method [Yin, 1990]', fontsize=12)
 
         if 'comsol' in self.pul_data and self.pul_data['comsol'] is not None:
-            core_exc = self.pul_data['comsol']['core']
-            sheath_exc = self.pul_data['comsol']['sheath']
+            core_exc = self.pul_data['comsol']['core_exc']
+            sheath_exc = self.pul_data['comsol']['sheath_exc']
 
             ax1.scatter(core_exc['freq'], (core_exc['r11']+core_exc['r2i']) * self.r_factor, label='mf.r11+mf.r2i (Core Exc.)', marker='o', edgecolor='black', facecolors='none', s=30)
             ax2.scatter(core_exc['freq'], (core_exc['l11']+core_exc['l2i']+core_exc['l12']) * self.l_factor, label='mf.L11+mf.L2i+mf.L12 (Core Exc.)', marker='o', edgecolor='black', facecolors='none', s=30)
@@ -183,7 +184,7 @@ class PatelModels:
             ax2.scatter(sheath_exc['freq'], sheath_exc['l2i'] * self.l_factor, label='mf.L2i (Sheath Exc.)', marker='x', facecolors='darkblue', s=12)
 
         # core self-impedance
-        zi = self.pul_data['analytical']['internal_impedance_matrix']['hybrid']
+        zi = self.pul_data['analytical']['internal_matrices']['hybrid']['impedance_matrix']
         ax1.plot(self.f, np.real(zi[:, 0, 0]) * self.r_factor, label=r'$R_{cc}$: core self-resistance', linestyle='-', color='black', linewidth=1.0) 
         ax2.plot(self.f, np.imag(zi[:, 0, 0]) / self.w * self.l_factor, label=r'$L_{cc}$: core self-inductance', linestyle='-', color='black', linewidth=1.0) 
         
@@ -218,3 +219,32 @@ class PatelModels:
         plt.tight_layout(rect=[0, 0, 1, 0.96])
         save_figure_multiformat(fig, self.results_dir, base_filename='patel_internal_impedance_matrix_energy_method')
 
+    def internal_admittance_elements(self):
+        """
+        Generic method to create a 1x2 subplot for shunt conductance (left)
+        and shunt capacitance (right) based on a configuration key.
+        """
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=self.figsize, sharey=False)
+        fig.suptitle('P.u.l. shunt admittance of a coaxial cable with sheath path return', fontsize=12)
+
+        # The capacity matrix is frequency-independent.
+        cap = self.pul_data['analytical']['internal_matrices']['hybrid']['capacitance_matrix']
+        cap_3d = np.ones_like(self.f)[:, np.newaxis, np.newaxis] * cap[np.newaxis, :, :]  # Expand to 3D for consistency
+        
+        if 'comsol' in self.pul_data and self.pul_data['comsol'] is not None:
+            cmsl_data = self.pul_data['comsol']['shunt_params']            
+            ax2.scatter(cmsl_data['freq'], cmsl_data['c_mfec'] * self.c_factor, label='COMSOL (ec.intWe)', marker='o', facecolors='black', s=10, zorder=2)
+
+        ax2.plot(self.f, cap_3d[:, 0, 0] * self.c_factor, label=r'$C_{11}$: internal capacitance of core insulation', linestyle='--', color='darkgray', linewidth=1.0)
+
+        # Configure right subplot (Capacitance)
+        ax2.set_xscale('log')
+        ax2.set_xlim(1e0, 1e6)
+        ax2.set_ylim(94, 96)
+        ax2.legend(fontsize='small')
+        ax2.set_xlabel('Frequency (Hz)')
+        ax2.set_ylabel(r'$C$ (nF/km)')
+        ax2.grid(True, which='both', linestyle='--', linewidth=0.5)
+        ax2.set_title('Internal Capacitance, $C$')
+        plt.tight_layout(rect=[0, 0, 1, 0.96])
+        save_figure_multiformat(fig, self.results_dir, base_filename='patel_internal_admittance_elements')

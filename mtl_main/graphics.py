@@ -132,7 +132,7 @@ class BaseMTLRepresentation:
         ax.add_patch(patch)        
 
         # Preenche o interior oco do tipo 'pipe' or 'core'.
-        if conductor_label.lower() in ['pipe', 'core']:
+        if conductor_label.lower() in ['pipe', 'core'] and conductor_data['radius'][0] > 0:
             fill_patch = Circle(
                 xy=conductor_center * self.unit_factor,
                 radius=conductor_data['radius'][0] * self.unit_factor,

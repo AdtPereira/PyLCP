@@ -148,6 +148,54 @@ def cosech(x):
     """
     return 1 / np.sinh(x)
 
+def capacitance_matrix_from_energy_method(energy_vector: np.ndarray, v0: float = 1.0) -> np.ndarray:
+    """
+    Calculates the capacitance matrix from the energy stored in the electric field.
+    Application: Single-core cable with core and sheath conductors.
+
+    Args:
+        energy_vector (numpy.ndarray): A 1D array of energy values for each conductor (in Joules).
+        v0 (float): The reference voltage (in Volts).
+
+    Returns:
+        numpy.ndarray: The capacitance matrix (C) in Farads.
+
+    References:
+    [1] Y. Yin, "Calculation of frequency-dependent parameters of underground power cables with 
+        finite element method," PhD, Electrical and Computer Engineering, The University of 
+        British Columbia, Ph.D. thesis, 1990
+
+    [2] I. Lafaia, N. Alatawneh, J. Mahseredjian, A. Ametani, M. T. Correia de Barros, I. Koçar and 
+        A. Naud, "Modeling of an Underground Cable Installed in a Poly-Ethylene Tube for Transient
+        Simulations," in IEEJ Power and Energy Society Conference, Nagoya, 2015.
+    """
+    # Ensure the energy vector has the correct number of elements
+    if len(energy_vector) != 3:
+        raise ValueError("The energy_vector must contain exactly three elements: [W11, W22, W12].")
+
+    # The pre-calculated inverse of matrix A from Equation (4) [2]
+    A_inv = np.array([
+        [ 1.0,  0.0,  0.0],
+        [ 0.0,  1.0,  0.0],
+        [-0.5, -0.5,  0.5]
+    ])
+
+    # Define the right-hand side vector B from Equation (4) [2]
+    B = (4 / v0**2) * np.asarray(energy_vector)
+
+    # Calculate capacitance components directly using matrix-vector multiplication
+    # C_components = A_inv * B
+    capacitance_vector = A_inv @ B
+
+    # Extract the individual capacitance values
+    C11 = capacitance_vector[0]  # Self-capacitance of the core
+    C22 = capacitance_vector[1]  # Self-capacitance of the sheath
+    C12 = capacitance_vector[2]  # Magnitude of the mutual capacitance
+
+    # Assemble the final 2x2 symmetric capacitance matrix.
+    # The off-diagonal mutual capacitance terms are negative.
+    return np.array([[C11, C12], [C12, C22]])   
+
 class InternalPerUnitParameters:
     """
     This class calculates vector-frequency PUL parameters using an MTL geometry model.
@@ -597,16 +645,18 @@ class InternalPerUnitParameters:
         # --- Assemble the full internal impedance matrix [Zi] ---
         # A loop is required here because np.kron does not operate on stacks of matrices.
         Zi = np.zeros((self.num_freq, num_total_conductors, num_total_conductors), dtype=complex)
-        identity_N = np.identity(N)
+        Ri = np.zeros((self.num_freq, num_total_conductors, num_total_conductors), dtype=float)
+        Li = np.zeros((self.num_freq, num_total_conductors, num_total_conductors), dtype=float)
         for i in range(self.num_freq):
-            Zi[i, :, :] = np.kron(identity_N, Zij[i, :, :])
+            Zi[i, :, :] = np.kron(np.identity(N), Zij[i, :, :])
+            Ri[i, :, :] = Zi[i, :, :].real
+            Li[i, :, :] = Zi[i, :, :].imag / (2 * np.pi * self.f[i])
 
         # --- Assemble the full internal potential coefficient matrix [Pi] ---
         # This matrix is frequency-independent, so it's calculated only once.
         Pi = np.kron(np.identity(N), Pij)
         
         # --- Shunt Admittance Matrix, Ye = jw * Pi^-1 ---
-        # The expensive inversion is done only once.
         inv_Pi = lu_solve(lu_factor(Pi), np.identity(Pi.shape[0]))
         
         # The result is multiplied by the jw vector using broadcasting.
@@ -615,9 +665,12 @@ class InternalPerUnitParameters:
         Ye = self.jw[:, np.newaxis, np.newaxis] * inv_Pi
 
         return {
-            'impedance_matrix': Zi,                 # 3D Array: (freq, cond, cond)
-            'shunt_admittance_matrix': Ye,          # 3D Array: (freq, cond, cond)
-            'potential_coefficient_matrix': Pi,     # 2D Array (freq-independent)
+            'resistance_matrix': Ri,            # 3D Array: (freq, cond, cond)
+            'inductance_matrix': Li,            # 3D Array: (freq, cond, cond)
+            'impedance_matrix': Zi,             # 3D Array: (freq, cond, cond)
+            'shunt_admittance_matrix': Ye,      # 3D Array: (freq, cond, cond)
+            'potential_coefficient_matrix': Pi, # 2D Array (freq-independent)
+            'capacitance_matrix': inv_Pi        # 2D Array (freq-independent)
         }
 
 class PerUnitParameters:
