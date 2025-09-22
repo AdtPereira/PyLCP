@@ -11,9 +11,10 @@ class BaseMTLRepresentation:
     It contains common functionalities and attributes shared by specialized
     representation classes.
     """
-    def __init__(self, model: MulticonductorTransmissionLine, case_name, units='meter'):        
+    def __init__(self, model: MulticonductorTransmissionLine, case_name, autoSave: bool = True, units='meter'):        
         self.model = model
         self.case_name = case_name
+        self.autoSave = autoSave
         unit_info = UNITS_DATA.get(units, UNITS_DATA['meter'])
         active_conductors = list(self.model.mtl.values())
         self.num_sc_cables = len(set(cond['center_point'] for cond in active_conductors))
@@ -67,6 +68,9 @@ class BaseMTLRepresentation:
             h_factor = 8
         elif self.model.mtl_type == 'scc':
             title = 'Buried Single-Core Cable'
+            h_factor = -2
+        elif self.model.mtl_type == 'hdpe':
+            title = 'Single-Core Cable Buried in HDPE-Air Gap Enclosure'
             h_factor = -2
         elif self.model.mtl_type == 'pipe':
             title = 'Pipe-Type Cable'
@@ -150,8 +154,8 @@ class IsolatedMTLRepresentation(BaseMTLRepresentation):
     such as single wires, coaxial cables, and pipe-type cables where
     the ground effect is not the primary focus of the schematic.
     """
-    def __init__(self, model: MulticonductorTransmissionLine, case_name, units):
-        super().__init__(model, case_name, units)
+    def __init__(self, model: MulticonductorTransmissionLine, case_name, autoSave, units):
+        super().__init__(model, case_name, autoSave, units)
 
     def _finalize_plot(self, ax, title):
         """Applies final settings for an isolated system plot."""
@@ -195,7 +199,8 @@ class IsolatedMTLRepresentation(BaseMTLRepresentation):
             self._plot_conductor_graphic(ax, conductor_data, parameters, used_labels)
 
         self._finalize_plot(ax, parameters['title'])
-        save_figure_multiformat(fig, self.results_dir, base_filename)
+        if self.autoSave:
+            save_figure_multiformat(fig, self.results_dir, base_filename)
 
 class GroundReturnMTLRepresentation(BaseMTLRepresentation):
     """
@@ -203,8 +208,8 @@ class GroundReturnMTLRepresentation(BaseMTLRepresentation):
     such as buried cables or overhead lines, where the ground plane
     is an essential part of the schematic.
     """
-    def __init__(self, model: MulticonductorTransmissionLine, case_name, units):
-        super().__init__(model, case_name, units)
+    def __init__(self, model: MulticonductorTransmissionLine, case_name, autoSave, units):
+        super().__init__(model, case_name, autoSave, units)
 
     def system_schematic(self, base_filename='system_schematic') -> None:
         """
@@ -222,7 +227,9 @@ class GroundReturnMTLRepresentation(BaseMTLRepresentation):
         self._schematic_annotations(ax, parameters)        
         x_margin_scale = 0.2 if self.num_sc_cables > 2 else 1.0
         self._finalize_plot(ax, parameters['title'], x_margin_scale)
-        save_figure_multiformat(fig, self.results_dir, base_filename)
+
+        if self.autoSave:
+            save_figure_multiformat(fig, self.results_dir, base_filename)
 
     def _plot_enclosure_graphic(self, ax, conductor_data, parameters, used_labels):
         """

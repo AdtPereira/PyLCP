@@ -13,7 +13,7 @@ import json
 from typing import Dict, Any, Tuple, List
 from utils.case_utils import UNITS_DATA
 
-class SingleCoreCableModelGenerator:
+class SingleCoreCableInHDPEModelGenerator:
     """
     A class to generate parametric models for single-core cable arrangements.
     """
@@ -97,9 +97,9 @@ class SingleCoreCableModelGenerator:
         return conductor_id
     
     @staticmethod
-    def _show_model(model: Dict[str, Any]):
+    def show_model(model: Dict[str, Any], title: str = "Generated Model") -> None:
         """Prints the generated model dictionary in a readable format."""
-        print(f"\n--- Generated Model: {model.get('name', 'N/A')} ---")
+        print(f"\n--- {title}: {model.get('name', 'N/A')} ---")
         print(json.dumps(model, indent=2, default=str))
         print("---------------------------------------------------\n")
 
@@ -159,7 +159,7 @@ class SingleCoreCableModelGenerator:
                     v['enclosure'] = None
 
         if show_model:
-            self._show_model(model)
+            self.show_model(model)
 
         return model
     
@@ -230,10 +230,82 @@ class SingleCoreCableModelGenerator:
                     v['enclosure'] = None
 
         if show_model:
-            self._show_model(model)
+            self.show_model(model)
 
         return model
-    
+
+    def hdpe_ignored_model(self, host_conductor: str = 'sheath', show_model: bool = False) -> Dict[str, Any]:
+        """
+        Generates a model for a cable inside an HDPE enclosure.
+        The enclosure is defined within a conductor in the JSON and is added
+        as a property to that conductor in the final model dictionary.
+        The geometry remains eccentric.
+        """
+        
+        # --- Data Retrieval ---
+        # Find the conductor that defines the enclosure (typically the outermost one).
+        host_conductor_data = getattr(self, host_conductor)
+        host_insulation = host_conductor_data.get('insulation')
+        enclosure_data = host_conductor_data.get('enclosure')
+
+        if not enclosure_data:
+            raise ValueError(f"Enclosure definition not found within conductor '{host_conductor}'.")
+
+        # --- Eccentricity Calculation ---
+        # 1. The cable's center is the reference point, defined by the burial depth.
+        cable_center = (0.0, -self.arrangement['burial_depth'])
+        
+        # 2. The enclosure's center is calculated based on the cable's position.        
+        cable_outer_radius = host_conductor_data['outer_radius'] + (host_insulation['thickness'] if host_insulation else 0)        
+        enclosure_inner_radius = enclosure_data['inner_radius']
+        
+        if cable_outer_radius > enclosure_inner_radius:
+            raise ValueError("Cable does not fit inside the enclosure based on JSON dimensions.")
+
+        vertical_offset = enclosure_inner_radius - cable_outer_radius
+        
+        # 3. The enclosure's center is displaced upwards by the offset.
+        enclosure_center = (cable_center[0], cable_center[1] + vertical_offset)
+
+        # --- Model Generation ---
+        model = {
+            'name': self.input_data.get('name', 'HDPE_Enclosed_SCC_System'),
+            'type': 'hdpe',
+            'note': 'A parametric model of a cable eccentrically placed inside an HDPE enclosure.',
+            'idx_ref_conductor': 0,
+            0: {
+                'line_id': 0,
+                'conductor_name': 'soil',
+                'line_type': 'return',
+                'line_return': None,
+                'conductivity': self.soil['conductivity_S_per_m'],
+                'relative_permeability': 1.0,
+                'relative_permittivity': self.soil['relative_permittivity'],
+                'relative_permittivity_out': 1.0,
+            },
+        }
+
+        conductor_id = 1
+        # Add the cable conductors (core, sheath) at their reference position
+        conductor_id = self._add_cable_conductors(model, conductor_id, cable_center)
+
+        # --- Inject Enclosure Data into Host Conductor ---
+        # Find the host conductor's entry in the generated model.
+        for k, v in model.items():
+            if isinstance(k, int) and k > 0: 
+                v['enclosure'] = None
+                # if v.get('conductor_name') == host_conductor:
+                #     # Add the enclosure dictionary, including its calculated center point.
+                #     v['enclosure'] = enclosure_data
+                #     v['enclosure']['center_point'] = enclosure_center
+                # else:
+                #     v['enclosure'] = None
+
+        if show_model:
+            self.show_model(model)
+
+        return model
+       
     def generate_underground_model(self, show_model: bool = False) -> Dict[str, Any]:
         """
         Generates a parametric model for underground cables in a flat arrangement.
@@ -270,7 +342,7 @@ class SingleCoreCableModelGenerator:
             conductor_id = self._add_cable_conductors(model, conductor_id, cp)
 
         if show_model:
-            self._show_model(model)
+            self.show_model(model)
 
         return model
     
@@ -303,7 +375,7 @@ class SingleCoreCableModelGenerator:
             conductor_id = self._add_cable_conductors(model, conductor_id, cp)
 
         if show_model:
-            self._show_model(model)
+            self.show_model(model)
 
         return model
 
@@ -337,7 +409,7 @@ class SingleCoreCableModelGenerator:
             conductor_id = self._add_cable_conductors(model, conductor_id, cp)
 
         if show_model:
-            self._show_model(model)
+            self.show_model(model)
 
         return model
 
@@ -373,6 +445,6 @@ class SingleCoreCableModelGenerator:
         self._add_cable_conductors(model, 1, (0.0, 0.0))
 
         if show_model:
-            self._show_model(model)
+            self.show_model(model)
 
         return model

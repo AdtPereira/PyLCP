@@ -313,6 +313,129 @@ class SingleCoreCableStrategy(MTLStrategy):
         # Free-Space Permittivity [np.array]
         context.epsilon_out = np.array([sc.epsilon_0 * conductor['relative_permittivity_out'] for conductor in mtl.values()])
 
+class SingleCoreCableInHDPEStrategy(MTLStrategy):
+    """Strategy for single-core cable MTLs."""
+
+    def preprocess_mtl_data(self, mtl_input: dict) -> dict:
+        # For single-core cables (scc), we expect integer keys starting from 1.
+        mtl = {key: value for key, value in mtl_input.items() if isinstance(key, int) and key > 0}
+        mtl_ref = {key: value for key, value in mtl_input.items() if key == 0 and value.get('line_type') == 'return' and value.get('conductor_name') == 'soil'}
+        return mtl, mtl_ref
+
+    def validate(self, mtl: dict, mtl_ref: dict, mtl_input: dict):
+        key_conductors = sorted(mtl.keys())
+        key_expected = list(range(1, len(key_conductors) + 1))
+
+        assert len(mtl) > 0, "Single Core Cable-based MTL must have at least one conductor."
+        assert key_conductors == key_expected, "Cable conductor tags must be a sequence starting from 1."
+        # assert mtl_data[0]['line_type'] == 'return', "Conductor with index '0' must be the return path for cables."
+        # assert idx_ref in mtl_data, f"The reference conductor index {idx_ref} must be in the MTL dictionary."
+
+    def _count_scc_and_conductors(self, mtl_input: dict) -> tuple:
+        """
+        Counts the number of (sc) cables (N) and conductors per cable (M)
+        based on the provided data structure.
+        """
+        # 1. Filter to get only active conductors
+        active_conductors = [
+            v for k, v in mtl_input.items()
+            if isinstance(k, int) and v.get('line_type') == 'active'
+        ]
+
+        if not active_conductors:
+            return 0, 0
+
+        # 2. Count the number of cables (N) by finding unique center points
+        num_cables = len(set([cond['center_point'] for cond in active_conductors]))
+
+        # 3. Count conductors per cable (M)
+        total_active_conductors = len(active_conductors)
+        
+        if num_cables > 0:
+            conductors_per_cable = total_active_conductors // num_cables
+        else:
+            conductors_per_cable = 0
+
+        return num_cables, conductors_per_cable
+    
+    def _extract_hdpe_parameters(self, mtl: dict) -> dict:
+        """
+        Extracts geometric and physical parameters from a single-core cable
+        data structure using descriptive names for clarity. It handles solid
+        cores (inner radius = 0) and hollow layers.
+
+        Args:
+            mtl (dict): The dictionary containing conductor data for the SCC.
+
+        Returns:
+            dict: A dictionary with the calculated parameters (radii, rho, mu, epsilon).
+        """
+        hdpe = {'core': {}, 'sheath': {}, 'armor': {}}
+        core_enclosure, sheath_enclosure, armor_enclosure = None, None, None
+
+        # Identify each enclosure by its name
+        for conductor_data in mtl.values():
+            name = conductor_data.get('conductor_name')
+            if name == 'core' and conductor_data.get('enclosure') is not None:
+                core_enclosure = conductor_data['enclosure']
+            elif name == 'sheath' and conductor_data.get('enclosure') is not None:
+                sheath_enclosure = conductor_data['enclosure']
+            elif name == 'armor' and conductor_data.get('enclosure') is not None:
+                armor_enclosure = conductor_data['enclosure']
+        
+        # === CORE ===
+        if core_enclosure:
+            pass
+        
+        # === SHEATH ===
+        if sheath_enclosure:
+            hdpe['sheath']['inner_radius'] = sheath_enclosure['inner_radius']
+            hdpe['sheath']['outer_radius'] = sheath_enclosure['outer_radius']
+            
+            if 'insulation' in sheath_enclosure and sheath_enclosure['insulation']:
+                hdpe['sheath']['insulation_permittivity'] = sheath_enclosure['insulation']['relative_permittivity'] * sc.epsilon_0
+
+            # Extract physical properties for the sheath conductor (layer 2)
+            hdpe['sheath']['permittivity'] = sheath_enclosure['relative_permittivity'] * sc.epsilon_0
+
+        # === ARMOR ===
+        if armor_enclosure and hdpe.get('sheath_insulation_outer_radius') is not None:
+            pass
+
+        return hdpe
+    
+    def apply_mtl_ref_properties(self, context, mtl_input: dict) -> None:
+        # Number of single core cables (N) and conductors per cable (M)
+        context.num_sc_cables, context.num_conductors_per_scc = self._count_scc_and_conductors(mtl_input)
+
+    def apply_mtl_properties(self, context, mtl: dict) -> None:
+        """
+        Calculates and applies overhead-line-specific distance matrices to the MTL object
+        by delegating the calculation to a static helper method.
+        """
+        # 1. Delegate the complex calculation to the static method
+        properties = MTLStrategy._cable_distance_with_ground_return(mtl)
+        context.d_matrix_ground_return = properties['d_matrix_ground_return']
+        context.D_matrix_ground_return = properties['D_matrix_ground_return']
+        context.vertical_separation_matrix = properties['vertical_separation_matrix']
+        context.horizontal_separation_matrix = properties['horizontal_separation_matrix']
+
+        # Extract and apply SCC geometric parameters
+        context.scc = MTLStrategy._extract_scc_parameters(mtl)
+        context.scc['hdpe'] = self._extract_hdpe_parameters(mtl)
+
+        # Conductors Permeability [np.array]
+        context.mu = np.array([sc.mu_0 * conductor['relative_permeability'] for conductor in mtl.values()]) 
+
+        # Conductors Permittivity [np.array]
+        context.epsilon = np.array([sc.epsilon_0 * conductor['relative_permittivity'] for conductor in mtl.values()]) 
+
+        # Conductors conductivity [np.array]
+        context.sigma = np.array([conductor['conductivity'] for conductor in mtl.values()])
+
+        # Free-Space Permittivity [np.array]
+        context.epsilon_out = np.array([sc.epsilon_0 * conductor['relative_permittivity_out'] for conductor in mtl.values()])
+
 class CableStrategy(MTLStrategy):
     """Strategy for cable-based MTLs like 'coaxial', 'coated_wires', etc."""
 
@@ -508,6 +631,7 @@ def mtl_strategy_factory(mtl_type: str) -> MTLStrategy:
         'overhead': OverheadLineStrategy,
         'scc': SingleCoreCableStrategy,
         'pipe': CableStrategy,
+        'hdpe': SingleCoreCableInHDPEStrategy,
     }
     
     strategy_class = strategies.get(mtl_type)

@@ -6,6 +6,14 @@ REFERENCES:
 
 [2] A. Ametani, T. Ohno and N. Nagaoka, Cable System Transients: Theory, Modeling and 
     Simulation, Wiley-IEEE Press, 2015.
+
+[3] Y. Yin, "Calculation of frequency-dependent parameters of underground power cables with 
+        finite element method," PhD, Electrical and Computer Engineering, The University of 
+        British Columbia, Ph.D. thesis, 1990
+
+[4] I. Lafaia, N. Alatawneh, J. Mahseredjian, A. Ametani, M. T. Correia de Barros, I. Koçar and 
+    A. Naud, "Modeling of an Underground Cable Installed in a Poly-Ethylene Tube for Transient
+    Simulations," in IEEJ Power and Energy Society Conference, Nagoya, 2015. 
 """
 
 import numpy as np
@@ -159,15 +167,6 @@ def capacitance_matrix_from_energy_method(energy_vector: np.ndarray, v0: float =
 
     Returns:
         numpy.ndarray: The capacitance matrix (C) in Farads.
-
-    References:
-    [1] Y. Yin, "Calculation of frequency-dependent parameters of underground power cables with 
-        finite element method," PhD, Electrical and Computer Engineering, The University of 
-        British Columbia, Ph.D. thesis, 1990
-
-    [2] I. Lafaia, N. Alatawneh, J. Mahseredjian, A. Ametani, M. T. Correia de Barros, I. Koçar and 
-        A. Naud, "Modeling of an Underground Cable Installed in a Poly-Ethylene Tube for Transient
-        Simulations," in IEEJ Power and Energy Society Conference, Nagoya, 2015.
     """
     # Ensure the energy vector has the correct number of elements
     if len(energy_vector) != 3:
@@ -195,6 +194,221 @@ def capacitance_matrix_from_energy_method(energy_vector: np.ndarray, v0: float =
     # Assemble the final 2x2 symmetric capacitance matrix.
     # The off-diagonal mutual capacitance terms are negative.
     return np.array([[C11, C12], [C12, C22]])   
+
+class EquivalentRadiiSystems:
+    def __init__(self, model: MulticonductorTransmissionLine):
+        """
+        Initializes the vectorized calculator.
+
+        Args:
+            model (MulticonductorTransmissionLine): The MTL geometry model.
+        """
+        self.model = model
+
+        # Identify each enclosure by its name
+        scc = model.scc if hasattr(model, 'scc') else None
+        core_enclosure, sheath_enclosure, armor_enclosure = None, None, None
+        for key, enclosure_data in scc['hdpe'].items():
+            if key == 'core':
+                core_enclosure = enclosure_data
+            elif key == 'sheath':
+                sheath_enclosure = enclosure_data
+            elif key == 'armor':
+                armor_enclosure = enclosure_data
+
+        if 'core_outer_radius' in scc:
+            print("Core enclosure detected.")
+            self.rho1, self.mu1 = scc['core_resistivity'], scc['core_permeability']
+            self.r1, self.r2 = scc['core_inner_radius'], scc['core_outer_radius']
+
+        if 'core_insulation_outer_radius' in scc:
+            print("Core insulation detected.")
+            self.ei1, self.mui1 = scc['core_insulation_permittivity'], scc['core_insulation_permeability']
+            self.r3 = scc['core_insulation_outer_radius']
+
+        if 'sheath_outer_radius' in scc:
+            print("Sheath enclosure detected.")
+            self.rho2, self.mu2 = scc['sheath_resistivity'], scc['sheath_permeability']
+            self.r3, self.r4 = scc['sheath_inner_radius'], scc['sheath_outer_radius']
+
+        if 'sheath_insulation_outer_radius' in scc:
+            print("Sheath insulation detected.")
+            self.ei2, self.mui2 = scc['sheath_insulation_permittivity'], scc['sheath_insulation_permeability']
+            self.r5 = scc['sheath_insulation_outer_radius']
+
+        if sheath_enclosure is not None:
+            print("Sheath air-gap enclosure detected.")
+            self.r6, self.r7 = sheath_enclosure['inner_radius'], sheath_enclosure['outer_radius']
+            self.ei3, self.mui3 = sheath_enclosure['permittivity'], sc.mu_0
+
+        if 'armor_outer_radius' in scc:
+            print("Armor enclosure detected.")
+            self.rho3, self.mu3 = scc['armor_resistivity'], scc['armor_permeability']
+            self.r5, self.r6 = scc['armor_inner_radius'], scc['armor_outer_radius']
+
+        if 'armor_insulation_outer_radius' in scc:
+            print("Armor insulation detected.")
+            self.ei3, self.mui3 = scc['armor_insulation_permittivity'], scc['armor_insulation_permeability']
+            self.r7 = scc['armor_insulation_outer_radius']
+    
+    def concentric_insulators(self):
+        # A fórmula para a capacitância de um cilindro coaxial é C = 2*pi*epsilon / ln(r_externo / r_interno)
+
+        # C_S: Capacitância da isolação da bainha do cabo
+        C_S = (2 * np.pi * self.ei2) / np.log(self.r5 / self.r4) if self.r5 > self.r4 else np.inf
+
+        # C_a: Capacitância do entreferro de ar
+        C_a = (2 * np.pi * sc.epsilon_0) / np.log(self.r6 / self.r5) if self.r6 > self.r5 else np.inf
+
+        # C_H: Capacitância do duto de PEAD
+        C_H = (2 * np.pi * self.ei3) / np.log(self.r7 / self.r6) if self.r7 > self.r6 else np.inf
+
+        # --- Etapa 3: Calcular a capacitância total C0 para a conexão em série ---
+        # C0 = (1/C_S + 1/C_a + 1/C_H)^-1 Eq. 9 [4]
+        inv_C_S = 1 / C_S if C_S != np.inf else 0
+        inv_C_a = 1 / C_a if C_a != np.inf else 0
+        inv_C_H = 1 / C_H if C_H != np.inf else 0
+        C0 = 1 / (inv_C_S + inv_C_a + inv_C_H)
+
+        # --- Etapa 4: Calcular a permissividade relativa equivalente eps_a ---
+        eps_a_relative = C0 * np.log(self.r7 / self.r4) / (2 * np.pi * sc.epsilon_0)
+
+        print("\n======== Equivalent Radii Systems (ERS) Results ========")
+        print("r1:", self.r1, "r2:", self.r2, "r3:", self.r3, "r4:", self.r4, "r5:", self.r5, "r6:", self.r6, "r7:", self.r7)
+        print("eri1:", self.ei1/sc.epsilon_0, "eri2:", self.ei2/sc.epsilon_0, "eri3:", self.ei3/sc.epsilon_0)
+        print(f"C_S: {C_S:.4e}, C_a: {C_a:.4e}, C_H: {C_H:.4e}")
+        print(f"Total Capacitance C0: {C0:.4e}")
+        print(f"Equivalent Relative Permittivity eps_a: {eps_a_relative:.4e}")
+        print("===================================================================\n")
+
+        return {'total_capacitance': C0, 'equivalent_relative_permittivity': eps_a_relative}
+
+    def equiv_rel_permittivity_epsr_area_weighted(self, ShowInfo: bool = True) -> float:
+        """
+        Calculates the equivalent relative permittivity for "Case 2" from Lafaia, 2015 [4].
+
+        This method uses an area-weighted average of the permittivities of the
+        insulating layers that are replaced in this simplified model. The model
+        assumes a single, homogeneous insulator extending from the metallic sheath (r4)
+        to the outer radius of the HDPE tube (r7).
+
+        Returns:
+            float: The calculated equivalent relative permittivity (eps_a).
+        """
+        # Relative permittivities of the materials
+        eri2 = self.ei2 / sc.epsilon_0  # Cable's outer insulation
+        eri3 = self.ei3 / sc.epsilon_0  # HDPE tube material
+
+        # --- Cross-sectional area of each layer ---
+        area_out_insul = self.r5**2 - self.r4**2
+        area_air = self.r6**2 - self.r5**2
+        area_hdpe = self.r7**2 - self.r6**2
+        total_area = self.r7**2 - self.r4**2
+
+        # --- Area-weighted average permittivity ---
+        weighted_sum = (area_out_insul * eri2) + (area_air) + (area_hdpe * eri3)        
+        eps_a = weighted_sum / total_area
+
+        # --- Print a summary of the calculation for clarity ---
+        if ShowInfo:
+            print("\n======== Area-Weighted Average Permittivity Results ========")
+            print(f"Replacing layers from r4={self.r4*1000:.2f} mm to r7={self.r7*1000:.2f} mm")
+            print("--------------------------------------------------------------------")
+            print(f"Layer 1 (Insulation): Area/pi =  {area_out_insul*1e6:.2f} mm^2, eps_r = {eri2}")
+            print(f"Layer 2 (Air Gap):    Area/pi = {area_air*1e6:.2f} mm^2, eps_r = {1}")
+            print(f"Layer 3 (HDPE Tube):  Area/pi = {area_hdpe*1e6:.2f} mm^2, eps_r = {eri3}")
+            print("--------------------------------------------------------------------")
+            print(f"Total Area/pi: {total_area*1e6:.2f} mm^2")
+            print(f"Calculated Equivalent Relative Permittivity (eps_a): {eps_a:.4f}")
+            print("====================================================================\n")
+
+        return {
+            'sheath_outer_radius': self.r4,
+            'sheath_insulation_outer_radius': self.r5,
+            'sheath_enclosure_inner_radius': self.r6,
+            'sheath_enclosure_outer_radius': self.r7,
+            'equivalent_relative_permittivity': eps_a
+        }
+    
+    def equivalent_parameters_from_gmd(self, ShowInfo: bool = True):
+        """
+        Calculates equivalent parameters for a cable in an HDPE tube using the
+        Geometric Mean Distance (GMD) method as described by Lafaia, 2015 [4].
+
+        This method implements the logic from Equations (5) through (11) in the reference paper.
+        It transforms the eccentric geometry into an equivalent concentric one, adjusts
+        permittivity to preserve capacitance, and calculates a final equivalent
+        permittivity for the entire outer insulation system.
+
+        Args:
+            D1 (float): Inner diameter of the HDPE tube [m].
+            D2 (float): Outer diameter of the HDPE tube [m].
+
+        Returns:
+            dict: A dictionary containing the key calculated parameters, including
+                  the equivalent radii, modified permittivity, total capacitance,
+                  and the final equivalent relative permittivity (eps_a).
+        """
+        # --- Step 1: Get necessary parameters from the model ---
+        two_pi_eo = 2 * np.pi * sc.epsilon_0
+        r4, r5 = self.r4, self.r5
+        D1, D2 = 2 * self.r6, 2 * self.r7
+        
+        # --- Equivalent outer radii r6 (the air gap) and r7 (HDPE) using GMD (Eq. 6 & 7) ---
+        r6_gmd = np.exp(np.log(D1 / 2) + (2 * r5 / D1)**2 / 2 - 0.5)
+        r7_gmd = np.exp(np.log(D2 / 2) + (2 * r5 / D2)**2 / 2 - 0.5)
+
+        # --- Modify HDPE permittivity to preserve capacitance (Eq. 8) ---
+        eps_3_prime = self.ei3 / sc.epsilon_0 * (np.log(r7_gmd / r6_gmd) / np.log(D2 / D1))
+
+        # --- Total capacitance as a series of concentric layers (Eq. 9) ---
+        # C_S: Capacitance of the cable's sheath insulator
+        cs = 2 * np.pi * self.ei2 / np.log(r5 / r4)
+
+        # C_a: Capacitance of the equivalent concentric air gap
+        ca = two_pi_eo / np.log(r6_gmd / r5)
+
+        # C_H: Capacitance of the equivalent concentric HDPE tube with modified permittivity
+        ch = two_pi_eo * eps_3_prime / np.log(r7_gmd / r6_gmd)
+
+        # Total series capacitance C0
+        c0 = 1 / (1 / cs + 1 / ca + 1 / ch)
+
+        # --- Final equivalent permittivity eps_a (Eq. 11) ---
+        # This represents a single insulator from r4 to r5 with the total capacitance C0
+        eps_a_31 = c0 * np.log(r5 / r4) / two_pi_eo
+        eps_a_32 = c0 * np.log(r6_gmd / r4) / two_pi_eo
+        eps_a_33 = c0 * np.log(r7_gmd / r4) / two_pi_eo
+
+        # --- Print and return results for analysis ---
+        if ShowInfo:
+            print("\n======== GMD-Based Equivalent Systems Results (Lafaia, 2015) ========")
+            print(f"Original HDPE Dims [mm]: D1={D1*1000:.2f}, D2={D2*1000:.2f}")
+            print(f"Cable Outer Radius r5 [mm]: {r5*1000:.2f}")
+            print("-------------------------------------------------------------------")
+            print(f"GMD Air Gap Outer Radius r6 [mm]: {r6_gmd*1000:.2f}")
+            print(f"GMD HDPE Tube Outer Radius r7 [mm]: {r7_gmd*1000:.2f}")
+            print(f"Modified HDPE Relative Permittivity eps_3': {eps_3_prime:.4f}")
+            print("-------------------------------------------------------------------")
+            print(f"C_S: {cs:.4e} F/m, C_a: {ca:.4e} F/m, C_H: {ch:.4e} F/m")
+            print(f"Total Series Capacitance C0: {c0:.4e} F/m")
+            print(f"Final Equivalent Relative Permittivity, eps_a:")
+            print(f"Case 3.1: {eps_a_31:.4f}")
+            print(f"Case 3.2: {eps_a_32:.4f}")
+            print(f"Case 3.3: {eps_a_33:.4f}")
+            print("===================================================================\n")
+
+        return {
+            'air_gap_outer_radius': r6_gmd,
+            'hdpe_outer_radius': r7_gmd,
+            'modified_hdpe_rel_permittivity': eps_3_prime,
+            'equivalent_outer_capacitance': c0,
+            'equivalent_relative_permittivity': {
+                'case 3.1': eps_a_31,
+                'case 3.2': eps_a_32,
+                'case 3.3': eps_a_33,
+            }
+        }
 
 class InternalPerUnitParameters:
     """

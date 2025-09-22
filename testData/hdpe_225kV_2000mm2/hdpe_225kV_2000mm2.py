@@ -2,6 +2,7 @@
 
 import sys
 import os
+import copy
 from pathlib import Path
 import time
 import numpy as np
@@ -26,37 +27,36 @@ try:
     from plotter.lafaia_models import LafaiaModels
     from mtl_main.graphics import GroundReturnMTLRepresentation
     from mtl_main.source import MulticonductorTransmissionLine
-    from models.scc import SingleCoreCableModelGenerator
+    from models.hdpe import SingleCoreCableInHDPEModelGenerator
     from analytical_forms.single_core_cable import InternalPerUnitParameters
-    from mom_so.quasi_static_green import QuasiStatic
-    from mom_so.lossless_medium import HomogeneousLosslessMedium, LosslessPostProcessing
+    from analytical_forms.single_core_cable import EquivalentRadiiSystems
     print("Core modules imported successfully.")
 except ImportError as e:
     print(f"Error importing modules: {e}")
     sys.exit(1)
 
 # --- Load COMSOL Data ---
-COMSOL_DATA = {}
+COMSOL_DATA_0 = {}
 try:
-    COMSOL_DATA['core_exc'] = load_comsol_results(__file__, comsol_tag='_core_exc')
-    COMSOL_DATA['core_sheath'] = load_comsol_results(__file__, comsol_tag='_core_sheath')
-    COMSOL_DATA['sheath_exc'] = load_comsol_results(__file__, comsol_tag='_sheath_exc')
-    COMSOL_DATA['shunt_params'] = load_comsol_results(__file__, comsol_tag='_shunt_params')
+    COMSOL_DATA_0['core_exc'] = load_comsol_results(__file__, comsol_tag='_core_exc')
+    COMSOL_DATA_0['sheath_exc'] = load_comsol_results(__file__, comsol_tag='_sheath_exc')
+    COMSOL_DATA_0['core_sheath'] = load_comsol_results(__file__, comsol_tag='_core_sheath')
+    COMSOL_DATA_0['shunt_params'] = load_comsol_results(__file__, comsol_tag='_shunt_params')
     print("COMSOL data loaded successfully.")
 
     # Display the first few rows of the loaded data to verify
     print("--- Data Head ---")
-    print(COMSOL_DATA['core_exc'].head())
+    print(COMSOL_DATA_0['core_exc'].head())
 
     # Display a concise summary of the DataFrame
     print("\n--- DataFrame Info core_exc---")    
-    COMSOL_DATA['core_exc'].info()
+    COMSOL_DATA_0['core_exc'].info()
     print("\n--- DataFrame Info core_sheath---")
-    COMSOL_DATA['core_sheath'].info() 
+    COMSOL_DATA_0['core_sheath'].info() 
     print("\n--- DataFrame Info sheath_exc---")    
-    COMSOL_DATA['sheath_exc'].info()
+    COMSOL_DATA_0['sheath_exc'].info()
     print("\n--- DataFrame Info shunt_params---")    
-    COMSOL_DATA['shunt_params'].info()
+    COMSOL_DATA_0['shunt_params'].info()
 except FileNotFoundError as e:
     print(f"Warning: COMSOL data file not found. Skipping comparison. Details: {e}")
 
@@ -68,58 +68,108 @@ def main():
     
     # 1. Load parameters from the sibling .in.json file
     input_json = load_json_parameters(__file__, show_content=True)
-    model_generator = SingleCoreCableModelGenerator(input_json)
-    model = model_generator.generate_hdpe_enclosed_model(show_model=True)
-    mtl_model = MulticonductorTransmissionLine(model)
+    model_generator = SingleCoreCableInHDPEModelGenerator(input_json)
+    
+    model_0 = model_generator.eccentric_hdpe_enclosed_model(show_model=True)
+    model_1 = model_generator.hdpe_ignored_model(show_model=True)
+    mtl_0 = MulticonductorTransmissionLine(model_0)
+    mtl_1 = MulticonductorTransmissionLine(model_1)
+
+    # Equivalent Radii Systems (ERS) for shunt parameters
+    print("Calculating equivalent radii systems for shunt parameters...")
+    model_2 = copy.deepcopy(model_0)
+    ers = EquivalentRadiiSystems(mtl_0)
+    epsr_area = ers.equiv_rel_permittivity_epsr_area_weighted()
+    r4, r7 = epsr_area['sheath_outer_radius'], epsr_area['sheath_enclosure_outer_radius']
+    
+    # Remove enclosure for Model Case 2
+    model_2[2]['enclosure'] = None  
+    model_2[2]['insulation']['thickness'] = r7 - r4
+    model_2[2]['insulation']['relative_permittivity'] = epsr_area['equivalent_relative_permittivity']
+    model_generator.show_model(model_2, title='Modified HDPE Model (Case 2)')
+    mtl_2 = MulticonductorTransmissionLine(model_2)
+
+    # Case 3.1: The outer radius r0 of the equivalent insulator is taken as the cable 
+    # outer radius r5 in Fig. 1 (b) 
+    print("Calculating equivalent radii systems for shunt parameters...")
+    model_3 = copy.deepcopy(model_0)
+    ers = EquivalentRadiiSystems(mtl_0)
+    gmp = ers.equivalent_parameters_from_gmd()
+    eps_a = gmp['equivalent_relative_permittivity']['case 3.1']
+    model_3[2]['enclosure'] = None
+    model_3[2]['insulation']['relative_permittivity'] = eps_a
+    model_generator.show_model(model_3, title='Modified HDPE Model (Case 3)')
+    mtl_3 = MulticonductorTransmissionLine(model_3)
 
     # --- VECTORIZED CALCULATION ---
-    analytical_freqs = np.logspace(0, 6, num=200)
-    numerical_freqs = np.logspace(0, 6, num=31)
+    analytical_freqs = np.logspace(0, 6, num=31)
 
     # Analytical Formulation (Ametani et al., 2015)
-    print("Calculating internal parameters for all frequencies...")
-    internal = InternalPerUnitParameters(mtl_model, analytical_freqs)
-
-    # MoM-SO formulation (Patel, 2014)
-    # print("Vectorized numeric routine (MoM-SO)...")
-    # green_matrix = QuasiStatic(mtl_model).green_matrix()
-    # mom_so = HomogeneousLosslessMedium(mtl_model, numerical_freqs)
-    # post_processor = LosslessPostProcessing(mtl_model)
-    # z_partial_stack = mom_so.z_partial(green_matrix)    # Partial impedance matrix
-    # zs_stack = post_processor.z_total(z_partial_stack)  # Total series impedance matrix
+    print("Calculating internal parameters for Model Case 1...")
+    pul_1 = InternalPerUnitParameters(mtl_1, analytical_freqs) 
+    print("Calculating internal parameters for Model Case 2...")
+    pul_2 = InternalPerUnitParameters(mtl_2, analytical_freqs)
+    print("Calculating internal parameters for Model Case 3.1...")
+    pul_31 = InternalPerUnitParameters(mtl_3, analytical_freqs)
 
     # Populate the pul_data dictionary 
     pul_data = {
-        'analytical': {
-            "frequencies": analytical_freqs,
-            "internal_parameters": {
-                "bessel": internal.parameters_by_bessel(),
-                "approximation": internal.parameters_approximation(),
-                "hybrid": internal.parameters_hybrid(transition_frequency=1e5)
+        0: {
+            'analytical': None,
+            'numerical': None,
+            'comsol': COMSOL_DATA_0,
+        },
+        1: {
+            'analytical': {
+                "frequencies": analytical_freqs,
+                "internal_parameters": pul_1.parameters_hybrid(transition_frequency=1e5),
+                "internal_matrices": pul_1.internal_matrices(internal_form='hybrid'),
             },
-            "internal_matrices": {
-                "bessel": internal.internal_matrices(internal_form='bessel'),
-                "approximation": internal.internal_matrices(internal_form='approximation'),
-                "hybrid": internal.internal_matrices(internal_form='hybrid')
-            }
+            'numerical': None,
+            'comsol': None,
         },
-        'numerical': {
-            "frequencies": numerical_freqs,
-            # "partial_impedance_matrix": z_partial_stack,
-            # "series_impedance_matrix": zs_stack,
-            # "series_resistance_matrix": post_processor.rs_matrix(zs_stack),
-            # "series_inductance_matrix": post_processor.ls_matrix(zs_stack, numerical_freqs)
+        2: {
+            'analytical': {
+                "frequencies": analytical_freqs,
+                "internal_parameters": pul_2.parameters_hybrid(transition_frequency=1e5),
+                "internal_matrices": pul_2.internal_matrices(internal_form='hybrid'),
+            },
+            'numerical': None,
+            'comsol': None,
         },
-        'comsol': COMSOL_DATA,
+        3: {
+            'analytical': {
+                "frequencies": analytical_freqs,
+                "internal_parameters": pul_31.parameters_hybrid(transition_frequency=1e5),
+                "internal_matrices": pul_31.internal_matrices(internal_form='hybrid'),
+            },
+            'numerical': None,
+            'comsol': None,
+        },
     }
 
     print(f"End of the routine! Time spent on simulation: {(time.time() - st):.1f} seconds.\n")
-    plotter = LafaiaModels(pul_data, case_name)
+    plotter = LafaiaModels(pul_data, case_name, autoSave=True)
     plotter.internal_impedance_matrix_js_method()
     plotter.internal_impedance_matrix_energy_method()
     plotter.internal_impedance_elements()
     plotter.internal_admittance_elements()
-    GroundReturnMTLRepresentation(mtl_model, case_name, units='millimeter').system_schematic()    
+
+    # 1. Crie uma lista de configurações para cada esquemático
+    schematic_configs = [
+        {'mtl': mtl_0, 'filename': 'schematic_original_hdpe'},
+        {'mtl': mtl_1, 'filename': 'schematic_ignored_hdpe'},
+    ]
+
+    # 2. Itere sobre a lista para gerar cada esquemático
+    for config in schematic_configs:
+        schematic = GroundReturnMTLRepresentation(
+            config['mtl'], 
+            case_name=case_name, 
+            autoSave=True, 
+            units='millimeter'
+        )
+        schematic.system_schematic(base_filename=config['filename'])
     plt.show()
     
 if __name__ == "__main__":
