@@ -3,7 +3,7 @@ import pandas as pd
 import scipy.constants as sc
 import matplotlib.pyplot as plt
 import plotly.graph_objects as go
-from mtl_main.utils import *
+from utils.case_utils import *
 from mtl_main.source import MulticonductorTransmissionLine
 
 class MulticonductorCoatedWireSystems:

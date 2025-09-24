@@ -3,7 +3,6 @@ import sys
 
 SCRIPTS_TO_RUN = [
     "testData.hdpe_225kV_2000mm2.hdpe_225kV_2000mm2",
-    "testData.isolated_bifilar_pymon.isolated_bifilar_pymon",
     "testData.isolated_bifilar_s21.isolated_bifilar_s21",
     "testData.isolated_bifilar_s40.isolated_bifilar_s40",
     "testData.isolated_coax.isolated_coax",

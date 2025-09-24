@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 from pathlib import Path
 from typing import Dict, Any
 
-from mtl_main.utils import *
+from utils.case_utils import *
 from mtl_main.graphics import IsolatedMTLRepresentation
 from mtl_main.source import MulticonductorTransmissionLine
 from mtl_paul.py_fortran import FortranRunner
@@ -30,7 +30,7 @@ class BifilarCoatedWirePULParameters:
         self.case_name = case_name
         self.mtl_copy = copy.deepcopy(mtl)
         self.freq_range = {'ana': np.logspace(0, 6, num=200), 'mom': np.logspace(0, 6, num=30)}
-        self.srw_ratios = {'ana': np.linspace(4.0, 10.0, num=300), 'mom': np.linspace(4.0, 10.0, num=40)}
+        self.srw_ratios = {'ana': np.linspace(4.0, 10.0, num=300), 'mom': np.linspace(4.0, 10.0, num=30)}
 
         # Extrai parâmetros e prepara o executor do Fortran
         self._bifilar_analytical_solution()
@@ -406,7 +406,7 @@ class BifilarCoatedWirePULParameters:
         self._configure_plot_appearance(ax, 'Capacitance p.u.l. (nF/km)', capacitante_data, yscale='linear')
         plt.tight_layout()
 
-    def plot_srw_rates(self):
+    def plot_srw_rates(self, comsol_data: Dict[str, pd.DataFrame] = None):
         """
         Gera e exibe os gráficos dos resultados da simulação de forma flexível,
         organizados em subplots.
@@ -419,31 +419,43 @@ class BifilarCoatedWirePULParameters:
         """
 
         capacitante_data = {
-            'ribbon-c':     {'data': (self.srw_ratios.get('mom'), [data['ribbon-c']     for data in self.srw_mum_data.values()]), 'label': 'Dielectric-Coated (RIBBON.FOR)'},
             'mom-c':        {'data': (self.srw_ratios.get('mom'), [data['mom-c']        for data in self.srw_mum_data.values()]), 'label': 'Dielectric-Coated (MoM.PY)'},
-            'ribbon-c0':    {'data': (self.srw_ratios.get('mom'), [data['ribbon-c0']    for data in self.srw_mum_data.values()]), 'label': 'Bare-Wire (RIBBON.FOR)'},
             'mom-c0':       {'data': (self.srw_ratios.get('mom'), [data['mom-c0']       for data in self.srw_mum_data.values()]), 'label': 'Bare-Wire (MoM.PY)'},
+            'ribbon-c':     {'data': (self.srw_ratios.get('mom'), [data['ribbon-c']     for data in self.srw_mum_data.values()]), 'label': 'Dielectric-Coated (RIBBON.FOR)'},
+            'ribbon-c0':    {'data': (self.srw_ratios.get('mom'), [data['ribbon-c0']    for data in self.srw_mum_data.values()]), 'label': 'Bare-Wire (RIBBON.FOR)'},
             'exactly':      {'data': (self.srw_ratios.get('ana'), [data['c_exact']      for data in self.srw_data.values()]),     'label': 'Exactly'},
             'approx':       {'data': (self.srw_ratios.get('ana'), [data['c_approx']     for data in self.srw_data.values()]),     'label': 'Approx.'},
         }
 
         fig, ax = plt.subplots(figsize=self.figsize)
+         # Comsol Data Plotting
+        srw_cmsl = comsol_data['shunt_parameters']['srw_rate']
+        cap0_cmsl, cap_cmsl = comsol_data['shunt_parameters']['capacitance_analytic'], comsol_data['shunt_parameters']['capacitance_ec_intwe']
+        if srw_cmsl is not None and cap_cmsl is not None:
+            ax.plot(srw_cmsl, cap_cmsl * self.c_factor, label='COMSOL',
+                     linestyle='none', marker='s', markersize=10, fillstyle='none', markeredgecolor='darkblue', zorder=3)
+            
+            ax.plot(srw_cmsl, cap0_cmsl * self.c_factor,
+                     linestyle='none', marker='s', markersize=10, fillstyle='none', markeredgecolor='darkblue', zorder=3)
+            
         for key, data in capacitante_data.items():
             freq, value = data['data']
             label = data['label']
             if freq is not None and value is not None:
                 if key == 'ribbon-c':
-                    ax.plot(freq, value, label=label, color='k', linestyle='none', marker='s', markersize=5)
+                    ax.plot(freq, value, label=label, color='k', linestyle='none', marker='s', markersize=2)
                 elif key == 'ribbon-c0':
-                    ax.plot(freq, value, label=label, color='k', linestyle='none', marker='o', markersize=4)
+                    ax.plot(freq, value, label=label, color='k', linestyle='none', marker='o', markersize=2)
                 elif key == 'mom-c':
-                    ax.plot(freq, value, label=label, color='k', linestyle='none', marker='s', markersize=9, fillstyle='none', markeredgecolor='k', zorder=2)
+                    ax.plot(freq, value, label=label, color='k', linestyle='none', marker='s', markersize=6, fillstyle='none', markeredgecolor='k', zorder=2)
                 elif key == 'mom-c0':
-                    ax.plot(freq, value, label=label, color='k', linestyle='none', marker='o', markersize=9, fillstyle='none', markeredgecolor='k', zorder=2)
+                    ax.plot(freq, value, label=label, color='k', linestyle='none', marker='o', markersize=6, fillstyle='none', markeredgecolor='k', zorder=2)
                 elif key == 'approx':
                     ax.plot(freq, value, label=label, color='k', linestyle='--', linewidth=1.0, zorder=1)
                 elif key == 'exactly':
                     ax.plot(freq, value, label=label, color='k', linestyle=':', linewidth=1.0, zorder=1)
+
+       
 
         ax.set_xlabel('Ratio of separation to wire radius, s/r$_w$')
         ax.set_ylabel('Per-unit-length Capacitance, $C_{11}$ (pF/m)')

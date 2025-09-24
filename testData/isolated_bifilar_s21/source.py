@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 from pathlib import Path
 from typing import Dict, Any
 
-from mtl_main.utils import *
+from utils.case_utils import *
 from mtl_main.graphics import IsolatedMTLRepresentation
 from mtl_main.source import MulticonductorTransmissionLine
 from mtl_paul.py_fortran import FortranRunner
@@ -23,7 +23,7 @@ class BifilarBareWirePULParameters:
     how the calculated inductance and capacitance values stabilize. The class facilitates a comparison
     between a Fortran-based simulation (RIBBON.FOR) and a Python-based Method of Moments (MoM) implementation.
     """
-    def __init__(self, project_root: Path, case_name: str, mtl: Dict[str, Any], SUM_MAX: int = 10):
+    def __init__(self, project_root: Path, case_name: str, mtl: Dict[str, Any], SUM_MAX: int = 10, comsol_data: Dict[str, pd.DataFrame] = None):
         """
         Inicializa o analisador de convergência.
 
@@ -36,9 +36,10 @@ class BifilarBareWirePULParameters:
 
         self.project_root = project_root
         self.case_name = case_name
+        self.comsol_data = comsol_data
         self.mtl_copy = copy.deepcopy(mtl)
         self.freq_range = {'ana': np.logspace(0, 6, num=200), 'mom': np.logspace(0, 6, num=30)}
-        self.srw_ratios = {'ana': np.linspace(2.1, 8, num=300), 'mom': np.linspace(2.1, 8, num=40)}
+        self.srw_ratios = {'ana': np.linspace(2.1, 8, num=300), 'mom': np.linspace(2.1, 8, num=20)}
         self.N = len([key for key in mtl.keys() if isinstance(key, int)])
         
         self.sum_max = SUM_MAX
@@ -229,10 +230,10 @@ class BifilarBareWirePULParameters:
         self.mom_data = {freq: {'c': self.c_factor * mom_wires.C_maxwellian.item()} for freq in self.freq_range['mom']}
 
         if autoPlots:
-            mom_wires.plot_charge_density()
-            mom_wires.plot_harmonic_coefficients()
-            mom_wires.plot_collocation_points()
-            MulticonductorBareWireSystems.plot_convergence_rates(self.mtl_copy, nf_max=20)
+            mom_wires.plot_charge_density(comsol_data=self.comsol_data)
+            # mom_wires.plot_harmonic_coefficients()
+            # mom_wires.plot_collocation_points()
+            # MulticonductorBareWireSystems.plot_convergence_rates(self.mtl_copy, nf_max=20)
 
     def run_analytical(self):
         """

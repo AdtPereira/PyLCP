@@ -4,7 +4,8 @@ import pandas as pd
 import scipy.constants as sc
 import matplotlib.pyplot as plt
 import plotly.graph_objects as go
-from mtl_main.utils import *
+
+from utils.case_utils import *
 from mtl_main.source import MulticonductorTransmissionLine
 
 class MulticonductorBareWireSystems:
@@ -47,6 +48,9 @@ class MulticonductorBareWireSystems:
         self.sigma_coeffs = None
         self.C_generalized = None
         self.C_maxwellian = None
+
+        # Atributos gráficos
+        self.figsize = (12, 5)
 
     def _calculate_collocation_points(self):
         """
@@ -361,7 +365,7 @@ class MulticonductorBareWireSystems:
         )
         fig.show()
  
-    def plot_charge_density(self, tag_to_plot=1):
+    def plot_charge_density(self, tag_to_plot=1, comsol_data: dict = None):
         """
         Plota a densidade de carga para um condutor específico, alinhando
         dinamicamente a solução exata com a geometria real do sistema.
@@ -421,9 +425,27 @@ class MulticonductorBareWireSystems:
 
         # 4. Geração do Gráfico
         plt.style.use('default')
-        fig, ax = plt.subplots(figsize=(8, 5))
+        fig, ax = plt.subplots(figsize=self.figsize)
         ax.plot(np.rad2deg(theta_plot), charge_density_exact, 'r-', label='Solução Exata')
         ax.plot(np.rad2deg(theta_plot), charge_density_mom, 'k-.', label=f'MoM (tag={tag_to_plot})')
+        
+        # --- NEW: Plot COMSOL Data if provided ---
+        if comsol_data is not None and isinstance(comsol_data, dict):
+            # Map tag to the corresponding curve key
+            comsol_df = comsol_data.get('curve_1')
+            comsol_label = 'COMSOL (Curve 1)'
+
+            if comsol_df is not None and not comsol_df.empty:
+                # Convert arc length to angle in degrees
+                # angle = arc_length / radius
+                comsol_angle_deg = (comsol_df['arc_length'] / R) * (180 / np.pi)
+                
+                # Convert charge density from nC/m^2 to C/m^2
+                comsol_charge_density = comsol_df['surface_charge_density'] * 1e-9
+                
+                ax.plot(comsol_angle_deg, comsol_charge_density, 'b.', markersize=4, label=comsol_label)
+        # --- END of new section ---
+        
         ax.set_title(f'Distribuição de Carga (Condutor {tag_to_plot}) com D/R = {DR_ratio:.2f}')
         ax.set_xlabel('Ângulo (Graus)'); ax.set_ylabel('Densidade de Carga (C/m²)')
         ax.grid(True, linestyle='--', alpha=0.6)
@@ -474,7 +496,7 @@ class MulticonductorBareWireSystems:
 
         # --- Geração do Gráfico ---
         plt.style.use('default')
-        fig, ax = plt.subplots(figsize=(8, 5))
+        fig, ax = plt.subplots(figsize=self.figsize)
 
         # Plota cada série com um marcador distinto
         ax.plot(plot_j_const, ratio_const, marker='s', markersize=6, linestyle='none',
@@ -531,7 +553,7 @@ class MulticonductorBareWireSystems:
                 cap_even.append(bare_wires.C_maxwellian.item() * C_FACTOR)
 
         plt.style.use('default')
-        fig, ax = plt.subplots(figsize=(8, 5))
+        fig, ax = plt.subplots(figsize=(12, 5))
         ax.axhline(y=c_exact * C_FACTOR, color='k', linestyle=':', label=f'Exactly Value = {c_exact*C_FACTOR:.2f} pF/m')
         ax.plot(nf_odd, cap_odd, linestyle='none', marker='x', markersize=4, fillstyle='none', markeredgecolor='black', label='NF Ímpar')
         ax.plot(nf_even, cap_even, linestyle='none', marker='o', markersize=4, color='black', label='NF Par')

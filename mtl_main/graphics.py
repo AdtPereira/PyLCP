@@ -154,7 +154,7 @@ class IsolatedMTLRepresentation(BaseMTLRepresentation):
     such as single wires, coaxial cables, and pipe-type cables where
     the ground effect is not the primary focus of the schematic.
     """
-    def __init__(self, model: MulticonductorTransmissionLine, case_name, autoSave, units):
+    def __init__(self, model: MulticonductorTransmissionLine, case_name, autoSave=True, units='meter'):
         super().__init__(model, case_name, autoSave, units)
 
     def _finalize_plot(self, ax, title):
@@ -208,7 +208,7 @@ class GroundReturnMTLRepresentation(BaseMTLRepresentation):
     such as buried cables or overhead lines, where the ground plane
     is an essential part of the schematic.
     """
-    def __init__(self, model: MulticonductorTransmissionLine, case_name, autoSave, units):
+    def __init__(self, model: MulticonductorTransmissionLine, case_name, autoSave=True, units='meter'):
         super().__init__(model, case_name, autoSave, units)
 
     def system_schematic(self, base_filename='system_schematic') -> None:
