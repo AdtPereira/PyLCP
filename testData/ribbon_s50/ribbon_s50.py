@@ -1,8 +1,6 @@
 import sys
 import os
 import time
-import copy
-import numpy as np
 from pathlib import Path
 import matplotlib.pyplot as plt
 

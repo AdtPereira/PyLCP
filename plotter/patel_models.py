@@ -20,6 +20,7 @@ class PatelModels:
         """
         self.pul_data = pul_data
         self.case_name = case_name
+        self.cmsl = self.pul_data['comsol'] if 'comsol' in self.pul_data else None
         self.f = pul_data['analytical']['frequencies']
         self.f_mom = pul_data['numerical']['frequencies']
         self.w = 2 * np.pi * self.f
@@ -48,18 +49,18 @@ class PatelModels:
         # Equivalent single conductor impedance. Eq. (2.10a) [AMETANI, 2015]
         Zcs = zcs['z11'] + zcs['z12'] + zcs['z2i'] 
 
-        if 'comsol' in self.pul_data and self.pul_data['comsol'] is not None:
-            cmsl_data = self.pul_data['comsol']['core_sheath_return']            
-            ax1.scatter(cmsl_data['freq'], cmsl_data['coil_resistance'] * self.r_factor, label='COMSOL (mf)', marker='o', facecolors='black', s=10, zorder=2)
-            ax2.scatter(cmsl_data['freq'], cmsl_data['coil_inductance'] * self.l_factor, label='COMSOL (mf)', marker='o', facecolors='black', s=10, zorder=2)
+        if self.cmsl is not None:
+            cmsl = self.cmsl['cmsl_core_sheath_return']            
+            ax1.scatter(cmsl['freq'], cmsl['coil_resistance'] * self.r_factor, label='COMSOL (mf)', marker='o', facecolors='black', s=10, zorder=2)
+            ax2.scatter(cmsl['freq'], cmsl['coil_inductance'] * self.l_factor, label='COMSOL (mf)', marker='o', facecolors='black', s=10, zorder=2)
 
-            ax1.scatter(cmsl_data['freq'], cmsl_data['r11'] * self.r_factor, marker='o', facecolors='darkgray', s=10, zorder=3)
-            ax2.scatter(cmsl_data['freq'], cmsl_data['l11'] * self.l_factor, marker='o', facecolors='darkgray', s=10, zorder=3)
+            ax1.scatter(cmsl['freq'], cmsl['r11'] * self.r_factor, marker='o', facecolors='darkgray', s=10, zorder=3)
+            ax2.scatter(cmsl['freq'], cmsl['l11'] * self.l_factor, marker='o', facecolors='darkgray', s=10, zorder=3)
 
-            ax1.scatter(cmsl_data['freq'], cmsl_data['r2i'] * self.r_factor, marker='o', facecolors='darkblue', s=10, zorder=3)
-            ax2.scatter(cmsl_data['freq'], cmsl_data['l2i'] * self.l_factor, marker='o', facecolors='darkblue', s=10, zorder=3)
+            ax1.scatter(cmsl['freq'], cmsl['r2i'] * self.r_factor, marker='o', facecolors='darkblue', s=10, zorder=3)
+            ax2.scatter(cmsl['freq'], cmsl['l2i'] * self.l_factor, marker='o', facecolors='darkblue', s=10, zorder=3)
 
-            ax2.scatter(cmsl_data['freq'], cmsl_data['l12'] * self.l_factor, marker='o', facecolors='darkgreen', s=10, zorder=3)
+            ax2.scatter(cmsl['freq'], cmsl['l12'] * self.l_factor, marker='o', facecolors='darkgreen', s=10, zorder=3)
 
         ax1.scatter(self.f_mom, rs * self.r_factor, label='MoM-SO', marker='o', facecolors='none', edgecolors='k', s=50, zorder=3)
         ax2.scatter(self.f_mom, ls * self.l_factor, label='MoM-SO', marker='o', facecolors='none', edgecolors='k', s=50, zorder=3)
@@ -105,26 +106,25 @@ class PatelModels:
         fig, (ax1, ax2) = plt.subplots(1, 2, figsize=self.figsize, sharey=False)
         fig.suptitle(r'P.u.l. internal impedance matrix of a coaxial cable with $J_s$ Method [Yin, 1990]', fontsize=12)
 
-        if 'comsol' in self.pul_data and self.pul_data['comsol'] is not None:
-            core_exc = self.pul_data['comsol']['core_exc']
-            sheath_exc = self.pul_data['comsol']['sheath_exc']
-            Vs11 = core_exc['core_coil_voltage']       # Core Voltage source in the core excitation
-            Vs12 = core_exc['sheath_coil_voltage']     # Sheath Voltage source in the core excitation
-            Vs21 = sheath_exc['core_coil_voltage']     # Core Voltage source in the sheath excitation
-            Vs22 = sheath_exc['sheath_coil_voltage']   # Sheath Voltage source in the sheath excitation
-            w = 2 * np.pi * core_exc['freq']
+        if self.cmsl is not None:
+            core, sheath = self.cmsl['cmsl_core_exc'], self.cmsl['cmsl_sheath_exc']
+            Vs11 = core['core_coil_voltage']       # Core Voltage source in the core excitation
+            Vs12 = core['sheath_coil_voltage']     # Sheath Voltage source in the core excitation
+            Vs21 = sheath['core_coil_voltage']     # Core Voltage source in the sheath excitation
+            Vs22 = sheath['sheath_coil_voltage']   # Sheath Voltage source in the sheath excitation
+            w = 2 * np.pi * core['freq']
 
-            ax1.scatter(core_exc['freq'], np.real(Vs11) * self.r_factor,       label='mf.VCoil_Core (Core Exc.)', marker='o', edgecolor='black', facecolors='none', s=30)
-            ax2.scatter(core_exc['freq'], np.imag(Vs11) / w * self.l_factor,   label='mf.VCoil_core (Core Exc.)', marker='o', edgecolor='black', facecolors='none', s=30)
+            ax1.scatter(core['freq'], np.real(Vs11) * self.r_factor,       label='mf.VCoil_Core (Core Exc.)', marker='o', edgecolor='black', facecolors='none', s=30)
+            ax2.scatter(core['freq'], np.imag(Vs11) / w * self.l_factor,   label='mf.VCoil_core (Core Exc.)', marker='o', edgecolor='black', facecolors='none', s=30)
 
-            ax1.scatter(core_exc['freq'], np.real(Vs12) * self.r_factor,       label='mf.VCoil_Sheath (Core Exc.)', marker='o', edgecolor='darkgreen', facecolors='none', s=30)
-            ax2.scatter(core_exc['freq'], np.imag(Vs12) / w * self.l_factor,   label='mf.VCoil_Sheath (Core Exc.)', marker='o', edgecolor='darkgreen', facecolors='none', s=30)
+            ax1.scatter(core['freq'], np.real(Vs12) * self.r_factor,       label='mf.VCoil_Sheath (Core Exc.)', marker='o', edgecolor='darkgreen', facecolors='none', s=30)
+            ax2.scatter(core['freq'], np.imag(Vs12) / w * self.l_factor,   label='mf.VCoil_Sheath (Core Exc.)', marker='o', edgecolor='darkgreen', facecolors='none', s=30)
 
-            ax1.scatter(sheath_exc['freq'], np.real(Vs21) * self.r_factor,     label='mf.VCoil_Core (Sheath Exc.)', marker='x', facecolors='darkgreen', s=12)
-            ax2.scatter(sheath_exc['freq'], np.imag(Vs21) / w * self.l_factor, label='mf.VCoil_Core (Sheath Exc.)', marker='x', facecolors='darkgreen', s=12)
+            ax1.scatter(sheath['freq'], np.real(Vs21) * self.r_factor,     label='mf.VCoil_Core (Sheath Exc.)', marker='x', facecolors='darkgreen', s=12)
+            ax2.scatter(sheath['freq'], np.imag(Vs21) / w * self.l_factor, label='mf.VCoil_Core (Sheath Exc.)', marker='x', facecolors='darkgreen', s=12)
 
-            ax1.scatter(sheath_exc['freq'], np.real(Vs22) * self.r_factor,     label='mf.VCoil_Sheath (Sheath Exc.)', marker='x', facecolors='darkblue', s=12)
-            ax2.scatter(sheath_exc['freq'], np.imag(Vs22) / w * self.l_factor, label='mf.VCoil_Sheath (Sheath Exc.)', marker='x', facecolors='darkblue', s=12)
+            ax1.scatter(sheath['freq'], np.real(Vs22) * self.r_factor,     label='mf.VCoil_Sheath (Sheath Exc.)', marker='x', facecolors='darkblue', s=12)
+            ax2.scatter(sheath['freq'], np.imag(Vs22) / w * self.l_factor, label='mf.VCoil_Sheath (Sheath Exc.)', marker='x', facecolors='darkblue', s=12)
 
         # core self-impedance
         zi = self.pul_data['analytical']['internal_matrices']['hybrid']['impedance_matrix']
@@ -170,18 +170,17 @@ class PatelModels:
         fig, (ax1, ax2) = plt.subplots(1, 2, figsize=self.figsize, sharey=False)
         fig.suptitle(r'P.u.l. internal impedance matrix of a coaxial cable with Loss-Energy Method [Yin, 1990]', fontsize=12)
 
-        if 'comsol' in self.pul_data and self.pul_data['comsol'] is not None:
-            core_exc = self.pul_data['comsol']['core_exc']
-            sheath_exc = self.pul_data['comsol']['sheath_exc']
+        if self.cmsl is not None:
+            core, sheath = self.cmsl['cmsl_core_exc'], self.cmsl['cmsl_sheath_exc']
 
-            ax1.scatter(core_exc['freq'], (core_exc['r11']+core_exc['r2i']) * self.r_factor, label='mf.r11+mf.r2i (Core Exc.)', marker='o', edgecolor='black', facecolors='none', s=30)
-            ax2.scatter(core_exc['freq'], (core_exc['l11']+core_exc['l2i']+core_exc['l12']) * self.l_factor, label='mf.L11+mf.L2i+mf.L12 (Core Exc.)', marker='o', edgecolor='black', facecolors='none', s=30)
+            ax1.scatter(core['freq'], (core['r11']+core['r2i']) * self.r_factor, label='mf.r11+mf.r2i (Core Exc.)', marker='o', edgecolor='black', facecolors='none', s=30)
+            ax2.scatter(core['freq'], (core['l11']+core['l2i']+core['l12']) * self.l_factor, label='mf.L11+mf.L2i+mf.L12 (Core Exc.)', marker='o', edgecolor='black', facecolors='none', s=30)
 
-            ax1.scatter(core_exc['freq'], 0.5 * core_exc['r2i'] * self.r_factor, label='mf.r2i (Core Exc.)', marker='o', edgecolor='darkgreen', facecolors='none', s=12)
-            ax2.scatter(core_exc['freq'], 0.5 * core_exc['l2i'] * self.l_factor, label='mf.L2i (Core Exc.)', marker='o', edgecolor='darkgreen', facecolors='none', s=12)
+            ax1.scatter(core['freq'], 0.5 * core['r2i'] * self.r_factor, label='mf.r2i (Core Exc.)', marker='o', edgecolor='darkgreen', facecolors='none', s=12)
+            ax2.scatter(core['freq'], 0.5 * core['l2i'] * self.l_factor, label='mf.L2i (Core Exc.)', marker='o', edgecolor='darkgreen', facecolors='none', s=12)
 
-            ax1.scatter(sheath_exc['freq'], sheath_exc['r2i'] * self.r_factor, label='mf.r2i (Sheath Exc.)', marker='x', facecolors='darkblue', s=12)
-            ax2.scatter(sheath_exc['freq'], sheath_exc['l2i'] * self.l_factor, label='mf.L2i (Sheath Exc.)', marker='x', facecolors='darkblue', s=12)
+            ax1.scatter(sheath['freq'], sheath['r2i'] * self.r_factor, label='mf.r2i (Sheath Exc.)', marker='x', facecolors='darkblue', s=12)
+            ax2.scatter(sheath['freq'], sheath['l2i'] * self.l_factor, label='mf.L2i (Sheath Exc.)', marker='x', facecolors='darkblue', s=12)
 
         # core self-impedance
         zi = self.pul_data['analytical']['internal_matrices']['hybrid']['impedance_matrix']
@@ -231,9 +230,9 @@ class PatelModels:
         cap = self.pul_data['analytical']['internal_matrices']['hybrid']['capacitance_matrix']
         cap_3d = np.ones_like(self.f)[:, np.newaxis, np.newaxis] * cap[np.newaxis, :, :]  # Expand to 3D for consistency
         
-        if 'comsol' in self.pul_data and self.pul_data['comsol'] is not None:
-            cmsl_data = self.pul_data['comsol']['shunt_params']            
-            ax2.scatter(cmsl_data['freq'], cmsl_data['c_mfec'] * self.c_factor, label='COMSOL (ec.intWe)', marker='o', facecolors='black', s=10, zorder=2)
+        if self.cmsl is not None:
+            cmsl = self.cmsl['cmsl_shunt_params']            
+            ax2.scatter(cmsl['freq'], cmsl['c_mfec'] * self.c_factor, label='COMSOL (ec.intWe)', marker='o', facecolors='black', s=10, zorder=2)
 
         ax2.plot(self.f, cap_3d[:, 0, 0] * self.c_factor, label=r'$C_{11}$: internal capacitance of core insulation', linestyle='--', color='darkgray', linewidth=1.0)
 

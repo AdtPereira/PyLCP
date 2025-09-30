@@ -2,16 +2,16 @@ import subprocess
 import sys
 
 SCRIPTS_TO_RUN = [
+    "testData.bare_bifilar_s21.bare_bifilar_s21",
+    "testData.coated_bifilar_s40.coated_bifilar_s40",
     "testData.hdpe_225kV_2000mm2.hdpe_225kV_2000mm2",
-    "testData.isolated_bifilar_s21.isolated_bifilar_s21",
-    "testData.isolated_bifilar_s40.isolated_bifilar_s40",
-    "testData.isolated_coax.isolated_coax",
-    "testData.isolated_ribbon_s50.isolated_ribbon_s50",
+    "testData.coaxial.coaxial",
     "testData.ohtl_single_deConti.ohtl_single_deConti",
     "testData.ohtl_single_deConti_deri.ohtl_single_deConti_deri",
     "testData.ohtl_single_lima.ohtl_single_lima",
     "testData.ohtl_single_xue.ohtl_single_xue",
     "testData.pipe_trefoil_patel.pipe_trefoil_patel",
+    "testData.ribbon_s50.ribbon_s50",
     "testData.scc_138kV_prysmian.scc_138kV_prysmian",
     "testData.scc_flat_deConti.scc_flat_deConti",
     "testData.scc_flat_xue.scc_flat_xue",

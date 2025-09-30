@@ -40,9 +40,9 @@ class LafaiaModels:
 
         # Capacitance matrix from energy method
         print("Calculating capacitance matrix from energy method...")
-        w11 = self.pul_0['comsol']['shunt_params']['wcc'][0]
-        w22 = self.pul_0['comsol']['shunt_params']['wss'][0]
-        w12 = self.pul_0['comsol']['shunt_params']['wcs'][0]
+        w11 = self.cmsl['cmsl_shunt_params']['wcc'][0]
+        w22 = self.cmsl['cmsl_shunt_params']['wss'][0]
+        w12 = self.cmsl['cmsl_shunt_params']['wcs'][0]
         self.cap_matrix_energy_method = capacitance_matrix_from_energy_method(np.array([w11, w22, w12]), v0=1.0)
 
     def internal_impedance_elements(self):
@@ -60,7 +60,7 @@ class LafaiaModels:
         Zcs = zcs['z11'] + zcs['z12'] + zcs['z2i'] 
 
         if 'comsol' in self.pul_0 and self.cmsl is not None:
-            data = self.cmsl['core_sheath'] 
+            data = self.cmsl['cmsl_core_sheath'] 
             
             ax1.scatter(self.f, np.real(data['coil_impedance']) * self.r_factor,
                         label='COMSOL (mf)', marker='o', facecolors='black', s=10, zorder=2)
@@ -135,10 +135,10 @@ class LafaiaModels:
         fig.suptitle(r'Single core cable installed in HDPE tube [Lafaia, 2015] and $J_s$ Method [Yin, 1990]', fontsize=12)
 
         if 'comsol' in self.pul_0 and self.cmsl is not None:
-            Vs11 = self.cmsl['core_exc']['core_coil_voltage']       # Core Voltage source in the core excitation
-            Vs12 = self.cmsl['core_exc']['sheath_coil_voltage']     # Sheath Voltage source in the core excitation
-            Vs21 = self.cmsl['sheath_exc']['core_coil_voltage']     # Core Voltage source in the sheath excitation
-            Vs22 = self.cmsl['sheath_exc']['sheath_coil_voltage']   # Sheath Voltage source in the sheath excitation
+            Vs11 = self.cmsl['cmsl_core_exc']['core_coil_voltage']       # Core Voltage source in the core excitation
+            Vs12 = self.cmsl['cmsl_core_exc']['sheath_coil_voltage']     # Sheath Voltage source in the core excitation
+            Vs21 = self.cmsl['cmsl_sheath_exc']['core_coil_voltage']     # Core Voltage source in the sheath excitation
+            Vs22 = self.cmsl['cmsl_sheath_exc']['sheath_coil_voltage']   # Sheath Voltage source in the sheath excitation
 
             ax1.scatter(self.f, np.real(Vs11) * self.r_factor,
                         label='mf.VCoil_Core (Core Exc.)', marker='o', edgecolor='black', facecolors='none', s=30)
@@ -214,25 +214,24 @@ class LafaiaModels:
         fig.suptitle(r'P.u.l. internal impedance matrix of a single core cable with Loss-Energy Method [Yin, 1990]', fontsize=12)
 
         if 'comsol' in self.pul_0 and self.cmsl is not None:
-            core_exc = self.cmsl['core_exc']
-            sheath_exc = self.cmsl['sheath_exc']
+            core, sheath = self.cmsl['cmsl_core_exc'], self.cmsl['cmsl_sheath_exc']
 
-            ax1.scatter(self.f, (core_exc['r11']+core_exc['r2i']) * self.r_factor,
+            ax1.scatter(self.f, (core['r11']+core['r2i']) * self.r_factor,
                          label='mf.r11+mf.r2i (Core Exc.)', marker='o', edgecolor='black', facecolors='none', s=30)
             
-            ax2.scatter(self.f, (core_exc['l11']+core_exc['l2i']+core_exc['l12']+core_exc['l13']) * self.l_factor,
+            ax2.scatter(self.f, (core['l11']+core['l2i']+core['l12']+core['l13']) * self.l_factor,
                          label='mf.L11+mf.L2i+mf.L12+mf.L13 (Core Exc.)', marker='o', edgecolor='black', facecolors='none', s=30)
 
-            ax1.scatter(self.f, 0.5 * core_exc['r2i'] * self.r_factor,
+            ax1.scatter(self.f, 0.5 * core['r2i'] * self.r_factor,
                         label='mf.r2i (Core Exc.)', marker='o', edgecolor='darkgreen', facecolors='none', s=12)
             
-            ax2.scatter(self.f, 0.5 * core_exc['l2i'] * self.l_factor,
+            ax2.scatter(self.f, 0.5 * core['l2i'] * self.l_factor,
                         label='mf.L2i (Core Exc.)', marker='o', edgecolor='darkgreen', facecolors='none', s=12)
 
-            ax1.scatter(self.f, sheath_exc['r2i'] * self.r_factor,
+            ax1.scatter(self.f, sheath['r2i'] * self.r_factor,
                         label='mf.r2i (Sheath Exc.)', marker='x', facecolors='darkblue', s=12)
             
-            ax2.scatter(self.f, sheath_exc['l2i'] * self.l_factor,
+            ax2.scatter(self.f, sheath['l2i'] * self.l_factor,
                         label='mf.L2i (Sheath Exc.)', marker='x', facecolors='darkblue', s=12)
 
         # core self-impedance

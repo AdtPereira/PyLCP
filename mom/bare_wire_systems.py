@@ -60,45 +60,27 @@ class MulticonductorBareWireSystems:
         # Inicializa o dicionário principal que será o atributo da classe.
         self.collocation_data = {}
 
-        ## Equação (A.4a): Ângulo de separação entre os pontos de colocação.
-        theta = 2 * np.pi / self.NF
-
         # Equação (A.4b): Ângulo de rotação para o conjunto de pontos.
         delta = np.pi / (2 * self.NF)
 
         # Calcula os ângulos base, que são rotacionados por delta para obter
         # os ângulos dos pontos de observação (match points).
         base_angles = np.linspace(0, 2 * np.pi, self.NF, endpoint=False)
-        field_angles = base_angles + delta
-
-        # Os pontos de fonte são posicionados na metade do caminho entre os
-        # pontos de observação para garantir a estabilidade numérica.
-        source_angles = field_angles - (theta / 2)
+        match_angles = base_angles + delta
 
         # Itera sobre cada superfície definida na classe base MTL.
         for surface in self.model.surfaces:
-            tag = surface['tag']
-            surface_type = surface['type']
-            center = np.array(surface['center_point'])
-            radius = surface['radius']
-
-            # Cria o dicionário para a 'tag' do condutor, se ainda não existir.
-            if tag not in self.collocation_data:
-                self.collocation_data[tag] = {}
+            if surface['tag'] not in self.collocation_data:
+                self.collocation_data[surface['tag']] = {}
 
             # Calcula as coordenadas cartesianas para os pontos de fonte e observação.
-            source_points = center + radius * np.array([np.cos(source_angles), np.sin(source_angles)]).T
-            field_points = center + radius * np.array([np.cos(field_angles), np.sin(field_angles)]).T
+            match_points = np.array(surface['center_point']) + surface['radius'] * np.array([np.cos(match_angles), np.sin(match_angles)]).T
             
             # Preenche o dicionário para a superfície específica com seus dados.
-            self.collocation_data[tag][surface_type] = {
-                'source': {
-                    'cartesian': source_points,
-                    'angles_rad': source_angles
-                },
+            self.collocation_data[surface['tag']][surface['type']] = {
                 'observation': {
-                    'cartesian': field_points,
-                    'angles_rad': field_angles
+                    'cartesian': match_points,
+                    'angles_rad': match_angles
                 }
             }
 
@@ -179,51 +161,42 @@ class MulticonductorBareWireSystems:
             tag_p = field_surface['tag']
             type_p = field_surface['type']
             radius_p = field_surface['radius']
-            center_p = np.array(field_surface['center_point'])
-            nf_p = nfs_per_surface[p]
-            offset_p = offsets[p]
 
             # Obtém os pontos de observação para a superfície p
-            field_collocated_points = self.collocation_data[tag_p][type_p]['observation']['cartesian']
+            match_points = self.collocation_data[tag_p][type_p]['observation']['cartesian']
 
             # Preenche o vetor de potencial V para o bloco de linhas da superfície p
             if type_p == 'conductor':
-                # A fonte de potencial é o potencial do condutor
-                self.V_vector[offset_p : offset_p + nf_p] = self.model.mtl[tag_p]['potential_to_infinity']
+                self.V_vector[offsets[p] : offsets[p] + nfs_per_surface[p]] = self.model.mtl[tag_p]['potential_to_infinity']
             
             # A condição de fronteira na bainha dielétrica resulta em 0 no lado direito da equação
             elif type_p == 'primary_insulation':
-                self.V_vector[offset_p : offset_p + nf_p] = 0.0
+                self.V_vector[offsets[p] : offsets[p] + nfs_per_surface[p]] = 0.0
 
             # Loop sobre as superfícies de FONTE q (colunas da matriz)
             for q, source_surface in enumerate(self.model.surfaces):
-                center_q = np.array(source_surface['center_point'])
                 radius_q = source_surface['radius']
                 epsilon = self.model.epsilon_out[source_surface['tag']]
-                nf_q = nfs_per_surface[q]
-                offset_q = offsets[q]
 
                 # Loop sobre cada ponto de observação m na superfície p
-                for m in range(nf_p):
-                    row_idx = offset_p + m
+                for m in range(nfs_per_surface[p]):
+                    row_idx = offsets[p] + m
                     
                     # Ângulo do ponto de observação relativo ao centro da sua PRÓPRIA superfície
-                    rho_i_vector = field_collocated_points[m] - center_p
-                    rho_i = np.linalg.norm(rho_i_vector)
+                    rho_i_vector = match_points[m] - np.array(field_surface['center_point'])
                     theta_i = np.arctan2(rho_i_vector[1], rho_i_vector[0])
 
                     # Loop sobre cada função de base n na superfície q
-                    for n in range(nf_q):
-                        col_idx = offset_q + n
-                        source_harmonic_idx = n  # Índice harmônico local da fonte
-                        is_cosine_term = (source_harmonic_idx % 2 != 0)
-                        k = (source_harmonic_idx + 1) // 2 if is_cosine_term else source_harmonic_idx // 2
+                    for n in range(nfs_per_surface[q]):
+                        col_idx = offsets[q] + n
                         
-                        # --- Início da Lógica de Cálculo do Elemento da Matriz ---
-                        # Esta seção implementa a física. Por enquanto, calcula o potencial.
-
+                        # Índice harmônico local da fonte
+                        harmonic_idx = n
+                        is_cosine_term = (harmonic_idx % 2 != 0)
+                        k = (harmonic_idx + 1) // 2 if is_cosine_term else harmonic_idx // 2
+                        
                         # Ângulo e vetor fonte 'b' relativo ao centro da superfície FONTE 'q'
-                        rho_b_vector = field_collocated_points[m] - center_q
+                        rho_b_vector = match_points[m] - np.array(source_surface['center_point'])
                         rho_b = np.linalg.norm(rho_b_vector)
                         theta_b = np.arctan2(rho_b_vector[1], rho_b_vector[0])
 
@@ -236,7 +209,7 @@ class MulticonductorBareWireSystems:
 
                         # Auto-interação (Observador NA fronteira da fonte)
                         # Termo constante (k=0)
-                        if source_harmonic_idx == 0:
+                        if harmonic_idx == 0:
                             if p == q:
                                 self.D_matrix[row_idx, col_idx] = (-radius_q / epsilon) * np.log(radius_p)
                             
@@ -289,35 +262,19 @@ class MulticonductorBareWireSystems:
         if self.collocation_data is None:
             self._calculate_collocation_points()
 
-        # 1. Preparar os dados para o Plotly a partir da nova estrutura aninhada
         plot_data = []
+        
         # Itera sobre cada 'tag' de condutor no dicionário (ex: 0, 1)
         for tag, conductor_surfaces in self.collocation_data.items():
-            # Itera sobre cada superfície desse condutor (ex: 'conductor', 'sheath')
-            for surface_type, surface_data in conductor_surfaces.items():
-                
+            for surface_type, surface_data in conductor_surfaces.items():                
                 matching_surface = next(s for s in self.model.surfaces if s['tag'] == tag and s['type'] == surface_type)
-                radius = matching_surface['radius']
-
-                # Extrai e adiciona os dados de pontos de fonte
-                for i, pt in enumerate(surface_data['source']['cartesian']):
-                    plot_data.append({
-                        'x': pt[0], 'y': pt[1],
-                        'type': 'Source',
-                        'tag': tag,
-                        'surface': surface_type,
-                        'radius': radius,
-                        'angle_rad': surface_data['source']['angles_rad'][i]
-                    })
-
-                # Extrai e adiciona os dados de pontos de observação
                 for i, pt in enumerate(surface_data['observation']['cartesian']):
                     plot_data.append({
                         'x': pt[0], 'y': pt[1],
                         'type': 'Observation',
                         'tag': tag,
                         'surface': surface_type,
-                        'radius': radius,
+                        'radius': matching_surface['radius'],
                         'angle_rad': surface_data['observation']['angles_rad'][i]
                     })
 
@@ -326,10 +283,10 @@ class MulticonductorBareWireSystems:
 
         for surface in self.model.surfaces:
             fig.add_shape(type="circle",
-                        xref="x", yref="y",
-                        x0=surface['center_point'][0] - surface['radius'], y0=surface['center_point'][1] - surface['radius'],
-                        x1=surface['center_point'][0] + surface['radius'], y1=surface['center_point'][1] + surface['radius'],
-                        line_color="Black", fillcolor="LightGray", opacity=0.7)
+                xref="x", yref="y",
+                x0=surface['center_point'][0] - surface['radius'], y0=surface['center_point'][1] - surface['radius'],
+                x1=surface['center_point'][0] + surface['radius'], y1=surface['center_point'][1] + surface['radius'],
+                line_color="Black", fillcolor="LightGray", opacity=0.7)
 
         # 4. Adicionar os pontos de colocação a partir do DataFrame
         for pt_type, color, symbol in [('Source', 'blue', 'circle'), ('Observation', 'red', 'x-thin')]:
@@ -339,6 +296,7 @@ class MulticonductorBareWireSystems:
                 mode='markers',
                 marker=dict(color=color, symbol=symbol, size=8, line=dict(width=1, color='DarkSlateGrey')),
                 name=pt_type,
+                
                 # Atualiza o customdata e o hovertemplate para exibir as novas informações
                 customdata=df_subset[['tag', 'surface', 'radius', 'angle_rad']],
                 hovertemplate=(
@@ -429,7 +387,7 @@ class MulticonductorBareWireSystems:
         ax.plot(np.rad2deg(theta_plot), charge_density_exact, 'r-', label='Solução Exata')
         ax.plot(np.rad2deg(theta_plot), charge_density_mom, 'k-.', label=f'MoM (tag={tag_to_plot})')
         
-        # --- NEW: Plot COMSOL Data if provided ---
+        # --- Plot COMSOL Data if provided ---
         if comsol_data is not None and isinstance(comsol_data, dict):
             # Map tag to the corresponding curve key
             comsol_df = comsol_data.get('curve_1')
@@ -444,7 +402,6 @@ class MulticonductorBareWireSystems:
                 comsol_charge_density = comsol_df['surface_charge_density'] * 1e-9
                 
                 ax.plot(comsol_angle_deg, comsol_charge_density, 'b.', markersize=4, label=comsol_label)
-        # --- END of new section ---
         
         ax.set_title(f'Distribuição de Carga (Condutor {tag_to_plot}) com D/R = {DR_ratio:.2f}')
         ax.set_xlabel('Ângulo (Graus)'); ax.set_ylabel('Densidade de Carga (C/m²)')

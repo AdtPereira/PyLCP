@@ -132,4 +132,127 @@ class MergedComsolDataReader:
             clean_names[col] = new_name
         df.rename(columns=clean_names, inplace=True)
         return df
-    
+
+class ComsolDataReader:
+    """
+    Uma classe dedicada para ler e analisar todos os arquivos .txt do COMSOL
+    do diretório 'Results' de um caso específico.
+
+    Ela descobre, lê e analisa automaticamente todos os arquivos .txt, retornando-os
+    em um dicionário estruturado.
+    """
+
+    def __init__(self, project_root: Path, case_name: str):
+        """
+        Inicializa o leitor identificando o diretório 'Results' alvo.
+
+        Args:
+            project_root (Path): O diretório raiz do projeto pyLCP.
+            case_name (str): O nome do caso de teste específico (ex: 'coated_bifilar_s40').
+        """
+        self.project_root = project_root
+        self.case_name = case_name
+        self.results_path = project_root / 'testData' / case_name / 'Results'
+        self.data = {}
+
+        if not self.results_path.is_dir():
+            raise FileNotFoundError(
+                f"O diretório Results não foi encontrado para o caso '{case_name}' em: {self.results_path}"
+            )
+        
+    def load_all_results(self) -> dict[str, pd.DataFrame]:
+        """
+        Verifica o diretório 'Results', carrega todos os arquivos .txt e os retorna
+        como um dicionário de DataFrames.
+
+        Returns:
+            Um dicionário onde as chaves são os nomes dos arquivos (sem a extensão .txt)
+            e os valores são os DataFrames do pandas analisados.
+        """
+        txt_files = list(self.results_path.glob('*.txt'))
+        if not txt_files:
+            print(f"Aviso: Nenhum arquivo .txt encontrado em {self.results_path}")
+            return {}
+
+        print(f"Encontrado(s) {len(txt_files)} arquivo(s) .txt no diretório Results do caso '{self.case_name}'.")
+
+        for file_path in txt_files:
+            file_stem = file_path.stem
+            try:
+                self.data[file_stem] = self._parse_single_file(file_path)
+            except Exception as e:
+                print(f"Erro ao analisar o arquivo {file_path.name}: {e}")
+
+        return self.data
+
+    def _parse_single_file(self, file_path: Path) -> pd.DataFrame:
+        """
+        Método privado para ler e analisar um único arquivo .txt do COMSOL.
+        Contém a lógica de análise principal.
+        """
+        print(f"  -> Carregando e analisando: {file_path.name}...")
+        
+        header_lines, data_lines = [], []
+        with open(file_path, 'r', encoding='utf-8') as f:
+            for line in f:
+                if line.startswith('%'):
+                    if not any(keyword in line for keyword in ['Model:', 'Version:', 'Date:', 'Table:']):
+                        header_lines.append(line)
+                elif line.strip():
+                    data_lines.append(line.strip())
+
+        full_header_str = ' '.join([h.replace('%', '').strip() for h in header_lines])
+        parts = re.split(r'(\([^)]+\))', full_header_str)
+        
+        column_names = []
+        i = 0
+        while i < len(parts) - 1:
+            var_name = parts[i].strip()
+            unit = parts[i+1].strip()
+            if var_name:
+                column_names.append(f"{var_name} {unit}")
+            i += 2
+        num_cols = len(column_names)
+
+        all_values_str = " ".join(data_lines).split()
+        if not all_values_str: raise ValueError("Nenhum dado encontrado no arquivo.")
+        if len(all_values_str) % num_cols != 0:
+            raise ValueError(f"Incompatibilidade de dados: {len(all_values_str)} valores não é múltiplo de {num_cols} colunas.")
+        
+        data_array = np.array(all_values_str).reshape(-1, num_cols)
+        df = pd.DataFrame(data_array, columns=column_names)
+
+        for col in df.columns:
+            if df[col].astype(str).str.contains('i').any():
+                df[col] = df[col].str.replace('i', 'j', regex=False).apply(complex)
+            else:
+                df[col] = pd.to_numeric(df[col], errors='coerce')
+
+        clean_names = {col: re.sub(r'[^a-z0-9_]+', '_', re.sub(r'\s*\([^)]+\)', '', col.lower())).strip('_') for col in df.columns}
+        df.rename(columns=clean_names, inplace=True)
+        
+        return df
+
+    def show_summary(self, head_rows: int = 5):
+        """
+        Exibe um resumo de todos os DataFrames carregados, mostrando o head e info de cada um.
+
+        Args:
+            head_rows (int): O número de linhas a serem exibidas do cabeçalho de cada DataFrame.
+        """
+        if not self.data:
+            print("Nenhum dado carregado para exibir o resumo. Execute 'load_all_results()' primeiro.")
+            return
+
+        print(f"\n--- Resumo dos Dados Carregados para o Caso '{self.case_name}' ---")
+        for name, df in self.data.items():
+            print(f"\n==================================================")
+            print(f"  Arquivo: '{name}.txt'")
+            print(f"==================================================")
+            
+            print(f"\n--- Head ---")
+            print(df.head(head_rows))
+            
+            print(f"\n--- Info ---")
+            df.info()
+            print("\n")

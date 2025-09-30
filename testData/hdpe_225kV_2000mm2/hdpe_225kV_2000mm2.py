@@ -3,9 +3,9 @@
 import sys
 import os
 import copy
-from pathlib import Path
 import time
 import numpy as np
+from pathlib import Path
 import matplotlib.pyplot as plt
 
 # --- Configure project root for module imports ---
@@ -24,6 +24,7 @@ except IndexError:
 # --- Import custom modules ---
 try:
     from utils.case_utils import *
+    from utils.comsol_data import ComsolDataReader
     from plotter.lafaia_models import LafaiaModels
     from mtl_main.graphics import GroundReturnMTLRepresentation
     from mtl_main.source import MulticonductorTransmissionLine
@@ -36,29 +37,18 @@ except ImportError as e:
     sys.exit(1)
 
 # --- Load COMSOL Data ---
-COMSOL_DATA_0 = {}
+COMSOL_DATA = {}
 try:
-    COMSOL_DATA_0['core_exc'] = load_comsol_results(__file__, comsol_tag='_core_exc')
-    COMSOL_DATA_0['sheath_exc'] = load_comsol_results(__file__, comsol_tag='_sheath_exc')
-    COMSOL_DATA_0['core_sheath'] = load_comsol_results(__file__, comsol_tag='_core_sheath')
-    COMSOL_DATA_0['shunt_params'] = load_comsol_results(__file__, comsol_tag='_shunt_params')
-    print("COMSOL data loaded successfully.")
-
-    # Display the first few rows of the loaded data to verify
-    print("--- Data Head ---")
-    print(COMSOL_DATA_0['core_exc'].head())
-
-    # Display a concise summary of the DataFrame
-    print("\n--- DataFrame Info core_exc---")    
-    COMSOL_DATA_0['core_exc'].info()
-    print("\n--- DataFrame Info core_sheath---")
-    COMSOL_DATA_0['core_sheath'].info() 
-    print("\n--- DataFrame Info sheath_exc---")    
-    COMSOL_DATA_0['sheath_exc'].info()
-    print("\n--- DataFrame Info shunt_params---")    
-    COMSOL_DATA_0['shunt_params'].info()
+    print(f"--- Instanciando ComsolDataReader para o caso '{case_name}' ---")
+    reader = ComsolDataReader(project_root, case_name)
+    COMSOL_DATA = reader.load_all_results()
+    if COMSOL_DATA:
+        reader.show_summary()
 except FileNotFoundError as e:
-    print(f"Warning: COMSOL data file not found. Skipping comparison. Details: {e}")
+    print(f"Aviso: Diretório de dados do COMSOL não encontrado. Detalhes: {e}")
+except Exception as e:
+    print(f"Ocorreu um erro ao carregar os dados do COMSOL: {e}")
+
 
 def main():
     """
@@ -117,7 +107,7 @@ def main():
         0: {
             'analytical': None,
             'numerical': None,
-            'comsol': COMSOL_DATA_0,
+            'comsol': COMSOL_DATA,
         },
         1: {
             'analytical': {

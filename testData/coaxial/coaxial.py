@@ -20,6 +20,7 @@ except IndexError:
 # --- Import custom modules ---
 try:
     from utils.case_utils import *
+    from utils.comsol_data import ComsolDataReader
     from models import single_core_cables as scc 
     from plotter.patel_models import PatelModels
     from mtl_main.graphics import IsolatedMTLRepresentation
@@ -27,6 +28,7 @@ try:
     from analytical_forms.single_core_cable import InternalPerUnitParameters
     from mom_so.quasi_static_green import QuasiStatic
     from mom_so.lossless_medium import HomogeneousLosslessMedium, LosslessPostProcessing
+    from mom.coaxial_cable_systems import MulticonductorCoaxialCableSystems
     print("Core modules imported successfully.")
 except ImportError as e:
     print(f"Error importing modules: {e}")
@@ -35,30 +37,17 @@ except ImportError as e:
 # --- Load COMSOL Data ---
 COMSOL_DATA = {}
 try:
-    COMSOL_DATA['core_sheath_return'] = load_comsol_results(__file__, comsol_tag='')
-    COMSOL_DATA['core_exc'] = load_comsol_results(__file__, comsol_tag='_core_exc')
-    COMSOL_DATA['core_exc_constrains'] = load_comsol_results(__file__, comsol_tag='_core_exc_constrains')
-    COMSOL_DATA['sheath_exc'] = load_comsol_results(__file__, comsol_tag='_sheath_exc')
-    COMSOL_DATA['shunt_params'] = load_comsol_results(__file__, comsol_tag='_shunt_params')
-    print("COMSOL data loaded successfully.")
+    print(f"--- Instanciando ComsolDataReader para o caso '{case_name}' ---")
+    reader = ComsolDataReader(project_root, case_name)
+    COMSOL_DATA = reader.load_all_results()
 
-    # Display the first few rows of the loaded data to verify
-    print("--- Data Head ---")
-    print(COMSOL_DATA['core_sheath_return'].head())
-
-    # Display a concise summary of the DataFrame
-    print("\n--- DataFrame Info core_sheath_return---")
-    COMSOL_DATA['core_sheath_return'].info()    
-    print("\n--- DataFrame Info core_exc---")    
-    COMSOL_DATA['core_exc'].info()
-    print("\n--- DataFrame Info core_exc_constrains---")
-    COMSOL_DATA['core_exc_constrains'].info()
-    print("\n--- DataFrame Info sheath_exc---")
-    COMSOL_DATA['sheath_exc'].info()
-    print("\n--- DataFrame Info shunt_params---")
-    COMSOL_DATA['shunt_params'].info()
+    if COMSOL_DATA:
+        reader.show_summary()
 except FileNotFoundError as e:
-    print(f"Warning: COMSOL data file not found. Skipping comparison. Details: {e}")
+    print(f"Aviso: Diretório de dados do COMSOL não encontrado. Detalhes: {e}")
+except Exception as e:
+    print(f"Ocorreu um erro ao carregar os dados do COMSOL: {e}")
+
 
 def verify_constrain_equation(mtl_model):
     """
@@ -67,7 +56,7 @@ def verify_constrain_equation(mtl_model):
     the displacement current from COMSOL.
     """
     try:
-        df = COMSOL_DATA['core_exc_constrains']
+        df = COMSOL_DATA['cmsl_core_exc_constrains']
         # --- Prerequisite: Ensure you have exported these columns from COMSOL ---
         freq = df['freq'].values
         Ik = df['coil_current'].values      # Expected total current in the conductor
@@ -111,6 +100,7 @@ def verify_constrain_equation(mtl_model):
         print("\n[SUCCESS] The constraint equation was verified: I_conduction + I_displacement = Ik")
     else:
         print("\n[FAILURE] The constraint equation was NOT verified.")
+
         
 def main():
     """ Main function to run the simulation and plotting using vectorized calculations. """
@@ -118,6 +108,7 @@ def main():
     input_json = load_json_parameters(__file__, show_content=True)
     model = scc.isolated_coaxial_cable(input_json, show_model=True)
     mtl_model = MulticonductorTransmissionLine(model)
+    # mom_wires = MulticonductorCoaxialCableSystems(mtl_model)
 
     # --- VECTORIZED CALCULATION ---
     analytical_freqs = np.logspace(0, 6, num=200)
