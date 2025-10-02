@@ -63,7 +63,7 @@ def main():
     pul.run_single_fortran()
     pul.run_analytical()
     pul.run_fortran()
-    pul.run_mom_methods(autoPlots=True)
+    pul.run_mom_methods(case_name, autoPlots=True)
     pul.run_mom_so()
     pul.run_srw_rates()
     pul.run_convergence()

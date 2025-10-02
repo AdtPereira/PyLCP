@@ -12,7 +12,8 @@ from mtl_paul.py_fortran import FortranRunner
 from analytical_forms.isolated_wires import WiresHomogeneousMedia
 from mom_so.quasi_static_green import QuasiStatic
 from mom_so.lossless_medium import HomogeneousLosslessMedium, LosslessPostProcessing
-from mom.bare_wire_systems import MulticonductorBareWireSystems
+from mom.bare_wire_systems import BareWireMoMSolver
+from plotter.mom_models import MoMVisualizer
 
 class BifilarBareWirePULParameters:
     """
@@ -23,7 +24,7 @@ class BifilarBareWirePULParameters:
     how the calculated inductance and capacitance values stabilize. The class facilitates a comparison
     between a Fortran-based simulation (RIBBON.FOR) and a Python-based Method of Moments (MoM) implementation.
     """
-    def __init__(self, project_root: Path, case_name: str, mtl: Dict[str, Any], SUM_MAX: int = 10, comsol_data: Dict[str, pd.DataFrame] = None):
+    def __init__(self, project_root: Path, case_name: str, mtl: Dict[str, Any], SUM_MAX: int = 10, comsol_data: Dict[str, pd.DataFrame] = {}):
         """
         Inicializa o analisador de convergência.
 
@@ -52,7 +53,8 @@ class BifilarBareWirePULParameters:
         self.srw_data = {}
         self.srw_mum_data = {}
         self.analytical_data = {}
-        self.mom_data = {}
+        self.mom_collocation_data = {}
+        self.mom_galerkin_data = {}
         self.mom_so_data = {}
         self.ribbon_data = {}
 
@@ -71,6 +73,10 @@ class BifilarBareWirePULParameters:
             'colors': ['black', 'gray', 'lightgray', 'darkgray', 'dimgray', 'silver', 'gainsboro']
         }
 
+        # Assumes the script is run from the project's root directory.
+        self.results_dir = os.path.join('testData', self.case_name, 'Results')
+        os.makedirs(self.results_dir, exist_ok=True)
+        
     def _prepare_fortran_runner(self, mtl):
         """Prepara os parâmetros e o executor para a simulação Fortran."""
 
@@ -212,7 +218,7 @@ class BifilarBareWirePULParameters:
             freq: {'c': self.c_factor * self.runner.CAP0_matrix.item(), 
                    'le': self.l_factor * self.runner.IND_matrix.item()} for freq in self.freq_range['mom']}
 
-    def run_mom_methods(self, autoPlots=False):
+    def run_mom_methods(self, case_name, autoPlots=False):
         """
         Executa a simulação clássica do Método dos Momentos (MoM) para a linha de transmissão bifilar.
 
@@ -223,17 +229,23 @@ class BifilarBareWirePULParameters:
 
         mtl_model = MulticonductorTransmissionLine(self.mtl_copy)
         IsolatedMTLRepresentation(mtl_model, self.case_name, units='millimeter').system_schematic()
-        mom_wires = MulticonductorBareWireSystems(mtl_model)
-        mom_wires.run_simulation()
-        mom_wires.print_results()
+        solver = BareWireMoMSolver(mtl_model)
+        solver.run_collocation_method()
+        solver.run_galerkin_method()
+        
+        visualizer = MoMVisualizer(solver, case_name)
+        visualizer.print_terminal_results()
+        if autoPlots:            
+            visualizer.plot_collocation_points()
+            visualizer.plot_harmonic_coefficients()
+            visualizer.plot_surface_charge_density(comsol_data=self.comsol_data)
+            visualizer.plot_convergence_rates(self.mtl_copy, nf_max=12)
 
-        self.mom_data = {freq: {'c': self.c_factor * mom_wires.C_maxwellian.item()} for freq in self.freq_range['mom']}
-
-        if autoPlots:
-            mom_wires.plot_charge_density(comsol_data=self.comsol_data)
-            mom_wires.plot_harmonic_coefficients()
-            mom_wires.plot_collocation_points()
-            MulticonductorBareWireSystems.plot_convergence_rates(self.mtl_copy, nf_max=20)
+        self.mom_collocation_data = {
+            freq: {'c': self.c_factor * solver.mom_data['collocation']['maxwellian_capacitance'].item()} for freq in self.freq_range['mom']}
+        
+        self.mom_galerkin_data = {
+            freq: {'c': self.c_factor * solver.mom_data['galerkin']['maxwellian_capacitance'].item()} for freq in self.freq_range['mom']}
 
     def run_analytical(self):
         """
@@ -359,8 +371,8 @@ class BifilarBareWirePULParameters:
             mtl_local[1]['center_point'] = (separation, 0.0)
 
             mtl_model = MulticonductorTransmissionLine(mtl_local)
-            mom_wires = MulticonductorBareWireSystems(mtl_model)
-            mom_wires.run_simulation()
+            solver = BareWireMoMSolver(mtl_model)
+            solver.run_collocation_method()
 
             self._prepare_fortran_runner(mtl_local)
             self.runner.run_fortran(self.fortran_base_params)
@@ -373,7 +385,7 @@ class BifilarBareWirePULParameters:
             self.srw_mum_data[ratio] = {
                 'c_mom-so': self.c_factor * np.real(capacitance.item()),
                 'c_ribbon': self.c_factor * self.runner.CAP0_matrix.item(),
-                'c_mom': self.c_factor * mom_wires.C_maxwellian.item()
+                'c_mom': self.c_factor * solver.mom_data['collocation']['maxwellian_capacitance'].item(),
             }
 
     def run_convergence(self):
@@ -401,8 +413,8 @@ class BifilarBareWirePULParameters:
                     temp_mtl[key]['sheath'] = None
 
             mom_bare_wires_model = MulticonductorTransmissionLine(temp_mtl)
-            mom_bare_wires = MulticonductorBareWireSystems(mom_bare_wires_model)
-            mom_bare_wires.run_simulation()
+            solver = BareWireMoMSolver(mom_bare_wires_model)
+            solver.run_collocation_method()
 
             # === MoM-SO Instance ===
             green_matrix = QuasiStatic(mom_bare_wires_model).green_matrix()
@@ -413,14 +425,14 @@ class BifilarBareWirePULParameters:
             # Coleta de resultados
             results.append({
                 'k': k,
-                'L (RIBBON.FOR)':       self.runner.IND_matrix if self.fortran_base_params is not None else np.nan,
-                'C (RIBBON.FOR)':       self.runner.CAP_matrix if self.fortran_base_params is not None else np.nan,
-                'C0 (RIBBON.FOR)':      self.runner.CAP0_matrix if self.fortran_base_params is not None else np.nan,
-                'CGEN (RIBBON.FOR)':    self.runner.CGEN0_matrix if self.fortran_base_params is not None else np.nan,
-                'C0 (BARE-WIRE.PY)':    mom_bare_wires.C_maxwellian if mom_bare_wires.C_maxwellian is not None else np.nan,
-                'CGEN (BARE-WIRE.PY)':  mom_bare_wires.C_generalized if mom_bare_wires.C_generalized is not None else np.nan,
-                'C0 (MOM-SO.PY)':       np.real(maxwell_cap) if maxwell_cap is not None else np.nan,
-                'CGEN (MOM-SO.PY)':     np.real(general_cap) if general_cap is not None else np.nan,
+                'L (RIBBON.FOR)':       self.runner.IND_matrix,
+                'C (RIBBON.FOR)':       self.runner.CAP_matrix,
+                'C0 (RIBBON.FOR)':      self.runner.CAP0_matrix,
+                'CGEN (RIBBON.FOR)':    self.runner.CGEN0_matrix,
+                'C0 (BARE-WIRE.PY)':    solver.mom_data['collocation']['maxwellian_capacitance'],
+                'CGEN (BARE-WIRE.PY)':  solver.mom_data['collocation']['generalized_capacitance'],
+                'C0 (MOM-SO.PY)':       np.real(maxwell_cap),
+                'CGEN (MOM-SO.PY)':     np.real(general_cap),
             })
             print(f"  Complete for k = {k}.")
 
@@ -445,6 +457,7 @@ class BifilarBareWirePULParameters:
 
         fig, ax = plt.subplots(figsize=self.figsize)
         self._configure_plot_appearance(ax, r'Series Resistance p.u.l. ($\Omega$/km)', resistance_data)
+        save_figure_multiformat(fig, self.results_dir, base_filename='pul_series_resistance')
         plt.tight_layout()
 
     def plot_inductance_results(self):
@@ -469,6 +482,7 @@ class BifilarBareWirePULParameters:
 
         fig, ax = plt.subplots(figsize=self.figsize)
         self._configure_plot_appearance(ax, 'Series Inductance p.u.l. (mH/km)', inductance_data, yscale='linear')
+        save_figure_multiformat(fig, self.results_dir, base_filename='pul_series_inductance')
         plt.tight_layout()
 
     def plot_capacitance_results(self):
@@ -484,7 +498,7 @@ class BifilarBareWirePULParameters:
         """
         
         capacitante_data = {
-            'mom':      {'data': (self.freq_range.get('mom'), [data['c']        for data in self.mom_data.values()]),        'label': 'MoM'},
+            'mom':      {'data': (self.freq_range.get('mom'), [data['c']        for data in self.mom_collocation_data.values()]),        'label': 'MoM'},
             'ribbon':   {'data': (self.freq_range.get('mom'), [data['c']        for data in self.ribbon_data.values()]),     'label': 'RIBBON.FOR'},
             'mom-so':   {'data': (self.freq_range.get('mom'), [data['c']        for data in self.mom_so_data.values()]),     'label': 'MoM-SO'},
             'wires':    {'data': (self.freq_range.get('ana'), [data['c_wires']  for data in self.analytical_data.values()]), 'label': 'n+1 wires'},
@@ -494,6 +508,7 @@ class BifilarBareWirePULParameters:
 
         fig, ax = plt.subplots(figsize=self.figsize)
         self._configure_plot_appearance(ax, 'Capacitance p.u.l. (nF/km)', capacitante_data, yscale='linear')
+        save_figure_multiformat(fig, self.results_dir, base_filename='pul_shunt_capacitance')
         plt.tight_layout()
 
     def plot_srw_rates(self):
@@ -538,6 +553,7 @@ class BifilarBareWirePULParameters:
         ax.set_ylim(10, 90)
         ax.legend()
         ax.grid(True, linestyle='--', linewidth=0.5)
+        save_figure_multiformat(fig, self.results_dir, base_filename='ratio_srw_capacitance')
         plt.tight_layout()
 
     def plot_generalized_capacitance_convergence(self):
@@ -565,7 +581,7 @@ class BifilarBareWirePULParameters:
             return
 
         plt.style.use('default')
-        _, (ax1, ax2) = plt.subplots(1, 2, figsize=self.figsize, sharey=True)
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=self.figsize, sharey=True)
         # fig.suptitle('')
 
         fortran_nf_axis = self.results_df.index + 1
@@ -602,6 +618,7 @@ class BifilarBareWirePULParameters:
         ax1.set_ylabel('Generalized Capacitance Matrix, $CGEN$ (pF/m)', fontsize=11)
         ax1.set_title('Auto-Capacitance Term $CGEN_{00}$')
         ax2.set_title('Mutual Capacitance Term $CGEN_{01}$')
+        save_figure_multiformat(fig, self.results_dir, base_filename='generalized_capacitance_convergence')
         plt.tight_layout(rect=[0, 0, 1, 0.96])
 
     def plot_free_space_capacitance_convergence(self):
@@ -671,5 +688,6 @@ class BifilarBareWirePULParameters:
         # ax.legend(loc='upper center', fontsize=9, ncol=legend_items_count, bbox_to_anchor=(0.5, 1.1), fancybox=True)
         ax.legend(loc='lower right', fontsize=10)
         ax.grid(False)
+        save_figure_multiformat(fig, self.results_dir, base_filename='free_space_capacitance_convergence')
         plt.tight_layout()
     

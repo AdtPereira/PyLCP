@@ -4,8 +4,8 @@ import sys
 SCRIPTS_TO_RUN = [
     "testData.bare_bifilar_s21.bare_bifilar_s21",
     "testData.coated_bifilar_s40.coated_bifilar_s40",
-    "testData.hdpe_225kV_2000mm2.hdpe_225kV_2000mm2",
     "testData.coaxial.coaxial",
+    "testData.hdpe_225kV_2000mm2.hdpe_225kV_2000mm2",
     "testData.ohtl_single_deConti.ohtl_single_deConti",
     "testData.ohtl_single_deConti_deri.ohtl_single_deConti_deri",
     "testData.ohtl_single_lima.ohtl_single_lima",

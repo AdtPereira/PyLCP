@@ -1,14 +1,112 @@
-import copy
 import numpy as np
-import pandas as pd
-import scipy.constants as sc
-import matplotlib.pyplot as plt
-import plotly.graph_objects as go
+import scipy.integrate as spi
+import scipy.constants as spc
 
 from utils.case_utils import *
 from mtl_main.source import MulticonductorTransmissionLine
 
-class MulticonductorBareWireSystems:
+@staticmethod
+def galerkin_integrand(phi_p, p_idx, q_idx, test_func_idx, basis_func_idx, self_instance):
+    """
+    Método estático para calcular o integrando do Método de Galerkin.
+    
+    Calcula f_pa(phi_p) * g_qb(phi_p), onde 'f' é a função de teste e 'g' é o potencial
+    da função de base.
+
+    Args:
+        phi_p (float): Ângulo no condutor de observação 'p' (variável de integração).
+        p_idx (int): Índice da superfície de observação.
+        q_idx (int): Índice da superfície da fonte.
+        test_func_idx (int): Índice da função de teste 'a' no condutor 'p'.
+        basis_func_idx (int): Índice da função de base 'b' no condutor 'q'.
+        self_instance (object): A instância da classe para acessar os dados do modelo.
+
+    Returns:
+        float: O valor do integrando.
+    """
+    # Obter dados das superfícies
+    field_surface = self_instance.model.surfaces[p_idx]
+    source_surface = self_instance.model.surfaces[q_idx]
+    epsilon = self_instance.model.epsilon_out[source_surface['tag']]
+
+    # --- 1. Calcular o valor da função de teste f_pa(phi_p) ---
+    is_test_cos = (test_func_idx % 2 != 0)
+    k_test = (test_func_idx + 1) // 2 if is_test_cos else test_func_idx // 2
+
+    if k_test == 0:
+        f_pa = 1.0
+    elif is_test_cos:
+        f_pa = np.cos(k_test * phi_p)
+    else:
+        f_pa = np.sin(k_test * phi_p)
+
+    # --- 2. Calcular o potencial g_qb(phi_p) ---
+    # Coordenadas do ponto de observação no condutor 'p'
+    obs_point = np.array(field_surface['center_point']) + \
+                field_surface['radius'] * np.array([np.cos(phi_p), np.sin(phi_p)])
+
+    # Vetor do centro da fonte 'q' ao ponto de observação
+    rho_b_vector = obs_point - np.array(source_surface['center_point'])
+    rho_b = np.linalg.norm(rho_b_vector)
+    theta_b = np.arctan2(rho_b_vector[1], rho_b_vector[0])
+
+    is_basis_cos = (basis_func_idx % 2 != 0)
+    k_basis = (basis_func_idx + 1) // 2 if is_basis_cos else basis_func_idx // 2
+    
+    g_qb = 0.0
+    if k_basis == 0:  # Termo constante da fonte
+        if p_idx == q_idx:
+            g_qb = (-source_surface['radius'] / epsilon) * np.log(field_surface['radius'])
+        else:
+            g_qb = (-source_surface['radius'] / epsilon) * np.log(rho_b)
+    else:  # Termos harmônicos da fonte
+        if p_idx == q_idx:
+            term = np.cos(k_basis * phi_p) if is_basis_cos else np.sin(k_basis * phi_p)
+            g_qb = (source_surface['radius'] / (2 * k_basis * epsilon)) * term
+        else:
+            term = np.cos(k_basis * theta_b) if is_basis_cos else np.sin(k_basis * theta_b)
+            g_qb = (source_surface['radius'] / (2 * k_basis * epsilon)) * ((source_surface['radius'] / rho_b)**k_basis) * term
+
+    return f_pa * g_qb
+
+@staticmethod
+def maxwellian_capacitance(model, mom_data):
+    """
+    Calcula a matriz de capacitância física (Maxwelliana) de dimensão (N-1)x(N-1)
+    a partir da matriz de capacitância generalizada de dimensão NxN.
+
+    Este processo ocorre em duas etapas:
+    1.  Primeiro, uma matriz Maxwelliana completa (NxN) é calculada usando a
+        Equação 5.21, que é dada por:
+        C_completa_ij = c_ij - (soma_linha_i * soma_coluna_j) / soma_total
+    2.  Em seguida, a matriz é reduzida para (N-1)x(N-1) ao remover a linha e a
+        coluna correspondentes ao condutor de referência, cujo índice é
+        especificado pelo atributo da classe `self.idx_ref`.
+    """
+    cgen = mom_data['generalized_capacitance']
+    idx_ref = model.mtl_idx_ref
+
+    # --- Validações ---
+    assert isinstance(cgen, np.ndarray), "A matriz de capacitância generalizada deve ser um array NumPy."
+    assert cgen.ndim == 2 and cgen.shape[0] == cgen.shape[1], "A matriz de capacitância generalizada deve ser quadrada."
+    assert cgen.shape[0] > 1, "O cálculo da capacitância Maxwelliana requer pelo menos 2 condutores."
+    assert 0 <= idx_ref < cgen.shape[0], f"O índice de referência self.idx_ref ({idx_ref}) está fora do intervalo válido [0, {cgen.shape[0]-1}]."
+
+    # --- Etapa 1: Calcular a matriz Maxwelliana completa (NxN) ---
+    total_sum = np.sum(cgen)
+
+    # Evita a divisão por zero
+    assert np.abs(total_sum) > 1e-15, "A soma dos elementos da matriz de capacitância generalizada é zero, resultando em divisão por zero."
+
+    correction_matrix = np.outer(np.sum(cgen, axis=1), np.sum(cgen, axis=0)) / total_sum
+    C_full = cgen - correction_matrix
+
+    # --- Etapa 2: Reduzir a matriz para (N-1)x(N-1) ---
+    # Usa np.delete para remover a linha (axis=0) e a coluna (axis=1)
+    # correspondentes ao índice do condutor de referência `self.idx_ref`.
+    return np.delete(np.delete(C_full, idx_ref, axis=0), idx_ref, axis=1)
+
+class BareWireMoMSolver:
     """
     Calcula a capacitância e distribuição de carga para sistemas de fios nus
     usando o Método dos Momentos (MoM) com expansão em séries harmônicas.
@@ -33,32 +131,20 @@ class MulticonductorBareWireSystems:
         # Número de coeficientes harmônicos de Fourier por condutor
         self.NF = [2*surface['fourier_order']+1 for surface in self.model.surfaces][0]
         
-        # Resultado Analítico
-        self.R = self.model.surfaces[0]['radius']      
-        self.D = self.model.D_pq[0, 1]
-        self.DR_ratio = self.D / self.R
-        assert self.DR_ratio > 2, "A razão D/R deve ser maior que 2 para garantir a convergência da solução."
-        self.C_exact_bare_wires = np.pi * sc.epsilon_0 / np.arccosh(0.5 * self.DR_ratio)
-
         # Atributos de resultado
-        self.collocation_data = None
-        self.D_matrix = None
-        self.T_matrix = None
-        self.V_vector = None
-        self.sigma_coeffs = None
-        self.C_generalized = None
-        self.C_maxwellian = None
+        self.mom_data = {'collocation': {}, 'galerkin': {}}
 
-        # Atributos gráficos
-        self.figsize = (12, 5)
+        self.DR_ratio = (model.D_pq[0, 1]) / (model.surfaces[0]['radius'])
+        assert self.DR_ratio > 2, "A razão D/R deve ser maior que 2 para garantir a convergência da solução."
+        self.C_exact_bare_wires = np.pi * spc.epsilon_0 / np.arccosh(0.5 * self.DR_ratio)
 
-    def _calculate_collocation_points(self):
+    def _collocation_points(self):
         """
         Calcula e armazena os pontos de colocação, classificando-os em um dicionário
         aninhado pela 'tag' do condutor e pelo tipo de superfície ('conductor', 'sheath').
         """
         # Inicializa o dicionário principal que será o atributo da classe.
-        self.collocation_data = {}
+        collocation_data = {}
 
         # Equação (A.4b): Ângulo de rotação para o conjunto de pontos.
         delta = np.pi / (2 * self.NF)
@@ -70,90 +156,87 @@ class MulticonductorBareWireSystems:
 
         # Itera sobre cada superfície definida na classe base MTL.
         for surface in self.model.surfaces:
-            if surface['tag'] not in self.collocation_data:
-                self.collocation_data[surface['tag']] = {}
+            if surface['tag'] not in collocation_data:
+                collocation_data[surface['tag']] = {}
 
             # Calcula as coordenadas cartesianas para os pontos de fonte e observação.
             match_points = np.array(surface['center_point']) + surface['radius'] * np.array([np.cos(match_angles), np.sin(match_angles)]).T
             
             # Preenche o dicionário para a superfície específica com seus dados.
-            self.collocation_data[surface['tag']][surface['type']] = {
+            collocation_data[surface['tag']][surface['type']] = {
                 'observation': {
                     'cartesian': match_points,
                     'angles_rad': match_angles
                 }
             }
+        
+        self.mom_data['collocation']['data'] = collocation_data
 
-    def _calculate_generalized_capacitance(self):
+    def _generalized_capacitance_clements(self):
         """
         Calcula a matriz de capacitância generalizada C a partir da matriz T (D^-1).
         """
-        self.T_matrix = np.linalg.inv(self.D_matrix)
+        moment_matrix = self.mom_data['collocation']['moment_matrix']
+        T_matrix = np.linalg.inv(moment_matrix)
         C_matrix = np.zeros((2, 2))
 
         for n in range(2):      # Índice do condutor da carga
+            r_i = self.model.surfaces[n]['radius']
             for m in range(2):  # Índice do condutor do potencial
-                sum_of_T_elements = np.sum(self.T_matrix[(n * self.NF), (m * self.NF):((m + 1) * self.NF)])
-                C_matrix[n, m] = 2 * np.pi * self.R * sum_of_T_elements
-        
-        self.C_generalized = C_matrix
+                sum_of_T_elements = np.sum(T_matrix[(n * self.NF), (m * self.NF):((m + 1) * self.NF)])
+                C_matrix[n, m] = 2 * np.pi * r_i * sum_of_T_elements
 
-    def _calculate_maxwellian_capacitance(self):
+        self.mom_data['collocation']['generalized_capacitance'] = C_matrix
+
+    def _generalized_capacitance_savage(self):
         """
-        Calcula a matriz de capacitância física (Maxwelliana) de dimensão (N-1)x(N-1)
-        a partir da matriz de capacitância generalizada de dimensão NxN.
+        Calcula a matriz de capacitância generalizada C a partir da matriz T (D^-1)
+        seguindo a formulação de Savage (1993) para o Método de Galerkin.
 
-        Este processo ocorre em duas etapas:
-        1.  Primeiro, uma matriz Maxwelliana completa (NxN) é calculada usando a
-            Equação 5.21, que é dada por:
-            C_completa_ij = c_ij - (soma_linha_i * soma_coluna_j) / soma_total
-        2.  Em seguida, a matriz é reduzida para (N-1)x(N-1) ao remover a linha e a
-            coluna correspondentes ao condutor de referência, cujo índice é
-            especificado pelo atributo da classe `self.idx_ref`.
+        A formulação é dada por: C_ij = (2*pi)^2 * r_i * T_ij[0,0], onde T_ij[0,0]
+        é o elemento superior esquerdo da submatriz correspondente da matriz inversa T.
         """
-        gc = self.C_generalized
+        # 1. Inverter a matriz D para obter a matriz T
+        moment_matrix = self.mom_data['galerkin']['moment_matrix']
+        T_matrix = np.linalg.inv(moment_matrix)
 
-        # --- Validações ---
-        assert isinstance(gc, np.ndarray), "A matriz de capacitância generalizada deve ser um array NumPy."
-        assert gc.ndim == 2 and gc.shape[0] == gc.shape[1], "A matriz de capacitância generalizada deve ser quadrada."
-        num_conductors = gc.shape[0]
-        assert num_conductors > 1, "O cálculo da capacitância Maxwelliana requer pelo menos 2 condutores."
-        assert hasattr(self.model, 'mtl_idx_ref'), "O atributo 'mtl_idx_ref' (índice do condutor de referência) não foi encontrado."
-        assert 0 <= self.model.mtl_idx_ref < num_conductors, f"O índice de referência self.idx_ref ({self.model.mtl_idx_ref}) está fora do intervalo válido [0, {num_conductors-1}]."
+        # 2. Obter o número de condutores (superfícies)
+        num_conductors = len(self.model.surfaces)
+        C_matrix = np.zeros((num_conductors, num_conductors))
 
-        # --- Etapa 1: Calcular a matriz Maxwelliana completa (NxN) ---
-        total_sum = np.sum(gc)
+        # 3. Iterar sobre cada elemento da matriz de capacitância a ser calculada
+        for i in range(num_conductors):      # Índice 'i' para o condutor da carga (linha)
+            for j in range(num_conductors):  # Índice 'j' para o condutor do potencial (coluna)
 
-        # Evita a divisão por zero
-        if np.abs(total_sum) < 1e-15:
-            raise ValueError("A soma dos elementos da matriz de capacitância generalizada é zero, resultando em divisão por zero.")
+                # 4. Obter o raio do condutor da carga 'i'
+                # Isso é mais robusto que usar self.R, pois considera raios diferentes.
+                r_i = self.model.surfaces[i]['radius']
 
-        row_sums = np.sum(gc, axis=1)
-        col_sums = np.sum(gc, axis=0)
+                # 5. Localizar o elemento (0,0) da submatriz T_ij
+                # Este é o elemento superior esquerdo do bloco que relaciona a observação
+                # no condutor 'i' com a fonte no condutor 'j'.
+                T_ij_00 = T_matrix[i * self.NF, j * self.NF]
 
-        correction_matrix = np.outer(row_sums, col_sums) / total_sum
-        C_full = gc - correction_matrix
+                # 6. Calcular o elemento da capacitância C_ij conforme Equação 4.37
+                C_matrix[i, j] = (2 * np.pi)**2 * r_i * T_ij_00
 
-        # --- Etapa 2: Reduzir a matriz para (N-1)x(N-1) ---
-        # Usa np.delete para remover a linha (axis=0) e a coluna (axis=1)
-        # correspondentes ao índice do condutor de referência `self.idx_ref`.
-        self.C_maxwellian = np.delete(np.delete(C_full, self.model.mtl_idx_ref, axis=0), self.model.mtl_idx_ref, axis=1)
+        self.mom_data['galerkin']['generalized_capacitance'] = C_matrix
 
-    def run_simulation(self):
+    def run_collocation_method(self):
         """
         Executa a simulação completa do MoM, montando o sistema de equações para
         todas as superfícies (condutoras e dielétricas) com base nas novas
         estruturas de dados.
         """
-        self._calculate_collocation_points()
+        self._collocation_points()
+        collocation_data = self.mom_data['collocation']['data']
+        moment_matrix = np.zeros((self.model.N, self.model.N))
+        V_vector = np.zeros(self.model.N)
 
         # 1. Preparar os índices e vetores do sistema
         # Pré-calcula o número de coeficientes (NF) para cada superfície
         nfs_per_surface = [2 * surface['fourier_order'] + 1 for surface in self.model.surfaces]
         offsets = np.cumsum([0] + nfs_per_surface)
-
-        self.D_matrix = np.zeros((self.model.N, self.model.N))
-        self.V_vector = np.zeros(self.model.N)
 
         # 2. Montar a Matriz [D] e o Vetor [V]
         # Loop sobre as superfícies de OBSERVAÇÃO p (linhas da matriz)
@@ -163,15 +246,15 @@ class MulticonductorBareWireSystems:
             radius_p = field_surface['radius']
 
             # Obtém os pontos de observação para a superfície p
-            match_points = self.collocation_data[tag_p][type_p]['observation']['cartesian']
+            match_points = collocation_data[tag_p][type_p]['observation']['cartesian']
 
             # Preenche o vetor de potencial V para o bloco de linhas da superfície p
             if type_p == 'conductor':
-                self.V_vector[offsets[p] : offsets[p] + nfs_per_surface[p]] = self.model.mtl[tag_p]['potential_to_infinity']
+                V_vector[offsets[p] : offsets[p] + nfs_per_surface[p]] = self.model.mtl[tag_p]['potential_to_infinity']
             
             # A condição de fronteira na bainha dielétrica resulta em 0 no lado direito da equação
             elif type_p == 'primary_insulation':
-                self.V_vector[offsets[p] : offsets[p] + nfs_per_surface[p]] = 0.0
+                V_vector[offsets[p] : offsets[p] + nfs_per_surface[p]] = 0.0
 
             # Loop sobre as superfícies de FONTE q (colunas da matriz)
             for q, source_surface in enumerate(self.model.surfaces):
@@ -211,315 +294,80 @@ class MulticonductorBareWireSystems:
                         # Termo constante (k=0)
                         if harmonic_idx == 0:
                             if p == q:
-                                self.D_matrix[row_idx, col_idx] = (-radius_q / epsilon) * np.log(radius_p)
+                                moment_matrix[row_idx, col_idx] = (-radius_q / epsilon) * np.log(radius_p)
                             
                             # Interação mútua
                             else: 
-                                self.D_matrix[row_idx, col_idx] = (-radius_q / epsilon) * np.log(rho_b)
+                                moment_matrix[row_idx, col_idx] = (-radius_q / epsilon) * np.log(rho_b)
                         
                         # Termos harmônicos (k>0)
                         else:  
                             # Auto-interação
                             if p == q:
                                 term = np.cos(k * theta_i) if is_cosine_term else np.sin(k * theta_i)
-                                self.D_matrix[row_idx, col_idx] = (radius_q / (2 * k * epsilon)) * term
+                                moment_matrix[row_idx, col_idx] = (radius_q / (2 * k * epsilon)) * term
                             
                             # Interação mútua
                             else:
                                 term = np.cos(k * theta_b) if is_cosine_term else np.sin(k * theta_b)
-                                self.D_matrix[row_idx, col_idx] = (radius_q / (2 * k * epsilon)) * ((radius_q / rho_b)**k) * term
+                                moment_matrix[row_idx, col_idx] = (radius_q / (2 * k * epsilon)) * ((radius_q / rho_b)**k) * term
                         
                         # ========================================================================
                         # ==== FIM DA LÓGICA DE CÁLCULO DO ELEMENTO DA MATRIZ D ==================
                         # ========================================================================
 
-        # 3. Resolver o sistema e obter os resultados
-        self.sigma_coeffs = np.linalg.solve(self.D_matrix, self.V_vector)
-        self._calculate_generalized_capacitance()
-        self._calculate_maxwellian_capacitance()
-
-    def print_results(self):
-        """Imprime um resumo dos resultados da simulação."""
-        if self.C_maxwellian is None:
-            print("Executando simulação primeiro...")
-            self.run_simulation()
-
-        if self.NF < 4: 
-            matrix_viewer(self.D_matrix, "D Matrix")
-            matrix_viewer(self.sigma_coeffs, "Sigma Coefficients Vector")
-            print(f"\nSurfaces (len: {len(self.model.surfaces)}): \n{self.model.surfaces}")
-
-        print(f"\nSurfaces Dim: {len(self.model.surfaces)}.")
-        print(f"\nD Matrix Shape: {self.D_matrix.shape}.")
-        matrix_viewer(self.C_generalized, "MoM Generalized Capacitance Matrix (F/m)")
-        matrix_viewer(self.C_maxwellian, "Maxwellian Bifilar Capacitance (MoM) (F/m)")
-
-    def plot_collocation_points(self):
-        """
-        Gera um gráfico interativo dos pontos de colocação usando Plotly,
-        refletindo a nova estrutura de dicionário de self.collocation_data.
-        """
-        if self.collocation_data is None:
-            self._calculate_collocation_points()
-
-        plot_data = []
+        # 4. Armazenar os resultados no dicionário mom_data
+        self.mom_data['collocation']['V_vector'] = V_vector
+        self.mom_data['collocation']['moment_matrix'] = moment_matrix
+        self.mom_data['collocation']['sigma_coeffs'] = np.linalg.solve(moment_matrix, V_vector)
         
-        # Itera sobre cada 'tag' de condutor no dicionário (ex: 0, 1)
-        for tag, conductor_surfaces in self.collocation_data.items():
-            for surface_type, surface_data in conductor_surfaces.items():                
-                matching_surface = next(s for s in self.model.surfaces if s['tag'] == tag and s['type'] == surface_type)
-                for i, pt in enumerate(surface_data['observation']['cartesian']):
-                    plot_data.append({
-                        'x': pt[0], 'y': pt[1],
-                        'type': 'Observation',
-                        'tag': tag,
-                        'surface': surface_type,
-                        'radius': matching_surface['radius'],
-                        'angle_rad': surface_data['observation']['angles_rad'][i]
-                    })
+        self._generalized_capacitance_clements()
+        cap_matrix = maxwellian_capacitance(self.model, self.mom_data['collocation'])
+        self.mom_data['collocation']['maxwellian_capacitance'] = cap_matrix
 
-        df = pd.DataFrame(plot_data)
-        fig = go.Figure()
-
-        for surface in self.model.surfaces:
-            fig.add_shape(type="circle",
-                xref="x", yref="y",
-                x0=surface['center_point'][0] - surface['radius'], y0=surface['center_point'][1] - surface['radius'],
-                x1=surface['center_point'][0] + surface['radius'], y1=surface['center_point'][1] + surface['radius'],
-                line_color="Black", fillcolor="LightGray", opacity=0.7)
-
-        # 4. Adicionar os pontos de colocação a partir do DataFrame
-        for pt_type, color, symbol in [('Source', 'blue', 'circle'), ('Observation', 'red', 'x-thin')]:
-            df_subset = df[df['type'] == pt_type]
-            fig.add_trace(go.Scatter(
-                x=df_subset['x'], y=df_subset['y'],
-                mode='markers',
-                marker=dict(color=color, symbol=symbol, size=8, line=dict(width=1, color='DarkSlateGrey')),
-                name=pt_type,
-                
-                # Atualiza o customdata e o hovertemplate para exibir as novas informações
-                customdata=df_subset[['tag', 'surface', 'radius', 'angle_rad']],
-                hovertemplate=(
-                    f"<b>{pt_type}</b><br>"
-                    "Condutor (tag): %{customdata[0]}<br>"
-                    "Superfície: %{customdata[1]}<br>"
-                    "Coord X: %{x:.4f} m<br>"
-                    "Coord Y: %{y:.4f} m<br>"
-                    "Ângulo: %{customdata[3]:.3f} rad<br>"
-                    "Raio: %{customdata[2]:.4f} m"
-                    "<extra></extra>"
-                )
-            ))
-
-        # 5. Configurar o layout do gráfico (não muda)
-        fig.update_layout(
-            title='Mapa Interativo de Pontos de Colocação',
-            xaxis_title='Coordenada X (m)',
-            yaxis_title='Coordenada Y (m)',
-            yaxis_scaleanchor="x",
-            yaxis_scaleratio=1,
-            legend_title_text='Tipo de Ponto',
-            template='plotly_white'
-        )
-        fig.show()
- 
-    def plot_charge_density(self, tag_to_plot=1, comsol_data: dict = None):
+    def run_galerkin_method(self): 
         """
-        Plota a densidade de carga para um condutor específico, alinhando
-        dinamicamente a solução exata com a geometria real do sistema.
-
-        Args:
-            tag_to_plot (int): A 'tag' do condutor para o qual a densidade de
-                            carga será plotada.
+        Executa a simulação completa do MoM usando o Método de Galerkin.
         """
-        if self.sigma_coeffs is None:
-            self.run_simulation()
-
-        # 1. Obter dados do condutor a ser plotado e de seu par
-        all_tags = list(self.model.mtl.keys())
-        if len(all_tags) != 2:
-            print("Erro: plot_charge_density foi projetado para sistemas de 2 condutores.")
-            return
-        other_tag = next(tag for tag in all_tags if tag != tag_to_plot)
-
-        center_plot = np.array(self.model.mtl[tag_to_plot]['center_point'])
-        center_other = np.array(self.model.mtl[other_tag]['center_point'])
-
-        conductor_surface = next(s for s in self.model.surfaces if s['tag'] == tag_to_plot and s['type'] == 'conductor')
-        R = conductor_surface['radius']
-        D = np.linalg.norm(center_plot - center_other)
-        DR_ratio = D / R
-
-        # 2. Calcular a Solução Analítica com Alinhamento e Sinal Corretos
-        theta_plot = np.linspace(0, 2 * np.pi, 360)
-
-        vec_to_other = center_other - center_plot
-        angle_of_max_charge = np.arctan2(vec_to_other[1], vec_to_other[0])
-        denominator = DR_ratio - 2 * np.cos(theta_plot - angle_of_max_charge)
-
-        delta_v = self.model.mtl[tag_to_plot]['potential_to_infinity'] - self.model.mtl[other_tag]['potential_to_infinity']
-        numerator = (DR_ratio**2 / 4) - 1
+        moment_matrix = np.zeros((self.model.N, self.model.N))
+        V_vector = np.zeros(self.model.N)
         
-        # CORREÇÃO FINAL: Remover o abs() para preservar o sinal da carga
-        charge_density_exact = (self.C_exact_bare_wires * delta_v / R) * (numerator / denominator)
-
-        # 3. Reconstruir a Solução MoM para o Condutor Correto
-        nfs_per_surface = [2 * s['fourier_order'] + 1 for s in self.model.surfaces]
+        nfs_per_surface = [2 * surface['fourier_order'] + 1 for surface in self.model.surfaces]
         offsets = np.cumsum([0] + nfs_per_surface)
-        
-        surface_index = next(i for i, s in enumerate(self.model.surfaces) if s['tag'] == tag_to_plot and s['type'] == 'conductor')
-        
-        offset = offsets[surface_index]
-        nf = nfs_per_surface[surface_index]
-        coeffs_to_plot = self.sigma_coeffs[offset : offset + nf]
 
-        charge_density_mom = np.zeros_like(theta_plot)
-        charge_density_mom += coeffs_to_plot[0]
-        max_k = (nf - 1) // 2
-        for k in range(1, max_k + 1):
-            cos_coeff = coeffs_to_plot[2 * k - 1]
-            sin_coeff = coeffs_to_plot[2 * k]
-            charge_density_mom += cos_coeff * np.cos(k * theta_plot) + sin_coeff * np.sin(k * theta_plot)
-
-        # 4. Geração do Gráfico
-        plt.style.use('default')
-        fig, ax = plt.subplots(figsize=self.figsize)
-        ax.plot(np.rad2deg(theta_plot), charge_density_exact, 'r-', label='Solução Exata')
-        ax.plot(np.rad2deg(theta_plot), charge_density_mom, 'k-.', label=f'MoM (tag={tag_to_plot})')
-        
-        # --- Plot COMSOL Data if provided ---
-        if comsol_data is not None and isinstance(comsol_data, dict):
-            # Map tag to the corresponding curve key
-            comsol_df = comsol_data.get('curve_1')
-            comsol_label = 'COMSOL (Curve 1)'
-
-            if comsol_df is not None and not comsol_df.empty:
-                # Convert arc length to angle in degrees
-                # angle = arc_length / radius
-                comsol_angle_deg = (comsol_df['arc_length'] / R) * (180 / np.pi)
+        # Loop sobre as superfícies de OBSERVAÇÃO p (linhas da matriz)
+        for p, field_surface in enumerate(self.model.surfaces):
+            # Loop sobre as superfícies de FONTE q (colunas da matriz)
+            for q, source_surface in enumerate(self.model.surfaces):
                 
-                # Convert charge density from nC/m^2 to C/m^2
-                comsol_charge_density = comsol_df['surface_charge_density'] * 1e-9
-                
-                ax.plot(comsol_angle_deg, comsol_charge_density, 'b.', markersize=4, label=comsol_label)
-        
-        ax.set_title(f'Distribuição de Carga (Condutor {tag_to_plot}) com D/R = {DR_ratio:.2f}')
-        ax.set_xlabel('Ângulo (Graus)'); ax.set_ylabel('Densidade de Carga (C/m²)')
-        ax.grid(True, linestyle='--', alpha=0.6)
-        ax.set_xticks(np.arange(0, 361, 90)); ax.set_xlim(0, 360)
-        ax.legend()
-        plt.tight_layout()
+                # Loop sobre as FUNÇÕES DE TESTE 'm' na superfície 'p'
+                for m in range(nfs_per_surface[p]):
+                    row_idx = offsets[p] + m
+                    
+                    # Loop sobre as FUNÇÕES DE BASE 'n' na superfície 'q'
+                    for n in range(nfs_per_surface[q]):
+                        col_idx = offsets[q] + n
+                        
+                        # --- Integração Numérica com scipy.integrate.quad ---
+                        integral_value, _ = spi.quad(
+                            galerkin_integrand, 0, 2 * np.pi,
+                            args=(p, q, m, n, self),
+                            limit=350
+                        )
+                        moment_matrix[row_idx, col_idx] = integral_value
 
-    def plot_harmonic_coefficients(self):
-        """
-        Reproduz e expande a Figura 4(c) de Clements (1975), mostrando a magnitude
-        de todos os coeficientes da série harmônica com indexação ajustada.
-
-        O gráfico mostra a razão entre a magnitude de cada coeficiente harmônico
-        e a magnitude do coeficiente constante. A plotagem segue a convenção:
-        - j=1: Termo Constante
-        - j=2, 4, 6,...: Coeficientes Cossenoidais
-        - j=3, 5, 7,...: Coeficientes Senoidais
-        """
-        if self.sigma_coeffs is None:
-            print("Executando a simulação para obter os coeficientes...")
-            self.run_simulation()
-
-        # Isola os coeficientes do primeiro condutor
-        coeffs_condutor1 = self.sigma_coeffs[:self.NF]
-
-        # O coeficiente constante (alpha_n1) está no índice 0 do código
-        constant_term = coeffs_condutor1[0]
-        if np.abs(constant_term) < 1e-15: # Evita divisão por zero
-            print("Coeficiente constante é próximo de zero. Não é possível normalizar.")
-            return
-
-        # --- Mapeamento de Índices para Plotagem ---
-        # j=1: Termo Constante. Sua razão normalizada é 1.0.
-        plot_j_const = [1]
-        ratio_const = [1.0]
-
-        # j=2, 4, 6,...: Coeficientes Cossenoidais (índices 1, 3, 5,... no código)
-        code_indices_cos = np.arange(1, self.NF, 2)
-        plot_j_cos = code_indices_cos + 1 # Mapeia [1, 3, 5] para [2, 4, 6]
-        coeffs_cos = coeffs_condutor1[code_indices_cos]
-        ratio_cos = np.abs(coeffs_cos) / np.abs(constant_term)
-
-        # j=3, 5, 7,...: Coeficientes Senoidais (índices 2, 4, 6,... no código)
-        code_indices_sin = np.arange(2, self.NF, 2)
-        plot_j_sin = code_indices_sin + 1 # Mapeia [2, 4, 6] para [3, 5, 7]
-        coeffs_sin = coeffs_condutor1[code_indices_sin]
-        ratio_sin = np.abs(coeffs_sin) / np.abs(constant_term)
-
-        # --- Geração do Gráfico ---
-        plt.style.use('default')
-        fig, ax = plt.subplots(figsize=self.figsize)
-
-        # Plota cada série com um marcador distinto
-        ax.plot(plot_j_const, ratio_const, marker='s', markersize=6, linestyle='none',
-                fillstyle='none', markeredgecolor='black', label='Termo Constante (j=1)')
-
-        ax.plot(plot_j_cos, ratio_cos, marker='^', markersize=6, linestyle='none',
-                fillstyle='none', markeredgecolor='black', label='Coeficientes Cossenoidais (j=2, 4, ...)')
-
-        ax.plot(plot_j_sin, ratio_sin, marker='o', markersize=4, linestyle='none',
-                fillstyle='none', markeredgecolor='black', label='Coeficientes Senoidais (j=3, 5, ...)')
-
-        ax.set_title(f'Magnitude Normalizada dos Coeficientes Harmônicos (d/a = {self.DR_ratio:.1f})', fontsize=14)
-        ax.set_ylabel(r'$|\alpha_{nj} / \alpha_{n1}|$', fontsize=12)
-        ax.set_xlabel('Índice do Coeficiente (j)', fontsize=12)
-        ax.legend()
-        ax.set_xlim(left=0)
-        ax.set_ylim(bottom=-0.05)
-        ax.set_xticks(np.arange(1, self.NF + 1))
-        ax.grid(True, which='major', axis='y', linestyle='--', alpha=0.7)
-
-        plt.tight_layout()
-        
-    @staticmethod
-    def plot_convergence_rates(mtl: dict, nf_max=20):
-        """ Plota a convergência da capacitância em função de NF, usando um modelo base. """
-        print(f"\nGerando gráfico de convergência até NF={nf_max}...")
-        
-        C_FACTOR = 1e12  # Fator de conversão para pF/m
-        
-        # Extrai R e D da configuração base para calcular o valor exato.
-        R = mtl[0]['radius'][1]
-        center1 = np.array(mtl[0]['center_point'])
-        center2 = np.array(mtl[1]['center_point'])
-        D = np.linalg.norm(center1 - center2)
-        c_exact = (np.pi * sc.epsilon_0) / np.arccosh(D / R / 2.0)
-        nf_range = range(1, nf_max + 1)
-
-        nf_odd, nf_even, cap_odd, cap_even = [], [], [], []
-
-        for nf in nf_range:
-            temp_mtl = copy.deepcopy(mtl)
-            temp_mtl[0]['fourier_order'] = nf
-            temp_mtl[1]['fourier_order'] = nf
-
-            mtl_model = MulticonductorTransmissionLine(temp_mtl)
-            bare_wires = MulticonductorBareWireSystems(mtl_model)
-            bare_wires.run_simulation()
+            # Preenchimento do Vetor V conforme a formulação de Galerkin
+            if field_surface['type'] == 'conductor':
+                potential = self.model.mtl[field_surface['tag']]['potential_to_infinity']
+                # Apenas o termo constante (m=0) da integral do lado direito é não-nulo
+                V_vector[offsets[p]] = 2 * np.pi * potential
             
-            if nf % 2 != 0:
-                nf_odd.append(nf)
-                cap_odd.append(bare_wires.C_maxwellian.item() * C_FACTOR)
-            else:
-                nf_even.append(nf)
-                cap_even.append(bare_wires.C_maxwellian.item() * C_FACTOR)
+        # Resolver o sistema e obter os resultados
+        self.mom_data['galerkin']['V_vector'] = V_vector
+        self.mom_data['galerkin']['moment_matrix'] = moment_matrix
+        self.mom_data['galerkin']['sigma_coeffs'] = np.linalg.solve(moment_matrix, V_vector)
+        
+        self._generalized_capacitance_savage()
+        cap_matrix = maxwellian_capacitance(self.model, self.mom_data['galerkin'])
+        self.mom_data['galerkin']['maxwellian_capacitance'] = cap_matrix
 
-        plt.style.use('default')
-        fig, ax = plt.subplots(figsize=(12, 5))
-        ax.axhline(y=c_exact * C_FACTOR, color='k', linestyle=':', label=f'Exactly Value = {c_exact*C_FACTOR:.2f} pF/m')
-        ax.plot(nf_odd, cap_odd, linestyle='none', marker='x', markersize=4, fillstyle='none', markeredgecolor='black', label='NF Ímpar')
-        ax.plot(nf_even, cap_even, linestyle='none', marker='o', markersize=4, color='black', label='NF Par')
-        ax.set_title(f'Convergência da Capacitância para D/R = {D/R:.2f}')
-        ax.set_xlabel('NF - Número de Coeficientes de Fourier por Fio')
-        ax.set_ylabel('Capacitância (pF/m)')
-        ax.set_xticks(np.arange(0, nf_max + 1, 2))
-        ax.set_xlim(0, nf_max); ax.set_ylim(bottom=0)
-        ax.set_ylim(0, max(cap_odd + cap_even) * 1.1)
-        ax.grid(False)
-        ax.legend()
-        plt.tight_layout()

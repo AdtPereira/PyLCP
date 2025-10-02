@@ -28,7 +28,6 @@ try:
     from analytical_forms.single_core_cable import InternalPerUnitParameters
     from mom_so.quasi_static_green import QuasiStatic
     from mom_so.lossless_medium import HomogeneousLosslessMedium, LosslessPostProcessing
-    from mom.coaxial_cable_systems import MulticonductorCoaxialCableSystems
     print("Core modules imported successfully.")
 except ImportError as e:
     print(f"Error importing modules: {e}")

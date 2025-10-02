@@ -1,16 +1,15 @@
 {
-    // Use IntelliSense to learn about possible attributes.
-    // Hover to view descriptions of existing attributes.
-    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
     "configurations": [
-        
         {
-            "name": "Python Debugger: Current File",
+            "name": "Debug: Arquivo Atual como Módulo",
             "type": "debugpy",
             "request": "launch",
-            "program": "${file}",
-            "console": "integratedTerminal"
+            "console": "integratedTerminal",
+            // Executa o nosso script runner
+            "program": "${workspaceFolder}/debug_runner.py",
+            // Passa o caminho do arquivo atualmente aberto como um argumento para o script
+            "args": ["${file}"]
         }
     ]
 }
