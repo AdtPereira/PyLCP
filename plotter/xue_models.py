@@ -10,6 +10,7 @@ class XueModels:
     """
     def __init__(self, pul_parameters):
         self.pul_data = pul_parameters
+        self.cmsl = self.pul_data['comsol'] if 'comsol' in self.pul_data else None
         self.f = pul_parameters['frequencies']
         self.w = 2 * np.pi * self.f
 
@@ -22,12 +23,17 @@ class XueModels:
         ]
 
         self.xue_series = [
-            {'key': 'p100_deconti',      'label': 'De Conti Approx.', 'color': 'red', 'linestyle': ':'},
-            {'key': 'p100_er20_deconti', 'label': '', 'color': 'red', 'linestyle': ':'},
-            {'key': 'p500_deconti',      'label': '', 'color': 'red', 'linestyle': ':'},
-            {'key': 'p100',      'label': r'$\rho_e=100 \;\Omega m, \epsilon_r=1$',  'color': 'black', 'linestyle': '-'},
+            {'key': 'p100', 'label': r'$\rho_e=100 \;\Omega m, \epsilon_r=1$',  'color': 'black', 'linestyle': '-'},
             {'key': 'p100_er20', 'label': r'$\rho_e=100 \;\Omega m, \epsilon_r=20$', 'color': 'black', 'linestyle': '--'},
             {'key': 'p500',      'label': r'$\rho_e=500 \;\Omega m, \epsilon_r=1$',  'color': 'black', 'linestyle': '-.'},
+            {'key': 'p100_deconti', 'label': 'De Conti Approx.', 'color': 'red', 'linestyle': ':'},
+            {'key': 'p100_er20_deconti', 'label': '', 'color': 'red', 'linestyle': ':'},
+            {'key': 'p500_deconti',      'label': '', 'color': 'red', 'linestyle': ':'},
+        ]
+
+        self.xue_series_norm = [
+            {'key': 'p100', 'label': r'$\rho_e=100 \;\Omega m, \epsilon_r=1$',  'color': 'black', 'linestyle': '-'},
+            {'key': 'p100_deconti', 'label': 'De Conti Approx.', 'color': 'red', 'linestyle': ':'},
         ]
 
         self.nakagawa_carson_series = [
@@ -105,7 +111,17 @@ class XueModels:
                 'p': 1, 'q': 1,
                 'x_lim': {'resistance': (1E4, 1E7), 'inductance': (1E4, 1E7)},
                 'y_lim': {'resistance': (1E0, 1E5), 'inductance': (0.5, 2.0)},
+                'y_ticks': {'resistance': np.arange(1E0, 1E5, 1E1), 'inductance': np.arange(0.5, 2.1, 0.5)},
                 'series_to_plot': self.xue_series
+            },
+            'fig419_norm': {
+                'suptitle': 'Figure 4.19: P.u.l. Self-impedance of phase - a sheath with Magalhães/Xue formulation [1]',
+                'resistance_title': 'P.u.l. series resistance',
+                'inductance_title': 'P.u.l. series inductance',
+                'p': 1, 'q': 1,
+                'x_lim': {'resistance': (1E4, 1E7), 'inductance': (1E4, 1E7)},
+                # 'y_lim': {'resistance': (1E0, 1E5), 'inductance': (0.5, 2.0)},
+                'series_to_plot': self.xue_series_norm
             },
             'fig421': {
                 'suptitle': 'Figure 4.21: P.u.l. Mutual impedance between phase - a and phase - b sheaths with Magalhães/Xue formulation [1]',
@@ -114,6 +130,7 @@ class XueModels:
                 'p': 1, 'q': 3,
                 'x_lim': {'resistance': (1E4, 1E7), 'inductance': (1E4, 1E7)},
                 'y_lim': {'resistance': (1E0, 1E5), 'inductance': (0.0, 1.5)},
+                'y_ticks': {'resistance': np.arange(1E0, 1E5, 1E1), 'inductance': np.arange(0.0, 1.6, 0.5)},
                 'series_to_plot': self.xue_series
             },
             'fig423': {
@@ -138,11 +155,17 @@ class XueModels:
         fig.suptitle(config['suptitle'], fontsize=12, y=0.98)
 
         for series in config['series_to_plot']:
-            zs_3d = self.pul_data[series['key']]['series_impedance_matrix']
-            zs = zs_3d[:, p, q]
+            zi = self.pul_data[series['key']]['internal_impedance_matrix']
+            zg = self.pul_data[series['key']]['earth-return_impedance_matrix']
+            zs = self.pul_data[series['key']]['series_impedance_matrix']
             style = {'label': series['label'], 'color': series['color'], 'linestyle': series['linestyle'], 'linewidth': 1.0}
-            ax1.plot(self.f, zs.real * 1e3, **style)
-            ax2.plot(self.f, zs.imag / self.w * 1e6, **style)
+            ax1.plot(self.f, np.real(zs[:, p, q]) * 1e3, **style)
+            ax2.plot(self.f, np.imag(zs[:, p, q]) / self.w * 1e6, **style)
+
+        if self.cmsl is not None and config_key == 'fig419':
+            cmsl = self.cmsl['cmsl_ground_return_impedance']  
+            ax1.scatter(cmsl['freq'], cmsl['coil_resistance'] * 1e3, label='COMSOL (mf)', marker='o', facecolors='black', s=10, zorder=2)
+            ax2.scatter(cmsl['freq'], cmsl['coil_inductance'] * 1e6, label='COMSOL (mf)', marker='o', facecolors='black', s=10, zorder=2)
 
         ax1.set_xscale('log')
         ax1.set_yscale('log')
@@ -157,9 +180,50 @@ class XueModels:
         ax2.set_xscale('log')
         ax2.set_xlim(config['x_lim']['inductance'])
         ax2.set_ylim(config['y_lim']['inductance'])
+        ax2.set_yticks(config['y_ticks']['inductance'])
         ax2.legend(fontsize='small')
         ax2.set_xlabel('Frequency (Hz)')
         ax2.set_ylabel(fr'$Ls_{{{p+1}{q+1}}} \, (mH/km)$')
+        ax2.grid(True, which='both', linestyle='--', linewidth=0.5)
+        ax2.set_title(config['inductance_title'])
+        plt.tight_layout(rect=[0, 0, 1, 0.96])
+
+    def _scc_norm_impedance_subplots(self, config_key):
+        """
+        Generic method to create a 1x2 subplot for series resistance (left)
+        and series inductance (right) based on a configuration key.
+        """
+        config = self.plot_configs[config_key]
+        p, q = config['p'], config['q']
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=self.figsize, sharey=False)
+        fig.suptitle(config['suptitle'], fontsize=12, y=0.98)
+
+        for series in config['series_to_plot']:
+            # zg = self.pul_data[series['key']]['series_impedance_matrix']
+            zg = self.pul_data[series['key']]['earth-return_impedance_matrix']
+            style = {'label': series['label'], 'color': series['color'], 'linestyle': series['linestyle'], 'linewidth': 1.0}
+            ax1.plot(self.f, np.abs(zg[:, p, q]), **style)
+            ax2.plot(self.f, np.angle(zg[:, p, q], deg=True), **style)
+
+        if self.cmsl is not None:
+            cmsl = self.cmsl['cmsl_ground_return_impedance']  
+            ax1.scatter(cmsl['freq'], np.abs(cmsl['coil_impedance']), label='COMSOL (mf)', marker='o', facecolors='black', s=10, zorder=2)
+            ax2.scatter(cmsl['freq'], np.angle(cmsl['coil_impedance'], deg=True), label='COMSOL (mf)', marker='o', facecolors='black', s=10, zorder=2)
+
+        ax1.set_xscale('log')
+        ax1.set_yscale('log')
+        ax1.set_xlim(config['x_lim']['resistance'])
+        ax1.legend(fontsize='small')
+        ax1.set_xlabel('Frequency (Hz)')
+        ax1.set_ylabel(fr'$|Rs_{{{p+1}{q+1}}}| \, (\Omega/m)$')
+        ax1.grid(True, which='both', linestyle='--', linewidth=0.5)
+        ax1.set_title(config['resistance_title'])
+        
+        ax2.set_xscale('log')
+        ax2.set_xlim(config['x_lim']['inductance'])
+        ax2.legend(fontsize='small')
+        ax2.set_xlabel('Frequency (Hz)')
+        ax2.set_ylabel('Angle (degrees)')
         ax2.grid(True, which='both', linestyle='--', linewidth=0.5)
         ax2.set_title(config['inductance_title'])
         plt.tight_layout(rect=[0, 0, 1, 0.96])
@@ -213,16 +277,22 @@ class XueModels:
 
         for series in config['series_to_plot']:
             zs_3d = self.pul_data[series['key']]['series_impedance_matrix']
-            zs = zs_3d[:, p, q]            
             style = {'label': series['label'], 'color': series['color'], 'linestyle': series['linestyle']}
-            ax1.plot(self.f, zs.real * 1e3, **style)
-            ax2.plot(self.f, zs.imag / self.w * 1e6, **style)
+            ax1.plot(self.f, zs_3d[:, p, q].real * 1e3, **style)
+            ax2.plot(self.f, zs_3d[:, p, q].imag / self.w * 1e6, **style)
+
+        if self.cmsl is not None:
+            cmsl = self.cmsl['cmsl_ground_return_impedance_h5']  
+            zs = cmsl['coil_impedance']
+            f, w = cmsl['freq'], 2 * np.pi * cmsl['freq']
+            ax1.scatter(f, np.real(zs) * 1e3, label='COMSOL (mf)', marker='o', facecolors='black', s=10, zorder=2)
+            ax2.scatter(f, np.imag(zs) / w * 1e6, label='COMSOL (mf)', marker='o', facecolors='black', s=10, zorder=2)
 
         # Configure left subplot (Resistance)
         ax1.set_xscale('log')
         ax1.set_yscale('log')
         ax1.set_xlim(config['x_lim']['resistance'])
-        ax1.set_ylim(config['y_lim']['resistance'])
+        # ax1.set_ylim(config['y_lim']['resistance'])
         ax1.legend(fontsize='small')
         ax1.set_xlabel('Frequency (Hz)')
         ax1.set_ylabel(r'$R_s \, (\Omega/km)$')
@@ -232,7 +302,7 @@ class XueModels:
         # Configure right subplot (Inductance)
         ax2.set_xscale('log')
         ax2.set_xlim(config['x_lim']['inductance'])
-        ax2.set_ylim(config['y_lim']['inductance'])
+        # ax2.set_ylim(config['y_lim']['inductance'])
         ax2.legend(fontsize='small')
         ax2.set_xlabel('Frequency (Hz)')
         ax2.set_ylabel(r'$L_s \, (mH/km)$')
@@ -340,6 +410,10 @@ class XueModels:
     def plot_fig419(self):
         """Plots the data corresponding to Figure 4.19 from the reference."""
         self._scc_impedance_subplots('fig419')
+
+    def plot_fig419_norm(self):
+        """Plots the data corresponding to Figure 4.19 from the reference."""
+        self._scc_norm_impedance_subplots('fig419_norm')
 
     def plot_fig421(self):
         """Plots the data corresponding to Figure 4.21 from the reference."""

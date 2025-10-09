@@ -2,7 +2,7 @@
   "type": "overhead",
   "note": "An XUE overhead line. Ref.: Example xx, p.xxx, 2018",
   "arrangement": {
-    "height_m": 10.0,
+    "height_m": 5.0,
     "spacing_m": null
   },
   "soil": {

@@ -8,17 +8,19 @@ class DeContiModels:
     A highly refactored class to handle plotting for the Xue model results.
     It uses a configuration-driven approach to generate complex subplot figures.
     """
-    def __init__(self, pul_parameters):
+    def __init__(self, model, pul_parameters):
+        self.model = model
         self.pul_data = pul_parameters
         self.f = pul_parameters['frequencies']
         self.w = 2 * np.pi * self.f
-
         self.figsize = (12, 5)
+
+        epsr1 = self.model.mtl_ref[0]['relative_permittivity']
 
         self.comparison = [
             {'key': 'magalhaes_xue', 'label': 'Magalhães/Xue',  'color': 'black', 'linestyle': '-', 'linewidth': 2},
             {'key': 'sunde', 'label': 'Sunde', 'color': 'gray', 'linestyle': ':', 'linewidth': 2},
-            {'key': 'pollaczek', 'label': 'Pollaczek', 'color': 'darkblue', 'linestyle': '-', 'linewidth': 2},
+            {'key': 'pollaczek', 'label': 'Pollaczek', 'color': 'blue', 'linestyle': '-', 'linewidth': 2},
             {'key': 'ametani', 'label': 'Ametani', 'color': 'darkgreen', 'linestyle': '-', 'linewidth': 2},
             {'key': 'deconti', 'label': 'De Conti', 'color': 'red', 'linestyle': ':', 'linewidth': 1},
             {'key': 'saad', 'label': 'Saad', 'color': 'red', 'linestyle': ':', 'linewidth': 1},
@@ -26,12 +28,12 @@ class DeContiModels:
         ]
         
         self.paper_2023 = [
-            {'key': 'p100',   'label': r'$\rho_e=100 \;\Omega m$',  'color': 'black', 'linestyle': '-', 'marker': 'o'},
-            {'key': 'p1000',  'label': r'$\rho_e=1000 \;\Omega m$', 'color': 'black', 'linestyle': '-', 'marker': 's'},
-            {'key': 'p10000', 'label': r'$\rho_e=10000 \;\Omega m$','color': 'black', 'linestyle': '-', 'marker': '^'},
-            {'key': 'p100_deConti', 'label': '', 'color': 'red', 'linestyle': '--', 'marker': None},
-            {'key': 'p1000_deConti', 'label': '', 'color': 'red', 'linestyle': '--', 'marker': None},
-            {'key': 'p10000_deConti', 'label': '', 'color': 'red', 'linestyle': '--', 'marker': None},
+            {'key': 'p100',   'label': r'Integral Form. $\rho_e=100 \;\Omega m$',  'color': 'black', 'linestyle': '-', 'linewidth': 2.0},
+            {'key': 'p1000',  'label': r'Integral Form. $\rho_e=1000 \;\Omega m$', 'color': 'blue', 'linestyle': '-', 'linewidth': 2.0},
+            {'key': 'p10000', 'label': r'Integral Form. $\rho_e=10000 \;\Omega m$','color': 'darkgreen', 'linestyle': '-', 'linewidth': 2.0},
+            {'key': 'p100_deConti', 'label': 'De Conti Approx.', 'color': 'red', 'linestyle': '--', 'linewidth': 1.0},
+            {'key': 'p1000_deConti', 'label': '', 'color': 'red', 'linestyle': '--', 'linewidth': 1.0},
+            {'key': 'p10000_deConti', 'label': '', 'color': 'red', 'linestyle': '--', 'linewidth': 1.0},
         ]
 
         self.plot_configs = {
@@ -45,7 +47,7 @@ class DeContiModels:
                 'series_to_plot': self.comparison
             },
             'impedance': {
-                'suptitle': r"Flat arrangement's mutual ground-return impedance for $\varepsilon_{r1} = 10$",
+                'suptitle': fr"Flat arrangement's mutual ground-return impedance for $\varepsilon_{{r1}} = {epsr1}$",
                 'norm_title': 'Absolute Impedance',
                 'angle_title': 'Angle of Impedance',
                 'p': 2, 'q': 0,
@@ -101,40 +103,69 @@ class DeContiModels:
         ax2.set_title(config['inductance_title'])
         plt.tight_layout(rect=[0, 0, 1, 0.96])
 
-    def _impedance_subplots(self, config_key):
+    def _impedance_subplots(self, config_key, graph_form='norm_and_angle'):
         config = self.plot_configs[config_key]
         p, q = config['p'], config['q']
         fig, (ax1, ax2) = plt.subplots(1, 2, figsize=self.figsize, sharey=False)
         fig.suptitle(config['suptitle'], fontsize=12, y=0.98)
 
         for series in config['series_to_plot']:
-            zg_3d = self.pul_data[series['key']]['earth-return_impedance_matrix']
-            zg = zg_3d[:, p, q]
-            style = {'label': series['label'], 'color': series['color'], 'linestyle': series['linestyle'],
-                     'marker': series['marker'], 'markersize': 3, 'linewidth': 1.0}
-            ax1.plot(self.f, np.abs(zg), **style)
-            ax2.plot(self.f, np.angle(zg, deg=True), **style)
+            zg = self.pul_data[series['key']]['earth-return_impedance_matrix']
+            style = {
+                'label': series.get('label', ''),
+                'color': series.get('color', 'black'),
+                'linestyle': series.get('linestyle', '-'),
+                'linewidth': series.get('linewidth', 1.0)}            
 
-        # Configure left subplot (Resistance)
-        ax1.set_xscale('log')
-        ax1.set_xlim(config['x_lim']['norm'])
-        ax1.set_ylim(config['y_lim']['norm'])
-        ax1.legend(fontsize='small')
-        ax1.set_xlabel('Frequency (Hz)')
-        ax1.set_ylabel(fr'$|Zg_{{{p+1}{q+1}}}| \, (\Omega/m)$')
-        ax1.grid(True, which='both', linestyle='--', linewidth=0.5)
-        ax1.set_title(config['norm_title'])
+            # Configure left subplot (Resistance)
+            if graph_form == 'norm_and_angle':
+                ax1.plot(self.f, np.abs(zg[:, p, q]), **style)
+                ax2.plot(self.f, np.angle(zg[:, p, q], deg=True), **style)
 
-        # Configure right subplot (Inductance)
-        ax2.set_xscale('log')
-        ax2.set_xlim(config['x_lim']['angle'])
-        ax2.set_ylim(config['y_lim']['angle'])
-        ax2.legend(fontsize='small')
-        ax2.set_xlabel('Frequency (Hz)')
-        ax2.set_ylabel(fr'Angle of $Zg_{{{p+1}{q+1}}}$ (Degrees)')
-        ax2.grid(True, which='both', linestyle='--', linewidth=0.5)
-        ax2.set_title(config['angle_title'])
-        plt.tight_layout(rect=[0, 0, 1, 0.96])
+                ax1.set_xscale('log')
+                ax1.set_xlim(config['x_lim']['norm'])
+                ax1.set_ylim(config['y_lim']['norm'])
+                ax1.legend(fontsize='small')
+                ax1.set_xlabel('Frequency (Hz)')
+                ax1.set_ylabel(fr'$|Zg_{{{p+1}{q+1}}}| \, (\Omega/m)$')
+                ax1.grid(True, which='both', linestyle='--', linewidth=0.5)
+                ax1.set_title(config['norm_title'])
+
+                # Configure right subplot (Inductance)
+                ax2.set_xscale('log')
+                ax2.set_xlim(config['x_lim']['angle'])
+                ax2.set_ylim(config['y_lim']['angle'])
+                ax2.legend(fontsize='small')
+                ax2.set_xlabel('Frequency (Hz)')
+                ax2.set_ylabel(fr'Angle of $Zg_{{{p+1}{q+1}}}$ (Degrees)')
+                ax2.grid(True, which='both', linestyle='--', linewidth=0.5)
+                ax2.set_title(config['angle_title'])
+                plt.tight_layout(rect=[0, 0, 1, 0.96])
+
+            elif graph_form=='resistance_and_inductance':
+                ax1.plot(self.f, np.real(zg[:, p, q]) * 1e3, **style)
+                ax2.plot(self.f, np.imag(zg[:, p, q]) / self.w * 1e6, **style)
+
+                ax1.set_xscale('log')
+                ax1.set_yscale('log')
+                ax1.set_xlim(config['x_lim']['norm'])
+                # ax1.set_ylim(config['y_lim']['norm'])
+                ax1.legend(fontsize='small')
+                ax1.set_xlabel('Frequency (Hz)')
+                # ax1.set_ylabel(fr'$|Zg_{{{p+1}{q+1}}}| \, (\Omega/m)$')
+                ax1.grid(True, which='both', linestyle='--', linewidth=0.5)
+                ax1.set_title(config['norm_title'])
+
+                # Configure right subplot (Inductance)
+                ax2.set_xscale('log')
+                ax2.set_xlim(config['x_lim']['angle'])
+                # ax2.set_ylim(config['y_lim']['angle'])
+                ax2.legend(fontsize='small')
+                ax2.set_xlabel('Frequency (Hz)')
+                # ax2.set_ylabel(fr'Angle of $Zg_{{{p+1}{q+1}}}$ (Degrees)')
+                ax2.grid(True, which='both', linestyle='--', linewidth=0.5)
+                ax2.set_title(config['angle_title'])
+                plt.tight_layout(rect=[0, 0, 1, 0.96])
 
     def _potential_subplots(self, config_key):
         config = self.plot_configs[config_key]
@@ -171,11 +202,11 @@ class DeContiModels:
         ax2.set_title(config['angle_title'])
         plt.tight_layout(rect=[0, 0, 1, 0.96])
 
-    def impedance_comparison(self):
+    def fig_3(self, graph_form='norm_and_angle'):
         """Plots the data corresponding to Figure 3 from the reference."""
-        self._impedance_subplots('impedance')
+        self._impedance_subplots('impedance', graph_form)
 
-    def potential_comparison(self):
+    def fig_6(self):
         """Plots the data corresponding to Figure 6 from the reference."""
         self._potential_subplots('potential')
 

@@ -23,6 +23,7 @@ except IndexError:
 # --- Import custom modules ---
 try:
     from utils.case_utils import *
+    from utils.comsol_data import ComsolDataReader
     from plotter.xue_models import XueModels
     from models.scc import SingleCoreCableModelGenerator
     from mtl_main.graphics import GroundReturnMTLRepresentation
@@ -32,6 +33,19 @@ try:
 except ImportError as e:
     print(f"Error importing modules: {e}")
     sys.exit(1)
+
+# --- Load COMSOL Data ---
+COMSOL_DATA = {}
+try:
+    print(f"--- Instanciando ComsolDataReader para o caso '{case_name}' ---")
+    reader = ComsolDataReader(project_root, case_name)
+    COMSOL_DATA = reader.load_all_results()
+    if COMSOL_DATA:
+        reader.show_summary()
+except FileNotFoundError as e:
+    print(f"Aviso: Diretório de dados do COMSOL não encontrado. Detalhes: {e}")
+except Exception as e:
+    print(f"Ocorreu um erro ao carregar os dados do COMSOL: {e}")
 
 def main():
     """ Main function to run the simulation and plotting using vectorized calculations. """
@@ -59,8 +73,12 @@ def main():
     }
     
     # --- VECTORIZED CALCULATION ---
-    pul_data = {'frequencies': np.logspace(3, 7, num=40)}
+    numerical_freqs = np.logspace(4, 7, num=31)
 
+    pul_data = {
+        'comsol': COMSOL_DATA,
+        'frequencies': numerical_freqs}
+    
     # 1. Calculate internal parameters ONCE, as the cable geometry is the same for all scenarios.
     print("Calculating internal parameters for all frequencies...")
     internal = InternalPerUnitParameters(mtl_model_a, pul_data['frequencies'])
@@ -78,8 +96,9 @@ def main():
     plotter = XueModels(pul_data)
     plotter.plot_fig419()
     plotter.plot_fig421()
-    plotter.plot_fig423()
-    GroundReturnMTLRepresentation(mtl_model_a, case_name, units='centimeter').system_schematic()
+    # plotter.plot_fig419_norm()
+    # plotter.plot_fig423()
+    # GroundReturnMTLRepresentation(mtl_model_a, case_name, units='centimeter').system_schematic()
     plt.show()    
 
 if __name__ == "__main__":

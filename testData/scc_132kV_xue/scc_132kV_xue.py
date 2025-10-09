@@ -84,7 +84,7 @@ def main():
     }
 
     # --- VECTORIZED CALCULATION ---
-    pul_data = {'frequencies': np.logspace(1, 7, num=120)}
+    pul_data = {'frequencies': np.logspace(4, 7, num=200)}
 
     # 1. Calculate internal parameters ONCE, as the cable geometry is the same for all scenarios.
     print("Calculating internal parameters for all frequencies...")

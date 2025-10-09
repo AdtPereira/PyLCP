@@ -20,9 +20,9 @@ import numpy as np
 import copy
 import scipy.special as ss
 import scipy.constants as sc
-from scipy.integrate import quad
 from scipy.linalg import lu_factor, lu_solve
 from mtl_main.source import MulticonductorTransmissionLine
+from utils.case_utils import *
 
 def sommerfeld_quasi_tem_approx_impedance(hnm, dnm, ke2, ka2, type_form='gauss_legendre', pts=150):
     """ Calculates the Carson integral using Gauss-Legendre quadrature and scipy.integrate.quad."""
@@ -927,11 +927,9 @@ class PerUnitParameters:
         self.k_air2 = -self.jw * sc.mu_0 * self.jw * sc.epsilon_0
         self.k_earth2 = -self.jw * self.mu1 * (self.sigma_1 + self.jw * self.e1)
 
-    def ground_return_parameters(self, zg_form='magalhaes_xue', yg_form='magalhaes_xue'):
-        """
-        Calculates Earth-return parameters over a vector of frequencies.
-        """
-        N, M = self.model.num_sc_cables, self.model.num_conductors_per_scc
+    def earth_return_parameters(self, zg_form='magalhaes_xue', yg_form='magalhaes_xue'):
+        """ Calculates Earth-return parameters over a vector of frequencies. """
+        N = self.model.num_sc_cables
         d_matrix = self.model.d_matrix_ground_return
         D_matrix = self.model.D_matrix_ground_return
         hnm = self.model.vertical_separation_matrix
@@ -942,6 +940,7 @@ class PerUnitParameters:
         # Adjust wave numbers based on the formulation
         if zg_form in ['sunde', 'deconti_sunde']:
             k_air2 = np.zeros_like(self.f, dtype=complex)
+        
         elif zg_form in ['pollaczek', 'ametani', 'saad', 'wedepohl']:
             k_air2 = np.zeros_like(self.f, dtype=complex)
             k_earth2 = -self.jw * self.mu1 * self.sigma_1
@@ -1014,6 +1013,7 @@ class PerUnitParameters:
                 for m in range(N):
                     if zg_form == 'ametani':
                         S1c[:, n, m] = 2 * sommerfeld_ametani_approx(hnm[n, m], dnm[n, m], ke2=k_earth2)
+                    
                     else:
                         S1c[:, n, m] = 2 * sommerfeld_quasi_tem_approx_impedance(hnm[n, m], dnm[n, m], ke2=k_earth2, ka2=k_air2)
                         if yg_form in ['magalhaes_xue']:
@@ -1036,13 +1036,13 @@ class PerUnitParameters:
         N, M = self.model.num_sc_cables, self.model.num_conductors_per_scc
         num_total_conductors = N * M
 
-        earth_return = self.ground_return_parameters(zg_form, yg_form)
-        z0_jk = earth_return['earth-return_impedance_matrix']  # Shape (num_freq, N, N)
-        pg_jk = earth_return['earth-return_potential_coefficient'] # Shape (num_freq, N, N)
+        earth_return = self.earth_return_parameters(zg_form, yg_form)
+        z0_jk = earth_return['earth-return_impedance_matrix']       # Shape (num_freq, N, N)
+        pg_jk = earth_return['earth-return_potential_coefficient']  # Shape (num_freq, N, N)
 
-        Zi = pul_internal['impedance_matrix'] # Shape (num_freq, N*M, N*M)
-        Ye = pul_internal['shunt_admittance_matrix'] # Shape (num_freq, N*M, N*M)
-        Pi = pul_internal['potential_coefficient_matrix'] # Shape (N*M, N*M)
+        Zi = pul_internal['impedance_matrix']                       # Shape (num_freq, N*M, N*M)
+        Ye = pul_internal['shunt_admittance_matrix']                # Shape (num_freq, N*M, N*M)
+        Pi = pul_internal['potential_coefficient_matrix']           # Shape (N*M, N*M)
 
         # Loop to build the block matrix for each frequency
         ones_MM = np.ones((M, M))

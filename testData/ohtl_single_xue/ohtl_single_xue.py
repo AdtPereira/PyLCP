@@ -23,6 +23,7 @@ except IndexError:
 # --- Import custom modules ---
 try:
     from utils.case_utils import *
+    from utils.comsol_data import ComsolDataReader
     from models import overhead_lines
     from mtl_main.graphics import GroundReturnMTLRepresentation
     from mtl_main.source import MulticonductorTransmissionLine
@@ -32,6 +33,19 @@ try:
 except ImportError as e:
     print(f"Error importing modules: {e}")
     sys.exit(1)
+
+# --- Load COMSOL Data ---
+COMSOL_DATA = {}
+try:
+    print(f"--- Instanciando ComsolDataReader para o caso '{case_name}' ---")
+    reader = ComsolDataReader(project_root, case_name)
+    COMSOL_DATA = reader.load_all_results()
+    if COMSOL_DATA:
+        reader.show_summary()
+except FileNotFoundError as e:
+    print(f"Aviso: Diretório de dados do COMSOL não encontrado. Detalhes: {e}")
+except Exception as e:
+    print(f"Ocorreu um erro ao carregar os dados do COMSOL: {e}")
 
 def main():
     """ Main function to run the simulation and plotting using vectorized calculations. """
@@ -58,7 +72,12 @@ def main():
         'p2000_carson': {'zg_form': 'carson',   'mtl': MulticonductorTransmissionLine(model_c_data)}
     }
 
-    pul_data = {'frequencies': np.logspace(3, 9, num=200)}
+    # --- VECTORIZED CALCULATION ---
+    numerical_freqs = np.logspace(0, 6, num=51)
+
+    pul_data = {
+        'comsol': COMSOL_DATA,
+        'frequencies': numerical_freqs}
 
     # Calculate internal parameters ONCE, as the cable geometry is the same for all scenarios.
     print("Calculating internal parameters for all frequencies...")
@@ -75,12 +94,12 @@ def main():
     print(f"End of simulations! Time spent: {(time.time() - st):.1f} seconds.\n")
     plotter = XueModels(pul_data)
     plotter.plot_fig42()
-    plotter.plot_fig43()
-    plotter.plot_fig45()
-    plotter.plot_fig46()
-    plotter.plot_fig47()
-    plotter.plot_fig48()
-    GroundReturnMTLRepresentation(mtl_model, case_name, units='millimeter').system_schematic()
+    # plotter.plot_fig43()
+    # plotter.plot_fig45()
+    # plotter.plot_fig46()
+    # plotter.plot_fig47()
+    # plotter.plot_fig48()
+    # GroundReturnMTLRepresentation(mtl_model, case_name, units='millimeter').system_schematic()
     plt.show()
 
 if __name__ == "__main__":

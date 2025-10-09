@@ -65,15 +65,16 @@ def main():
     for key, value in scenarios.items():
         print(f"Calculating scenario: {key}...")
         pul = PerUnitParameters(value['mtl'], pul_data['frequencies'])
-        pul_data[key] = pul.ground_return_parameters(
+        pul_data[key] = pul.earth_return_parameters(
             zg_form=value['zg_form'], yg_form=value['yg_form']
         )
     
     print(f"End of the routine! Time spent on simulation: {(time.time() - st):.1f} seconds.\n")
-    plotter = DeContiModels(pul_data)
-    plotter.impedance_comparison()
-    plotter.potential_comparison()
-    GroundReturnMTLRepresentation(mtl_model_a, case_name, units='centimeter').system_schematic()
+    plotter = DeContiModels(mtl_model_a, pul_data)
+    plotter.fig_3(graph_form='norm_and_angle')
+    plotter.fig_3(graph_form='resistance_and_inductance')
+    # plotter.fig_6()
+    # GroundReturnMTLRepresentation(mtl_model_a, case_name, units='centimeter').system_schematic()
     plt.show()    
 
 if __name__ == "__main__":

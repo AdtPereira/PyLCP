@@ -61,7 +61,7 @@ def main():
     for key, value in scenarios.items():
         print(f"Calculating scenario: {key}...")
         pul = PerUnitParameters(value['mtl'], pul_data['frequencies'])
-        pul_data[key] = pul.ground_return_parameters(zg_form=value['zg_form'])
+        pul_data[key] = pul.earth_return_parameters(zg_form=value['zg_form'])
     
     print(f"End of the routine! Time spent on simulation: {(time.time() - st):.1f} seconds.\n")
     plotter = DeContiModels(pul_data)
