@@ -1,4 +1,6 @@
 import re
+import sys
+import os
 import numpy as np
 import pandas as pd
 from pathlib import Path
@@ -142,7 +144,7 @@ class ComsolDataReader:
     em um dicionário estruturado.
     """
 
-    def __init__(self, project_root: Path, case_name: str):
+    def __init__(self, script_file_path: str, autoShow: bool = True):
         """
         Inicializa o leitor identificando o diretório 'Results' alvo.
 
@@ -150,11 +152,23 @@ class ComsolDataReader:
             project_root (Path): O diretório raiz do projeto pyLCP.
             case_name (str): O nome do caso de teste específico (ex: 'coated_bifilar_s40').
         """
+        project_root = Path(script_file_path).resolve().parents[2]
+        if str(project_root) not in sys.path:
+            sys.path.insert(0, str(project_root))
+            
+        case_name = os.path.splitext(os.path.basename(script_file_path))[0]        
+        
         self.project_root = project_root
         self.case_name = case_name
         self.results_path = project_root / 'testData' / case_name / 'Results'
-        self.data = {}
+        self.data = self.load_all_results()
 
+        if autoShow and self.data:
+            self.show_summary()
+
+        print(f"Project root configured at: {project_root}")
+        print(f"--- Instanciando ComsolDataReader para o caso '{case_name}' ---")
+        
         if not self.results_path.is_dir():
             raise FileNotFoundError(
                 f"O diretório Results não foi encontrado para o caso '{case_name}' em: {self.results_path}"
@@ -170,6 +184,8 @@ class ComsolDataReader:
             e os valores são os DataFrames do pandas analisados.
         """
         txt_files = list(self.results_path.glob('*.txt'))
+        data = {}
+        
         if not txt_files:
             print(f"Aviso: Nenhum arquivo .txt encontrado em {self.results_path}")
             return {}
@@ -179,11 +195,11 @@ class ComsolDataReader:
         for file_path in txt_files:
             file_stem = file_path.stem
             try:
-                self.data[file_stem] = self._parse_single_file(file_path)
+                data[file_stem] = self._parse_single_file(file_path)
             except Exception as e:
                 print(f"Erro ao analisar o arquivo {file_path.name}: {e}")
 
-        return self.data
+        return data
 
     def _parse_single_file(self, file_path: Path) -> pd.DataFrame:
         """

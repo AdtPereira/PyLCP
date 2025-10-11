@@ -113,54 +113,54 @@ class MTLStrategy(ABC):
             'horizontal_separation_matrix': horizontal_separation_matrix
         }
 
-    @staticmethod
-    def _cable_distance_with_ground_return(mtl: dict) -> dict:
-        """
-        Calculates all necessary distance matrices for overhead line analysis,
-        including geometric, ground return, horizontal, and vertical separations.
-        Returns a dictionary of the calculated matrices.
-        """
-        # Create a sorted list of CORE conductors to ensure consistent ordering
-        core_conductors = sorted({key: value for key, value in mtl.items() if value.get('conductor_name') in ['core']}.items())
+    # @staticmethod
+    # def _cable_distance_with_ground_return(mtl: dict) -> dict:
+    #     """
+    #     Calculates all necessary distance matrices for overhead line analysis,
+    #     including geometric, ground return, horizontal, and vertical separations.
+    #     Returns a dictionary of the calculated matrices.
+    #     """
+    #     # Create a sorted list of CORE conductors to ensure consistent ordering
+    #     core_conductors = sorted({key: value for key, value in mtl.items() if value.get('conductor_name') in ['core']}.items())
         
-        # Count number of CORE conductors 
-        N = len(core_conductors)
+    #     # Count number of CORE conductors 
+    #     N = len(core_conductors)
         
-        d_matrix = np.zeros((N, N))
-        D_matrix = np.zeros((N, N))
-        vertical_separation_matrix = np.zeros((N, N))
-        horizontal_separation_matrix = np.zeros((N, N))
+    #     d_matrix = np.zeros((N, N))
+    #     D_matrix = np.zeros((N, N))
+    #     vertical_separation_matrix = np.zeros((N, N))
+    #     horizontal_separation_matrix = np.zeros((N, N))
 
-        for n_idx, (n_tag, n_conductor) in enumerate(core_conductors):
-            for m_idx, (m_tag, m_conductor) in enumerate(core_conductors):
-                cn = n_conductor['center_point']
-                cm = m_conductor['center_point']
+    #     for n_idx, (n_tag, n_conductor) in enumerate(core_conductors):
+    #         for m_idx, (m_tag, m_conductor) in enumerate(core_conductors):
+    #             cn = n_conductor['center_point']
+    #             cm = m_conductor['center_point']
 
-                # Horizontal and Vertical separation
-                dnm = cn[0] - cm[0]
-                hnm = cn[1] + cm[1]
+    #             # Horizontal and Vertical separation
+    #             dnm = cn[0] - cm[0]
+    #             hnm = cn[1] + cm[1]
 
-                # Geometric Distance (d_nm)
-                if n_tag == m_tag:
-                    d = n_conductor['radius'][1] # Use radius for self-distance
-                else:
-                    d = np.sqrt(dnm ** 2 + (cn[1] - cm[1]) ** 2)
+    #             # Geometric Distance (d_nm)
+    #             if n_tag == m_tag:
+    #                 d = n_conductor['radius'][1] 
+    #             else:
+    #                 d = np.sqrt(dnm ** 2 + (cn[1] - cm[1]) ** 2)
 
-                # Distance to Image (D_nm)
-                D = np.sqrt(dnm ** 2 + hnm ** 2)
+    #             # Distance to Image (D_nm)
+    #             D = np.sqrt(dnm ** 2 + hnm ** 2)
 
-                # Populate the matrices at the correct indices
-                d_matrix[n_idx, m_idx] = d
-                D_matrix[n_idx, m_idx] = D
-                vertical_separation_matrix[n_idx, m_idx] = hnm
-                horizontal_separation_matrix[n_idx, m_idx] = dnm
+    #             # Populate the matrices at the correct indices
+    #             d_matrix[n_idx, m_idx] = d
+    #             D_matrix[n_idx, m_idx] = D
+    #             vertical_separation_matrix[n_idx, m_idx] = hnm
+    #             horizontal_separation_matrix[n_idx, m_idx] = dnm
 
-        return {
-            'd_matrix_ground_return': d_matrix,
-            'D_matrix_ground_return': D_matrix,
-            'vertical_separation_matrix': vertical_separation_matrix,
-            'horizontal_separation_matrix': horizontal_separation_matrix
-        }
+    #     return {
+    #         'd_matrix_ground_return': d_matrix,
+    #         'D_matrix_ground_return': D_matrix,
+    #         'vertical_separation_matrix': vertical_separation_matrix,
+    #         'horizontal_separation_matrix': horizontal_separation_matrix
+    #     }
 
     @staticmethod
     def _extract_scc_parameters(mtl: dict) -> dict:
@@ -282,6 +282,54 @@ class SingleCoreCableStrategy(MTLStrategy):
 
         return num_cables, conductors_per_cable
     
+    def _cable_distance_with_ground_return(self, mtl: dict) -> dict:
+        """
+        Calculates all necessary distance matrices for overhead line analysis,
+        including geometric, ground return, horizontal, and vertical separations.
+        Returns a dictionary of the calculated matrices.
+        """
+        # Create a sorted list of conductors to ensure consistent ordering
+        cables = sorted({key: value for key, value in mtl.items() if value.get('conductor_name') in ['sheath']}.items())
+        
+        # Count number of cables conductors 
+        N = len(cables)
+        
+        d_matrix = np.zeros((N, N))
+        D_matrix = np.zeros((N, N))
+        vertical_separation_matrix = np.zeros((N, N))
+        horizontal_separation_matrix = np.zeros((N, N))
+
+        for n_idx, (n_tag, n_conductor) in enumerate(cables):
+            for m_idx, (m_tag, m_conductor) in enumerate(cables):
+                cn = n_conductor['center_point']
+                cm = m_conductor['center_point']
+
+                # Horizontal and Vertical separation
+                dnm = cn[0] - cm[0]
+                hnm = cn[1] + cm[1]
+
+                # Geometric Distance (d_nm)
+                if n_tag == m_tag:
+                    d = n_conductor['radius'][1] + n_conductor['insulation']['thickness'] # Use outer radius for self-distance
+                else:
+                    d = np.sqrt(dnm ** 2 + (cn[1] - cm[1]) ** 2)
+
+                # Distance to Image (D_nm)
+                D = np.sqrt(dnm ** 2 + hnm ** 2)
+
+                # Populate the matrices at the correct indices
+                d_matrix[n_idx, m_idx] = d
+                D_matrix[n_idx, m_idx] = D
+                vertical_separation_matrix[n_idx, m_idx] = hnm
+                horizontal_separation_matrix[n_idx, m_idx] = dnm
+
+        return {
+            'd_matrix_ground_return': d_matrix,
+            'D_matrix_ground_return': D_matrix,
+            'vertical_separation_matrix': vertical_separation_matrix,
+            'horizontal_separation_matrix': horizontal_separation_matrix
+        }
+    
     def apply_mtl_ref_properties(self, context, mtl_input: dict) -> None:
         # Number of single core cables (N) and conductors per cable (M)
         context.num_sc_cables, context.num_conductors_per_scc = self._count_scc_and_conductors(mtl_input)
@@ -292,7 +340,7 @@ class SingleCoreCableStrategy(MTLStrategy):
         by delegating the calculation to a static helper method.
         """
         # 1. Delegate the complex calculation to the static method
-        properties = MTLStrategy._cable_distance_with_ground_return(mtl)
+        properties = self._cable_distance_with_ground_return(mtl)
         context.d_matrix_ground_return = properties['d_matrix_ground_return']
         context.D_matrix_ground_return = properties['D_matrix_ground_return']
         context.vertical_separation_matrix = properties['vertical_separation_matrix']

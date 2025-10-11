@@ -1,5 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
+from utils.case_utils import *
 
 class PrysmianModels:
     """
@@ -284,3 +285,53 @@ class PrysmianModels:
                             c_unit = '[pF/m]'
                         _print_real_matrix('[C]', c_matrix, c_unit)
         print("\n" + "="*80)
+
+    def compare_internal_impedance_matrix(self, config_key='core-sheath'):
+        internal_params = self.pul_data['internal']
+        Ri = self.pul_data['internal_matrices']['resistance_matrix']
+        Li = self.pul_data['internal_matrices']['inductance_matrix']
+
+        z11 = internal_params['zcs']['z11']
+        z12 = internal_params['zcs']['z12']
+        z2i = internal_params['zcs']['z2i']
+        z20 = internal_params['zs3']['z20']
+        z23 = internal_params['zs3']['z23']
+        z2m = internal_params['z2m']
+        
+        zcs = z11 + z12 + z2i
+        zs3 = z20 + z23
+
+        impedance_data = {
+            'Zcc': zcs + zs3 - 2 * z2m,
+            'Zss': zs3,
+            'Zcs': zs3 - z2m,
+        }
+        
+        config = self.plot_configs[config_key]
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=self.figsize, sharey=False)
+        fig.suptitle(config['suptitle'], fontsize=12, y=0.98)
+
+        ax1.plot(self.f, Ri[:, 0, 0], color='red', linestyle='--', linewidth=1.5, label='Ri')
+        ax2.plot(self.f, Li[:, 0, 0], color='red', linestyle='--', linewidth=1.5, label='Li')
+        ax1.plot(self.f, Ri[:, 1, 1], color='red', linestyle='--', linewidth=1.5, label='')
+        ax2.plot(self.f, Li[:, 1, 1], color='red', linestyle='--', linewidth=1.5, label='')
+        ax1.plot(self.f, Ri[:, 0, 1], color='red', linestyle='--', linewidth=1.5, label='')
+        ax2.plot(self.f, Li[:, 0, 1], color='red', linestyle='--', linewidth=1.5, label='')
+        
+        for series_config in config['series_to_plot']:
+            z = impedance_data[series_config['key']]
+            style = {k: series_config[k] for k in ['label', 'color', 'linestyle', 'linewidth']}
+            
+            ax1.plot(self.f, np.real(z), **style)
+            ax2.plot(self.f, np.imag(z) / self.w, **style)
+
+        # Configure axes
+        ax1.set(xscale='log', xlabel='Frequency (Hz)', ylabel=r'Resistance ($\Omega$/m)', title=config['resistance_title'])
+        ax1.grid(True, which='both', linestyle='--', linewidth=0.5)
+        ax1.legend(fontsize='small')
+        
+        ax2.set(xscale='log', xlabel='Frequency (Hz)', ylabel=r'Inductance (H/m)', title=config['inductance_title'])
+        ax2.grid(True, which='both', linestyle='--', linewidth=0.5)
+        ax2.legend(fontsize='small')
+
+        plt.tight_layout(rect=[0, 0, 1, 0.96])

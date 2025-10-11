@@ -113,7 +113,7 @@ def main():
             'analytical': {
                 "frequencies": analytical_freqs,
                 "internal_parameters": pul_1.parameters_hybrid(transition_frequency=1e5),
-                "internal_matrices": pul_1.internal_matrices(internal_form='hybrid'),
+                "internal_matrices": pul_1.matrices(internal_form='hybrid'),
             },
             'numerical': None,
             'comsol': None,
@@ -122,7 +122,7 @@ def main():
             'analytical': {
                 "frequencies": analytical_freqs,
                 "internal_parameters": pul_2.parameters_hybrid(transition_frequency=1e5),
-                "internal_matrices": pul_2.internal_matrices(internal_form='hybrid'),
+                "internal_matrices": pul_2.matrices(internal_form='hybrid'),
             },
             'numerical': None,
             'comsol': None,
@@ -131,7 +131,7 @@ def main():
             'analytical': {
                 "frequencies": analytical_freqs,
                 "internal_parameters": pul_31.parameters_hybrid(transition_frequency=1e5),
-                "internal_matrices": pul_31.internal_matrices(internal_form='hybrid'),
+                "internal_matrices": pul_31.matrices(internal_form='hybrid'),
             },
             'numerical': None,
             'comsol': None,

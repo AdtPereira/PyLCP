@@ -1,0 +1,36 @@
+{
+  "arrangement": {
+    "unit": "meter",
+    "type": "trefoil",
+    "burial_depth": 1.3,
+    "spacing": 0.100,
+    "fourier_order": 10,
+    "idx_ref_conductor": 0
+  },
+  "soil": {
+    "conductivity_S_per_m": 0.01,
+    "relative_permittivity": 1.0
+  },
+  "cable_definition": {
+    "core": {
+      "inner_radius": 0,
+      "outer_radius": 0.02075,
+      "conductivity_S_per_m": 3.134796e7,
+      "insulation": {
+        "type": "XLPE",
+        "thickness": 0.0195,
+        "relative_permittivity": 2.68
+      }
+    },
+    "sheath": {
+      "inner_radius": 0.04025,
+      "outer_radius": 0.04276,
+      "conductivity_S_per_m": 4.488330e6,
+      "insulation": {
+        "type": "HDPE",
+        "thickness": 0.00518,
+        "relative_permittivity": 2.3
+      }
+    }
+  }
+}

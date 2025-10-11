@@ -54,7 +54,7 @@ except IndexError:
 try:
     from utils.case_utils import *
     from plotter.prysmian_models import PrysmianModels
-    from models.scc import SingleCoreCableModelGenerator
+    from models.single_core_cable import SingleCoreCableModelGenerator
     from mtl_main.graphics import GroundReturnMTLRepresentation
     from mtl_main.source import MulticonductorTransmissionLine
     from analytical_forms.single_core_cable import InternalPerUnitParameters, PerUnitParameters
@@ -68,7 +68,7 @@ def main():
     st = time.time()    
     input_json = load_json_parameters(__file__, show_content=True)
     model_generator = SingleCoreCableModelGenerator(input_json)
-    model = model_generator.generate_underground_model(show_model=True)
+    model = model_generator.underground_model(show_model=True)
     
     # --- Model setup ---
     mtl_model = MulticonductorTransmissionLine(model)
@@ -90,7 +90,8 @@ def main():
     print("Calculating internal parameters for all frequencies...")
     #    This returns a dictionary of 3D matrices (e.g., shape (40, 6, 6)).
     internal = InternalPerUnitParameters(mtl_model, pul_data['frequencies'])
-    pul_data['internal'] = internal.parameters_by_bessel()
+    pul_data['internal'] = internal.parameters_approximation()
+    pul_data['internal_matrices'] = internal.matrices()
     print("Internal parameters calculated.")
 
     # 2. Loop through scenarios to calculate ground-return effects.
@@ -107,20 +108,21 @@ def main():
     internal = InternalPerUnitParameters(mtl_model, discrete_frequencies)
     pul = PerUnitParameters(mtl_model, discrete_frequencies)
     pul_data_discrete = pul.quasi_tem_approximation(
-        internal.internal_matrices(), zg_form='ametani', yg_form='ametani'
+        internal.matrices(), zg_form='ametani', yg_form='ametani'
     )
     pul_data_discrete['frequencies'] = discrete_frequencies
     print("Discrete calculation for logging finished.")
 
     print(f"End of the routine! Time spent on simulation: {(time.time() - st):.1f} seconds.\n")
     plotter = PrysmianModels(pul_data, pul_data_discrete)
-    plotter.core_parameters()
-    plotter.sheath_parameters()   
-    plotter.core_sheath_internal_impedance_matrix() 
-    plotter.core_sheath_internal_parameters()
-    plotter.ground_return_impedance()
-    plotter.log_matricial_pul_parameters()
-    GroundReturnMTLRepresentation(mtl_model, case_name, units='centimeter').system_schematic()
+    plotter.compare_internal_impedance_matrix() 
+    # plotter.core_sheath_internal_impedance_matrix() 
+    # plotter.core_parameters()
+    # plotter.sheath_parameters()   
+    # plotter.core_sheath_internal_parameters()
+    # plotter.ground_return_impedance()
+    # plotter.log_matricial_pul_parameters()
+    # GroundReturnMTLRepresentation(mtl_model, case_name, units='centimeter').system_schematic()
     plt.show()    
 
 if __name__ == "__main__":

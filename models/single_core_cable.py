@@ -10,7 +10,9 @@ cable layers.
 """
 
 import json
-from typing import Dict, Any, Tuple, List
+from pathlib import Path
+import numpy as np
+from typing import Dict, Any, Tuple
 from utils.case_utils import UNITS_DATA
 
 class SingleCoreCableModelGenerator:
@@ -18,7 +20,7 @@ class SingleCoreCableModelGenerator:
     A class to generate parametric models for single-core cable arrangements.
     """
 
-    def __init__(self, input_json: Dict[str, Any]):
+    def __init__(self, file_path: str, silent_mode: bool = False):
         """
         Initializes the generator with cable and environmental definitions.
 
@@ -26,7 +28,11 @@ class SingleCoreCableModelGenerator:
             input_json (Dict[str, Any]): A dictionary containing the definitions
                                          for the cable, soil, and arrangement.
         """
-        self.input_data = input_json
+        self.script_path = Path(file_path)
+        self.silent_mode = silent_mode
+
+        self.input_data = self.load_json_parameters()
+        
         self.cable_def = self.input_data.get('cable_definition', {})
         self.soil = self.input_data.get('soil', {})
         self.arrangement = self.input_data.get('arrangement', {})
@@ -38,6 +44,41 @@ class SingleCoreCableModelGenerator:
         self.core = self.cable_def.get('core')
         self.sheath = self.cable_def.get('sheath')
         self.armor = self.cable_def.get('armor')
+
+    def load_json_parameters(self) -> dict:
+        """
+        Dynamically loads parameters from a '.json' file.
+        It assumes the '.in.json' file has the same base name as the
+        calling script and is located in the same directory.
+
+        Args:
+            script_file_path (str): The __file__ attribute from the calling script.
+            show_content (bool): If True, prints the content of the loaded
+                                dictionary to the console. Defaults to False.
+
+        Returns:
+            dict: A dictionary with the parameters loaded from the JSON file.
+        """
+        
+        model_file_name = f"{self.script_path.stem}.json"
+        model_path = self.script_path.resolve().parent / model_file_name
+
+        print(f"Case name identified as: '{self.script_path.stem}'")
+        
+        if not model_path.exists():
+            raise FileNotFoundError(f"The parameter file could not be found at: {model_path}")
+
+        with open(model_path, 'r') as f:
+            parameters = json.load(f)
+        
+        print(f"Successfully loaded parameters from: {model_path}")
+        
+        if not self.silent_mode:
+            print(f"\n--- Content of {model_file_name} ---")
+            print(json.dumps(parameters, indent=2))
+            print("--------------------------------------\n")
+            
+        return parameters
 
     def _add_single_layer(self, 
                           model: Dict[str, Any], 
@@ -103,7 +144,7 @@ class SingleCoreCableModelGenerator:
         print(json.dumps(model, indent=2, default=str))
         print("---------------------------------------------------\n")
 
-    def concentric_hdpe_enclosed_model(self, host_conductor: str = 'sheath', show_model: bool = False) -> Dict[str, Any]:
+    def concentric_hdpe_enclosed_model(self, host_conductor: str = 'sheath') -> Dict[str, Any]:
         """
         Generates a model for a cable inside an HDPE enclosure.
         The enclosure is defined within a conductor in the JSON and is added
@@ -158,12 +199,12 @@ class SingleCoreCableModelGenerator:
                 else:
                     v['enclosure'] = None
 
-        if show_model:
+        if not self.silent_mode:
             self._show_model(model)
 
         return model
     
-    def eccentric_hdpe_enclosed_model(self, host_conductor: str = 'sheath', show_model: bool = False) -> Dict[str, Any]:
+    def eccentric_hdpe_enclosed_model(self, host_conductor: str = 'sheath') -> Dict[str, Any]:
         """
         Generates a model for a cable inside an HDPE enclosure.
         The enclosure is defined within a conductor in the JSON and is added
@@ -229,12 +270,12 @@ class SingleCoreCableModelGenerator:
                 else:
                     v['enclosure'] = None
 
-        if show_model:
+        if not self.silent_mode:
             self._show_model(model)
 
         return model
     
-    def generate_underground_model(self, show_model: bool = False) -> Dict[str, Any]:
+    def underground_model(self) -> Dict[str, Any]:
         """
         Generates a parametric model for underground cables in a flat arrangement.
         The number of cables and their spacing is determined by the 'arrangement'
@@ -242,6 +283,7 @@ class SingleCoreCableModelGenerator:
         """
         depth = self.arrangement['burial_depth']
         num_conductors = self.arrangement.get('num_conductors', 1)
+        
         # Default spacing to 0 if not specified (for the single conductor case)
         spacing = self.arrangement.get('spacing', 0) if num_conductors > 1 else 0
 
@@ -269,12 +311,12 @@ class SingleCoreCableModelGenerator:
         for cp in center_points:
             conductor_id = self._add_cable_conductors(model, conductor_id, cp)
 
-        if show_model:
+        if not self.silent_mode:
             self._show_model(model)
 
         return model
     
-    def generate_conventional_single_phase(self, show_model: bool = False) -> Dict[str, Any]:
+    def conventional_single_phase(self) -> Dict[str, Any]:
         """
         Generates a parametric model for a single buried SCC cable.
         """
@@ -302,12 +344,12 @@ class SingleCoreCableModelGenerator:
         for cp in center_points:
             conductor_id = self._add_cable_conductors(model, conductor_id, cp)
 
-        if show_model:
+        if not self.silent_mode:
             self._show_model(model)
 
         return model
 
-    def generate_conventional_three_phase_flat(self, show_model: bool = False) -> Dict[str, Any]:
+    def conventional_three_phase_flat(self) -> Dict[str, Any]:
         """
         Generates a model for a three-phase flat arrangement of SCC cables.
         """
@@ -336,12 +378,12 @@ class SingleCoreCableModelGenerator:
         for cp in center_points:
             conductor_id = self._add_cable_conductors(model, conductor_id, cp)
 
-        if show_model:
+        if not self.silent_mode:
             self._show_model(model)
 
         return model
 
-    def generate_isolated_coaxial_cable(self, show_model: bool = False) -> Dict[str, Any]:
+    def isolated_coaxial_cable(self) -> Dict[str, Any]:
         """
         Generates a model for a single isolated coaxial cable.
         """
@@ -372,7 +414,62 @@ class SingleCoreCableModelGenerator:
         # For a coaxial cable, there is only one center point at the origin
         self._add_cable_conductors(model, 1, (0.0, 0.0))
 
-        if show_model:
+        if not self.silent_mode:
+            self._show_model(model)
+
+        return model
+
+    def simple_trefoil(self) -> Dict[str, Any]:
+        """
+        Gera um modelo para um arranjo trifólio (trefoil) de três fases de cabos SCC.
+        Assume-se que 'burial_depth' corresponde à profundidade dos centros dos
+        dois condutores da base (h3 na figura de referência). O 'spacing' é a
+        distância de centro a centro entre cabos adjacentes.
+        """
+        # Profundidade dos cabos da base (h3)
+        depth_bottom = self.arrangement['burial_depth']
+        spacing = self.arrangement['spacing']
+
+        # --- Cálculo da Geometria Trifólio ---
+        # A altura do triângulo equilátero formado pelos cabos.
+        height = spacing * np.sqrt(3) / 2
+        
+        # As coordenadas dos cabos da base (b e c) são conhecidas.
+        y_bottom = -depth_bottom
+        x_side = spacing / 2
+
+        # A coordenada do cabo superior (a) é calculada a partir da base.
+        # Sua posição vertical é a da base mais a altura do triângulo.
+        y_top = y_bottom + height
+        
+        center_points = [
+            (0.0, y_top),         # Cabo superior (a)
+            (-x_side, y_bottom),  # Cabo inferior esquerdo (b)
+            (+x_side, y_bottom)   # Cabo inferior direito (c)
+        ]
+        
+        model = {
+            'name': self.input_data.get('name', 'THREE_PHASE_TREFOIL_SCC'),
+            'type': 'scc',
+            'note': self.input_data.get('note', 'A parametric three-phase trefoil SCC model based on bottom conductor depth.'),
+            'idx_ref_conductor': self.arrangement.get('idx_ref_conductor', 0),
+            0: {
+                'line_id': 0,
+                'conductor_name': 'soil',
+                'line_type': 'return',
+                'line_return': None,
+                'conductivity': self.soil['conductivity_S_per_m'],
+                'relative_permeability': 1.0,
+                'relative_permittivity': self.soil['relative_permittivity'],
+                'relative_permittivity_out': 1.0,
+            },
+        }
+
+        conductor_id = 1
+        for cp in center_points:
+            conductor_id = self._add_cable_conductors(model, conductor_id, cp)
+
+        if not self.silent_mode:
             self._show_model(model)
 
         return model

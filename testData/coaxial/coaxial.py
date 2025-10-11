@@ -136,9 +136,9 @@ def main():
                 "hybrid": internal.parameters_hybrid(transition_frequency=1e5)
             },
             "internal_matrices": {
-                "bessel": internal.internal_matrices(internal_form='bessel'),
-                "approximation": internal.internal_matrices(internal_form='approximation'),
-                "hybrid": internal.internal_matrices(internal_form='hybrid')
+                "bessel": internal.matrices(internal_form='bessel'),
+                "approximation": internal.matrices(internal_form='approximation'),
+                "hybrid": internal.matrices(internal_form='hybrid')
             },
         },
         'numerical': {

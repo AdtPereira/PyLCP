@@ -1,5 +1,6 @@
 import os
 import numpy as np
+from pathlib import Path
 import matplotlib.pyplot as plt
 from matplotlib.patches import Circle, Wedge
 from mtl_main.source import MulticonductorTransmissionLine
@@ -11,12 +12,14 @@ class BaseMTLRepresentation:
     It contains common functionalities and attributes shared by specialized
     representation classes.
     """
-    def __init__(self, model: MulticonductorTransmissionLine, case_name, autoSave: bool = True, units='meter'):        
+    def __init__(self, file_path: str, model: MulticonductorTransmissionLine, autoSave: bool = True, units: str = 'meter'):        
+        
+        self.script_path = Path(file_path)
         self.model = model
-        self.case_name = case_name
         self.autoSave = autoSave
         unit_info = UNITS_DATA.get(units, UNITS_DATA['meter'])
         active_conductors = list(self.model.mtl.values())
+        
         self.num_sc_cables = len(set(cond['center_point'] for cond in active_conductors))
         self.unit_factor = unit_info['scale']
         self.label_unit = unit_info['label']
@@ -39,7 +42,7 @@ class BaseMTLRepresentation:
         }
 
         # Assumes the script is run from the project's root directory.
-        self.results_dir = os.path.join('testData', self.case_name, 'Results')
+        self.results_dir = os.path.join('testData', self.script_path.stem, 'Results')
         os.makedirs(self.results_dir, exist_ok=True)
 
     def _calculate_schematic_parameters(self) -> dict:
@@ -50,8 +53,19 @@ class BaseMTLRepresentation:
             A dictionary containing parameters like max_radius, h_factor,
             title, and the primary core conductor data.
         """
-        core_conductor = next((c for c in self.model.mtl.values() if c.get('line_type') == 'active'), None)
+        active_conductors = [c for c in self.model.mtl.values() if c.get('line_type') == 'active']
+        core_conductor = active_conductors[0] if active_conductors else None
         
+        # Calculate the average vertical position and find the deepest conductor
+        unique_centers = list(set(tuple(c['center_point']) for c in active_conductors))
+        y_avg, y_min = 0, 0
+        deepest_conductor = core_conductor
+        if unique_centers:
+            y_coords = [center[1] for center in unique_centers]
+            y_avg = sum(y_coords) / len(y_coords)
+            y_min = min(y_coords)
+            deepest_conductor = next((c for c in active_conductors if c['center_point'][1] == y_min), core_conductor)
+
         max_radius = 0
         if core_conductor:
             for conductor in self.model.mtl.values():
@@ -68,7 +82,7 @@ class BaseMTLRepresentation:
             h_factor = 8
         elif self.model.mtl_type == 'scc':
             title = 'Buried Single-Core Cable'
-            h_factor = -2
+            h_factor = -2.5
         elif self.model.mtl_type == 'hdpe':
             title = 'Single-Core Cable Buried in HDPE-Air Gap Enclosure'
             h_factor = -2
@@ -84,11 +98,14 @@ class BaseMTLRepresentation:
 
         return {
             'core_conductor': core_conductor,
+            'deepest_conductor': deepest_conductor,
             'max_radius': max_radius,
             'h_factor': h_factor,
-            'title': title
+            'title': title,
+            'y_avg': y_avg,
+            'y_min': y_min,
         }
-
+    
     def _plot_conductor_graphic(self, ax, conductor_data, parameters, used_labels):
         """
         Plots a single cylindrical layer of a cable (as a Circle or Wedge).
@@ -96,13 +113,24 @@ class BaseMTLRepresentation:
         """
         conductor_label = conductor_data.get('conductor_name', 'Conductor')
         conductor_center = np.array(conductor_data['center_point']) if conductor_data['center_point'] else np.array([0, 0])
-        insulation_center = np.array(conductor_data['insulation']['center_point']) if conductor_data['insulation'] is not None else np.array([0, 0])
+        insulation_data = conductor_data.get('insulation')
+        insulation_center = np.array(insulation_data['center_point']) if insulation_data else np.copy(conductor_center)
         label_to_plot = conductor_label if conductor_label not in used_labels else None
 
-        # Adjust y-position for ground-return systems
+        # Adjust y-position for ground-return systems while preserving relative heights
         if parameters['h_factor'] != 1:
-            conductor_center[1] = parameters['h_factor'] * parameters['max_radius']
-            insulation_center[1] = parameters['h_factor'] * parameters['max_radius']
+            y_real_conductor = conductor_data['center_point'][1]
+            y_avg = parameters['y_avg']
+            schematic_y_avg = parameters['h_factor'] * parameters['max_radius']
+            
+            # Calculate the new schematic y-position for the conductor
+            schematic_y_conductor = schematic_y_avg + (y_real_conductor - y_avg)
+            
+            # Handle insulation center, preserving any original offset
+            y_offset_insulation = insulation_center[1] - conductor_center[1]
+            
+            conductor_center[1] = schematic_y_conductor
+            insulation_center[1] = schematic_y_conductor + y_offset_insulation
         
         if label_to_plot:
             used_labels.add(label_to_plot)
@@ -154,8 +182,8 @@ class IsolatedMTLRepresentation(BaseMTLRepresentation):
     such as single wires, coaxial cables, and pipe-type cables where
     the ground effect is not the primary focus of the schematic.
     """
-    def __init__(self, model: MulticonductorTransmissionLine, case_name, autoSave=True, units='meter'):
-        super().__init__(model, case_name, autoSave, units)
+    def __init__(self, file_path: str, model: MulticonductorTransmissionLine, autoSave=True, units='meter'):
+        super().__init__(file_path, model, autoSave, units)
 
     def _finalize_plot(self, ax, title):
         """Applies final settings for an isolated system plot."""
@@ -208,8 +236,8 @@ class GroundReturnMTLRepresentation(BaseMTLRepresentation):
     such as buried cables or overhead lines, where the ground plane
     is an essential part of the schematic.
     """
-    def __init__(self, model: MulticonductorTransmissionLine, case_name, autoSave=True, units='meter'):
-        super().__init__(model, case_name, autoSave, units)
+    def __init__(self, file_path: str, model: MulticonductorTransmissionLine, autoSave=True, units='meter'):
+        super().__init__(file_path, model, autoSave, units)
 
     def system_schematic(self, base_filename='system_schematic') -> None:
         """
@@ -270,18 +298,26 @@ class GroundReturnMTLRepresentation(BaseMTLRepresentation):
 
     def _schematic_annotations(self, ax, params):
         """Draws annotations like the ground level and depth/height line."""
-        core_center_x = params['core_conductor']['center_point'][0]
-        schematic_y = (params['h_factor'] * params['max_radius']) * self.unit_factor
+        deepest_cond = params['deepest_conductor']
+        deepest_cond_x = deepest_cond['center_point'][0]
         
-        dim_x_arrow = (core_center_x + params['max_radius'] * 2.5) * self.unit_factor
+        # Calculate the schematic y-position of the deepest conductor
+        y_real_deepest = params['y_min']
+        y_avg = params['y_avg']
+        schematic_y_avg = params['h_factor'] * params['max_radius']
+        schematic_y_deepest = schematic_y_avg + (y_real_deepest - y_avg)
+        
+        schematic_y_scaled = schematic_y_deepest * self.unit_factor
+        
+        dim_x_arrow = (deepest_cond_x + params['max_radius'] * 3.5) * self.unit_factor
         ax.annotate('', xy=(dim_x_arrow, 0), xycoords='data', 
-                    xytext=(dim_x_arrow, schematic_y), textcoords='data',
+                    xytext=(dim_x_arrow, schematic_y_scaled), textcoords='data',
                     arrowprops=dict(arrowstyle='<->', color='black', lw=1, zorder=3))
         
-        real_h = abs(params['core_conductor']['center_point'][1])
+        real_h = abs(y_real_deepest)
         label_text = f'h = {real_h:.2f} m'
         
-        ax.text(dim_x_arrow, schematic_y / 2, label_text, ha='center', va='center', fontsize=9, 
+        ax.text(dim_x_arrow, schematic_y_scaled / 2, label_text, ha='center', va='center', fontsize=9, 
                 zorder=3, bbox=dict(boxstyle='square,pad=0.3', fc='white', ec='none', alpha=0.8))
 
         ax.axhline(y=0, color='darkgreen', linestyle=':', linewidth=1.5, zorder=2)

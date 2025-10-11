@@ -54,7 +54,7 @@ except IndexError:
 try:
     from utils.case_utils import *
     from plotter.prysmian_models import PrysmianModels
-    from models.scc import SingleCoreCableModelGenerator
+    from models.single_core_cable import SingleCoreCableModelGenerator
     from mtl_main.graphics import GroundReturnMTLRepresentation
     from mtl_main.source import MulticonductorTransmissionLine
     from analytical_forms.single_core_cable import InternalPerUnitParameters, PerUnitParameters
@@ -68,7 +68,7 @@ def main():
     st = time.time()    
     input_json = load_json_parameters(__file__, show_content=True)
     model_generator = SingleCoreCableModelGenerator(input_json)
-    model = model_generator.generate_underground_model(show_model=True)
+    model = model_generator.underground_model(show_model=True)
     
     # --- Model setup ---
     mtl_model = MulticonductorTransmissionLine(model)
@@ -107,7 +107,7 @@ def main():
     internal = InternalPerUnitParameters(mtl_model, discrete_frequencies)
     pul = PerUnitParameters(mtl_model, discrete_frequencies)
     pul_data_discrete = pul.quasi_tem_approximation(
-        internal.internal_matrices(), zg_form='ametani', yg_form='ametani'
+        internal.matrices(), zg_form='ametani', yg_form='ametani'
     )
     pul_data_discrete['frequencies'] = discrete_frequencies
     print("Discrete calculation for logging finished.")

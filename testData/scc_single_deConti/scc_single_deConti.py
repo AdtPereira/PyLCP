@@ -24,7 +24,7 @@ except IndexError:
 try:
     from utils.case_utils import *
     from plotter.deConti_models import DeContiModels
-    from models.scc import SingleCoreCableModelGenerator
+    from models.single_core_cable import SingleCoreCableModelGenerator
     from mtl_main.graphics import GroundReturnMTLRepresentation
     from mtl_main.source import MulticonductorTransmissionLine
     from analytical_forms.single_core_cable import PerUnitParameters
@@ -38,7 +38,7 @@ def main():
     st = time.time()    
     input_json = load_json_parameters(__file__, show_content=True)
     model_generator = SingleCoreCableModelGenerator(input_json)
-    model = model_generator.generate_underground_model(show_model=True)
+    model = model_generator.underground_model(show_model=True)
     
     # # --- Model setup (sem alteração) ---
     mtl_model = MulticonductorTransmissionLine(model)

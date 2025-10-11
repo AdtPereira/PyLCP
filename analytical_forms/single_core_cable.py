@@ -683,7 +683,7 @@ class InternalPerUnitParameters:
             'potentials': {'pcj': pcj, 'psj': psj, 'paj': paj}
         }
 
-    def parameters_hybrid(self, transition_frequency):
+    def parameters_hybrid(self, transition_frequency=1e5):
         """
         Calculates internal parameters using a hybrid approach based on a single
         transition frequency.
@@ -740,7 +740,7 @@ class InternalPerUnitParameters:
         
         return params_hybrid
     
-    def internal_matrices(self, internal_form='hybrid'):
+    def matrices(self, internal_form='hybrid'):
         """
         Assembles the full internal impedance [Zi] and shunt admittance [Ye] matrices
         for all specified frequencies.
@@ -811,8 +811,7 @@ class InternalPerUnitParameters:
             Zcs_j = zs3 - zij['z2m']            # mutual impedance between the core and sheath
             
             # impedance matrix of the j-th phase of SCC cable. Eq. (2.11) [2] 
-            Zij_values = np.array([[Zcc_j, Zcs_j],
-                                   [Zcs_j, Zss_j]])
+            Zij_values = np.array([[Zcc_j, Zcs_j], [Zcs_j, Zss_j]])
             
             # cable internal potential coefficient matrix. Eq. (2.19) [2]
             pcj, psj = zij['potentials']['pcj'], zij['potentials']['psj']
@@ -1029,7 +1028,7 @@ class PerUnitParameters:
             'k_earth2': k_earth2,
         }
 
-    def quasi_tem_approximation(self, pul_internal, zg_form='magalhaes_xue', yg_form='magalhaes_xue'):
+    def quasi_tem_approximation(self, pul_internal_matrices, zg_form='magalhaes_xue', yg_form='magalhaes_xue'):
         """
         Assembles the final PUL matrices for a vector of frequencies.
         """
@@ -1040,9 +1039,9 @@ class PerUnitParameters:
         z0_jk = earth_return['earth-return_impedance_matrix']       # Shape (num_freq, N, N)
         pg_jk = earth_return['earth-return_potential_coefficient']  # Shape (num_freq, N, N)
 
-        Zi = pul_internal['impedance_matrix']                       # Shape (num_freq, N*M, N*M)
-        Ye = pul_internal['shunt_admittance_matrix']                # Shape (num_freq, N*M, N*M)
-        Pi = pul_internal['potential_coefficient_matrix']           # Shape (N*M, N*M)
+        Zi = pul_internal_matrices['impedance_matrix']                       # Shape (num_freq, N*M, N*M)
+        Ye = pul_internal_matrices['shunt_admittance_matrix']                # Shape (num_freq, N*M, N*M)
+        Pi = pul_internal_matrices['potential_coefficient_matrix']           # Shape (N*M, N*M)
 
         # Loop to build the block matrix for each frequency
         ones_MM = np.ones((M, M))
