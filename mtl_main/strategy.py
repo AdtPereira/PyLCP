@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 import numpy as np
 import scipy.constants as sc
+from collections import defaultdict
 
 class MTLStrategy(ABC):
     """ Abstract Base Class defining the interface for MTL type-specific logic."""
@@ -282,51 +283,79 @@ class SingleCoreCableStrategy(MTLStrategy):
 
         return num_cables, conductors_per_cable
     
-    def _cable_distance_with_ground_return(self, mtl: dict) -> dict:
+    def _cable_distance_matrices(self, mtl: dict) -> dict:
         """
-        Calculates all necessary distance matrices for overhead line analysis,
-        including geometric, ground return, horizontal, and vertical separations.
-        Returns a dictionary of the calculated matrices.
+            Calcula todas as matrizes de distância necessárias para a análise de cabos,
+            incluindo as separações geométricas, de retorno pelo solo, horizontais e verticais.
+
+            Para cada cabo físico, esta função seleciona o componente com o maior raio externo
+            para representá-lo nos cálculos de distância. O agrupamento dos componentes de um
+            mesmo cabo é feito pela coordenada 'center_point' compartilhada.
         """
-        # Create a sorted list of conductors to ensure consistent ordering
-        cables = sorted({key: value for key, value in mtl.items() if value.get('conductor_name') in ['sheath']}.items())
+        # 1. Agrupar condutores pela coordenada 'center_point'
+        cable_groups = defaultdict(list)
+        for key, data in mtl.items():
+            # Ignora o condutor de retorno (solo)
+            if data.get('line_type') == 'return':
+                continue
+            
+            if data.get('center_point') is None:
+                continue
+            
+            # Armazena a tupla (chave_original, dados) no grupo correspondente à sua posição
+            cable_groups[tuple(data.get('center_point'))].append((key, data))
+
+        # 2. Para cada grupo (localização), selecionar o condutor com o maior raio externo
+        selected_cables = []
+        for center_point, conductors_in_group in cable_groups.items():
+            if not conductors_in_group:
+                continue
+
+            # Função para calcular o raio externo total de um condutor
+            def get_outer_radius(conductor_tuple):
+                data = conductor_tuple[1]
+                insulation_thickness = (data.get('insulation') or {}).get('thickness', 0)
+                # data['radius'] é uma tupla (raio_interno, raio_externo)
+                return data['radius'][1] + insulation_thickness
+
+            # Encontra o condutor com o raio externo máximo no grupo
+            representative_conductor = max(conductors_in_group, key=get_outer_radius)
+            selected_cables.append(representative_conductor)
+
+        # 3. Ordenar a lista final pela chave original (0, 1, 2...) para garantir consistência
+        cables = sorted(selected_cables, key=lambda item: item[0])
         
-        # Count number of cables conductors 
-        N = len(cables)
-        
+        N = len(cables)        
         d_matrix = np.zeros((N, N))
         D_matrix = np.zeros((N, N))
-        vertical_separation_matrix = np.zeros((N, N))
+        images_vertical_distance_matrix = np.zeros((N, N))
         horizontal_separation_matrix = np.zeros((N, N))
 
-        for n_idx, (n_tag, n_conductor) in enumerate(cables):
-            for m_idx, (m_tag, m_conductor) in enumerate(cables):
-                cn = n_conductor['center_point']
-                cm = m_conductor['center_point']
+        for n_idx, (n_tag, n_cable) in enumerate(cables):
+            for m_idx, (m_tag, m_cable) in enumerate(cables):
+                cn, cm = n_cable['center_point'], m_cable['center_point']
 
-                # Horizontal and Vertical separation
-                dnm = cn[0] - cm[0]
-                hnm = cn[1] + cm[1]
-
-                # Geometric Distance (d_nm)
+                # Horizontal spacing, s = dnm
                 if n_tag == m_tag:
-                    d = n_conductor['radius'][1] + n_conductor['insulation']['thickness'] # Use outer radius for self-distance
+                    # Self Parameters
+                    s = n_cable['radius'][1] + (n_cable.get('insulation') or {}).get('thickness', 0)
                 else:
-                    d = np.sqrt(dnm ** 2 + (cn[1] - cm[1]) ** 2)
+                    s = cn[0] - cm[0] 
 
-                # Distance to Image (D_nm)
-                D = np.sqrt(dnm ** 2 + hnm ** 2)
+                # Physical Distance (d)
+                d_matrix[n_idx, m_idx] = np.sqrt(s ** 2 + (cn[1] - cm[1]) ** 2)
 
-                # Populate the matrices at the correct indices
-                d_matrix[n_idx, m_idx] = d
-                D_matrix[n_idx, m_idx] = D
-                vertical_separation_matrix[n_idx, m_idx] = hnm
-                horizontal_separation_matrix[n_idx, m_idx] = dnm
+                # Distance to Image (D)
+                D_matrix[n_idx, m_idx] = np.sqrt(s ** 2 + (cn[1] + cm[1]) ** 2)
+
+                # Physical Distances
+                images_vertical_distance_matrix[n_idx, m_idx] = cn[1] + cm[1]
+                horizontal_separation_matrix[n_idx, m_idx] = s
 
         return {
             'd_matrix_ground_return': d_matrix,
             'D_matrix_ground_return': D_matrix,
-            'vertical_separation_matrix': vertical_separation_matrix,
+            'images_vertical_distance_matrix': images_vertical_distance_matrix,
             'horizontal_separation_matrix': horizontal_separation_matrix
         }
     
@@ -340,10 +369,10 @@ class SingleCoreCableStrategy(MTLStrategy):
         by delegating the calculation to a static helper method.
         """
         # 1. Delegate the complex calculation to the static method
-        properties = self._cable_distance_with_ground_return(mtl)
+        properties = self._cable_distance_matrices(mtl)
         context.d_matrix_ground_return = properties['d_matrix_ground_return']
         context.D_matrix_ground_return = properties['D_matrix_ground_return']
-        context.vertical_separation_matrix = properties['vertical_separation_matrix']
+        context.images_vertical_distance_matrix = properties['images_vertical_distance_matrix']
         context.horizontal_separation_matrix = properties['horizontal_separation_matrix']
 
         # Extract and apply SCC geometric parameters

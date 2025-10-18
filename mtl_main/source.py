@@ -54,7 +54,7 @@ class MulticonductorTransmissionLine:
         self.num_conductors_per_scc = None
         self.d_matrix_ground_return = None
         self.D_matrix_ground_return = None
-        self.vertical_separation_matrix = None
+        self.images_vertical_distance_matrix = None
         self.horizontal_separation_matrix = None
 
         # Delegate preprocessing and validation to the strategy

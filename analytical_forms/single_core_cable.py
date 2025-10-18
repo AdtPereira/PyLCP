@@ -475,6 +475,7 @@ class InternalPerUnitParameters:
                         z11[invalid_mask] = complex(np.inf, np.inf) # Use complex()
                     elif invalid_mask:
                         z11 = complex(np.inf, np.inf) # Use complex()
+            
             else:
                 with np.errstate(divide='ignore', invalid='ignore'):
                     D1 = ss.iv(1, x2) * ss.kv(1, x1) - ss.iv(1, x1) * ss.kv(1, x2)
@@ -580,29 +581,17 @@ class InternalPerUnitParameters:
             r1, r2 = scc['core_inner_radius'], scc['core_outer_radius']
             m_core = np.sqrt(s * mu1 / rho1)
             x1, x2 = m_core * r1, m_core * r2
+            pm = rho1 * m_core
 
-            # --- z11: internal impedance of core outer surface ---
+            # --- z11: internal impedance of solid core outer surface ---
             if np.isclose(r1, 0):
-                with np.errstate(divide='ignore', invalid='ignore'):
-                    z11 = (m_core * rho1 / (two_pi * r2)) * coth(0.777 * x2) + 0.356 * rho1 / (np.pi * r2**2)
-                    
-                    invalid_mask = np.isclose(x2, 0) | np.isnan(x2)
-                    if z11.ndim > 0:
-                        z11[invalid_mask] = complex(np.inf, np.inf)
-                    elif invalid_mask:
-                        z11 = complex(np.inf, np.inf)
+                z11 = pm / (two_pi * r2) * coth(0.777 * x2) + 0.356 * rho1 / (np.pi * r2**2)
+                
+            # --- z11: internal impedance of tubular core outer surface ---
             else:
                 with np.errstate(divide='ignore', invalid='ignore'):
-                    D1 = ss.iv(1, x2) * ss.kv(1, x1) - ss.iv(1, x1) * ss.kv(1, x2)
-                    N1 = ss.iv(0, x2) * ss.kv(1, x1) + ss.kv(0, x2) * ss.iv(1, x1)
-                    z11 = (s * mu1 / two_pi) * (1 / (x2 * D1)) * N1
-                    
-                    # Create a mask for invalid conditions (nan or near-zero denominator)
-                    invalid_mask = np.isnan(D1) | np.isclose(D1, 0)
-                    if z11.ndim > 0:
-                        z11[invalid_mask] = complex(np.inf, np.inf)
-                    elif invalid_mask:
-                        z11 = complex(np.inf, np.inf)
+                    # Fórmula análoga à de z20 (impedância externa da bainha)
+                    z11 = pm / (two_pi * r2) * coth(m_core * (r2 - r1)) + rho1 / (two_pi * r2 * (r1 + r2))
 
         if 'core_insulation_outer_radius' in scc:
             mui1 = scc['core_insulation_permeability']
@@ -931,12 +920,11 @@ class PerUnitParameters:
         N = self.model.num_sc_cables
         d_matrix = self.model.d_matrix_ground_return
         D_matrix = self.model.D_matrix_ground_return
-        hnm = self.model.vertical_separation_matrix
+        hnm = self.model.images_vertical_distance_matrix
         dnm = self.model.horizontal_separation_matrix
 
-        k_air2, k_earth2 = self.k_air2, self.k_earth2
-
         # Adjust wave numbers based on the formulation
+        k_air2, k_earth2 = self.k_air2, self.k_earth2
         if zg_form in ['sunde', 'deconti_sunde']:
             k_air2 = np.zeros_like(self.f, dtype=complex)
         
@@ -944,18 +932,16 @@ class PerUnitParameters:
             k_air2 = np.zeros_like(self.f, dtype=complex)
             k_earth2 = -self.jw * self.mu1 * self.sigma_1
 
-        # The arguments to ss.kv will broadcast correctly.
         # k_earth2 is (num_freq,), d_matrix is (N, N).
         # Result of sqrt() * d_matrix is (num_freq, N, N)
         # ss.kv operates element-wise, returning a (num_freq, N, N) array.
-        arg_d = 1j * np.sqrt(k_earth2)[:, np.newaxis, np.newaxis] * d_matrix
-        arg_D = 1j * np.sqrt(k_earth2)[:, np.newaxis, np.newaxis] * D_matrix
-        K0_jke_dnm = ss.kv(0, arg_d)
-        K0_jke_Dnm = ss.kv(0, arg_D)
+        K0_jke_dnm = ss.kv(0, 1j * np.sqrt(k_earth2)[:, np.newaxis, np.newaxis] * d_matrix)
+        K0_jke_Dnm = ss.kv(0, 1j * np.sqrt(k_earth2)[:, np.newaxis, np.newaxis] * D_matrix)
 
         S1c = np.zeros((self.num_freq, N, N), dtype=complex)
         S2c = np.zeros((self.num_freq, N, N), dtype=complex)
         pg = np.zeros((self.num_freq, N, N), dtype=complex)
+        Yg = np.zeros_like(pg, dtype=complex)
 
         # Wedepohl e Wilcox Approximation Expression
         if zg_form in ['wedepohl']:
@@ -965,11 +951,11 @@ class PerUnitParameters:
             # Reshape 1D frequency vectors to (num_freq, 1, 1) for broadcasting
             # with 2D geometry matrices (N, N) to get a (num_freq, N, N) result.
             yg_3d = yg[:, np.newaxis, np.newaxis]
-            jw_mu0_2pi_3d = self.jw_mu0_2pi[:, np.newaxis, np.newaxis]
+            jw_mu0_2pi = self.jw_mu0_2pi[:, np.newaxis, np.newaxis]
             
             ln_term = np.log(0.5 * np.euler_gamma * yg_3d * d_matrix)
             S1c = -ln_term + 0.5 + (2/3) * yg_3d * hnm
-            zg = jw_mu0_2pi_3d * S1c
+            zg = jw_mu0_2pi * S1c
 
         # De Conti Approximation Expressions
         elif zg_form in ['deconti', 'deconti_sunde', 'saad']:
@@ -985,27 +971,18 @@ class PerUnitParameters:
             yg_3d = yg[:, np.newaxis, np.newaxis]
             zg_term_1_3d = zg_term_1[:, np.newaxis, np.newaxis]
             yg_term_1_3d = yg_term_1[:, np.newaxis, np.newaxis]
-            jw_mu0_2pi_3d = self.jw_mu0_2pi[:, np.newaxis, np.newaxis]
-            jw_2pi_sg_3d = self.jw_2pi_sg[:, np.newaxis, np.newaxis]
-
-            exp_term = np.exp(hnm * yg_3d)
-            term_2 = 2 / (4 + (yg_3d**2 * dnm**2))
+            jw_mu0_2pi = self.jw_mu0_2pi[:, np.newaxis, np.newaxis]
+            jw_2pi_sg = self.jw_2pi_sg[:, np.newaxis, np.newaxis]
             
             # Earth-return impedance based on quasi-TEM assumption [1]
             # All arrays are now (num_freq, N, N), allowing for element-wise operations
-            zg = jw_mu0_2pi_3d * (K0_jke_dnm + zg_term_1_3d * exp_term * term_2)
+            term_2 = 2 / (4 + (yg_3d**2 * dnm**2))
+            zg = jw_mu0_2pi * (K0_jke_dnm + zg_term_1_3d * np.exp(hnm * yg_3d) * term_2)
 
             # Earth-return admittance based on quasi-TEM assumption [1]
             if yg_form in ['deconti']:
-                pg = jw_2pi_sg_3d * (K0_jke_dnm + yg_term_1_3d * K0_jke_Dnm)
+                pg = jw_2pi_sg * (K0_jke_dnm + yg_term_1_3d * K0_jke_Dnm)
                 
-                # The linear solve part CANNOT be vectorized and requires a loop
-                yg_matrix = np.zeros_like(pg, dtype=complex)
-                identity_N = np.identity(N)
-                for i in range(self.num_freq):
-                    lu, piv = lu_factor(pg[i, :, :])
-                    yg_matrix[i, :, :] = self.jw[i] * lu_solve((lu, piv), identity_N)
-        
         # Integral expressions are also vectorized thanks to the custom Gauss-Legendre function
         elif zg_form in ['magalhaes_xue', 'sunde', 'pollaczek', 'ametani']:
             for n in range(N):
@@ -1022,26 +999,32 @@ class PerUnitParameters:
             zg = self.jw_mu0_2pi[:, np.newaxis, np.newaxis] * (K0_jke_dnm - K0_jke_Dnm + S1c)
             pg = self.jw_2pi_sg[:, np.newaxis, np.newaxis] * (K0_jke_dnm - K0_jke_Dnm + S2c)
 
+        # The linear solve part CANNOT be vectorized and requires a loop
+        identity_N = np.identity(N)
+        for i in range(self.num_freq):
+            lu, piv = lu_factor(pg[i, :, :])
+            Yg[i, :, :] = self.jw[i] * lu_solve((lu, piv), identity_N)
+
         return {
-            'earth-return_impedance_matrix': zg,
-            'earth-return_potential_coefficient': pg,
+            'impedance_matrix': zg,
+            'potential_coefficient': pg,
+            'admittance_matrix': Yg,
             'k_earth2': k_earth2,
         }
 
-    def quasi_tem_approximation(self, pul_internal_matrices, zg_form='magalhaes_xue', yg_form='magalhaes_xue'):
+    def quasi_tem_approx_matrices(self, internal_matrices, earth_return_params):
         """
         Assembles the final PUL matrices for a vector of frequencies.
         """
         N, M = self.model.num_sc_cables, self.model.num_conductors_per_scc
-        num_total_conductors = N * M
+        MN = N*M
 
-        earth_return = self.earth_return_parameters(zg_form, yg_form)
-        z0_jk = earth_return['earth-return_impedance_matrix']       # Shape (num_freq, N, N)
-        pg_jk = earth_return['earth-return_potential_coefficient']  # Shape (num_freq, N, N)
+        z0_jk = earth_return_params['impedance_matrix']         # Shape (num_freq, N, N)
+        pg_jk = earth_return_params['potential_coefficient']    # Shape (num_freq, N, N)
 
-        Zi = pul_internal_matrices['impedance_matrix']                       # Shape (num_freq, N*M, N*M)
-        Ye = pul_internal_matrices['shunt_admittance_matrix']                # Shape (num_freq, N*M, N*M)
-        Pi = pul_internal_matrices['potential_coefficient_matrix']           # Shape (N*M, N*M)
+        Zi = internal_matrices['impedance_matrix']              # Shape (num_freq, N*M, N*M)
+        Ye = internal_matrices['shunt_admittance_matrix']       # Shape (num_freq, N*M, N*M)
+        Pi = internal_matrices['potential_coefficient_matrix']  # Shape (N*M, N*M)
 
         # Loop to build the block matrix for each frequency
         ones_MM = np.ones((M, M))
@@ -1056,18 +1039,20 @@ class PerUnitParameters:
 
         # Shunt Admittance Matrix calculation
         # Pi is 2D, Pe is 3D. Use broadcasting to add them.
-        P = Pi[np.newaxis, :, :] + Pe
+        Psh = Pi[np.newaxis, :, :] + Pe
         
         # The linear solve must be looped over the frequency axis
-        Ysh = np.zeros_like(P, dtype=complex)
-        identity_matrix = np.identity(num_total_conductors)
+        Ysh = np.zeros_like(Psh, dtype=complex)
+        Ye = np.zeros_like(Psh, dtype=complex)
         for i in range(self.num_freq):
-            lu, piv = lu_factor(P[i, :, :])
-            Ysh[i, :, :] = self.jw[i] * lu_solve((lu, piv), identity_matrix)
+            Ysh[i, :, :] = self.jw[i] * lu_solve(lu_factor(Psh[i, :, :]), np.identity(MN))
+            # Ye[i, :, :] = self.jw[i] * lu_solve(lu_factor(Pe[i, :, :]), np.identity(MN))
 
         return {
-            'internal_impedance_matrix': Zi,
-            'earth-return_impedance_matrix': Z0,
+            'earth_return_impedance_matrix': Z0,
+            'earth_return_potential_coefficient': Pe,
+            'earth_return_admittance_matrix': Ye,
+            'potential_coefficient': Psh,
             'series_impedance_matrix': Zs,
             'shunt_admittance_matrix': Ysh,
         }

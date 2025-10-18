@@ -236,7 +236,7 @@ class GroundReturnMTLRepresentation(BaseMTLRepresentation):
     such as buried cables or overhead lines, where the ground plane
     is an essential part of the schematic.
     """
-    def __init__(self, file_path: str, model: MulticonductorTransmissionLine, autoSave=True, units='meter'):
+    def __init__(self, file_path: str, model: MulticonductorTransmissionLine, autoSave: bool = True, units: str = 'meter'):
         super().__init__(file_path, model, autoSave, units)
 
     def system_schematic(self, base_filename='system_schematic') -> None:

@@ -1,26 +1,12 @@
-# scc_flat_xue.py
-
 import sys
 import os
 import time
 import copy
 import numpy as np
-from pathlib import Path
 import matplotlib.pyplot as plt
 
-# --- Configure project root for module imports ---
-try:
-    os.system('cls' if os.name == 'nt' else 'clear')
-    project_root = Path(__file__).resolve().parents[2]
-    if str(project_root) not in sys.path:
-        sys.path.insert(0, str(project_root)) 
-    print(f"Project root configured at: {project_root}")
-    case_name = os.path.splitext(os.path.basename(__file__))[0]
-    print(f"Case name identified as: '{case_name}'")
-except IndexError:
-    raise RuntimeError("Could not find project root. Ensure the directory structure is correct.")
-
 # --- Import custom modules ---
+os.system('cls' if os.name == 'nt' else 'clear')
 try:
     from utils.case_utils import *
     from utils.comsol_data import ComsolDataReader
@@ -34,25 +20,11 @@ except ImportError as e:
     print(f"Error importing modules: {e}")
     sys.exit(1)
 
-# --- Load COMSOL Data ---
-COMSOL_DATA = {}
-try:
-    print(f"--- Instanciando ComsolDataReader para o caso '{case_name}' ---")
-    reader = ComsolDataReader(project_root, case_name)
-    COMSOL_DATA = reader.load_all_results()
-    if COMSOL_DATA:
-        reader.show_summary()
-except FileNotFoundError as e:
-    print(f"Aviso: Diretório de dados do COMSOL não encontrado. Detalhes: {e}")
-except Exception as e:
-    print(f"Ocorreu um erro ao carregar os dados do COMSOL: {e}")
-
 def main():
     """ Main function to run the simulation and plotting using vectorized calculations. """
     st = time.time()    
-    input_json = load_json_parameters(__file__, show_content=True)
-    model_generator = SingleCoreCableModelGenerator(input_json)
-    model = model_generator.simple_trefoil(show_model=True)
+    cmsl_reader = ComsolDataReader(__file__)
+    model = SingleCoreCableModelGenerator(__file__).simple_trefoil()
     
     # --- Model setup ---
     mtl_model_a = MulticonductorTransmissionLine(model)
@@ -63,43 +35,64 @@ def main():
     model_c_data[0]['conductivity'] = 0.002 # rho = 500 Ohm.m
     mtl_model_c = MulticonductorTransmissionLine(model_c_data)
 
-    scenarios = {
-        'p100':      {'mtl': mtl_model_a, 'zg_form': 'magalhaes_xue', 'yg_form': 'magalhaes_xue'},
-        'p100_er20': {'mtl': mtl_model_b, 'zg_form': 'magalhaes_xue', 'yg_form': 'magalhaes_xue'},
-        'p500':      {'mtl': mtl_model_c, 'zg_form': 'magalhaes_xue', 'yg_form': 'magalhaes_xue'},
-        'p100_deconti':      {'mtl': mtl_model_a, 'zg_form': 'deconti', 'yg_form': 'deconti'},
-        'p100_er20_deconti': {'mtl': mtl_model_b, 'zg_form': 'deconti', 'yg_form': 'deconti'},
-        'p500_deconti':      {'mtl': mtl_model_c, 'zg_form': 'deconti', 'yg_form': 'deconti'},
+    pul_data = {
+        'comsol': None, #cmsl_reader.data,
+        'frequencies': np.logspace(3, 7, num=121),
+        'scenarios': {
+            'p100': {
+                'mtl': mtl_model_a,
+                'zg_form': 'magalhaes_xue',
+                'yg_form': 'magalhaes_xue'
+            },
+            'p100_er20': {
+                'mtl': mtl_model_b,
+                'zg_form': 'magalhaes_xue',
+                'yg_form': 'magalhaes_xue'
+            },
+            'p500': {
+                'mtl': mtl_model_c,
+                'zg_form': 'magalhaes_xue',
+                'yg_form': 'magalhaes_xue'
+            },
+            'p100_deconti': {
+                'mtl': mtl_model_a,
+                'zg_form': 'deconti',
+                'yg_form': 'deconti'
+            },
+            'p100_er20_deconti': {
+                'mtl': mtl_model_b,
+                'zg_form': 'deconti',
+                'yg_form': 'deconti'
+            },
+            'p500_deconti': {
+                'mtl': mtl_model_c,
+                'zg_form': 'deconti',
+                'yg_form': 'deconti'
+            },
+        }
     }
     
-    # --- VECTORIZED CALCULATION ---
-    numerical_freqs = np.logspace(4, 7, num=31)
-
-    pul_data = {
-        'comsol': COMSOL_DATA,
-        'frequencies': numerical_freqs}
-    
-    # 1. Calculate internal parameters ONCE, as the cable geometry is the same for all scenarios.
     print("Calculating internal parameters for all frequencies...")
-    internal = InternalPerUnitParameters(mtl_model_a, pul_data['frequencies'])
-    pul_data['internal_matrices'] = internal.matrices()
-    print("Internal parameters calculated.")
+    pul = InternalPerUnitParameters(mtl_model_a, pul_data['frequencies'])
+    internal_matrices = pul.matrices(internal_form='hybrid')
+    pul_data['internal_matrices'] = internal_matrices
 
-
-    # 2. Loop through scenarios to calculate ground-return effects.
-    for key, value in scenarios.items():
+    for key, value in pul_data['scenarios'].items():
         print(f"Calculating scenario: {key}...")
         pul = PerUnitParameters(value['mtl'], pul_data['frequencies'])
-        pul_data[key] = pul.quasi_tem_approximation(
-            internal.matrices(), zg_form=value['zg_form'], yg_form=value['yg_form']
-        )
+
+        earth_return = pul.earth_return_parameters(value['zg_form'], value['yg_form'])
+        quasi_tem = pul.quasi_tem_approx_matrices(internal_matrices, earth_return)
+        
+        value['earth_return_parameters'] = earth_return
+        value['quasi_tem_matrices'] = quasi_tem
     
     print(f"End of the routine! Time spent on simulation: {(time.time() - st):.1f} seconds.\n")
-    plotter = XueModels(pul_data)
-    plotter.plot_fig419(graph_form='resistance_and_inductance')
+    plotter = XueModels(__file__, pul_data)
+    plotter.plot_fig419()
     plotter.plot_fig421()
     plotter.plot_fig423()
-    GroundReturnMTLRepresentation(mtl_model_a, case_name, units='centimeter').system_schematic()
+    GroundReturnMTLRepresentation(__file__, mtl_model_a, units='centimeter').system_schematic()
     plt.show()    
 
 if __name__ == "__main__":

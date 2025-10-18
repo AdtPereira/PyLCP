@@ -187,7 +187,6 @@ class InternalPerUnitParameters:
         # DC Internal Inductance
         li_cc_solid = self.model.mu / (8 * np.pi)
         
-        # --- MODIFICAÇÃO PARA EVITAR DIVISÃO POR ZERO ---
         # 1. Crie um array de raios internos seguro, substituindo 0 por 1 nos condutores sólidos.
         ri_safe_for_division = np.where(self.is_tubular_mask, self.ri, 1.0)
         
@@ -199,10 +198,10 @@ class InternalPerUnitParameters:
         
         # 4. O log é agora calculado sem nenhum aviso.
         log_term = np.log(log_argument)
-        # --- FIM DA MODIFICAÇÃO ---
 
         ro2, ri2 = self.ro**2, self.ri**2
         ro2ri2 = ro2 - ri2
+        
         # Evita divisão por zero se ro2ri2 for zero (tubo defeituoso)
         term1_denom = 4 * ro2ri2
         term1 = np.divide((ro2 - 3 * ri2), term1_denom, where=term1_denom!=0)
@@ -230,22 +229,23 @@ class InternalPerUnitParameters:
             zi_hf_solid_diag = (1.0 / (2 * np.pi * self.ro)) * np.sqrt(jw_mu / self.model.sigma)
             bessel_arg_solid = np.sqrt(jw_mu * self.model.sigma) * self.ro
             zi_solid_diag = zi_hf_solid_diag * ss.iv(0, bessel_arg_solid) / ss.iv(1, bessel_arg_solid)
+        
         zi_solid_diag[np.abs(bessel_arg_solid) < 1e-9] = ri_cc_diag
 
         # Tubular Wire
         with np.errstate(divide='ignore', invalid='ignore'):
             kappa = np.sqrt(jw_mu * self.model.sigma)
             kro, kri = kappa * self.ro, kappa * self.ri
+            num = ss.iv(0, kro) * ss.kv(1, kri) + ss.iv(1, kri) * ss.kv(0, kro)
             den = ss.kv(1, kri) * ss.iv(1, kro) - ss.iv(1, kri) * ss.kv(1, kro)
-            num_ext = ss.iv(0, kro) * ss.kv(1, kri) + ss.iv(1, kri) * ss.kv(0, kro)
-            zi_tubular_diag = zi_hf_solid_diag * (num_ext / den)
-        zi_tubular_diag[np.abs(kro) < 1e-9] = ri_cc_diag
+            zi_tubular_diag = zi_hf_solid_diag * (num / den)
         
+        zi_tubular_diag[np.abs(kro) < 1e-9] = ri_cc_diag        
         zi_diag = np.where(self.is_tubular_mask, zi_tubular_diag, zi_solid_diag)
         
         return {'Zi_bessel': self._build_diag_matrix(zi_diag)}
         
-    def kelvin_impedance(self):
+    def kelvin_impedance_solid_wires(self):
         """Calculates exact internal impedance for solid wires using Kelvin functions."""
         dc_params = self.dc_parameters()
         ri_cc_diag = np.diag(dc_params['Ri_cc'])
@@ -262,11 +262,13 @@ class InternalPerUnitParameters:
             # Resistance
             numerador_R = Be.real * Bep.imag - Be.imag * Bep.real
             Ri_val = scaling_factor * numerador_R
+            
             # Reactance
             numerador_wL = Be.real * Bep.real + Be.imag * Bep.imag
             wLi_val = scaling_factor * numerador_wL
 
         zi_kelvin_diag = Ri_val + 1j * wLi_val
+        
         # Kelvin functions are for solid wires, result for tubular is meaningless/inf
         zi_kelvin_diag = np.where(self.is_tubular_mask, np.inf, zi_kelvin_diag)
         zi_kelvin_diag[q < 1e-6] = ri_cc_diag
@@ -304,7 +306,7 @@ class InternalPerUnitParameters:
         """
         dc_params = self.dc_parameters()
         bessel_params = self.matrix_impedance_bessel()
-        kelvin_params = self.kelvin_impedance()        
+        kelvin_params = self.kelvin_impedance_solid_wires()        
         approx_params = self.approximations()
         return {**dc_params, **bessel_params, **kelvin_params, **approx_params}
 
@@ -342,7 +344,7 @@ class PerUnitParameters:
                 ke2_i, ka2_i = self.k_earth2[i], self.k_air2[i]
                 for n in range(N):
                     for m in range(N):
-                        hnm = self.model.vertical_separation_matrix[n, m]
+                        hnm = self.model.images_vertical_distance_matrix[n, m]
                         dnm = self.model.horizontal_separation_matrix[n, m]
                         S1[i, n, m] = 2 * sommerfeld_adaptive(hnm, dnm, ke2_i, ka2_i)
                         S2[i, n, m] = 2 * sommerfeld_adaptive(hnm, dnm, ke2_i, ka2_i, s_form='s2')
@@ -351,7 +353,7 @@ class PerUnitParameters:
             # Vectorized Gauss-Legendre integration
             for n in range(N):
                 for m in range(N):
-                    hnm = self.model.vertical_separation_matrix[n, m]
+                    hnm = self.model.images_vertical_distance_matrix[n, m]
                     dnm = self.model.horizontal_separation_matrix[n, m]
                     S1[:, n, m] = 2 * sommerfeld(hnm, dnm, self.k_earth2, self.k_air2)
                     S2[:, n, m] = 2 * sommerfeld(hnm, dnm, self.k_earth2, self.k_air2, s_form='s2')
@@ -403,7 +405,7 @@ class PerUnitParameters:
                 n2_i = n2_form[i] if isinstance(n2_form, np.ndarray) else n2_form
                 for n in range(N):
                     for m in range(N):
-                        hnm = self.model.vertical_separation_matrix[n, m]
+                        hnm = self.model.images_vertical_distance_matrix[n, m]
                         dnm = self.model.horizontal_separation_matrix[n, m]
                         S1[i, n, m] = 2 * sommerfeld_quasi_tem_approx_adaptive(hnm, dnm, ke2_i)
                         if zg_form == 'nakagawa':
@@ -411,7 +413,7 @@ class PerUnitParameters:
         else: 
             for n in range(N):
                 for m in range(N):
-                    hnm = self.model.vertical_separation_matrix[n, m]
+                    hnm = self.model.images_vertical_distance_matrix[n, m]
                     dnm = self.model.horizontal_separation_matrix[n, m]
                     S1[:, n, m] = 2 * sommerfeld_quasi_tem_approx(hnm, dnm, ke2_form)                    
                     if zg_form == 'nakagawa':
@@ -435,7 +437,7 @@ class PerUnitParameters:
         h_array = np.array([c['center_point'][1] for c in self.model.surfaces])
         S1_diag = np.log((h_array + p_dot[:, np.newaxis]) / h_array)
         
-        num_sq = (self.model.vertical_separation_matrix + 2 * p_dot[:, np.newaxis, np.newaxis])**2 + self.model.horizontal_separation_matrix**2
+        num_sq = (self.model.images_vertical_distance_matrix + 2 * p_dot[:, np.newaxis, np.newaxis])**2 + self.model.horizontal_separation_matrix**2
         num = np.sqrt(num_sq)
         den = self.model.d_matrix_ground_return
         

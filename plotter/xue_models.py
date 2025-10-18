@@ -28,7 +28,8 @@ class XueModels:
         # Assumes the script is run from the project's root directory.
         self.results_dir = os.path.join('testData', self.script_path.stem, 'Results')
         os.makedirs(self.results_dir, exist_ok=True)
-
+        
+        self.xlim = tuple(pul_data['frequencies'][[0, -1]])
         self.figsize = (12, 5)
 
         comsol_layout_template = [
@@ -112,7 +113,6 @@ class XueModels:
                 'resistance_title': 'P.u.l. series resistance',
                 'inductance_title': 'P.u.l. series inductance',
                 'p': 0, 'q': 0,
-                'x_lim': {'resistance': (1E3, 1E9), 'inductance': (1E3, 1E9)},
                 'y_lim': {'resistance': (1E0, 1E5), 'inductance': (1, 2.5)},
                 'series_to_plot': self.overhead_line
             },
@@ -121,7 +121,6 @@ class XueModels:
                 'resistance_title': 'P.u.l. series resistance',
                 'inductance_title': 'P.u.l. series inductance',
                 'p': 0, 'q': 0,
-                'x_lim': {'resistance': (1E3, 1E9), 'inductance': (1E3, 1E9)},
                 'y_lim': {'resistance': (1E0, 1E4), 'inductance': (1.4, 2.2)},
                 'series_to_plot': self.nakagawa_carson_series
             },
@@ -130,7 +129,6 @@ class XueModels:
                 'conductance_title': 'P.u.l. shunt conductance',
                 'capacitance_title': 'P.u.l. shunt capacitance',
                 'p': 0, 'q': 0,
-                'x_lim': {'conductance': (1E3, 1E9), 'capacitance': (1E3, 1E9)},
                 'y_lim': {'conductance': (-0.3, 0.1), 'capacitance': (6.6, 7.4)},
                 'series_to_plot': self.overhead_line
             },
@@ -139,7 +137,6 @@ class XueModels:
                 'conductance_title': 'P.u.l. shunt conductance',
                 'capacitance_title': 'P.u.l. shunt capacitance',
                 'p': 0, 'q': 0,
-                'x_lim': {'conductance': (1E3, 1E9), 'capacitance': (1E3, 1E9)},
                 'y_lim': {'conductance': (-0.06, 0.02), 'capacitance': (7.22, 7.32)},
                 'series_to_plot': self.nakagawa_carson_series
             },
@@ -148,7 +145,6 @@ class XueModels:
                 'attenuation_title': 'Attenuation constant',
                 'phase_velocity_title': 'Normalized Phase velocity',
                 'p': 0, 'q': 0,
-                'x_lim': {'attenuation': (1E3, 1E9), 'phase_velocity': (1E3, 1E9)},
                 'y_lim': {'attenuation': (1E-3, 1E1), 'phase_velocity': (0.8, 1.1)},
                 'series_to_plot': self.overhead_line
             },
@@ -157,7 +153,6 @@ class XueModels:
                 'attenuation_title': 'Attenuation constant',
                 'phase_velocity_title': 'Normalized Phase velocity',
                 'p': 0, 'q': 0,
-                'x_lim': {'attenuation': (1E3, 1E9), 'phase_velocity': (1E3, 1E9)},
                 'y_lim': {'attenuation': (1E-3, 1E2), 'phase_velocity': (0.8, 1.1)},
                 'series_to_plot': self.attenuation_constant_series
             },
@@ -166,7 +161,6 @@ class XueModels:
                 'resistance_title': 'P.u.l. series resistance',
                 'inductance_title': 'P.u.l. series inductance',
                 'p': 1, 'q': 1,
-                'x_lim': {'resistance': (1E4, 1E7), 'inductance': (1E4, 1E7)},
                 'y_lim': {'resistance': (1E1, 1E5), 'inductance': (0.5, 2.0)},
                 'y_ticks': {'resistance': np.arange(1E0, 1E5, 1E1), 'inductance': np.arange(0.5, 2.1, 0.5)},
                 'series_to_plot': self.sc_cables,
@@ -177,7 +171,6 @@ class XueModels:
                 'resistance_title': 'P.u.l. series resistance',
                 'inductance_title': 'P.u.l. series inductance',
                 'p': 1, 'q': 3,
-                'x_lim': {'resistance': (1E4, 1E7), 'inductance': (1E4, 1E7)},
                 'y_lim': {'resistance': (1E1, 1E5), 'inductance': (0.0, 1.5)},
                 'y_ticks': {'resistance': np.arange(1E1, 1E5, 1E1), 'inductance': np.arange(0.0, 1.6, 0.5)},
                 'series_to_plot': self.sc_cables,
@@ -188,7 +181,6 @@ class XueModels:
                 'resistance_title': 'P.u.l. series resistance',
                 'inductance_title': 'P.u.l. series inductance',
                 'p': 1, 'q': 5,
-                'x_lim': {'resistance': (1E4, 1E7), 'inductance': (1E4, 1E7)},
                 'y_lim': {'resistance': (1E1, 1E5), 'inductance': (0.0, 1.5)},
                 'y_ticks': {'resistance': np.arange(1E1, 1E5, 1E1), 'inductance': np.arange(0.0, 1.6, 0.5)},
                 'series_to_plot': self.sc_cables,
@@ -199,10 +191,25 @@ class XueModels:
                 'conductance_title': 'P.u.l. shunt conductance',
                 'capacitance_title': 'P.u.l. shunt capacitance',
                 'p': 1, 'q': 1,
-                'x_lim': {'conductance': (1E3, 1E7), 'capacitance': (1E3, 1E7)},
                 'y_lim': {'conductance': (0.0, 20), 'capacitance': (0.0, 3.0)},
                 'y_ticks': {'conductance': np.arange(0.0, 21, 5), 'capacitance': np.arange(0.0, 3.1, 1.0)},
                 'series_to_plot': self.sc_cables
+            },
+            'fig423a': {
+                'suptitle': 'Figure 4.23a: P.u.l. Self-Ground Admittance with Magalhães/Xue formulation [Xue, 2018]',
+                'conductance_title': 'P.u.l. shunt conductance',
+                'capacitance_title': 'P.u.l. shunt capacitance',
+                'p': 1, 'q': 1,
+                'y_lim': {'conductance': (0.0, 20), 'capacitance': (0.0, 3.0)},
+                'y_ticks': {'conductance': np.arange(0, 21, 5), 'capacitance': np.arange(0, 3.1, 1)},
+                'series_to_plot': [
+                    {
+                        'key': 'p100',
+                        'type': {
+                            'series_term': {'label': r'$\rho_e=100 \;\Omega m, \epsilon_r=1$', 'color': 'black', 'linestyle': '-', 'linewidth': 1.5},
+                            'ground-return_term': {'label': '', 'color': 'darkgreen', 'linestyle': '--', 'linewidth': 1.0}}
+                    },
+                ] 
             },
             'fig425': {
                 'suptitle': 'Figure 4.25: P.u.l. Mutual-admittance between phase - a and phase - b sheaths with Magalhães/Xue formulation [Xue, 2018]',
@@ -240,8 +247,8 @@ class XueModels:
 
             # Analytical plotting loop
             for series in config['series_to_plot']:
-                zs = self.pul_data[series['key']]['series_impedance_matrix']
-                zg = self.pul_data[series['key']]['earth-return_impedance_matrix']
+                zs = self.pul_data['scenarios'][series['key']]['quasi_tem_matrices']['series_impedance_matrix']
+                zg = self.pul_data['scenarios'][series['key']]['quasi_tem_matrices']['earth_return_impedance_matrix']
                 
                 ax1.plot(self.f, np.real(zs[:, p, q]) * 1e3, **series['type']['series_term'])
                 ax2.plot(self.f, np.imag(zs[:, p, q]) / self.w * 1e6, **series['type']['series_term'])
@@ -265,8 +272,8 @@ class XueModels:
             # Configure left subplot (Resistance)
             ax1.set_xscale('log')
             ax1.set_yscale('log')
-            ax1.set_xlim(config['x_lim']['resistance'])
-            ax1.set_ylim(config['y_lim']['resistance'])
+            ax1.set_xlim(self.xlim)
+            # ax1.set_ylim(config['y_lim']['resistance'])
             ax1.legend(fontsize='small')
             ax1.set_xlabel('Frequency (Hz)')
             ax1.set_ylabel(fr'$Rs_{{{p+1}{q+1}}} \, (\Omega/km)$')
@@ -274,9 +281,9 @@ class XueModels:
             ax1.set_title(config['resistance_title'])
             
             ax2.set_xscale('log')
-            ax2.set_xlim(config['x_lim']['inductance'])
-            ax2.set_ylim(config['y_lim']['inductance'])
-            ax2.set_yticks(config['y_ticks']['inductance'])
+            ax2.set_xlim(self.xlim)
+            # ax2.set_ylim(config['y_lim']['inductance'])
+            # ax2.set_yticks(config['y_ticks']['inductance'])
             ax2.legend(fontsize='small')
             ax2.set_xlabel('Frequency (Hz)')
             ax2.set_ylabel(fr'$Ls_{{{p+1}{q+1}}} \, (mH/km)$')
@@ -298,17 +305,14 @@ class XueModels:
         fig.suptitle(config['suptitle'], fontsize=12, y=0.98)
         
         if graph_form == 'conductance_and_capacitance':
-            
-            # Analytical plotting loop
             for series in config['series_to_plot']:
-                ysh = self.pul_data[series['key']]['shunt_admittance_matrix']
-                
-                ax1.plot(self.f, np.real(ysh[:, p, q]) * 1e3, **series['type']['series_term'])
-                ax2.plot(self.f, np.imag(ysh[:, p, q]) / self.w * 1e9, **series['type']['series_term'])
+                Ysh = self.pul_data['scenarios'][series['key']]['quasi_tem_matrices']['shunt_admittance_matrix']
+                ax1.plot(self.f, np.real(Ysh[:, p, q]) * 1e3, **series['type']['series_term'])
+                ax2.plot(self.f, np.imag(Ysh[:, p, q]) / self.w * 1e9, **series['type']['series_term'])
 
             ax1.set_xscale('log')
-            ax1.set_xlim(config['x_lim']['conductance'])
-            ax1.set_ylim(config['y_lim']['conductance'])
+            ax1.set_xlim(self.xlim)
+            # ax1.set_ylim(config['y_lim']['conductance'])
             ax1.legend(fontsize='small')
             ax1.set_xlabel('Frequency (Hz)')
             ax1.set_ylabel(fr'$G_{{{p+1}{q+1}}} \, (S/km)$')
@@ -316,9 +320,9 @@ class XueModels:
             ax1.set_title(config['conductance_title'])
             
             ax2.set_xscale('log')
-            ax2.set_xlim(config['x_lim']['capacitance'])
-            ax2.set_ylim(config['y_lim']['capacitance'])
-            ax2.set_yticks(config['y_ticks']['capacitance'])
+            ax2.set_xlim(self.xlim)
+            # ax2.set_ylim(config['y_lim']['capacitance'])
+            # ax2.set_yticks(config['y_ticks']['capacitance'])
             ax2.legend(fontsize='small')
             ax2.set_xlabel('Frequency (Hz)')
             ax2.set_ylabel(fr'$C_{{{p+1}{q+1}}} \, (\mu F/km)$')
@@ -340,10 +344,10 @@ class XueModels:
         fig.suptitle(config['suptitle'], fontsize=12, y=0.98)
 
         for series in config['series_to_plot']:
-            zs_3d = self.pul_data[series['key']]['series_impedance_matrix']
+            zs = self.pul_data['scenarios'][series['key']]['quasi_tem_matrices']['series_impedance_matrix']
             style = {'label': series['label'], 'color': series['color'], 'linestyle': series['linestyle']}
-            ax1.plot(self.f, zs_3d[:, p, q].real * 1e3, **style)
-            ax2.plot(self.f, zs_3d[:, p, q].imag / self.w * 1e6, **style)
+            ax1.plot(self.f, zs[:, p, q].real * 1e3, **style)
+            ax2.plot(self.f, zs[:, p, q].imag / self.w * 1e6, **style)
 
         if self.cmsl is not None:
             cmsl = self.cmsl['cmsl_ground_return_impedance_h5']  
@@ -355,7 +359,7 @@ class XueModels:
         # Configure left subplot (Resistance)
         ax1.set_xscale('log')
         ax1.set_yscale('log')
-        ax1.set_xlim(config['x_lim']['resistance'])
+        ax1.set_xlim(self.xlim)
         # ax1.set_ylim(config['y_lim']['resistance'])
         ax1.legend(fontsize='small')
         ax1.set_xlabel('Frequency (Hz)')
@@ -365,7 +369,7 @@ class XueModels:
 
         # Configure right subplot (Inductance)
         ax2.set_xscale('log')
-        ax2.set_xlim(config['x_lim']['inductance'])
+        ax2.set_xlim(self.xlim)
         # ax2.set_ylim(config['y_lim']['inductance'])
         ax2.legend(fontsize='small')
         ax2.set_xlabel('Frequency (Hz)')
@@ -385,16 +389,15 @@ class XueModels:
         fig.suptitle(config['suptitle'], fontsize=12, y=0.98)
 
         for series in config['series_to_plot']:
-            ysh_3d = self.pul_data[series['key']]['shunt_admittance_matrix']
-            ysh = ysh_3d[:, p, q]    
+            ysh = self.pul_data['scenarios'][series['key']]['quasi_tem_matrices']['shunt_admittance_matrix']
             style = {'label': series['label'], 'color': series['color'], 'linestyle': series['linestyle']}
-            ax1.plot(self.f, ysh.real * 1e3 , **style)
-            ax2.plot(self.f, ysh.imag / self.w * 1e12, **style)
+            ax1.plot(self.f, np.real(ysh[:, p, q]) * 1e3 , **style)
+            ax2.plot(self.f, np.imag(ysh[:, p, q]) / self.w * 1e12, **style)
 
         # Configure left subplot (Conductance)
         ax1.set_xscale('log')
-        ax1.set_xlim(config['x_lim']['conductance'])
-        ax1.set_ylim(config['y_lim']['conductance'])
+        ax1.set_xlim(self.xlim)
+        # ax1.set_ylim(config['y_lim']['conductance'])
         ax1.legend(fontsize='small')
         ax1.set_xlabel('Frequency (Hz)')
         ax1.set_ylabel(r'$G \, (S/km)$')
@@ -403,8 +406,8 @@ class XueModels:
 
         # Configure right subplot (Capacitance)
         ax2.set_xscale('log')
-        ax2.set_xlim(config['x_lim']['capacitance'])
-        ax2.set_ylim(config['y_lim']['capacitance'])
+        ax2.set_xlim(self.xlim)
+        # ax2.set_ylim(config['y_lim']['capacitance'])
         ax2.legend(fontsize='small')
         ax2.set_xlabel('Frequency (Hz)')
         ax2.set_ylabel(r'$C \, (nF/km)$')
@@ -419,17 +422,16 @@ class XueModels:
         fig.suptitle(config['suptitle'], fontsize=12, y=0.98)
 
         for series in config['series_to_plot']:
-            gamma_v_3d = self.pul_data[series['key']]['propagation_voltage_matrix']
-            gamma_v = gamma_v_3d[:, p, q]   
+            gamma_v = self.pul_data['scenarios'][series['key']]['propagation_voltage_matrix']
             style = {'label': series['label'], 'color': series['color'], 'linestyle': series['linestyle']}
-            ax1.plot(self.f, gamma_v.real * 1e3, **style)
-            ax2.plot(self.f, self.w / gamma_v.imag / sc.c, **style)
+            ax1.plot(self.f, np.real(gamma_v[:, p, q]) * 1e3, **style)
+            ax2.plot(self.f, self.w / np.imag(gamma_v[:, p, q]) / sc.c, **style)
 
         # Configure left subplot (attenuation)
         ax1.set_xscale('log')
         ax1.set_yscale('log')
-        ax1.set_xlim(config['x_lim']['attenuation'])
-        ax1.set_ylim(config['y_lim']['attenuation'])
+        ax1.set_xlim(self.xlim)
+        # ax1.set_ylim(config['y_lim']['attenuation'])
         ax1.legend(fontsize='small')
         ax1.set_xlabel('Frequency (Hz)')
         ax1.set_ylabel( r'Attenuation Constant, $\alpha_{\nu}$ (Np/km)')
@@ -438,8 +440,8 @@ class XueModels:
 
         # Configure right subplot (phase velocity)
         ax2.set_xscale('log')
-        ax2.set_xlim(config['x_lim']['phase_velocity'])
-        ax2.set_ylim(config['y_lim']['phase_velocity'])
+        ax2.set_xlim(self.xlim)
+        # ax2.set_ylim(config['y_lim']['phase_velocity'])
         ax2.legend(fontsize='small')
         ax2.set_xlabel('Frequency (Hz)')
         ax2.set_ylabel(r'Phase Velocity, $c_{\nu}/c_0$')
@@ -486,6 +488,10 @@ class XueModels:
     def plot_fig423(self, graph_form='conductance_and_capacitance'):
         """Plots the data corresponding to Figure 4.23 from the reference."""
         self._scc_admittance_subplots('fig423', graph_form)
+
+    def plot_fig423a(self, graph_form='conductance_and_capacitance'):
+        """Plots the data corresponding to Figure 4.23a from the reference."""
+        self._scc_admittance_subplots('fig423a', graph_form)
 
     def plot_fig425(self, graph_form='conductance_and_capacitance'):
         """Plots the data corresponding to Figure 4.25 from the reference."""

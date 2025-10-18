@@ -1,5 +1,3 @@
-# scc_flat_xue.py
-
 '''
 PRYSMIAN_138kV_CORE_SHEATH Cable Data (in meters):
 1. CONDUTOR: Corda de cobre tipo circular compacta, de acordo com os requisitos da norma NBR NM 280 (classe 2). Seção nominal: 500 mm2
@@ -33,27 +31,14 @@ PROPRIEDADES ELÉTRICAS
 import sys
 import os
 import time
-import copy
 import numpy as np
-from pathlib import Path
 import matplotlib.pyplot as plt
 
-# --- Configure project root for module imports ---
-try:
-    os.system('cls' if os.name == 'nt' else 'clear')
-    project_root = Path(__file__).resolve().parents[2]
-    if str(project_root) not in sys.path:
-        sys.path.insert(0, str(project_root)) 
-    print(f"Project root configured at: {project_root}")
-    case_name = os.path.splitext(os.path.basename(__file__))[0]
-    print(f"Case name identified as: '{case_name}'")
-except IndexError:
-    raise RuntimeError("Could not find project root. Ensure the directory structure is correct.")
-
 # --- Import custom modules ---
+os.system('cls' if os.name == 'nt' else 'clear')
 try:
     from utils.case_utils import *
-    from plotter.prysmian_models import PrysmianModels
+    from plotter.scc_models import SingleCoreCableModels
     from models.single_core_cable import SingleCoreCableModelGenerator
     from mtl_main.graphics import GroundReturnMTLRepresentation
     from mtl_main.source import MulticonductorTransmissionLine
@@ -66,62 +51,69 @@ except ImportError as e:
 def main():
     """ Main function to run the simulation and plotting using vectorized calculations. """
     st = time.time()    
-    input_json = load_json_parameters(__file__, show_content=True)
-    model_generator = SingleCoreCableModelGenerator(input_json)
-    model = model_generator.underground_model(show_model=True)
-    
-    # --- Model setup ---
+    model = SingleCoreCableModelGenerator(__file__).underground_model()
     mtl_model = MulticonductorTransmissionLine(model)
 
-    # Define the calculation scenarios
-    scenarios = {
-        'magalhaes_xue': {'mtl': mtl_model, 'zg_form': 'magalhaes_xue'},
-        'sunde': {'mtl': mtl_model, 'zg_form': 'sunde'},
-        'pollaczek': {'mtl': mtl_model, 'zg_form': 'pollaczek'},
-        'ametani': {'mtl': mtl_model, 'zg_form': 'ametani'},
-        'deconti': {'mtl': mtl_model, 'zg_form': 'deconti'},
-        'saad': {'mtl': mtl_model, 'zg_form': 'saad'},
+    pul_data = {
+        'comsol': None, # cmsl_reader.data,
+        'frequencies': np.logspace(1, 7, num=121),
+        'logger_data': {
+            'frequencies': [1e2, 1e4, 1e5],
+            'scenario': 'ametani'
+        },
+        'scenarios': {
+            'magalhaes_xue': {
+                'mtl': mtl_model,
+                'zg_form': 'magalhaes_xue'
+            },
+            'sunde': {
+                'mtl': mtl_model,
+                'zg_form': 'sunde'
+            },
+            'pollaczek': {
+                'mtl': mtl_model,
+                'zg_form': 'pollaczek'
+            },
+            'ametani': {
+                'mtl': mtl_model,
+                'zg_form': 'ametani'
+            },
+            'deconti': {
+                'mtl': mtl_model,
+                'zg_form': 'deconti'
+            },
+            'saad': {
+                'mtl': mtl_model,
+                'zg_form': 'saad'
+            },
+        }
     }
 
-    # --- VECTORIZED CALCULATION ---
-    pul_data = {'frequencies': np.logspace(1, 7, num=120)}
-
-    # 1. Calculate internal parameters ONCE, as the cable geometry is the same for all scenarios.
     print("Calculating internal parameters for all frequencies...")
-    #    This returns a dictionary of 3D matrices (e.g., shape (40, 6, 6)).
-    internal = InternalPerUnitParameters(mtl_model, pul_data['frequencies'])
-    pul_data['internal'] = internal.parameters_by_bessel()
-    print("Internal parameters calculated.")
+    pul = InternalPerUnitParameters(mtl_model, pul_data['frequencies'])
+    internal_matrices = pul.matrices()
+    pul_data['internal_matrices'] = internal_matrices
+    pul_data['internal_parameters'] = pul.parameters_hybrid()
 
-    # 2. Loop through scenarios to calculate ground-return effects.
-    for key, value in scenarios.items():
+    for key, value in pul_data['scenarios'].items():
         print(f"Calculating scenario: {key}...")
         pul = PerUnitParameters(value['mtl'], pul_data['frequencies'])
-        pul_data[key] = pul.earth_return_parameters(zg_form=value['zg_form'])    
-    print("Calculations completed for all scenarios.")
+        
+        earth_return = pul.earth_return_parameters(value['zg_form'])
+        quasi_tem = pul.quasi_tem_approx_matrices(internal_matrices, earth_return)
 
-    # --- DISCRETE CALCULATION FOR LOGGING ---
-    discrete_frequencies = [1e2, 1e4, 1e5]
-
-    print("\nCalculating discrete points for logging...")
-    internal = InternalPerUnitParameters(mtl_model, discrete_frequencies)
-    pul = PerUnitParameters(mtl_model, discrete_frequencies)
-    pul_data_discrete = pul.quasi_tem_approximation(
-        internal.matrices(), zg_form='ametani', yg_form='ametani'
-    )
-    pul_data_discrete['frequencies'] = discrete_frequencies
-    print("Discrete calculation for logging finished.")
+        value['earth_return_parameters'] = earth_return
+        value['quasi_tem_matrices'] = quasi_tem
 
     print(f"End of the routine! Time spent on simulation: {(time.time() - st):.1f} seconds.\n")
-    plotter = PrysmianModels(pul_data, pul_data_discrete)
-    plotter.core_parameters()
-    plotter.sheath_parameters()   
-    plotter.core_sheath_internal_impedance_matrix() 
-    plotter.core_sheath_internal_parameters()
+    plotter = SingleCoreCableModels(__file__, pul_data)
+    plotter.internal_impedance_parameters(config_key='core')
+    plotter.internal_impedance_parameters(config_key='sheath')
+    plotter.internal_impedance_parameters(config_key='core_sheath')
+    plotter.internal_impedance_parameters(config_key='internal_parameters')
     plotter.ground_return_impedance()
-    plotter.log_matricial_pul_parameters()
-    GroundReturnMTLRepresentation(mtl_model, case_name, units='centimeter').system_schematic()
-    plt.show()    
+    GroundReturnMTLRepresentation(__file__, mtl_model, units='centimeter').system_schematic()
+    plt.show()
 
 if __name__ == "__main__":
     main()

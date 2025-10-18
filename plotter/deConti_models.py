@@ -1,21 +1,30 @@
+import os
 import numpy as np
 import matplotlib.pyplot as plt
-from mtl_main.source import MulticonductorTransmissionLine
+
+from pathlib import Path
 from utils.case_utils import *
+from mtl_main.source import MulticonductorTransmissionLine
 
 class DeContiModels:
     """
     A highly refactored class to handle plotting for the Xue model results.
     It uses a configuration-driven approach to generate complex subplot figures.
     """
-    def __init__(self, model, pul_parameters):
-        self.model = model
-        self.pul_data = pul_parameters
-        self.f = pul_parameters['frequencies']
+    def __init__(self, file_path: str, pul_data: dict, autoSave: bool = True):
+        self.script_path = Path(file_path)
+        self.autoSave = autoSave
+        self.pul_data = pul_data
+        
+        self.f = pul_data['frequencies']
         self.w = 2 * np.pi * self.f
+        
         self.figsize = (12, 5)
+        self.xlim = tuple(pul_data['frequencies'][[0, -1]])
 
-        epsr1 = self.model.mtl_ref[0]['relative_permittivity']
+        # Assumes the script is run from the project's root directory.
+        self.results_dir = os.path.join('testData', self.script_path.stem, 'Results')
+        os.makedirs(self.results_dir, exist_ok=True)
 
         self.comparison = [
             {'key': 'magalhaes_xue', 'label': 'Magalhães/Xue',  'color': 'black', 'linestyle': '-', 'linewidth': 2},
@@ -42,16 +51,15 @@ class DeContiModels:
                 'resistance_title': 'P.u.l. resistance',
                 'inductance_title': 'P.u.l. inductance',
                 'p': 0, 'q': 0,
-                'x_lim': {'resistance': (1E5, 1E8), 'inductance': (1E-1, 1E8)},
-                'y_lim': {'resistance': (0, 200), 'inductance': (0.5, 3.0)},
+                'x_lim': {'resistance': (1E4, 1E8), 'inductance': (1E-1, 1E8)},
+                'y_lim': {'resistance': (0, 100), 'inductance': (0, 3.0)},
                 'series_to_plot': self.comparison
             },
             'impedance': {
-                'suptitle': fr"Flat arrangement's mutual ground-return impedance for $\varepsilon_{{r1}} = {epsr1}$",
+                'suptitle': fr"Flat arrangement's mutual ground-return impedance for $\varepsilon_{{r1}} = {10}$",
                 'norm_title': 'Absolute Impedance',
                 'angle_title': 'Angle of Impedance',
                 'p': 2, 'q': 0,
-                'x_lim': {'norm': (1E4, 1E7), 'angle': (1E4, 1E7)},
                 'y_lim': {'norm': (0, 25), 'angle': (20, 90)},
                 'series_to_plot': self.paper_2023
             },
@@ -60,27 +68,26 @@ class DeContiModels:
                 'norm_title': 'Absolute Value',
                 'angle_title': 'Angle of Potential Coefficient',
                 'p': 2, 'q': 0,
-                'x_lim': {'norm': (1E4, 1E7), 'angle': (1E4, 1E7)},
                 'y_lim': {'norm': (0, 14), 'angle': (-90, 90)},
                 'series_to_plot': self.paper_2023
             }, 
         }
 
-    def _ground_return_impedance_subplots(self, config_key):
+    def ground_return_impedance(self, graph_key='ground_return_impedance'):
         """
         Generic method to create a 1x2 subplot for series resistance (left)
         and series inductance (right) based on a configuration key.
         """
-        config = self.plot_configs[config_key]
+        config = self.plot_configs[graph_key]
         p, q = config['p'], config['q']
         fig, (ax1, ax2) = plt.subplots(1, 2, figsize=self.figsize, sharey=False)
         fig.suptitle(config['suptitle'], fontsize=12, y=0.98)
 
         for series in config['series_to_plot']:
-            zg_3d = self.pul_data[series['key']]['earth-return_impedance_matrix']
+            Zg = self.pul_data['scenarios'][series['key']]['earth_return_parameters']['impedance_matrix']
             style = {'label': series['label'], 'color': series['color'], 'linestyle': series['linestyle'], 'linewidth': series['linewidth']}
-            ax1.plot(self.f, np.real(zg_3d[:, p, q]) , **style)
-            ax2.plot(self.f, np.imag(zg_3d[:, p, q]) / (2 * np.pi * self.f) * 1e6, **style) # Inductance in mH/km
+            ax1.plot(self.f, np.real(Zg[:, p, q]) , **style)
+            ax2.plot(self.f, np.imag(Zg[:, p, q]) / self.w * 1e6, **style)
 
         # Configure left subplot (Resistance)
         ax1.set_xscale('log')
@@ -95,22 +102,25 @@ class DeContiModels:
         # Configure right subplot (Inductance)
         ax2.set_xscale('log')
         ax2.set_xlim(config['x_lim']['inductance'])
-        # ax2.set_ylim(config['y_lim']['inductance'])
+        ax2.set_ylim(config['y_lim']['inductance'])
         ax2.legend(fontsize='small')
         ax2.set_xlabel('Frequency (Hz)')
-        ax2.set_ylabel(r'$L_s \, (mH/km)$')
+        ax2.set_ylabel(r'$L_s \, (\mu H/m)$')
         ax2.grid(True, which='both', linestyle='--', linewidth=0.5)
         ax2.set_title(config['inductance_title'])
         plt.tight_layout(rect=[0, 0, 1, 0.96])
 
-    def _impedance_subplots(self, config_key, graph_form='norm_and_angle'):
-        config = self.plot_configs[config_key]
+        if self.autoSave:
+            save_figure_multiformat(fig, self.results_dir, base_filename=f'{graph_key}')
+
+    def _impedance_subplots(self, graph_key, graph_form='norm_and_angle'):
+        config = self.plot_configs[graph_key]
         p, q = config['p'], config['q']
         fig, (ax1, ax2) = plt.subplots(1, 2, figsize=self.figsize, sharey=False)
         fig.suptitle(config['suptitle'], fontsize=12, y=0.98)
 
         for series in config['series_to_plot']:
-            zg = self.pul_data[series['key']]['earth-return_impedance_matrix']
+            Zg = self.pul_data['scenarios'][series['key']]['earth_return_parameters']['impedance_matrix']
             style = {
                 'label': series.get('label', ''),
                 'color': series.get('color', 'black'),
@@ -119,11 +129,11 @@ class DeContiModels:
 
             # Configure left subplot (Resistance)
             if graph_form == 'norm_and_angle':
-                ax1.plot(self.f, np.abs(zg[:, p, q]), **style)
-                ax2.plot(self.f, np.angle(zg[:, p, q], deg=True), **style)
+                ax1.plot(self.f, np.abs(Zg[:, p, q]), **style)
+                ax2.plot(self.f, np.angle(Zg[:, p, q], deg=True), **style)
 
                 ax1.set_xscale('log')
-                ax1.set_xlim(config['x_lim']['norm'])
+                ax1.set_xlim(self.xlim)
                 ax1.set_ylim(config['y_lim']['norm'])
                 ax1.legend(fontsize='small')
                 ax1.set_xlabel('Frequency (Hz)')
@@ -133,7 +143,7 @@ class DeContiModels:
 
                 # Configure right subplot (Inductance)
                 ax2.set_xscale('log')
-                ax2.set_xlim(config['x_lim']['angle'])
+                ax2.set_xlim(self.xlim)
                 ax2.set_ylim(config['y_lim']['angle'])
                 ax2.legend(fontsize='small')
                 ax2.set_xlabel('Frequency (Hz)')
@@ -143,12 +153,12 @@ class DeContiModels:
                 plt.tight_layout(rect=[0, 0, 1, 0.96])
 
             elif graph_form=='resistance_and_inductance':
-                ax1.plot(self.f, np.real(zg[:, p, q]) * 1e3, **style)
-                ax2.plot(self.f, np.imag(zg[:, p, q]) / self.w * 1e6, **style)
+                ax1.plot(self.f, np.real(Zg[:, p, q]) * 1e3, **style)
+                ax2.plot(self.f, np.imag(Zg[:, p, q]) / self.w * 1e6, **style)
 
                 ax1.set_xscale('log')
                 ax1.set_yscale('log')
-                ax1.set_xlim(config['x_lim']['norm'])
+                ax1.set_xlim(self.xlim)
                 # ax1.set_ylim(config['y_lim']['norm'])
                 ax1.legend(fontsize='small')
                 ax1.set_xlabel('Frequency (Hz)')
@@ -158,7 +168,7 @@ class DeContiModels:
 
                 # Configure right subplot (Inductance)
                 ax2.set_xscale('log')
-                ax2.set_xlim(config['x_lim']['angle'])
+                ax2.set_xlim(self.xlim)
                 # ax2.set_ylim(config['y_lim']['angle'])
                 ax2.legend(fontsize='small')
                 ax2.set_xlabel('Frequency (Hz)')
@@ -167,23 +177,24 @@ class DeContiModels:
                 ax2.set_title(config['angle_title'])
                 plt.tight_layout(rect=[0, 0, 1, 0.96])
 
-    def _potential_subplots(self, config_key):
-        config = self.plot_configs[config_key]
+        if self.autoSave:
+            save_figure_multiformat(fig, self.results_dir, base_filename=f'{graph_key}_{graph_form}')
+
+    def _potential_subplots(self, graph_key):
+        config = self.plot_configs[graph_key]
         p, q = config['p'], config['q']
         fig, (ax1, ax2) = plt.subplots(1, 2, figsize=self.figsize, sharey=False)
         fig.suptitle(config['suptitle'], fontsize=12, y=0.98)
 
         for series in config['series_to_plot']:
-            pg_3d = self.pul_data[series['key']]['earth-return_potential_coefficient']
-            pg = pg_3d[:, p, q]
-            style = {'label': series['label'], 'color': series['color'], 'linestyle': series['linestyle'],
-                     'marker': series['marker'], 'markersize': 3, 'linewidth': 1.0}
-            ax1.plot(self.f, np.abs(pg) * 1e-9, **style)
-            ax2.plot(self.f, np.angle(pg, deg=True), **style)
+            Pg = self.pul_data['scenarios'][series['key']]['earth_return_parameters']['potential_coefficient']
+            style = {'label': series['label'], 'color': series['color'], 'linestyle': series['linestyle'], 'markersize': 3, 'linewidth': 1.0}
+            ax1.plot(self.f, np.abs(Pg[:, p, q]) * 1e-9, **style)
+            ax2.plot(self.f, np.angle(Pg[:, p, q], deg=True), **style)
 
         # Configure left subplot (Resistance)
         ax1.set_xscale('log')
-        ax1.set_xlim(config['x_lim']['norm'])
+        ax1.set_xlim(self.xlim)
         ax1.set_ylim(config['y_lim']['norm'])
         ax1.legend(fontsize='small')
         ax1.set_xlabel('Frequency (Hz)')
@@ -193,7 +204,7 @@ class DeContiModels:
 
         # Configure right subplot (Inductance)
         ax2.set_xscale('log')
-        ax2.set_xlim(config['x_lim']['angle'])
+        ax2.set_xlim(self.xlim)
         ax2.set_ylim(config['y_lim']['angle'])
         ax2.legend(fontsize='small')
         ax2.set_xlabel('Frequency (Hz)')
@@ -202,6 +213,9 @@ class DeContiModels:
         ax2.set_title(config['angle_title'])
         plt.tight_layout(rect=[0, 0, 1, 0.96])
 
+        if self.autoSave:
+            save_figure_multiformat(fig, self.results_dir, base_filename=f'{graph_key}')
+
     def fig_3(self, graph_form='norm_and_angle'):
         """Plots the data corresponding to Figure 3 from the reference."""
         self._impedance_subplots('impedance', graph_form)
@@ -209,9 +223,6 @@ class DeContiModels:
     def fig_6(self):
         """Plots the data corresponding to Figure 6 from the reference."""
         self._potential_subplots('potential')
-
-    def ground_return_impedance(self):
-        self._ground_return_impedance_subplots('ground_return_impedance')
 
     def log_matricial_pul_parameters(self, discrete_pul_data, scale_units=True):
         """ Generates a terminal log report by slicing the discrete vectorized results. """

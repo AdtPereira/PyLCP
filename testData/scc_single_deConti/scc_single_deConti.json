@@ -1,9 +1,9 @@
 {
   "type": "scc",
-  "note": "An DE CONTI buried bare-wire. Ref.: Example 6a, p.157, 2023",
+  "note": "An DE CONTI buried bare-wire. Ref.: Example 6A, p.157, 2023",
   "arrangement": {
     "unit": "meter",
-    "type": "flat",
+    "type": "single",
     "num_conductors": 1,
     "burial_depth": 2.0,
     "spacing": null,

@@ -1,64 +1,19 @@
-# scc_flat_xue.py
-
-'''
-PRYSMIAN_138kV_CORE_SHEATH Cable Data (in meters):
-1. CONDUTOR: Corda de cobre tipo circular compacta, de acordo com os requisitos da norma NBR NM 280 (classe 2). Seção nominal: 500 mm2
-    Diâmetro nominal: 25,95 mm
-2. ENFAIXAMENTO DO CONDUTOR:  Fita semicondutora contendo pó inchante e fita de nylon, ambas aplicadas helicoidalmente sobre o condutor.
-    Diâmetro nominal: 26,73 mm
-3.BLINDAGEM DO CONDUTOR: Camada extrudada de composto semicondutor à base de XLPE. Espessura nominal: 1,5 mm
-    Diâmetro nominal: 29,73 mm
-4. ISOLAÇÃO: Camada extrudada de polietileno reticulado (XLPE) Espessura nominal: 13,31 mm
-    Diâmetro nominal: 60,35 mm
-    Permitividade relativa nominal: 2.3
-5. BLINDAGEM DA ISOLAÇÃO: Camada extrudada de composto semicondutor à base de XLPE. Espessura nominal: 1,5 mm
-    Diâmetro nominal: 63,35 mm
-6. ENFAIXAMENTO DA ISOLAÇÃO: Fita semicondutora contendo pó inchante, aplicada helicoidalmente sobre a blindagem da isolação.
-    Diâmetro nominal: 64,63 mm
-7. CAPA METÁLICA: Capa extrudada de liga de chumbo. Espessura nominal: 3,00 mm
-    Diâmetro nominal: 70,63 mm
-    Seção nominal: 637,4 mm2
-8. COBERTURA: Camada extrudada de polietileno de alta densidade (HDPE) contendo aditivo de proteção contra térmitas e grafite em pó.
-    Espessura nominal: 4,0 mm
-    Diâmetro nominal: 78,63 mm
-
-PROPRIEDADES ELÉTRICAS
-1. TENSÃO EFICAZ ENTRE FASE E TERRA (kV): 79,69
-2. TENSÃO EFICAZ ENTRE FASES (kV): 138
-3. NÍVEL BÁSICO DE IMPULSO (NBI) (kV): 650
-4. RESISTÊNCIA CC MÁXIMA DO CONDUTOR A 20º C (ohn/km): 0,0366
-5. CAPACITÂNCIA (mF/km): 0,1805
-'''
-
 import sys
 import os
 import time
-import copy
 import numpy as np
-from pathlib import Path
 import matplotlib.pyplot as plt
 
-# --- Configure project root for module imports ---
-try:
-    os.system('cls' if os.name == 'nt' else 'clear')
-    project_root = Path(__file__).resolve().parents[2]
-    if str(project_root) not in sys.path:
-        sys.path.insert(0, str(project_root)) 
-    print(f"Project root configured at: {project_root}")
-    case_name = os.path.splitext(os.path.basename(__file__))[0]
-    print(f"Case name identified as: '{case_name}'")
-except IndexError:
-    raise RuntimeError("Could not find project root. Ensure the directory structure is correct.")
-
 # --- Import custom modules ---
+os.system('cls' if os.name == 'nt' else 'clear')
 try:
     from utils.case_utils import *
-    from plotter.prysmian_models import PrysmianModels
+    from plotter.scc_models import SingleCoreCableModels
     from models.single_core_cable import SingleCoreCableModelGenerator
     from mtl_main.graphics import GroundReturnMTLRepresentation
     from mtl_main.source import MulticonductorTransmissionLine
     from analytical_forms.single_core_cable import InternalPerUnitParameters, PerUnitParameters
-    print("Core modules imported successfully.")
+    print("Modules imported successfully.")
 except ImportError as e:
     print(f"Error importing modules: {e}")
     sys.exit(1)
@@ -66,63 +21,57 @@ except ImportError as e:
 def main():
     """ Main function to run the simulation and plotting using vectorized calculations. """
     st = time.time()    
-    input_json = load_json_parameters(__file__, show_content=True)
-    model_generator = SingleCoreCableModelGenerator(input_json)
-    model = model_generator.underground_model(show_model=True)
-    
-    # --- Model setup ---
+    model = SingleCoreCableModelGenerator(__file__).underground_model()
     mtl_model = MulticonductorTransmissionLine(model)
 
-    # Define the calculation scenarios
-    scenarios = {
-        'magalhaes_xue': {'mtl': mtl_model, 'zg_form': 'magalhaes_xue'},
-        'sunde': {'mtl': mtl_model, 'zg_form': 'sunde'},
-        'pollaczek': {'mtl': mtl_model, 'zg_form': 'pollaczek'},
-        'ametani': {'mtl': mtl_model, 'zg_form': 'ametani'},
-        'deconti': {'mtl': mtl_model, 'zg_form': 'deconti'},
-        'saad': {'mtl': mtl_model, 'zg_form': 'saad'},
+    # 1. ESTRUTURA DE DADOS CENTRALIZADA
+    pul_data = {
+        'comsol': None, # cmsl_reader.data,
+        'frequencies': np.logspace(4, 7, num=121),
+        'scenarios': {
+            'p100_xue': {
+                'mtl': mtl_model,
+                'zg_form': 'magalhaes_xue',
+                'yg_form': 'magalhaes_xue',
+            },
+            'p100_deconti': {
+                'mtl': mtl_model,
+                'zg_form': 'deconti',
+                'yg_form': 'deconti',
+            },
+        }
     }
-
-    # --- VECTORIZED CALCULATION ---
-    pul_data = {'frequencies': np.logspace(4, 7, num=200)}
-
-    # 1. Calculate internal parameters ONCE, as the cable geometry is the same for all scenarios.
+    
     print("Calculating internal parameters for all frequencies...")
-    #    This returns a dictionary of 3D matrices (e.g., shape (40, 6, 6)).
-    internal = InternalPerUnitParameters(mtl_model, pul_data['frequencies'])
-    pul_data['internal'] = internal.parameters_approximation()
-    pul_data['internal_matrices'] = internal.matrices()
-    print("Internal parameters calculated.")
+    pul = InternalPerUnitParameters(mtl_model, pul_data['frequencies'])
+    internal_matrices = pul.matrices()
+    pul_data['internal_matrices'] = internal_matrices
 
-    # 2. Loop through scenarios to calculate ground-return effects.
-    for key, value in scenarios.items():
+    for key, value in pul_data['scenarios'].items():
         print(f"Calculating scenario: {key}...")
         pul = PerUnitParameters(value['mtl'], pul_data['frequencies'])
-        pul_data[key] = pul.earth_return_parameters(zg_form=value['zg_form'])    
-    print("Calculations completed for all scenarios.")
+        
+        earth_return = pul.earth_return_parameters(value['zg_form'], value['yg_form'])
+        quasi_tem = pul.quasi_tem_approx_matrices(internal_matrices, earth_return)
 
-    # --- DISCRETE CALCULATION FOR LOGGING ---
-    discrete_frequencies = [1e2, 1e4, 1e5]
-
-    print("\nCalculating discrete points for logging...")
-    internal = InternalPerUnitParameters(mtl_model, discrete_frequencies)
-    pul = PerUnitParameters(mtl_model, discrete_frequencies)
-    pul_data_discrete = pul.quasi_tem_approximation(
-        internal.matrices(), zg_form='ametani', yg_form='ametani'
-    )
-    pul_data_discrete['frequencies'] = discrete_frequencies
-    print("Discrete calculation for logging finished.")
-
+        value['earth_return_parameters'] = earth_return
+        value['quasi_tem_matrices'] = quasi_tem
+    
     print(f"End of the routine! Time spent on simulation: {(time.time() - st):.1f} seconds.\n")
-    plotter = PrysmianModels(pul_data, pul_data_discrete)
-    plotter.compare_internal_impedance_matrix() 
-    # plotter.core_sheath_internal_impedance_matrix() 
-    # plotter.core_parameters()
-    # plotter.sheath_parameters()   
-    # plotter.core_sheath_internal_parameters()
-    # plotter.ground_return_impedance()
-    # plotter.log_matricial_pul_parameters()
-    # GroundReturnMTLRepresentation(mtl_model, case_name, units='centimeter').system_schematic()
+    plotter = SingleCoreCableModels(__file__, pul_data)
+    plotter.series_impedance_matrix(condutor='core')
+    plotter.series_impedance_matrix(condutor='sheath')
+    plotter.series_impedance_matrix(condutor='core_sheath')
+    plotter.shunt_admittance_matrix(condutor='sheath')
+    plotter.potential_coefficients_matrix(condutor='core')
+    plotter.potential_coefficients_matrix(graph_form='real_and_imaginary', condutor='core')
+    plotter.earth_return_admittance_matrix()
+    plotter.earth_return_impedance_matrix()
+    plotter.earth_return_potential_coefficients_matrix()
+    plotter.internal_admittance_matrix()
+    plotter.internal_impedance_matrix()
+    plotter.internal_potential_coefficients_matrix()
+    GroundReturnMTLRepresentation(__file__, mtl_model, units='centimeter').system_schematic()
     plt.show()    
 
 if __name__ == "__main__":

@@ -83,6 +83,27 @@ def matrix_viewer(matrix: np.ndarray, title: str, columns_name: Optional[list] =
     else:
         print(df)
 
+def matrix_to_string(matrix: np.ndarray) -> str:
+    # ... (função auxiliar sem alteração)
+    lines = []
+    s_rows = [[f"{val:11.4e}" for val in row] for row in matrix]
+    for row in s_rows:
+        lines.append("  ".join(row))
+    return "\n".join(lines)
+
+def print_real_matrix(name: str, matrix_data: np.ndarray, unit: str):
+    # ... (função auxiliar sem alteração)
+    lines = _matrix_to_string(matrix_data).split('\n')
+    num_rows = len(lines)
+    middle_row_idx = num_rows // 2
+    
+    print("") 
+    for i in range(num_rows):
+        name_part = f"{name} = " if i == middle_row_idx else " " * (len(name) + 3)
+        unit_part = f" {unit}" if i == middle_row_idx else ""
+        print(f"{name_part}{lines[i]}{unit_part}")
+    print("") 
+
 def verify_kelvin_functions(q = 1.5):
     """
     This script verifies the output of scipy.special.kelvin() by comparing it
@@ -138,7 +159,7 @@ def verify_kelvin_functions(q = 1.5):
     print(f"Re[...] = {ber_p_from_bessel:>10.6f} -> Matches ber'(q)? {np.isclose(ber_p_ref, ber_p_from_bessel)}")
     print(f"Im[...] = {bei_p_from_bessel:>10.6f} -> Matches bei'(q)? {np.isclose(bei_p_ref, bei_p_from_bessel)}")
 
-def save_figure_multiformat(fig, results_dir, base_filename, formats=['png', 'pdf']):
+def save_figure_multiformat(fig, results_dir, base_filename, formats=['png']):
     """
     Saves a figure to multiple file formats in the case's results directory.
 
