@@ -56,7 +56,7 @@ def main():
 
     pul_data = {
         'comsol': None, # cmsl_reader.data,
-        'frequencies': np.logspace(1, 7, num=121),
+        'frequencies': np.logspace(0, 7, num=121),
         'logger_data': {
             'frequencies': [1e2, 1e4, 1e5],
             'scenario': 'ametani'
@@ -107,10 +107,10 @@ def main():
 
     print(f"End of the routine! Time spent on simulation: {(time.time() - st):.1f} seconds.\n")
     plotter = SingleCoreCableModels(__file__, pul_data)
-    plotter.internal_impedance_parameters(config_key='core')
-    plotter.internal_impedance_parameters(config_key='sheath')
-    plotter.internal_impedance_parameters(config_key='core_sheath')
-    plotter.internal_impedance_parameters(config_key='internal_parameters')
+    plotter.internal_impedance_parameters(graph_key='core')
+    plotter.internal_impedance_parameters(graph_key='sheath')
+    plotter.internal_impedance_parameters(graph_key='core_sheath')
+    plotter.internal_impedance_parameters(graph_key='internal_parameters')
     plotter.ground_return_impedance()
     GroundReturnMTLRepresentation(__file__, mtl_model, units='centimeter').system_schematic()
     plt.show()

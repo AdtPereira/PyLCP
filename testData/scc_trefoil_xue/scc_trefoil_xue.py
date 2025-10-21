@@ -91,7 +91,7 @@ def main():
     plotter = XueModels(__file__, pul_data)
     plotter.plot_fig419()
     plotter.plot_fig421()
-    plotter.plot_fig423()
+    plotter.scc_shunt_admittance_matrix()
     GroundReturnMTLRepresentation(__file__, mtl_model_a, units='centimeter').system_schematic()
     plt.show()    
 

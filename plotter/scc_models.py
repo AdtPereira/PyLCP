@@ -63,22 +63,89 @@ class SingleCoreCableModels:
             }
         ]
 
-        self.scc_external_params = [
+        self.impedance_series_to_plot = [
+            {
+                'key': 'p100_xue',
+                'type': {
+                    'self-core': {'label': 'Self-Core (Integral Form.)', 'color': 'red', 'linestyle': '-', 'linewidth': 2.0},
+                    'self-sheath': {'label': 'Self-Sheath (Integral Form.)', 'color': 'blue', 'linestyle': '-', 'linewidth': 2.0},
+                    'mutual-core-sheath': {'label': 'Mutual Core-Sheath (Integral Form.)', 'color': 'darkgreen', 'linestyle': '-', 'linewidth': 2.0}
+                }
+            },
+            {
+                'key': 'p100_deconti',
+                'type': {
+                    'self-core': {'label': 'De Conti Approx. Form.', 'color': 'black', 'linestyle': '--', 'linewidth': 1.0},
+                    'self-sheath': {'label': '', 'color': 'black', 'linestyle': '--', 'linewidth': 1.0},
+                    'mutual-core-sheath': {'label': '', 'color': 'black', 'linestyle': '--', 'linewidth': 1.0},
+                }
+            },
+        ] 
+
+        self.admittance_series_to_plot = [
+            {
+                'key': 'p100_xue',
+                'type': {
+                    'self-core': {'label': 'Self-Core (Integral Form.)', 'color': 'red', 'linestyle': '-', 'linewidth': 2.0},
+                    'self-sheath': {'label': 'Self-Sheath (Integral Form.)', 'color': 'blue', 'linestyle': '-', 'linewidth': 2.0},
+                    'mutual-core-sheath': {'label': 'Mutual Core-Sheath (Integral Form.)', 'color': 'darkgreen', 'linestyle': '-', 'linewidth': 2.0}
+                }
+            },
+            {
+                'key': 'p100_vance',
+                'type': {
+                    'self-core': {'label': 'Vance Approx. Form.', 'color': 'black', 'linestyle': '--', 'linewidth': 1.0},
+                    'self-sheath': {'label': '', 'color': 'black', 'linestyle': '--', 'linewidth': 1.0},
+                    'mutual-core-sheath': {'label': '', 'color': 'black', 'linestyle': '--', 'linewidth': 1.0},
+                }
+            },
+        ]
+
+        self.scc_series_params = [
             {
                 'key': 'p100_xue',
                 'type': {
                     'series_term': {'label': 'Magalhaes/Xue Integral Form.', 'color': 'black', 'linestyle': '-', 'linewidth': 2.0},
                     'shunt_term': {'label': 'Magalhaes/Xue Integral Form.', 'color': 'black', 'linestyle': '-', 'linewidth': 2.0},
                     'earth_return_term': {'label': 'Magalhaes/Xue Integral Form.', 'color': 'black', 'linestyle': '-', 'linewidth': 2.0}
-            }},
+                }
+            },
             {
                 'key': 'p100_deconti',
                 'type': {
                     'series_term': {'label': 'De Conti et al. Approx. Form.', 'color': 'red', 'linestyle': '--', 'linewidth': 1.0},
                     'shunt_term': {'label': 'De Conti et al. Approx. Form.', 'color': 'red', 'linestyle': '--', 'linewidth': 1.0},
                     'earth_return_term': {'label': 'De Conti et al. Approx. Form.', 'color': 'red', 'linestyle': '--', 'linewidth': 1.0}
-            }},
+                }
+            },
         ]    
+
+        self.scc_shunt_params = [
+            {
+                'key': 'p100_xue',
+                'type': {
+                    'series_term': {'label': 'Magalhaes/Xue Integral Form.', 'color': 'black', 'linestyle': '-', 'linewidth': 2.0},
+                    'shunt_term': {'label': 'Magalhaes/Xue Integral Form.', 'color': 'black', 'linestyle': '-', 'linewidth': 2.0},
+                    'earth_return_term': {'label': 'Magalhaes/Xue Integral Form.', 'color': 'black', 'linestyle': '-', 'linewidth': 2.0}
+                }
+            },
+            {
+                'key': 'p100_deconti',
+                'type': {
+                    'series_term': {'label': 'De Conti et al. Approx. Form.', 'color': 'red', 'linestyle': '--', 'linewidth': 1.0},
+                    'shunt_term': {'label': 'De Conti et al. Approx. Form.', 'color': 'red', 'linestyle': '--', 'linewidth': 1.0},
+                    'earth_return_term': {'label': 'De Conti et al. Approx. Form.', 'color': 'red', 'linestyle': '--', 'linewidth': 1.0}
+                }
+            },
+            {
+                'key': 'p100_vance',
+                'type': {
+                    'series_term': {'label': 'Vance Approx. Form.', 'color': 'blue', 'linestyle': '-.', 'linewidth': 1.0},
+                    'shunt_term': {'label': 'Vance Approx. Form.', 'color': 'blue', 'linestyle': '-.', 'linewidth': 1.0},
+                    'earth_return_term': {'label': 'Vance Approx. Form.', 'color': 'blue', 'linestyle': '-.', 'linewidth': 1.0}
+                }
+            },
+        ] 
 
         self.scc_params = [
             {
@@ -94,56 +161,77 @@ class SingleCoreCableModels:
                         'label': 'Internal', 'color': 'blue', 'linestyle': '--', 'linewidth': 1.5, 'zorder': 2},
                     'earth_return_term': {
                         'label': 'Earth-return (Integral Form.)', 'color': 'darkgreen', 'linestyle': '--', 'linewidth': 1.5, 'zorder': 3},
-                    'internal_external': {
-                        'label': 'Internal + Earth-return', 'color': 'red', 'linestyle': ':', 'linewidth': 1.5, 'zorder': 4},
-            }},
+                    'series_composition': {
+                        'label': 'Series Composition', 'color': 'red', 'linestyle': ':', 'linewidth': 1.5, 'zorder': 4},
+                }
+            },
         ]  
 
         self.xue_plot_configs = {
-            'series_impedance_core': {
+            'series_impedance_matrix': {
+                'suptitle': r'P.u.l. series impedance matrix of single core coaxial cable ($\rho_e=100 \;\Omega m, \epsilon_r=1$)',
+                'series_to_plot': self.impedance_series_to_plot,
+            },
+            'shunt_admittance_matrix': {
+                'suptitle': r'P.u.l. shunt admittance matrix of single core coaxial cable ($\rho_e=100 \;\Omega m, \epsilon_r=1$)',
+                'series_to_plot': self.admittance_series_to_plot,
+            },
+            'series_impedance_composition_core': {
                 'suptitle': r'P.u.l. core self-impedance ($\rho_e=100 \;\Omega m, \epsilon_r=1$)',
                 'resistance_title': r'P.u.l. series resistance',
                 'inductance_title': r'P.u.l. series inductance',
                 'series_to_plot': self.scc_params,
                 'comsol_series_to_plot': _generate_comsol_series(comsol_layout_template, 'vcoil_1')
             },
-            'series_impedance_sheath': {
+            'series_impedance_composition_sheath': {
                 'suptitle': r'P.u.l. sheath self-impedance ($\rho_e=100 \;\Omega m, \epsilon_r=1$)',
                 'resistance_title': r'P.u.l. series resistance',
                 'inductance_title': r'P.u.l. series inductance',
                 'series_to_plot': self.scc_params,
                 'comsol_series_to_plot': _generate_comsol_series(comsol_layout_template, 'vcoil_2')
             },
-            'series_impedance_core_sheath': {
+            'series_impedance_composition_core_sheath': {
                 'suptitle': r'P.u.l. core-sheath mutual impedance ($\rho_e=100 \;\Omega m, \epsilon_r=1$)',
                 'resistance_title': r'P.u.l. series resistance',
                 'inductance_title': r'P.u.l. series inductance',
                 'series_to_plot': self.scc_params,
                 'comsol_series_to_plot': _generate_comsol_series(comsol_layout_template, 'vcoil_2')
             },
-            'shunt_admittance_core': {
+            'shunt_admittance_composition_core': {
                 'suptitle': r'P.u.l. core self-admittance ($\rho_e=100 \;\Omega m, \epsilon_r=1$)',
                 'conductance_title': r'P.u.l. shunt conductance',
                 'capacitance_title': r'P.u.l. shunt capacitance',
                 'y_lim': {'conductance': (0, 20), 'capacitance': (0, 3)},
                 'series_to_plot': self.scc_params,
             },
-            'shunt_admittance_sheath': {
+            'shunt_admittance_composition_sheath': {
                 'suptitle': r'P.u.l. sheath self-admittance ($\rho_e=100 \;\Omega m, \epsilon_r=1$)',
                 'conductance_title': r'P.u.l. shunt conductance',
                 'capacitance_title': r'P.u.l. shunt capacitance',
                 'y_lim': {'conductance': (0, 20), 'capacitance': (0, 3)},
                 'series_to_plot': self.scc_params,
             },
-            'shunt_admittance_core_sheath': {
+            'shunt_admittance_composition_core_sheath': {
                 'suptitle': r'P.u.l. core-sheath mutual admittance ($\rho_e=100 \;\Omega m, \epsilon_r=1$)',
                 'conductance_title': r'P.u.l. shunt conductance',
                 'capacitance_title': r'P.u.l. shunt capacitance',
                 'y_lim': {'conductance': (0, 20), 'capacitance': (0, 3)},
                 'series_to_plot': self.scc_params,
             },
-            'potential_coeff_core': {
+            'potential_coefficients_composition_core': {
                 'suptitle': r'P.u.l. core potential coefficient ($\rho_e=100 \;\Omega m, \epsilon_r=1$)',
+                'norm_title': 'Absolute Value',
+                'angle_title': 'Angle of Potential Coefficient',
+                'series_to_plot': self.scc_params,
+            },
+            'potential_coefficients_composition_sheath': {
+                'suptitle': r'P.u.l. sheath potential coefficient ($\rho_e=100 \;\Omega m, \epsilon_r=1$)',
+                'norm_title': 'Absolute Value',
+                'angle_title': 'Angle of Potential Coefficient',
+                'series_to_plot': self.scc_params,
+            },
+             'potential_coefficients_composition_core_sheath': {
+                'suptitle': r'P.u.l. core-sheath potential coefficient ($\rho_e=100 \;\Omega m, \epsilon_r=1$)',
                 'norm_title': 'Absolute Value',
                 'angle_title': 'Angle of Potential Coefficient',
                 'series_to_plot': self.scc_params,
@@ -152,20 +240,20 @@ class SingleCoreCableModels:
                 'suptitle': r'P.u.l. earth-return impedance matrix of the single-core cable ($\rho_e=100 \;\Omega m, \epsilon_r=1$)',
                 'resistance_title': r'P.u.l. series resistance',
                 'inductance_title': r'P.u.l. series inductance',
-                'series_to_plot': self.scc_external_params,
+                'series_to_plot': self.scc_series_params,
                 'comsol_series_to_plot': _generate_comsol_series(comsol_layout_template, 'vcoil_1')
             },
             'earth_return_admittance': {
                 'suptitle': r'P.u.l. earth-return admittance matrix of the single-core cable ($\rho_e=100 \;\Omega m, \epsilon_r=1$)',
                 'conductance_title': r'P.u.l. shunt conductance',
                 'capacitance_title': r'P.u.l. shunt capacitance',
-                'series_to_plot': self.scc_external_params,
+                'series_to_plot': self.scc_shunt_params,
             },
             'earth_return_potential': {
                 'suptitle': r'P.u.l. earth-return potential coefficient of the single-core cable ($\rho_e=100 \;\Omega m, \epsilon_r=1$)',
                 'norm_title': 'Absolute Value',
                 'angle_title': 'Angle of Potential Coefficient',
-                'series_to_plot': self.scc_external_params,
+                'series_to_plot': self.scc_series_params,
             }, 
             'internal_impedance': {
                 'suptitle': r'P.u.l. internal impedance matrix of the single-core cable',
@@ -278,7 +366,7 @@ class SingleCoreCableModels:
         if self.autoSave:
             save_figure_multiformat(fig, self.results_dir, base_filename=f'impedance_parameters_{graph_key}')
 
-    def _scc_impedance_subplots(self, graph_key, graph_form):
+    def _impedance_subplots(self, graph_key):
         """
         Generic method to create a 1x2 subplot for series resistance (left)
         and series inductance (right) based on a configuration key.
@@ -287,7 +375,7 @@ class SingleCoreCableModels:
         fig, (ax1, ax2) = plt.subplots(1, 2, figsize=self.figsize, sharey=False)
         fig.suptitle(config['suptitle'], fontsize=12, y=0.98)
 
-        if graph_key == 'earth_return_impedance' and graph_form == 'resistance_and_inductance':
+        if graph_key in ['earth_return_impedance']:
             for series in config['series_to_plot']:
                 Zg = self.pul_data['scenarios'][series['key']]['earth_return_parameters']['impedance_matrix']
                 ax1.plot(self.f, np.real(Zg[:, 0, 0]) * 1e3, **series['type']['earth_return_term'])
@@ -311,14 +399,14 @@ class SingleCoreCableModels:
             ax2.set_title(config['inductance_title'])
             plt.tight_layout(rect=[0, 0, 1, 0.96])
 
-        if graph_key == 'internal_impedance' and graph_form == 'resistance_and_inductance':
+        if graph_key in ['internal_impedance']:
             Ri = self.pul_data['internal_matrices']['resistance_matrix']
             Li = self.pul_data['internal_matrices']['inductance_matrix']
 
             elements_to_plot = [
-                {'index': (0, 0), 'label': '$R_{00}$', 'color': 'black', 'linestyle': '-'},
-                {'index': (0, 1), 'label': '$R_{01}$', 'color': 'red',   'linestyle': '--'},
-                {'index': (1, 1), 'label': '$R_{11}$', 'color': 'blue',  'linestyle': ':'},
+                {'index': (0, 0), 'label': 'Self-core', 'color': 'black', 'linestyle': '-'},
+                {'index': (0, 1), 'label': 'Mutual core-sheath', 'color': 'red', 'linestyle': '--'},
+                {'index': (1, 1), 'label': 'Self-Sheath', 'color': 'blue', 'linestyle': ':'},
             ]
 
             for value in elements_to_plot:
@@ -344,12 +432,39 @@ class SingleCoreCableModels:
             ax2.set_title(config['inductance_title'])
             plt.tight_layout(rect=[0, 0, 1, 0.96])
 
-        if graph_key in ['series_impedance_core', 'series_impedance_sheath', 'series_impedance_core_sheath']:
-            if graph_key == 'series_impedance_core':
+        if graph_key in ['series_impedance_matrix']:            
+            for series in config['series_to_plot']:
+                Zs = self.pul_data['scenarios'][series['key']]['quasi_tem_matrices']['series_impedance_matrix']
+                ax1.plot(self.f, np.real(Zs[:, 0, 0]) * 1e3, **series['type']['self-core'])
+                ax1.plot(self.f, np.real(Zs[:, 1, 1]) * 1e3, **series['type']['self-sheath'])
+                ax1.plot(self.f, np.real(Zs[:, 0, 1]) * 1e3, **series['type']['mutual-core-sheath'])
+                
+                ax2.plot(self.f, np.imag(Zs[:, 0, 0]) / self.w * 1e6, **series['type']['self-core'])
+                ax2.plot(self.f, np.imag(Zs[:, 1, 1]) / self.w * 1e6, **series['type']['self-sheath'])
+                ax2.plot(self.f, np.imag(Zs[:, 0, 1]) / self.w * 1e6, **series['type']['mutual-core-sheath'])
+
+            ax1.set_xscale('log')
+            ax1.set_yscale('log')
+            ax1.set_xlim(self.xlim)
+            ax1.legend(fontsize='small')
+            ax1.set_xlabel('Frequency (Hz)')
+            ax1.set_ylabel(fr'$R \, (\Omega/km)$')
+            ax1.grid(True, which='both', linestyle='--', linewidth=0.5)
+            
+            ax2.set_xscale('log')
+            ax2.set_xlim(self.xlim)
+            ax2.legend(fontsize='small')
+            ax2.set_xlabel('Frequency (Hz)')
+            ax2.set_ylabel(fr'$L \, (mH/km)$')
+            ax2.grid(True, which='both', linestyle='--', linewidth=0.5)
+            plt.tight_layout(rect=[0, 0, 1, 0.96])
+
+        if graph_key in ['series_impedance_composition_core', 'series_impedance_composition_sheath', 'series_impedance_composition_core_sheath']:
+            if graph_key == 'series_impedance_composition_core':
                 idx_i, idx_j = 0, 0
-            elif graph_key == 'series_impedance_sheath':
+            elif graph_key == 'series_impedance_composition_sheath':
                 idx_i, idx_j = 1, 1
-            elif graph_key == 'series_impedance_core_sheath':
+            elif graph_key == 'series_impedance_composition_core_sheath':
                 idx_i, idx_j = 0, 1
             else:
                 raise ValueError("Invalid graph_key for series impedance.")
@@ -370,12 +485,12 @@ class SingleCoreCableModels:
                 ax1.plot(self.f, np.real(Zi[:, idx_i, idx_j]) * 1e3, **series['type']['internal_term'])
                 ax1.plot(self.f, np.real(Zg[:, 0, 0]) * 1e3, **series['type']['earth_return_term'])
                 ax1.plot(self.f, np.real(Zs[:, idx_i, idx_j]) * 1e3, **series['type']['series_term'])
-                ax1.plot(self.f, np.real(Zt[:, idx_i, idx_j]) * 1e3, **series['type']['internal_external'])
+                ax1.plot(self.f, np.real(Zt[:, idx_i, idx_j]) * 1e3, **series['type']['series_composition'])
 
                 ax2.plot(self.f, np.imag(Zi[:, idx_i, idx_j]) / self.w * 1e6, **series['type']['internal_term'])
                 ax2.plot(self.f, np.imag(Zg[:, 0, 0]) / self.w * 1e6, **series['type']['earth_return_term'])
                 ax2.plot(self.f, np.imag(Zs[:, idx_i, idx_j]) / self.w * 1e6, **series['type']['series_term'])
-                ax2.plot(self.f, np.imag(Zt[:, idx_i, idx_j]) / self.w * 1e6, **series['type']['internal_external'])
+                ax2.plot(self.f, np.imag(Zt[:, idx_i, idx_j]) / self.w * 1e6, **series['type']['series_composition'])
 
             ax1.set_xscale('log')
             ax1.set_yscale('log')
@@ -396,9 +511,9 @@ class SingleCoreCableModels:
             plt.tight_layout(rect=[0, 0, 1, 0.96])
 
         if self.autoSave:
-            save_figure_multiformat(fig, self.results_dir, base_filename=f'{graph_key}_{graph_form}')
+            save_figure_multiformat(fig, self.results_dir, base_filename=f'{graph_key}')
 
-    def _scc_admittance_subplots(self, graph_key, graph_form):
+    def _admittance_subplots(self, graph_key):
         """
         Generic method to create a 1x2 subplot for shunt conductance (left)
         and shunt capacitance (right) based on a configuration key.
@@ -407,12 +522,38 @@ class SingleCoreCableModels:
         fig, (ax1, ax2) = plt.subplots(1, 2, figsize=self.figsize, sharey=False)
         fig.suptitle(config['suptitle'], fontsize=12, y=0.98)
 
-        if graph_key == 'earth_return_admittance' and graph_form == 'conductance_and_capacitance':
+        if graph_key == 'shunt_admittance_matrix':
+            for series in config['series_to_plot']:
+                Ysh = self.pul_data['scenarios'][series['key']]['quasi_tem_matrices']['shunt_admittance_matrix']                
+                ax1.plot(self.f, np.real(Ysh[:, 0, 0]) * 1e3, **series['type']['self-core'])
+                ax1.plot(self.f, np.real(Ysh[:, 1, 1]) * 1e3, **series['type']['self-sheath'])
+                ax1.plot(self.f, np.real(Ysh[:, 0, 1]) * 1e3, **series['type']['mutual-core-sheath'])
+                
+                ax2.plot(self.f, np.imag(Ysh[:, 0, 0]) / self.w * 1e9, **series['type']['self-core'])
+                ax2.plot(self.f, np.imag(Ysh[:, 1, 1]) / self.w * 1e9, **series['type']['self-sheath'])
+                ax2.plot(self.f, np.imag(Ysh[:, 0, 1]) / self.w * 1e9, **series['type']['mutual-core-sheath'])
+
+            ax1.set_xscale('log')
+            ax1.set_xlim(self.xlim)
+            ax1.legend(fontsize='small')
+            ax1.set_xlabel('Frequency (Hz)')
+            ax1.set_ylabel(fr'$G \, (S/km)$')
+            ax1.grid(True, which='both', linestyle='--', linewidth=0.5)
+            
+            ax2.set_xscale('log')
+            ax2.set_xlim(self.xlim)
+            ax2.legend(fontsize='small')
+            ax2.set_xlabel('Frequency (Hz)')
+            ax2.set_ylabel(fr'$C \, (\mu F/km)$')
+            ax2.grid(True, which='both', linestyle='--', linewidth=0.5)
+            plt.tight_layout(rect=[0, 0, 1, 0.96])
+
+        if graph_key == 'earth_return_admittance':
             for series in config['series_to_plot']:
                 Yg = self.pul_data['scenarios'][series['key']]['earth_return_parameters']['admittance_matrix']
                 ax1.plot(self.f, np.real(Yg[:, 0, 0]) * 1e3, **series['type']['shunt_term'])
                 ax2.plot(self.f, np.imag(Yg[:, 0, 0]) / self.w * 1e9, **series['type']['shunt_term'])
-
+            
             ax1.set_xscale('log')
             ax1.set_xlim(self.xlim)
             ax1.legend(fontsize='small')
@@ -430,17 +571,16 @@ class SingleCoreCableModels:
             ax2.set_title(config['capacitance_title'])
             plt.tight_layout(rect=[0, 0, 1, 0.96])
 
-        if graph_key == 'internal_admittance' and graph_form == 'conductance_and_capacitance':
+        if graph_key == 'internal_admittance':
             Yi = self.pul_data['internal_matrices']['shunt_admittance_matrix']
             
             elements_to_plot = [
-                {'index': (0, 0), 'label': '$Y_{00}$', 'color': 'black', 'linestyle': '-'},
-                {'index': (0, 1), 'label': '$Y_{01}$', 'color': 'red',   'linestyle': '--'},
-                {'index': (1, 1), 'label': '$Y_{11}$', 'color': 'blue',  'linestyle': ':'},
+                {'index': (0, 0), 'label': 'Self-core', 'color': 'black', 'linestyle': '-'},
+                {'index': (0, 1), 'label': 'Mutual core-sheath', 'color': 'red', 'linestyle': '--'},
+                {'index': (1, 1), 'label': 'Self-Sheath', 'color': 'blue', 'linestyle': ':'},
             ]
 
             for value in elements_to_plot:
-                # Calculamos a parte real e imaginária a partir do array de 121 elementos
                 cond = np.real(Yi[:, value['index'][0], value['index'][1]]) * 1e3
                 cap = np.imag(Yi[:, value['index'][0], value['index'][1]]) / self.w * 1e9
 
@@ -465,12 +605,12 @@ class SingleCoreCableModels:
             ax2.set_title(config['capacitance_title'])
             plt.tight_layout(rect=[0, 0, 1, 0.96])
 
-        if graph_key in ['shunt_admittance_core', 'shunt_admittance_sheath', 'shunt_admittance_core_sheath']:
-            if graph_key == 'shunt_admittance_core':
+        if graph_key in ['shunt_admittance_composition_core', 'shunt_admittance_composition_sheath', 'shunt_admittance_composition_core_sheath']:
+            if graph_key == 'shunt_admittance_composition_core':
                 idx_i, idx_j = 0, 0
-            elif graph_key == 'shunt_admittance_sheath':
+            elif graph_key == 'shunt_admittance_composition_sheath':
                 idx_i, idx_j = 1, 1
-            elif graph_key == 'shunt_admittance_core_sheath':
+            elif graph_key == 'shunt_admittance_composition_core_sheath':
                 idx_i, idx_j = 0, 1
             else:
                 raise ValueError("Invalid graph_key for shunt admittance.")
@@ -480,23 +620,23 @@ class SingleCoreCableModels:
                 Yg = self.pul_data['scenarios'][series['key']]['earth_return_parameters']['admittance_matrix']
                 Ysh = self.pul_data['scenarios'][series['key']]['quasi_tem_matrices']['shunt_admittance_matrix']
                 
-                # # Loop to build the Equivalent block matrix for each frequency
-                # Yg_block = self.pul_data['scenarios'][series['key']]['quasi_tem_matrices']['earth_return_admittance_matrix']
-                # Yt = np.zeros_like(Yi, dtype=complex)
-                # for i in range(len(self.f)):
-                #     # inv_Yg = lu_solve(lu_factor(Yg_block[i, :, :]), np.eye(Yi.shape[1]))
-                #     inv_Yi = lu_solve(lu_factor(Yi[i, :, :]), np.eye(Yi.shape[1]))
-                #     # Yt[i, :, :] = lu_solve(lu_factor(inv_Yg + inv_Yi), np.eye(Yi.shape[1]))
+                Yt = np.zeros_like(Yi, dtype=complex)
+                model = self.pul_data['scenarios'][series['key']]['mtl']
+                M = model.num_conductors_per_scc
+                for i in range(len(self.f)):
+                    inv_Yi = np.linalg.inv(Yi[i, :, :])
+                    inv_Yg = np.linalg.inv(Yg[i, :, :]) * np.ones((M, M))
+                    Yt[i, :, :] = np.linalg.inv(inv_Yi + inv_Yg)
 
                 ax1.plot(self.f, np.real(Yi[:, idx_i, idx_j]) * 1e3, **series['type']['internal_term'])
                 ax1.plot(self.f, np.real(Yg[:, 0, 0]) * 1e3, **series['type']['earth_return_term'])
                 ax1.plot(self.f, np.real(Ysh[:, idx_i, idx_j]) * 1e3, **series['type']['shunt_term'])
-                # ax1.plot(self.f, np.real(Yt[:, idx_i, idx_j]) * 1e3, **series['type']['internal_external'])
+                ax1.plot(self.f, np.real(Yt[:, idx_i, idx_j]) * 1e3, **series['type']['series_composition'])
 
                 ax2.plot(self.f, np.imag(Yi[:, idx_i, idx_j]) / self.w * 1e9, **series['type']['internal_term'])
                 ax2.plot(self.f, np.imag(Yg[:, 0, 0]) / self.w * 1e9, **series['type']['earth_return_term'])
                 ax2.plot(self.f, np.imag(Ysh[:, idx_i, idx_j]) / self.w * 1e9, **series['type']['shunt_term'])
-                # ax2.plot(self.f, np.imag(Yt[:, idx_i, idx_j]) / self.w * 1e9, **series['type']['internal_external'])
+                ax2.plot(self.f, np.imag(Yt[:, idx_i, idx_j]) / self.w * 1e9, **series['type']['series_composition'])
 
             ax1.set_xscale('log')
             ax1.set_xlim(self.xlim)
@@ -518,14 +658,14 @@ class SingleCoreCableModels:
             plt.tight_layout(rect=[0, 0, 1, 0.96])
 
         if self.autoSave:
-            save_figure_multiformat(fig, self.results_dir, base_filename=f'{graph_key}_{graph_form}')
+            save_figure_multiformat(fig, self.results_dir, base_filename=f'{graph_key}')
 
-    def _scc_potential_subplots(self, graph_key, graph_form):
+    def _potential_subplots(self, graph_key):
         config = self.xue_plot_configs[graph_key]
         fig, (ax1, ax2) = plt.subplots(1, 2, figsize=self.figsize, sharey=False)
         fig.suptitle(config['suptitle'], fontsize=12, y=0.98)
         
-        if graph_key == 'earth_return_potential' and graph_form == 'norm_and_angle':
+        if graph_key == 'earth_return_potential':
             for series in config['series_to_plot']:                
                 Pg = self.pul_data['scenarios'][series['key']]['earth_return_parameters']['potential_coefficient']
                 ax1.plot(self.f, np.abs(Pg[:, 0, 0]) * 1e-9, **series['type']['earth_return_term'])
@@ -548,7 +688,7 @@ class SingleCoreCableModels:
             ax2.set_title(config['angle_title'])
             plt.tight_layout(rect=[0, 0, 1, 0.96])
 
-        elif graph_key == 'internal_potential' and graph_form == 'norm_and_angle':
+        elif graph_key == 'internal_potential':
             # Pega a matriz Pi, que é constante com a frequência
             Pi = self.pul_data['internal_matrices']['potential_coefficient_matrix']
 
@@ -588,10 +728,10 @@ class SingleCoreCableModels:
             ax2.set_title(config['angle_title'])
             plt.tight_layout(rect=[0, 0, 1, 0.96])
 
-        elif graph_key in ['potential_coeff_core', 'potential_coeff_sheath', 'potential_coeff_core_sheath']:
-            if graph_key == 'potential_coeff_core':
+        elif graph_key in ['potential_coefficients_composition_core', 'potential_coefficients_composition_sheath', 'potential_coefficients_composition_core_sheath']:
+            if graph_key == 'potential_coefficients_composition_core':
                 idx_i, idx_j = 0, 0
-            elif graph_key == 'potential_coeff_sheath':
+            elif graph_key == 'potential_coefficients_composition_sheath':
                 idx_i, idx_j = 1, 1
             elif graph_key == 'potential_coeff_core_sheath':
                 idx_i, idx_j = 0, 1
@@ -599,78 +739,43 @@ class SingleCoreCableModels:
                 raise ValueError("Invalid graph_key for potential coefficients.")
             
             Pi = self.pul_data['internal_matrices']['potential_coefficient_matrix']
+            for series in config['series_to_plot']:
+                Pg = self.pul_data['scenarios'][series['key']]['earth_return_parameters']['potential_coefficient']
+                Psh = self.pul_data['scenarios'][series['key']]['quasi_tem_matrices']['potential_coefficient']
+                Pt = Pi + Pg
 
-            if graph_form == 'norm_and_angle':
-                for series in config['series_to_plot']:
-                    Pg = self.pul_data['scenarios'][series['key']]['earth_return_parameters']['potential_coefficient']
-                    Psh = self.pul_data['scenarios'][series['key']]['quasi_tem_matrices']['potential_coefficient']
-                    Pt = Pi + Pg
+                ax1.plot(self.f, np.full(len(self.f), np.abs(Pi[idx_i, idx_j]))  * 1e-9, **series['type']['internal_term'])
+                ax1.plot(self.f, np.abs(Pg[:, 0, 0]) * 1e-9, **series['type']['earth_return_term'])
+                ax1.plot(self.f, np.abs(Psh[:, idx_i, idx_j]) * 1e-9, **series['type']['potential_term'])
+                ax1.plot(self.f, np.abs(Pt[:, idx_i, idx_j]) * 1e-9, **series['type']['series_composition'])
 
-                    ax1.plot(self.f, np.full(len(self.f), np.abs(Pi[idx_i, idx_j]))  * 1e-9, **series['type']['internal_term'])
-                    ax1.plot(self.f, np.abs(Pg[:, 0, 0]) * 1e-9, **series['type']['earth_return_term'])
-                    ax1.plot(self.f, np.abs(Psh[:, idx_i, idx_j]) * 1e-9, **series['type']['potential_term'])
-                    ax1.plot(self.f, np.abs(Pt[:, idx_i, idx_j]) * 1e-9, **series['type']['internal_external'])
+                ax2.plot(self.f, np.full(len(self.f), np.angle(Pi[idx_i, idx_j], deg=True)), **series['type']['internal_term'])
+                ax2.plot(self.f, np.angle(Pg[:, 0, 0], deg=True), **series['type']['earth_return_term'])
+                ax2.plot(self.f, np.angle(Psh[:, idx_i, idx_j], deg=True), **series['type']['potential_term'])
+                ax2.plot(self.f, np.angle(Pt[:, idx_i, idx_j], deg=True), **series['type']['series_composition'])
 
-                    ax2.plot(self.f, np.full(len(self.f), np.angle(Pi[idx_i, idx_j], deg=True)), **series['type']['internal_term'])
-                    ax2.plot(self.f, np.angle(Pg[:, 0, 0], deg=True), **series['type']['earth_return_term'])
-                    ax2.plot(self.f, np.angle(Psh[:, idx_i, idx_j], deg=True), **series['type']['potential_term'])
-                    ax2.plot(self.f, np.angle(Pt[:, idx_i, idx_j], deg=True), **series['type']['internal_external'])
+            ax1.set_xscale('log')
+            ax1.set_xlim(self.xlim)
+            ax1.legend(fontsize='small')
+            ax1.set_xlabel('Frequency (Hz)')
+            ax1.set_ylabel(fr'$|P| \times 10^9 \, (\Omega m s^{{-1}})$')
+            ax1.grid(True, which='both', linestyle='--', linewidth=0.5)
+            # ax1.set_title(config['norm_title'])
 
-                ax1.set_xscale('log')
-                ax1.set_xlim(self.xlim)
-                ax1.legend(fontsize='small')
-                ax1.set_xlabel('Frequency (Hz)')
-                ax1.set_ylabel(fr'$|P| \times 10^9 \, (\Omega m s^{{-1}})$')
-                ax1.grid(True, which='both', linestyle='--', linewidth=0.5)
-                # ax1.set_title(config['norm_title'])
-
-                ax2.set_xscale('log')
-                ax2.set_xlim(self.xlim)
-                ax2.legend(fontsize='small')
-                ax2.set_xlabel('Frequency (Hz)')
-                ax2.set_ylabel(fr'Angle of $P$ (Degrees)')
-                ax2.grid(True, which='both', linestyle='--', linewidth=0.5)
-                # ax2.set_title(config['angle_title'])
-                plt.tight_layout(rect=[0, 0, 1, 0.96])
-
-            elif graph_form == 'real_and_imaginary':
-                for series in config['series_to_plot']:
-                    Pg = self.pul_data['scenarios'][series['key']]['earth_return_parameters']['potential_coefficient']
-                    Psh = self.pul_data['scenarios'][series['key']]['quasi_tem_matrices']['potential_coefficient']
-                    Pt = Pi + Pg
-
-                    ax1.plot(self.f, np.full(len(self.f), np.real(Pi[idx_i, idx_j]))  * 1e-9, **series['type']['internal_term'])
-                    ax1.plot(self.f, np.real(Pg[:, 0, 0]) * 1e-9, **series['type']['earth_return_term'])
-                    ax1.plot(self.f, np.real(Psh[:, idx_i, idx_j]) * 1e-9, **series['type']['potential_term'])
-                    ax1.plot(self.f, np.real(Pt[:, idx_i, idx_j]) * 1e-9, **series['type']['internal_external'])
-
-                    ax2.plot(self.f, np.full(len(self.f), np.imag(Pi[idx_i, idx_j]))  * 1e-9, **series['type']['internal_term'])
-                    ax2.plot(self.f, np.imag(Pg[:, 0, 0]) * 1e-9, **series['type']['earth_return_term'])
-                    ax2.plot(self.f, np.imag(Psh[:, idx_i, idx_j]) * 1e-9, **series['type']['potential_term'])
-                    ax2.plot(self.f, np.imag(Pt[:, idx_i, idx_j]) * 1e-9, **series['type']['internal_external'])
-
-                ax1.set_xscale('log')
-                ax1.set_xlim(self.xlim)
-                ax1.legend(fontsize='small')
-                ax1.set_xlabel('Frequency (Hz)')
-                ax1.set_ylabel(fr'Real Part of $P \times 10^9 \, (\Omega m s^{{-1}})$')
-                ax1.grid(True, which='both', linestyle='--', linewidth=0.5)
-                # ax1.set_title(config['real_title'])
-
-                ax2.set_xscale('log')
-                ax2.set_xlim(self.xlim)
-                ax2.legend(fontsize='small')
-                ax2.set_xlabel('Frequency (Hz)')
-                ax2.set_ylabel(fr'Imaginary Part of $P \times 10^9 \, (\Omega m s^{{-1}})$')
-                ax2.grid(True, which='both', linestyle='--', linewidth=0.5)
-                # ax2.set_title(config['imaginary_title'])
-                plt.tight_layout(rect=[0, 0, 1, 0.96])
+            ax2.set_xscale('log')
+            ax2.set_xlim(self.xlim)
+            ax2.legend(fontsize='small')
+            ax2.set_xlabel('Frequency (Hz)')
+            ax2.set_ylabel(fr'Angle of $P$ (Degrees)')
+            ax2.grid(True, which='both', linestyle='--', linewidth=0.5)
+            # ax2.set_title(config['angle_title'])
+            plt.tight_layout(rect=[0, 0, 1, 0.96])
 
         if self.autoSave:
-            save_figure_multiformat(fig, self.results_dir, base_filename=f'{graph_key}_{graph_form}')
+            save_figure_multiformat(fig, self.results_dir, base_filename=f'{graph_key}')
 
-    def ground_return_impedance(self, config_key='ground_return_impedance'):
-        config = self.prysmian_plot_configs[config_key]
+    def ground_return_impedance(self, graph_key='ground_return_impedance'):
+        config = self.prysmian_plot_configs[graph_key]
         p, q = config['p'], config['q']
         fig, (ax1, ax2) = plt.subplots(1, 2, figsize=self.figsize, sharey=False)
         fig.suptitle(config['suptitle'], fontsize=12, y=0.98)
@@ -693,25 +798,25 @@ class SingleCoreCableModels:
         if self.autoSave:
             save_figure_multiformat(fig, self.results_dir, base_filename=f'ground_return_impedance')
 
-    def earth_return_impedance_matrix(self, graph_form='resistance_and_inductance'):
-        self._scc_impedance_subplots(graph_key='earth_return_impedance', graph_form=graph_form)
+    def series_impedance_earth_return(self):
+        self._impedance_subplots(graph_key='earth_return_impedance')
     
-    def internal_impedance_parameters(self, config_key):
+    def internal_impedance_parameters(self, graph_key):
         data = self.pul_data['internal_parameters']
 
-        if config_key == 'core':
+        if graph_key == 'core':
             z11 = data['zcs']['z11']
             z12 = data['zcs']['z12']
             z2i = data['zcs']['z2i']
             impedance_data = {'zcs': z11 + z12 + z2i, 'z11': z11, 'z12': z12, 'z2i': z2i}
 
-        elif config_key == 'sheath':
+        elif graph_key == 'sheath':
             z20 = data['zs3']['z20']
             z23 = data['zs3']['z23']
             z2m = data['z2m']
             impedance_data = {'zs3': z20 + z23, 'z20': z20, 'z23': z23, 'z2m': z2m}
 
-        elif config_key == 'core_sheath':
+        elif graph_key == 'core_sheath':
             zcs = data['zcs']['z11'] + data['zcs']['z12'] + data['zcs']['z2i']
             zs3 = data['zs3']['z20'] + data['zs3']['z23']
             z2m = data['z2m']
@@ -721,7 +826,7 @@ class SingleCoreCableModels:
                 'Zcs': zs3 - z2m
             }
 
-        elif config_key == 'internal_parameters':
+        elif graph_key == 'internal_parameters':
             impedance_data = {
                 'z11': data['zcs']['z11'],
                 'z2m': data['z2m'],
@@ -729,28 +834,34 @@ class SingleCoreCableModels:
                 'z20': data['zs3']['z20']
             }
         
-        self._internal_impedance_subplots(config_key, impedance_data)
+        self._internal_impedance_subplots(graph_key, impedance_data)
     
-    def internal_impedance_matrix(self, graph_form='resistance_and_inductance'):
-        self._scc_impedance_subplots(graph_key='internal_impedance', graph_form=graph_form)
+    def series_impedance_internal(self,):
+        self._impedance_subplots(graph_key='internal_impedance')
 
-    def series_impedance_matrix(self, graph_form='', condutor='core'):
-        self._scc_impedance_subplots(graph_key='series_impedance_{}'.format(condutor), graph_form=graph_form)
+    def series_impedance_matrix(self):
+        self._impedance_subplots(graph_key='series_impedance_matrix')
 
-    def shunt_admittance_matrix(self, graph_form='', condutor='core'):
-        self._scc_admittance_subplots(graph_key='shunt_admittance_{}'.format(condutor), graph_form=graph_form)
+    def shunt_admittance_matrix(self):
+        self._admittance_subplots(graph_key='shunt_admittance_matrix')
 
-    def potential_coefficients_matrix(self, graph_form='norm_and_angle', condutor='core'):
-        self._scc_potential_subplots(graph_key='potential_coeff_{}'.format(condutor), graph_form=graph_form)
+    def series_impedance_composition(self, condutor='core'):
+        self._impedance_subplots(graph_key='series_impedance_composition_{}'.format(condutor))
 
-    def earth_return_admittance_matrix(self, graph_form='conductance_and_capacitance'):
-        self._scc_admittance_subplots(graph_key='earth_return_admittance', graph_form=graph_form)
+    def shunt_admittance_composition(self, condutor='core'):
+        self._admittance_subplots(graph_key='shunt_admittance_composition_{}'.format(condutor))
+
+    def potential_coefficients_composition(self, condutor='core'):
+        self._potential_subplots(graph_key='potential_coefficients_composition_{}'.format(condutor))
+
+    def shunt_admittance_earth_return(self):
+        self._admittance_subplots(graph_key='earth_return_admittance')
     
-    def internal_admittance_matrix(self, graph_form='conductance_and_capacitance'):
-        self._scc_admittance_subplots(graph_key='internal_admittance', graph_form=graph_form)
+    def shunt_admittance_internal(self):
+        self._admittance_subplots(graph_key='internal_admittance')
 
-    def earth_return_potential_coefficients_matrix(self, graph_form='norm_and_angle'):
-        self._scc_potential_subplots(graph_key='earth_return_potential', graph_form=graph_form)
+    def potential_coefficients_earth_return(self):
+        self._potential_subplots(graph_key='earth_return_potential')
 
-    def internal_potential_coefficients_matrix(self, graph_form='norm_and_angle'):
-        self._scc_potential_subplots(graph_key='internal_potential', graph_form=graph_form)
+    def potential_coefficients_internal(self):
+        self._potential_subplots(graph_key='internal_potential')

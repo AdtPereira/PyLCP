@@ -425,12 +425,7 @@ class InternalPerUnitParameters:
             f (np.ndarray): A NumPy array of frequencies to be calculated.
         """
         self.model = model
-        # self.num_sc_cables, self.num_conductors_per_scc = model._count_scc_and_conductors()
-        
         self.f = np.asarray(frequencies)  # Ensure f is a NumPy array
-        self.num_freq = len(self.f)
-
-        # Angular frequency (rad/s) is now a vector
         self.jw = 1j * 2 * np.pi * self.f
 
     def parameters_by_bessel(self):
@@ -846,10 +841,10 @@ class InternalPerUnitParameters:
 
         # --- Assemble the full internal impedance matrix [Zi] ---
         # A loop is required here because np.kron does not operate on stacks of matrices.
-        Zi = np.zeros((self.num_freq, num_total_conductors, num_total_conductors), dtype=complex)
-        Ri = np.zeros((self.num_freq, num_total_conductors, num_total_conductors), dtype=float)
-        Li = np.zeros((self.num_freq, num_total_conductors, num_total_conductors), dtype=float)
-        for i in range(self.num_freq):
+        Zi = np.zeros((len(self.f), num_total_conductors, num_total_conductors), dtype=complex)
+        Ri = np.zeros((len(self.f), num_total_conductors, num_total_conductors), dtype=float)
+        Li = np.zeros((len(self.f), num_total_conductors, num_total_conductors), dtype=float)
+        for i in range(len(self.f)):
             Zi[i, :, :] = np.kron(np.identity(N), Zij[i, :, :])
             Ri[i, :, :] = Zi[i, :, :].real
             Li[i, :, :] = Zi[i, :, :].imag / (2 * np.pi * self.f[i])
@@ -889,19 +884,18 @@ class PerUnitParameters:
             model (MulticonductorTransmissionLine): The MTL geometry model.
             f (np.ndarray): A NumPy array of frequencies to be calculated.
         """
-        # MTL Geometry Model
         self.model = model
-        # self.num_sc_cables, self.num_conductors_per_scc = model._count_scc_and_conductors()
-        
         self.f = np.asarray(frequencies)
-        self.num_freq = len(self.f)
 
         # Soil Relative Permittivity
         self.e1 = model.mtl_ref[0]['relative_permittivity'] * sc.epsilon_0
+        
         # Soil conductivity (S/m)
         self.sigma_1 = model.mtl_ref[0]['conductivity']
+        
         # Soil Relative Permeability
         self.mu1 = model.mtl_ref[0]['relative_permeability'] * sc.mu_0
+        
         # Soil resistivity (ohm.m)
         self.rho_1 = 1 / self.sigma_1
 
@@ -914,6 +908,7 @@ class PerUnitParameters:
         # Wave numbers are now vectors
         self.k_air2 = -self.jw * sc.mu_0 * self.jw * sc.epsilon_0
         self.k_earth2 = -self.jw * self.mu1 * (self.sigma_1 + self.jw * self.e1)
+        self.gamma_earth = np.sqrt(self.jw * self.mu1 * (self.sigma_1 + self.jw * self.e1))
 
     def earth_return_parameters(self, zg_form='magalhaes_xue', yg_form='magalhaes_xue'):
         """ Calculates Earth-return parameters over a vector of frequencies. """
@@ -938,12 +933,12 @@ class PerUnitParameters:
         K0_jke_dnm = ss.kv(0, 1j * np.sqrt(k_earth2)[:, np.newaxis, np.newaxis] * d_matrix)
         K0_jke_Dnm = ss.kv(0, 1j * np.sqrt(k_earth2)[:, np.newaxis, np.newaxis] * D_matrix)
 
-        S1c = np.zeros((self.num_freq, N, N), dtype=complex)
-        S2c = np.zeros((self.num_freq, N, N), dtype=complex)
-        pg = np.zeros((self.num_freq, N, N), dtype=complex)
-        Yg = np.zeros_like(pg, dtype=complex)
+        S1c = np.zeros((len(self.f), N, N), dtype=complex)
+        S2c = np.zeros((len(self.f), N, N), dtype=complex)
+        Pg = np.zeros((len(self.f), N, N), dtype=complex)
+        Yg = np.zeros_like(Pg, dtype=complex)
 
-        # Wedepohl e Wilcox Approximation Expression
+        # Wedepohl-Wilcox Approximation
         if zg_form in ['wedepohl']:
             # yg is a 1D vector of shape (num_freq,)
             yg = 1j * np.sqrt(k_earth2)
@@ -955,9 +950,9 @@ class PerUnitParameters:
             
             ln_term = np.log(0.5 * np.euler_gamma * yg_3d * d_matrix)
             S1c = -ln_term + 0.5 + (2/3) * yg_3d * hnm
-            zg = jw_mu0_2pi * S1c
+            Zg = jw_mu0_2pi * S1c
 
-        # De Conti Approximation Expressions
+        # De Conti Closed-Form Approximation
         elif zg_form in ['deconti', 'deconti_sunde', 'saad']:
             # y0 and yg are 1D vectors of shape (num_freq,)
             y0 = 1j * np.sqrt(k_air2)
@@ -977,13 +972,9 @@ class PerUnitParameters:
             # Earth-return impedance based on quasi-TEM assumption [1]
             # All arrays are now (num_freq, N, N), allowing for element-wise operations
             term_2 = 2 / (4 + (yg_3d**2 * dnm**2))
-            zg = jw_mu0_2pi * (K0_jke_dnm + zg_term_1_3d * np.exp(hnm * yg_3d) * term_2)
+            Zg = jw_mu0_2pi * (K0_jke_dnm + zg_term_1_3d * np.exp(hnm * yg_3d) * term_2)
 
-            # Earth-return admittance based on quasi-TEM assumption [1]
-            if yg_form in ['deconti']:
-                pg = jw_2pi_sg * (K0_jke_dnm + yg_term_1_3d * K0_jke_Dnm)
-                
-        # Integral expressions are also vectorized thanks to the custom Gauss-Legendre function
+        # Integral expressions based on quasi-TEM assumption [1] 
         elif zg_form in ['magalhaes_xue', 'sunde', 'pollaczek', 'ametani']:
             for n in range(N):
                 for m in range(N):
@@ -992,45 +983,52 @@ class PerUnitParameters:
                     
                     else:
                         S1c[:, n, m] = 2 * sommerfeld_quasi_tem_approx_impedance(hnm[n, m], dnm[n, m], ke2=k_earth2, ka2=k_air2)
-                        if yg_form in ['magalhaes_xue']:
-                            S2c[:, n, m] = 2 * sommerfeld_quasi_tem_approx_admittance(hnm[n, m], dnm[n, m], ke2=k_earth2, ka2=k_air2)
+                        S2c[:, n, m] = 2 * sommerfeld_quasi_tem_approx_admittance(hnm[n, m], dnm[n, m], ke2=k_earth2, ka2=k_air2)
             
-            # Use broadcasting for element-wise multiplication with the jw vectors
-            zg = self.jw_mu0_2pi[:, np.newaxis, np.newaxis] * (K0_jke_dnm - K0_jke_Dnm + S1c)
-            pg = self.jw_2pi_sg[:, np.newaxis, np.newaxis] * (K0_jke_dnm - K0_jke_Dnm + S2c)
+            # Earth-return impedance
+            Zg = self.jw_mu0_2pi[:, np.newaxis, np.newaxis] * (K0_jke_dnm - K0_jke_Dnm + S1c)        
 
-        # The linear solve part CANNOT be vectorized and requires a loop
-        identity_N = np.identity(N)
-        for i in range(self.num_freq):
-            lu, piv = lu_factor(pg[i, :, :])
-            Yg[i, :, :] = self.jw[i] * lu_solve((lu, piv), identity_N)
+        # Earth-return admittance based on quasi-TEM assumption [1]
+        if yg_form in ['deconti']:
+            Pg = jw_2pi_sg * (K0_jke_dnm + yg_term_1_3d * K0_jke_Dnm)
+            for i in range(len(self.f)):
+                Yg[i, :, :] = self.jw[i] * np.linalg.inv(Pg[i, :, :])
+
+        elif yg_form in ['magalhaes_xue']:
+            Pg = self.jw_2pi_sg[:, np.newaxis, np.newaxis] * (K0_jke_dnm - K0_jke_Dnm + S2c)
+            for i in range(len(self.f)):
+                Yg[i, :, :] = self.jw[i] * np.linalg.inv(Pg[i, :, :])
+
+        # Earth-Return Admittance based on Vance (1978) formulation
+        elif yg_form in ['vance']:
+            for i in range(len(self.f)):
+                Yg[i, :, :] = (self.gamma_earth[i])**2 * np.linalg.inv(Zg[i, :, :])
+                Pg[i, :, :] = self.jw[i] * np.linalg.inv(Yg[i, :, :])
 
         return {
-            'impedance_matrix': zg,
-            'potential_coefficient': pg,
+            'impedance_matrix': Zg,
+            'potential_coefficient': Pg,
             'admittance_matrix': Yg,
-            'k_earth2': k_earth2,
+            'gamma_earth': self.gamma_earth,
         }
 
     def quasi_tem_approx_matrices(self, internal_matrices, earth_return_params):
         """
         Assembles the final PUL matrices for a vector of frequencies.
         """
-        N, M = self.model.num_sc_cables, self.model.num_conductors_per_scc
-        MN = N*M
+        M = self.model.num_conductors_per_scc
 
         z0_jk = earth_return_params['impedance_matrix']         # Shape (num_freq, N, N)
         pg_jk = earth_return_params['potential_coefficient']    # Shape (num_freq, N, N)
 
         Zi = internal_matrices['impedance_matrix']              # Shape (num_freq, N*M, N*M)
-        Ye = internal_matrices['shunt_admittance_matrix']       # Shape (num_freq, N*M, N*M)
         Pi = internal_matrices['potential_coefficient_matrix']  # Shape (N*M, N*M)
 
         # Loop to build the block matrix for each frequency
         ones_MM = np.ones((M, M))
         Z0 = np.zeros_like(Zi, dtype=complex)
         Pe = np.zeros_like(Zi, dtype=complex)
-        for i in range(self.num_freq):
+        for i in range(len(self.f)):
             Z0[i, :, :] = np.kron(z0_jk[i, :, :], ones_MM)
             Pe[i, :, :] = np.kron(pg_jk[i, :, :], ones_MM)
 
@@ -1044,9 +1042,9 @@ class PerUnitParameters:
         # The linear solve must be looped over the frequency axis
         Ysh = np.zeros_like(Psh, dtype=complex)
         Ye = np.zeros_like(Psh, dtype=complex)
-        for i in range(self.num_freq):
-            Ysh[i, :, :] = self.jw[i] * lu_solve(lu_factor(Psh[i, :, :]), np.identity(MN))
-            # Ye[i, :, :] = self.jw[i] * lu_solve(lu_factor(Pe[i, :, :]), np.identity(MN))
+        for i in range(len(self.f)):
+            # Ye[i, :, :] = self.jw[i] * np.kron(np.linalg.inv(pg_jk[i, :, :]), ones_MM)
+            Ysh[i, :, :] = self.jw[i] * np.linalg.inv(Psh[i, :, :])
 
         return {
             'earth_return_impedance_matrix': Z0,

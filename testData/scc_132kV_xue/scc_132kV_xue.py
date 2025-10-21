@@ -27,7 +27,7 @@ def main():
     # 1. ESTRUTURA DE DADOS CENTRALIZADA
     pul_data = {
         'comsol': None, # cmsl_reader.data,
-        'frequencies': np.logspace(4, 7, num=121),
+        'frequencies': np.logspace(0, 7, num=121),
         'scenarios': {
             'p100_xue': {
                 'mtl': mtl_model,
@@ -38,6 +38,11 @@ def main():
                 'mtl': mtl_model,
                 'zg_form': 'deconti',
                 'yg_form': 'deconti',
+            },
+            'p100_vance': {
+                'mtl': mtl_model,
+                'zg_form': 'deconti',
+                'yg_form': 'vance',
             },
         }
     }
@@ -58,19 +63,24 @@ def main():
         value['quasi_tem_matrices'] = quasi_tem
     
     print(f"End of the routine! Time spent on simulation: {(time.time() - st):.1f} seconds.\n")
-    plotter = SingleCoreCableModels(__file__, pul_data)
-    plotter.series_impedance_matrix(condutor='core')
-    plotter.series_impedance_matrix(condutor='sheath')
-    plotter.series_impedance_matrix(condutor='core_sheath')
-    plotter.shunt_admittance_matrix(condutor='sheath')
-    plotter.potential_coefficients_matrix(condutor='core')
-    plotter.potential_coefficients_matrix(graph_form='real_and_imaginary', condutor='core')
-    plotter.earth_return_admittance_matrix()
-    plotter.earth_return_impedance_matrix()
-    plotter.earth_return_potential_coefficients_matrix()
-    plotter.internal_admittance_matrix()
-    plotter.internal_impedance_matrix()
-    plotter.internal_potential_coefficients_matrix()
+    plotter = SingleCoreCableModels(__file__, pul_data, autoSave=False)
+    plotter.potential_coefficients_composition(condutor='core_sheath')
+    plotter.potential_coefficients_composition(condutor='core')
+    plotter.potential_coefficients_composition(condutor='sheath')
+    plotter.potential_coefficients_earth_return()
+    plotter.potential_coefficients_internal()
+    plotter.series_impedance_composition(condutor='core_sheath')
+    plotter.series_impedance_composition(condutor='core')
+    plotter.series_impedance_composition(condutor='sheath')
+    plotter.series_impedance_earth_return()
+    plotter.series_impedance_internal()
+    plotter.series_impedance_matrix()
+    plotter.shunt_admittance_composition(condutor='core_sheath')
+    plotter.shunt_admittance_composition(condutor='core')
+    plotter.shunt_admittance_composition(condutor='sheath')
+    plotter.shunt_admittance_earth_return()
+    plotter.shunt_admittance_internal()
+    plotter.shunt_admittance_matrix()
     GroundReturnMTLRepresentation(__file__, mtl_model, units='centimeter').system_schematic()
     plt.show()    
 

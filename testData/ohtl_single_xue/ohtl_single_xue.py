@@ -93,7 +93,7 @@ def main():
 
     print(f"End of simulations! Time spent: {(time.time() - st):.1f} seconds.\n")
     plotter = XueModels(pul_data)
-    plotter.plot_fig42()
+    plotter.overhead_series_impedance_matrix()
     # plotter.plot_fig43()
     # plotter.plot_fig45()
     # plotter.plot_fig46()
