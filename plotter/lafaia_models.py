@@ -165,20 +165,16 @@ class LafaiaModels:
                         label='mf.VCoil_Sheath (Sheath Exc.)', marker='x', facecolors='darkblue', s=12)
 
         # core self-impedance
-        zi = self.pul_01['analytical']['internal_matrices']['impedance_matrix']
-        
-        ax1.plot(self.f, np.real(zi[:, 0, 0]) * self.r_factor, label=r'$R_{cc}$: core self-resistance', linestyle='-', color='black', linewidth=1.0) 
-        
+        zi = self.pul_01['analytical']['internal_matrices']['impedance_matrix']        
+        ax1.plot(self.f, np.real(zi[:, 0, 0]) * self.r_factor, label=r'$R_{cc}$: core self-resistance', linestyle='-', color='black', linewidth=1.0)         
         ax2.plot(self.f, np.imag(zi[:, 0, 0]) / self.w * self.l_factor, label=r'$L_{cc}$: core self-inductance', linestyle='-', color='black', linewidth=1.0) 
         
         # mutual impedance between the core and sheath
-        ax1.plot(self.f, np.real(zi[:, 0, 1]) * self.r_factor, label=r'$R_{cs}$: core-sheath mutual resistance', linestyle='-', color='darkgreen', linewidth=1.0) 
-        
+        ax1.plot(self.f, np.real(zi[:, 0, 1]) * self.r_factor, label=r'$R_{cs}$: core-sheath mutual resistance', linestyle='-', color='darkgreen', linewidth=1.0)        
         ax2.plot(self.f, np.imag(zi[:, 0, 1]) / self.w * self.l_factor, label=r'$L_{cs}$: core-sheath mutual inductance', linestyle='-', color='darkgreen', linewidth=1.0) 
 
         # sheath self-impedance
-        ax1.plot(self.f, np.real(zi[:, 1, 1]) * self.r_factor, label=r'$R_{ss}$: sheath self-resistance', linestyle='-', color='darkblue', linewidth=1.0) 
-        
+        ax1.plot(self.f, np.real(zi[:, 1, 1]) * self.r_factor, label=r'$R_{ss}$: sheath self-resistance', linestyle='-', color='darkblue', linewidth=1.0)       
         ax2.plot(self.f, np.imag(zi[:, 1, 1]) / self.w * self.l_factor, label=r'$L_{ss}$: sheath self-inductance', linestyle='-', color='darkblue', linewidth=1.0) 
 
         # Configure left subplot (Resistance)
@@ -236,11 +232,8 @@ class LafaiaModels:
 
         # core self-impedance
         zi = self.pul_01['analytical']['internal_matrices']['impedance_matrix']
-        ax1.plot(self.f, np.real(zi[:, 0, 0]) * self.r_factor,
-                 label=r'$R_{cc}$: core self-resistance', linestyle='-', color='black', linewidth=1.0) 
-        
-        ax2.plot(self.f, np.imag(zi[:, 0, 0]) / self.w * self.l_factor,
-                 label=r'$L_{cc}$: core self-inductance', linestyle='-', color='black', linewidth=1.0) 
+        ax1.plot(self.f, np.real(zi[:, 0, 0]) * self.r_factor, label=r'$R_{cc}$: core self-resistance', linestyle='-', color='black', linewidth=1.0) 
+        ax2.plot(self.f, np.imag(zi[:, 0, 0]) / self.w * self.l_factor, label=r'$L_{cc}$: core self-inductance', linestyle='-', color='black', linewidth=1.0) 
         
         # mutual impedance between the core and sheath
         ax1.plot(self.f, np.real(zi[:, 0, 1]) * self.r_factor,

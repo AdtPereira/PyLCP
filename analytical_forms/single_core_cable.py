@@ -536,7 +536,7 @@ class InternalPerUnitParameters:
             paj = (1 / (two_pi * ei3)) * np.log(r7 / r6) if not np.isclose(r7, r6) else 0
 
         return {
-            'zcs': {'z11': z11, 'z12': z12, 'z2i': z2i},
+            'zcs': {'z11': z11, 'z12': z12, 'z2i': z2i, 'Zcs': z11 + z12 + z2i},
             'zsa': {'z20': z20, 'z23': z23, 'z3i': z3i},
             'za4': {'z30': z30, 'z34': z34},
             'zs3': {'z20': z20, 'z23': z23},
@@ -658,7 +658,7 @@ class InternalPerUnitParameters:
             paj = (1 / (two_pi * ei3)) * np.log(r7 / r6) if not np.isclose(r7, r6) else 0
 
         return {
-            'zcs': {'z11': z11, 'z12': z12, 'z2i': z2i},
+            'zcs': {'z11': z11, 'z12': z12, 'z2i': z2i, 'Zcs': z11 + z12 + z2i},
             'zsa': {'z20': z20, 'z23': z23, 'z3i': z3i},
             'za4': {'z30': z30, 'z34': z34},
             'zs3': {'z20': z20, 'z23': z23},
@@ -854,7 +854,8 @@ class InternalPerUnitParameters:
         Pi = np.kron(np.identity(N), Pij)
         
         # --- Shunt Admittance Matrix, Ye = jw * Pi^-1 ---
-        inv_Pi = lu_solve(lu_factor(Pi), np.identity(Pi.shape[0]))
+        # inv_Pi = lu_solve(lu_factor(Pi), np.identity(Pi.shape[0]))
+        inv_Pi = np.linalg.inv(Pi)
         
         # The result is multiplied by the jw vector using broadcasting.
         # jw[:, np.newaxis, np.newaxis] reshapes the 1D jw vector to (num_freq, 1, 1)
@@ -1016,40 +1017,40 @@ class PerUnitParameters:
         """
         Assembles the final PUL matrices for a vector of frequencies.
         """
-        M = self.model.num_conductors_per_scc
+        M = self.model.num_conductors_per_scc                   # M = 2; N = 3
 
         z0_jk = earth_return_params['impedance_matrix']         # Shape (num_freq, N, N)
         pg_jk = earth_return_params['potential_coefficient']    # Shape (num_freq, N, N)
+        yg_jk = earth_return_params['admittance_matrix']        # Shape (num_freq, N, N)
 
         Zi = internal_matrices['impedance_matrix']              # Shape (num_freq, N*M, N*M)
+        Yi = internal_matrices['shunt_admittance_matrix']       # Shape (num_freq, N*M, N*M)
         Pi = internal_matrices['potential_coefficient_matrix']  # Shape (N*M, N*M)
 
         # Loop to build the block matrix for each frequency
-        ones_MM = np.ones((M, M))
-        Z0 = np.zeros_like(Zi, dtype=complex)
-        Pe = np.zeros_like(Zi, dtype=complex)
+        Zg = np.zeros_like(Zi, dtype=complex)
+        Pg = np.zeros_like(Zi, dtype=complex)
+        Yg = np.zeros_like(Zi, dtype=complex)
         for i in range(len(self.f)):
-            Z0[i, :, :] = np.kron(z0_jk[i, :, :], ones_MM)
-            Pe[i, :, :] = np.kron(pg_jk[i, :, :], ones_MM)
+            Zg[i, :, :] = np.kron(z0_jk[i, :, :], np.ones((M, M)))
+            Pg[i, :, :] = np.kron(pg_jk[i, :, :], np.ones((M, M)))
 
         # Series impedance is a simple element-wise addition
-        Zs = Zi + Z0
+        Zs = Zi + Zg
 
         # Shunt Admittance Matrix calculation
         # Pi is 2D, Pe is 3D. Use broadcasting to add them.
-        Psh = Pi[np.newaxis, :, :] + Pe
+        Psh = Pi[np.newaxis, :, :] + Pg
         
         # The linear solve must be looped over the frequency axis
         Ysh = np.zeros_like(Psh, dtype=complex)
-        Ye = np.zeros_like(Psh, dtype=complex)
         for i in range(len(self.f)):
-            # Ye[i, :, :] = self.jw[i] * np.kron(np.linalg.inv(pg_jk[i, :, :]), ones_MM)
             Ysh[i, :, :] = self.jw[i] * np.linalg.inv(Psh[i, :, :])
 
         return {
-            'earth_return_impedance_matrix': Z0,
-            'earth_return_potential_coefficient': Pe,
-            'earth_return_admittance_matrix': Ye,
+            'earth_return_impedance_matrix': Zg,
+            'earth_return_potential_coefficient': Pg,
+            'earth_return_admittance_matrix': Yg,
             'potential_coefficient': Psh,
             'series_impedance_matrix': Zs,
             'shunt_admittance_matrix': Ysh,

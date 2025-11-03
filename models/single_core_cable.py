@@ -30,9 +30,7 @@ class SingleCoreCableModelGenerator:
         """
         self.script_path = Path(file_path)
         self.silent_mode = silent_mode
-
-        self.input_data = self.load_json_parameters()
-        
+        self.input_data = self.load_json_parameters()        
         self.cable_def = self.input_data.get('cable_definition', {})
         self.soil = self.input_data.get('soil', {})
         self.arrangement = self.input_data.get('arrangement', {})

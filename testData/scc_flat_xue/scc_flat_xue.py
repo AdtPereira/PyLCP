@@ -15,7 +15,7 @@ try:
     from mtl_main.graphics import GroundReturnMTLRepresentation
     from mtl_main.source import MulticonductorTransmissionLine
     from analytical_forms.single_core_cable import InternalPerUnitParameters, PerUnitParameters
-    from .plot_config import plot_config
+    from .plot_config import PLOT_CONFIG
     print("Modules imported successfully.")
 except ImportError as e:
     print(f"Error importing modules: {e}")
@@ -124,12 +124,12 @@ def main():
         value['quasi_tem_matrices'] = quasi_tem
     
     print(f"\nEnd of the routine! Time spent on simulation: {(time.time() - st):.1f} seconds.\n")
-    plotter = SCCPlotter(__file__, pul_data, plot_config, autoSave=True)
-    plotter.scc_series_impedance_matrix(graph_key_list=['fig419', 'fig421a', 'fig421b'])
-    plotter.scc_shunt_admittance_matrix(graph_key_list=['fig423', 'fig425a', 'fig425b'])
+    plotter = SCCPlotter(__file__, pul_data, PLOT_CONFIG, autoSave=False)
+    plotter.scc_earth_propagation_constant()
     plotter.scc_earth_return_impedance_matrix()
     plotter.scc_earth_return_admittance_matrix()
-    plotter.scc_earth_propagation_constant()
+    plotter.scc_series_impedance_matrix(graph_key_list=['fig419', 'fig421a', 'fig421b'])
+    plotter.scc_shunt_admittance_matrix(graph_key_list=['fig423', 'fig425a', 'fig425b'])
     GroundReturnMTLRepresentation(__file__, mtl_model_a, units='centimeter').system_schematic()
     plt.show()
 

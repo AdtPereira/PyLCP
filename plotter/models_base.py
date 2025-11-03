@@ -32,7 +32,7 @@ class BasePlotter:
         self.xlim = tuple(pul_data['frequencies'][[0, -1]])
         self.figsize = (12, 5)
 
-    def _plot_matricial_complex_quantity(self, graph_key):
+    def _plot_matricial_input(self, graph_key):
         """
         Método genérico para plotar uma grandeza complexa em dois subplots 
         (ex: R/L ou G/C).
@@ -41,13 +41,8 @@ class BasePlotter:
         p, q = config['p'], config['q']
         fig, (ax1, ax2) = plt.subplots(1, 2, figsize=self.figsize, sharey=False)
         fig.suptitle(config['suptitle'], fontsize=12, y=0.98)
-
-        # --- Configurações dos subplots (ex: 'left_plot', 'right_plot' em config)
         left_cfg = config['left_plot']
         right_cfg = config['right_plot']
-        
-        # --- Caminho para os dados (ex: 'data_path' em config)
-        # ex: ['scenarios', '{key}', 'quasi_tem_matrices', 'series_impedance_matrix']
         data_path = config['data_path'] 
         
         for series in config['series_to_plot']:
@@ -101,7 +96,135 @@ class BasePlotter:
         if self.autoSave:
             save_figure_multiformat(fig, self.results_dir, base_filename=f'{graph_key}')
 
-    def _plot_scalar_complex_quantity(self, graph_key):
+    def _plot_matricial_upper_triangular(self, graph_key):
+        """
+        Método genérico para plotar uma grandeza complexa em dois subplots 
+        (ex: R/L ou G/C).
+        """
+        config = self.plot_config[graph_key]
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=self.figsize, sharey=False)
+        fig.suptitle(config['suptitle'], fontsize=12, y=0.98)
+        left_cfg = config['left_plot']
+        right_cfg = config['right_plot']
+        data_path = config['data_path'] 
+        
+        # --- Bloco Analítico Genérico ---
+        for series in config['series_to_plot']:
+            matrix = self.pul_data[data_path[0]][series['key']][data_path[2]][data_path[3]]
+
+            for value in series['type'].values():
+                p, q = value['p'], value['q']
+                
+                # Plotar dados do subplot esquerdo
+                y1_data = self._calculate_plot_data(matrix[:,p,q], self.w, left_cfg['component'], left_cfg['scale'])                
+                ax1.plot(self.f, y1_data, color=value['color'], linestyle=value['linestyle'], linewidth=value['linewidth'], label=value['label'])
+                
+                # Plotar dados do subplot direito
+                y2_data = self._calculate_plot_data(matrix[:,p,q], self.w, right_cfg['component'], right_cfg['scale'])                
+                ax2.plot(self.f, y2_data, color=value['color'], linestyle=value['linestyle'], linewidth=value['linewidth'], label=value['label'])
+            
+        # --- Bloco COMSOL Genérico ---
+        if self.cmsl is not None and 'comsol_series_to_plot' in config:
+            freq = self.cmsl['frequencies']
+            w_cmsl = self.cmsl['angular_frequencies']
+            
+            for series in config['comsol_series_to_plot']:
+                cmsl_key = series.get('base_key')
+                cmsl_graph_type = config['comsol_matrix_key']
+                
+                if cmsl_key not in self.cmsl['scenarios']:
+                    print(f"Aviso: Chave COMSOL '{cmsl_key}' não encontrada.")
+                    continue
+
+                if cmsl_graph_type in ['impedance_matrix', 'admittance_matrix']:
+                    cmsl_matrix = self.cmsl['scenarios'][cmsl_key]['earth_return_parameters'][cmsl_graph_type]
+
+                elif cmsl_graph_type in ['series_impedance_matrix', 'shunt_admittance_matrix']:
+                    cmsl_matrix = self.cmsl['scenarios'][cmsl_key]['quasi_tem_matrices'][cmsl_graph_type]
+
+                # Obter o estilo de plotagem
+                style = {k: v for k, v in series.items() if k != 'base_key'}
+                
+                # Plotar dados do subplot esquerdo
+                y1_data_cmsl = self._calculate_plot_data(cmsl_matrix[:, p, q], w_cmsl, left_cfg['component'], left_cfg['scale'])
+                ax1.scatter(freq, y1_data_cmsl, **style)
+                
+                # Plotar dados do subplot direito
+                y2_data_cmsl = self._calculate_plot_data(cmsl_matrix[:, p, q], w_cmsl, right_cfg['component'], right_cfg['scale'])
+                ax2.scatter(freq, y2_data_cmsl, **style)
+
+        # --- Formatação Genérica dos Eixos ---
+        self._format_axis(ax1, self.f, self.xlim, left_cfg)
+        self._format_axis(ax2, self.f, self.xlim, right_cfg)
+        
+        plt.tight_layout(rect=[0, 0, 1, 0.96])
+        if self.autoSave:
+            save_figure_multiformat(fig, self.results_dir, base_filename=f'{graph_key}')
+
+    def _plot_non_matricial_list_parameter(self, graph_key):
+        """
+        Método genérico para plotar uma grandeza complexa em dois subplots 
+        (ex: R/L ou G/C).
+        """
+        config = self.plot_config[graph_key]
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=self.figsize, sharey=False)
+        fig.suptitle(config['suptitle'], fontsize=12, y=0.98)
+        left_cfg = config['left_plot']
+        right_cfg = config['right_plot']
+        data_path = config['data_path'] 
+        
+        # --- Bloco Analítico Genérico ---
+        for series in config['series_to_plot']:
+            matrix = self.pul_data[data_path[0]][series['key']][data_path[2]][data_path[3]]
+
+            for key, value in series['type'].items():
+                # Plotar dados do subplot esquerdo
+                y1_data = self._calculate_plot_data(matrix[key], self.w, left_cfg['component'], left_cfg['scale'])                
+                ax1.plot(self.f, y1_data, **value)
+                
+                # Plotar dados do subplot direito
+                y2_data = self._calculate_plot_data(matrix[key], self.w, right_cfg['component'], right_cfg['scale'])
+                ax2.plot(self.f, y2_data, **value)
+            
+        # --- Bloco COMSOL Genérico ---
+        if self.cmsl is not None and 'comsol_series_to_plot' in config:
+            freq = self.cmsl['frequencies']
+            w_cmsl = self.cmsl['angular_frequencies']
+            
+            for series in config['comsol_series_to_plot']:
+                cmsl_key = series.get('base_key')
+                cmsl_graph_type = config['comsol_matrix_key']
+                
+                if cmsl_key not in self.cmsl['scenarios']:
+                    print(f"Aviso: Chave COMSOL '{cmsl_key}' não encontrada.")
+                    continue
+
+                if cmsl_graph_type in ['impedance_matrix', 'admittance_matrix']:
+                    cmsl_matrix = self.cmsl['scenarios'][cmsl_key]['earth_return_parameters'][cmsl_graph_type]
+
+                elif cmsl_graph_type in ['series_impedance_matrix', 'shunt_admittance_matrix']:
+                    cmsl_matrix = self.cmsl['scenarios'][cmsl_key]['quasi_tem_matrices'][cmsl_graph_type]
+
+                # Obter o estilo de plotagem
+                style = {k: v for k, v in series.items() if k != 'base_key'}
+                
+                # Plotar dados do subplot esquerdo
+                y1_data_cmsl = self._calculate_plot_data(cmsl_matrix[:, p, q], w_cmsl, left_cfg['component'], left_cfg['scale'])
+                ax1.scatter(freq, y1_data_cmsl, **style)
+                
+                # Plotar dados do subplot direito
+                y2_data_cmsl = self._calculate_plot_data(cmsl_matrix[:, p, q], w_cmsl, right_cfg['component'], right_cfg['scale'])
+                ax2.scatter(freq, y2_data_cmsl, **style)
+
+        # --- Formatação Genérica dos Eixos ---
+        self._format_axis(ax1, self.f, self.xlim, left_cfg)
+        self._format_axis(ax2, self.f, self.xlim, right_cfg)
+        
+        plt.tight_layout(rect=[0, 0, 1, 0.96])
+        if self.autoSave:
+            save_figure_multiformat(fig, self.results_dir, base_filename=f'{graph_key}')
+
+    def _plot_non_matricial_parameter(self, graph_key):
         """
         Método genérico para plotar uma grandeza complexa em dois subplots 
         (ex: R/L ou G/C).
@@ -178,8 +301,10 @@ class BasePlotter:
         ax.set_xscale(cfg.get('xscale', 'log'))
         ax.set_yscale(cfg.get('yscale', 'linear'))
         ax.set_xlim(xlim)
-        ax.legend(fontsize='small')
+        if 'y_lim' in cfg:
+            ax.set_ylim(cfg['y_lim'])
+        if cfg.get('legend', False):
+           ax.legend(fontsize='small')
         ax.set_xlabel('Frequency (Hz)')
         ax.set_ylabel(cfg['label'])
         ax.grid(True, which='both', linestyle='--', linewidth=0.5)
-

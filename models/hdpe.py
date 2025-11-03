@@ -10,6 +10,7 @@ cable layers.
 """
 
 import json
+from pathlib import Path
 from typing import Dict, Any, Tuple, List
 from utils.case_utils import UNITS_DATA
 
@@ -18,7 +19,7 @@ class SingleCoreCableInHDPEModelGenerator:
     A class to generate parametric models for single-core cable arrangements.
     """
 
-    def __init__(self, input_json: Dict[str, Any]):
+    def __init__(self, file_path: str, silent_mode: bool = False):
         """
         Initializes the generator with cable and environmental definitions.
 
@@ -26,7 +27,9 @@ class SingleCoreCableInHDPEModelGenerator:
             input_json (Dict[str, Any]): A dictionary containing the definitions
                                          for the cable, soil, and arrangement.
         """
-        self.input_data = input_json
+        self.script_path = Path(file_path)
+        self.silent_mode = silent_mode
+        self.input_data = self.load_json_parameters()    
         self.cable_def = self.input_data.get('cable_definition', {})
         self.soil = self.input_data.get('soil', {})
         self.arrangement = self.input_data.get('arrangement', {})

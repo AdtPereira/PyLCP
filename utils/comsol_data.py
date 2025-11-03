@@ -2,11 +2,13 @@ import re
 import sys
 import os
 import re
-import scipy.constants as sc
-
 import numpy as np
 import pandas as pd
 from pathlib import Path
+
+import scipy.constants as sc
+from scipy.linalg import lu_factor, lu_solve
+from utils.case_utils import *
 
 class MergedComsolDataReader:
     """
@@ -330,18 +332,17 @@ class ComsolPostProcessor:
             print(f"Erro: Não foi possível extrair os parâmetros (rho_g, eps_r) da chave '{base_key}'.")
             return None, None
             
-        rho1 = float(match.group(1))    # Resistividade do solo (Ohm.m)
-        sigma1 = 1.0 / rho1             # Condutividade do solo (S/m)
-        epsr1 = float(match.group(2))   # Permissividade Relativa do solo
+        sigma1 = 1.0 / float(match.group(1))    # Condutividade do solo (S/m)
+        epsr1 = float(match.group(2))           # Permissividade Relativa do solo
 
         # Squared Ground propagation constant 
         gamma_earth = np.sqrt(jw * sc.mu_0 * (sigma1 + jw * epsr1 * sc.epsilon_0))
 
         # 3. Definir as chaves de dados com base no mapeamento fornecido
-        key_z_self = f"{base_key}_vcoil_1" # Z_AA, Z_BB, Z_CC
-        key_z_adj  = f"{base_key}_vcoil_2" # Z_AB, Z_BC
-        key_z_ext  = f"{base_key}_vcoil_3" # Z_AC
-        required_keys = [key_z_self, key_z_adj, key_z_ext]
+        key_self = f"{base_key}_vcoil_1" # Z_AA, Z_BB, Z_CC
+        key_adj  = f"{base_key}_vcoil_2" # Z_AB, Z_BC
+        key_ext  = f"{base_key}_vcoil_3" # Z_AC
+        required_keys = [key_self, key_adj, key_ext]
         
         # 4. Verificar se todas as chaves de dados necessárias existem
         if not all(key in self.ground_return for key in required_keys):
@@ -350,30 +351,25 @@ class ComsolPostProcessor:
             print(f"Chaves disponíveis: {list(self.ground_return.keys())}")
             return None, None
 
-        # 5. Obter os vetores de impedância (cada um com 'n' pontos)
-        Z_self = self.ground_return[key_z_self]
-        Z_adj  = self.ground_return[key_z_adj]
-        Z_ext  = self.ground_return[key_z_ext]
-        
         # Diagonal (Self-impedances)
-        Zg[:, 0, 0] = Z_self  # Z_AA
-        Zg[:, 1, 1] = Z_self  # Z_BB
-        Zg[:, 2, 2] = Z_self  # Z_CC
+        Zg[:, 0, 0] = self.ground_return[key_self]  # Z_AA
+        Zg[:, 1, 1] = self.ground_return[key_self]  # Z_BB
+        Zg[:, 2, 2] = self.ground_return[key_self]  # Z_CC
 
         # Termos adjacentes (A-B e B-C)
-        Zg[:, 0, 1] = Z_adj   # Z_AB
-        Zg[:, 1, 0] = Z_adj   # Z_BA (simetria)
-        Zg[:, 1, 2] = Z_adj   # Z_BC
-        Zg[:, 2, 1] = Z_adj   # Z_CB (simetria)
+        Zg[:, 0, 1] = self.ground_return[key_adj]   # Z_AB
+        Zg[:, 1, 0] = self.ground_return[key_adj]   # Z_BA
+        Zg[:, 1, 2] = self.ground_return[key_adj]   # Z_BC
+        Zg[:, 2, 1] = self.ground_return[key_adj]   # Z_CB
         
         # Termos externos (A-C)
-        Zg[:, 0, 2] = Z_ext   # Z_AC
-        Zg[:, 2, 0] = Z_ext   # Z_CA (simetria)
+        Zg[:, 0, 2] = self.ground_return[key_ext]   # Z_AC
+        Zg[:, 2, 0] = self.ground_return[key_ext]   # Z_CA
 
         # Earth-Return Admittance based on Vance (1978) formulation
         for i in range(len(freq)):
-            yg2 = (gamma_earth[i])**2 * np.ones((N, N))
-            Yg[i, :, :] = yg2 * np.linalg.inv(Zg[i, :, :])
+            gamma_earth2 = gamma_earth[i]**2 * np.eye(N)
+            Yg[i, :, :] = gamma_earth2 @ np.linalg.inv(Zg[i, :, :])
             Pg[i, :, :] = jw[i] * np.linalg.inv(Yg[i, :, :])
 
         return {
@@ -393,36 +389,36 @@ class ComsolPostProcessor:
 
         z0_jk = earth_return_params['impedance_matrix']         # Shape (num_freq, N, N)
         pg_jk = earth_return_params['potential_coefficient']    # Shape (num_freq, N, N)
+        yg_jk = earth_return_params['admittance_matrix']        # Shape (num_freq, N, N)
 
         Zi = internal_matrices['impedance_matrix']              # Shape (num_freq, N*M, N*M)
         Pi = internal_matrices['potential_coefficient_matrix']  # Shape (N*M, N*M)
+        Yi = internal_matrices['shunt_admittance_matrix']       # Shape (num_freq, N*M, N*M)
 
         # Loop to build the block matrix for each frequency
-        ones_MM = np.ones((M, M))
-        Z0 = np.zeros_like(Zi, dtype=complex)
-        Pe = np.zeros_like(Zi, dtype=complex)
+        Zg = np.zeros_like(Zi, dtype=complex)
+        Pg = np.zeros_like(Zi, dtype=complex)
+        Yg = np.zeros_like(Zi, dtype=complex)
         for i in range(len(freq)):
-            Z0[i, :, :] = np.kron(z0_jk[i, :, :], ones_MM)
-            Pe[i, :, :] = np.kron(pg_jk[i, :, :], ones_MM)
+            Zg[i, :, :] = np.kron(z0_jk[i, :, :], np.ones((M, M)))
+            Pg[i, :, :] = np.kron(pg_jk[i, :, :], np.ones((M, M)))
 
         # Series impedance is a simple element-wise addition
-        Zs = Zi + Z0
+        Zs = Zi + Zg
 
         # Shunt Admittance Matrix calculation
         # Pi is 2D, Pe is 3D. Use broadcasting to add them.
-        Psh = Pi[np.newaxis, :, :] + Pe
+        Psh = Pi[np.newaxis, :, :] + Pg
         
         # The linear solve must be looped over the frequency axis
         Ysh = np.zeros_like(Psh, dtype=complex)
-        Ye = np.zeros_like(Psh, dtype=complex)
         for i in range(len(freq)):
-            # Ye[i, :, :] = jw[i] * np.kron(np.linalg.inv(pg_jk[i, :, :]), ones_MM)
             Ysh[i, :, :] = jw[i] * np.linalg.inv(Psh[i, :, :])
 
         return {
-            'earth_return_impedance_matrix': Z0,
-            'earth_return_potential_coefficient': Pe,
-            'earth_return_admittance_matrix': Ye,
+            'earth_return_impedance_matrix': Zg,
+            'earth_return_potential_coefficient': Pg,
+            'earth_return_admittance_matrix': Yg,
             'potential_coefficient': Psh,
             'series_impedance_matrix': Zs,
             'shunt_admittance_matrix': Ysh,
