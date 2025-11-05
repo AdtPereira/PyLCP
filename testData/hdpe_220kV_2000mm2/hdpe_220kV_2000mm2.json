@@ -1,0 +1,67 @@
+{
+  "type": "shared-hdpe",
+  "name": "220 kV XLPE underground single-core cable under HDPE tube",
+  "note": "Asorza (2024) 220 kV 2000 mm² XLPE underground cable model under 10-inch diameter for the HDPE pipe.",
+  "arrangement": {
+    "unit": "meter",
+    "type": "single",
+    "num_conductors": 1,
+    "burial_depth": 1.230,
+    "spacing": 0.350,
+    "fourier_order": 4,
+    "idx_ref_conductor": 0
+  },
+  "soil": {
+    "conductivity_S_per_m": 0.01,
+    "relative_permittivity": 12.0
+  },
+  "cable_definition": {
+    "core": {
+      "inner_radius": 0.0,
+      "outer_radius": 0.02785,
+      "conductivity_S_per_m": 4.566210e7,
+      "insulation": {
+        "type": "core insulation",
+        "thickness": 0.02495,
+        "relative_permittivity": 2.9479,
+        "delta_tangent": 0.0008
+      },
+      "enclosure": null
+    },
+    "sheath": {
+      "inner_radius": 0.05280,
+      "outer_radius": 0.05595,
+      "conductivity_S_per_m": 1.308901e7,
+      "insulation": {
+        "type": "outer insulation",
+        "thickness": 0.0053,
+        "relative_permittivity": 2.3,
+        "delta_tangent": 0.001
+      },
+      "enclosure": {
+        "type": "HDPE",
+        "inner_radius": 0.11375,
+        "outer_radius": 0.12700,
+        "relative_permittivity": 2.3,
+        "delta_tangent": 0.001,
+        "insulation": {
+          "type": "air",
+          "thickness": null,
+          "relative_permittivity": 1.0
+        }
+      }
+    },
+    "ecc": {
+      "inner_radius": 0.0,
+      "outer_radius": 0.0081,
+      "conductivity_S_per_m": 5.813953e7,
+      "insulation": {
+        "type": "ecc insulation",
+        "thickness": 0.002,
+        "relative_permittivity": 2.3,
+        "delta_tangent": 0.0008
+      },
+      "enclosure": null
+    }
+  }
+}

@@ -38,6 +38,6 @@ class HDPEPlotter(BasePlotter):
             self._plot_matricial_upper_triangular(key)
 
     def hdpe_internal_impedance_elements(self):
-        for key in ['internal_impedance_elements']:
+        for key in ['coaxial_cable', 'internal_impedance_elements']:
             self._plot_non_matricial_list_parameter(key)
             

@@ -31,17 +31,20 @@ class SingleCoreCableModelGenerator:
         self.script_path = Path(file_path)
         self.silent_mode = silent_mode
         self.input_data = self.load_json_parameters()        
+        
         self.cable_def = self.input_data.get('cable_definition', {})
         self.soil = self.input_data.get('soil', {})
         self.arrangement = self.input_data.get('arrangement', {})
         self.reference = self.input_data.get('reference', {})
+        
         self.scale_unit = UNITS_DATA[self.arrangement.get('unit', 'meter')]['scale']
         self.fourier_order = self.arrangement.get('fourier_order', 0)
 
         # Cable layer definitions
-        self.core = self.cable_def.get('core')
-        self.sheath = self.cable_def.get('sheath')
-        self.armor = self.cable_def.get('armor')
+        self.core = self.cable_def.get('core', None)
+        self.sheath = self.cable_def.get('sheath', None)
+        self.armor = self.cable_def.get('armor', None)
+        self.ecc = self.cable_def.get('ecc', None)
 
     def load_json_parameters(self) -> dict:
         """
@@ -85,7 +88,7 @@ class SingleCoreCableModelGenerator:
                           layer_data: Dict[str, Any], 
                           layer_name: str) -> int:
         """
-        Adds a single conductor layer (e.g., core, sheath) to the model.
+        Adds a single conductor layer (e.g., core, sheath or armor) to the model.
         """
         insulation_data = layer_data.get('insulation')
         insulation_dict = None
@@ -121,9 +124,9 @@ class SingleCoreCableModelGenerator:
         return conductor_id + 1
 
     def _add_cable_conductors(self, 
-                              model: Dict[str, Any], 
-                              conductor_id: int, 
-                              center_point: Tuple[float, float]) -> int:
+                                model: Dict[str, Any], 
+                                conductor_id: int, 
+                                center_point: Tuple[float, float]) -> int:
         """
         Adds all defined conductive layers (core, sheath, armor) for a single cable.
         """
@@ -133,7 +136,72 @@ class SingleCoreCableModelGenerator:
             conductor_id = self._add_single_layer(model, conductor_id, center_point, self.sheath, 'sheath')
         if self.armor:
             conductor_id = self._add_single_layer(model, conductor_id, center_point, self.armor, 'armor')
+        
         return conductor_id
+    
+    def _add_ecc_conductor(self,
+                           model: Dict[str, Any],
+                           conductor_id: int,
+                           center_point: Tuple[float, float]) -> int:
+        """
+        Adiciona o condutor ECC (Earth Continuity Conductor) ao modelo
+        em seu 'center_point' específico.
+        """
+        if self.ecc:
+            conductor_id = self._add_single_layer(model, conductor_id, center_point, self.ecc, 'ecc')
+        return conductor_id
+    
+    def _calculate_ecc_center_trig(self,
+                                   enclosure_center: Tuple[float, float],
+                                   R_enc: float,
+                                   R_scc: float,
+                                   R_ecc: float,
+                                   vertical_offset_c: float) -> Tuple[float, float]:
+        """
+        Calcula a posição do ECC "entalado" (wedge) entre o SCC e o Duto HDPE
+        usando a Lei dos Cossenos.
+
+        Args:
+            enclosure_center (P_enc): Ponto central do duto.
+            R_enc: Raio interno do duto.
+            R_scc: Raio externo do cabo SCC.
+            R_ecc: Raio externo do cabo ECC.
+            vertical_offset_c (c): Distância entre P_enc e P_scc.
+        """
+        
+        # Validação de geometria
+        if R_enc <= (R_scc + R_ecc):
+            raise ValueError(
+                f"Geometria impossível: O ECC (R={R_ecc}) não cabe no espaço "
+                f"entre o SCC (R={R_scc}) e o duto HDPE (R={R_enc}). "
+                f"Condição (R_enc > R_scc + R_ecc) falhou."
+            )
+
+        # Lados do triângulo formado pelos centros (P_enc, P_scc, P_ecc)
+        a = R_scc + R_ecc  # Dist (P_scc -> P_ecc)
+        b = R_enc - R_ecc  # Dist (P_enc -> P_ecc)
+        c = vertical_offset_c  # Dist (P_enc -> P_scc)
+
+        # Lei dos Cossenos para encontrar o ângulo 'alpha' no vértice P_enc
+        # a² = b² + c² - 2bc*cos(alpha)
+        numerator = (b**2) + (c**2) - (a**2)
+        denominator = 2 * b * c
+
+        # Tratamento de erro de ponto flutuante
+        cos_alpha = max(min(numerator / denominator, 1.0), -1.0)
+        
+        alpha = np.arccos(cos_alpha)
+        sin_alpha = np.sin(alpha)
+
+        # Calcular o centro do ECC
+        # (Assumindo que o ECC está no quadrante x+, y-)
+        # O centro do ECC está a uma distância 'b' do 'enclosure_center',
+        # rotacionado pelo ângulo 'alpha' a partir da linha vertical P_enc -> P_scc.
+        
+        ecc_center_x = enclosure_center[0] + b * sin_alpha
+        ecc_center_y = enclosure_center[1] - b * cos_alpha # Subtrai pois o eixo é para baixo
+
+        return (ecc_center_x, ecc_center_y)
     
     @staticmethod
     def _show_model(model: Dict[str, Any]):
@@ -272,6 +340,191 @@ class SingleCoreCableModelGenerator:
             self._show_model(model)
 
         return model
+
+    def hdpe_shared_enclosed_model(self, host_conductor: str = 'sheath') -> Dict[str, Any]:
+        """
+        Gera um modelo para um cabo SCC e um ECC compartilhando um duto HDPE.
+        
+        Geometria:
+        1. 'burial_depth' define o centro do Duto HDPE.
+        2. O SCC (Cabo Principal) repousa no fundo do duto HDPE.
+        3. O ECC (Condutor de Continuidade) é posicionado no espaço "entalado" (wedge)
+           entre a superfície externa do SCC e a parede interna do duto HDPE.
+        """
+        
+        # --- 1. Dados do SCC e Duto ---
+        host_conductor_data = getattr(self, host_conductor)
+        host_insulation = host_conductor_data.get('insulation')
+        enclosure_data = host_conductor_data.get('enclosure')
+
+        # --- 2. Dados do ECC ---
+        ecc_insulation = self.ecc.get('insulation')
+        ecc_outer_radius = self.ecc['outer_radius'] + (ecc_insulation['thickness'] if ecc_insulation else 0)
+
+        assert enclosure_data is not None, "Enclosure definition must be provided for shared enclosure model."
+        assert self.ecc is not None, "ECC conductor data must be provided for shared enclosure model."
+        
+        # --- 3. Cálculo de Posição (Lógica Corrigida) ---
+        
+        # 3.1. O Duto (Enclosure) é o ponto de referência
+        # 'burial_depth' agora define o centro do duto.
+        enclosure_center = (0.0, -self.arrangement['burial_depth'])
+
+        # 3.2. Obter raios para cálculo
+        cable_outer_radius = host_conductor_data['outer_radius'] + (host_insulation['thickness'] if host_insulation else 0)
+        enclosure_inner_radius = enclosure_data['inner_radius']
+        
+        # Validações de geometria
+        assert enclosure_inner_radius > cable_outer_radius, "Enclosure inner radius must be larger than cable outer radius."
+        total_width_check = cable_outer_radius + 2 * ecc_outer_radius + cable_outer_radius
+        assert total_width_check < (2 * enclosure_inner_radius), "The cable and ECC do not fit side by side within the HDPE enclosure."
+
+        # 3.3. O centro do SCC (Cabo) é calculado relativo ao Duto
+        # O cabo repousa no fundo, então é deslocado para baixo.
+        vertical_offset = enclosure_inner_radius - cable_outer_radius
+        cable_center = (enclosure_center[0], enclosure_center[1] - vertical_offset)
+
+        # --- 4. Posição do ECC (Restrição 3) ---
+        # Delega o cálculo trigonométrico para o método privado
+        ecc_center = self._calculate_ecc_center_trig(
+            enclosure_center=enclosure_center,
+            R_enc=enclosure_inner_radius,
+            R_scc=cable_outer_radius,
+            R_ecc=ecc_outer_radius,
+            vertical_offset_c=vertical_offset
+        )
+
+        # --- 5. Geração do Modelo ---
+        model = {
+            'name': self.input_data.get('name', 'generic shared HDPE enclosed SCC system'),
+            'type': self.input_data.get('type', 'shared-hdpe'),
+            'note': self.input_data.get('note', 'NA'),
+            'idx_ref_conductor': 0,
+            0: {
+                'line_id': 0,
+                'conductor_name': 'soil',
+                'line_type': 'return',
+                'line_return': None,
+                'conductivity': self.soil['conductivity_S_per_m'],
+                'relative_permeability': 1.0,
+                'relative_permittivity': self.soil['relative_permittivity'],
+                'relative_permittivity_out': 1.0,
+            },
+        }
+
+        # --- 6. Adicionar Condutores ---
+        conductor_id = 1
+        
+        # Adiciona o SCC no 'cable_center' (calculado para repousar no fundo)
+        conductor_id = self._add_cable_conductors(model, conductor_id, cable_center)
+
+        # Adiciona o ECC no 'ecc_center' (calculado para estar no "canto")
+        conductor_id = self._add_ecc_conductor(model, conductor_id, ecc_center)
+
+        # --- 7. Injetar Dados do Duto (Enclosure) ---
+        for k, v in model.items():
+            if isinstance(k, int) and k > 0: 
+                if v.get('conductor_name') == host_conductor:
+                    # Adiciona o dicionário do duto, incluindo seu centro (referência primária).
+                    v['enclosure'] = enclosure_data
+                    v['enclosure']['center_point'] = enclosure_center
+                else:
+                    v['enclosure'] = None
+
+        if not self.silent_mode:
+            self._show_model(model)
+
+        return model
+
+    # def hdpe_shared_enclosed_model(self, host_conductor: str = 'sheath') -> Dict[str, Any]:
+    #     """
+    #     Generates a model for a cable inside an HDPE enclosure.
+    #     The enclosure is defined within a conductor in the JSON and is added
+    #     as a property to that conductor in the final model dictionary.
+    #     The geometry remains eccentric.
+    #     """
+        
+    #     # --- Data Retrieval (Main SCC and Enclosure) ---
+    #     # Find the conductor that defines the enclosure (typically the outermost one).
+    #     host_conductor_data = getattr(self, host_conductor)
+    #     host_insulation = host_conductor_data.get('insulation')
+    #     enclosure_data = host_conductor_data.get('enclosure')
+
+    #     # Earth Conductor Continuity (ECC) parameters
+    #     ecc_insulation = self.ecc.get('insulation')
+    #     ecc_outer_radius = self.ecc['outer_radius'] + (ecc_insulation['thickness'] if ecc_insulation else 0)
+
+    #     assert enclosure_data is not None, "Enclosure definition must be provided for shared enclosure model."
+    #     assert self.ecc is not None, "ECC conductor data must be provided for shared enclosure model."
+        
+    #     # --- Eccentricity Calculation (Main SCC) ---
+    #     # 1. The cable's center is the reference point, defined by the burial depth.
+    #     cable_center = (0.0, -self.arrangement['burial_depth'])
+        
+    #     # 2. The enclosure's center is calculated based on the cable's position.        
+    #     cable_outer_radius = host_conductor_data['outer_radius'] + (host_insulation['thickness'] if host_insulation else 0)        
+    #     enclosure_inner_radius = enclosure_data['inner_radius']
+    #     total_width = cable_outer_radius + 2 * ecc_outer_radius + cable_outer_radius
+        
+    #     assert enclosure_inner_radius > cable_outer_radius, "Enclosure inner radius must be larger than cable outer radius."
+    #     assert total_width < (2 * enclosure_inner_radius), "The cable and ECC do not fit side by side within the HDPE enclosure."
+        
+    #     # 3. O centro do duto (enclosure) é calculado com base na posição do cabo SCC.
+    #     #    O cabo SCC toca o fundo, então o centro do duto é deslocado para cima.
+    #     vertical_offset = enclosure_inner_radius - cable_outer_radius
+    #     enclosure_center = (cable_center[0], cable_center[1] + vertical_offset)
+
+    #     # --- 4. Posição do ECC (Restrição 2) ---
+    #     # Delega o cálculo trigonométrico para o método privado
+    #     ecc_center = self._calculate_ecc_center_trig(
+    #         enclosure_center=enclosure_center,
+    #         R_enc=enclosure_inner_radius,
+    #         R_scc=cable_outer_radius,
+    #         R_ecc=ecc_outer_radius,
+    #         vertical_offset_c=vertical_offset
+    #     )
+
+    #     # --- 5. Model Generation ---
+    #     model = {
+    #         'name': self.input_data.get('name', 'generic shared HDPE enclosed SCC system'),
+    #         'type': self.input_data.get('type', 'shared-hdpe'),
+    #         'note': self.input_data.get('note', 'NA'),
+    #         'idx_ref_conductor': 0,
+    #         0: {
+    #             'line_id': 0,
+    #             'conductor_name': 'soil',
+    #             'line_type': 'return',
+    #             'line_return': None,
+    #             'conductivity': self.soil['conductivity_S_per_m'],
+    #             'relative_permeability': 1.0,
+    #             'relative_permittivity': self.soil['relative_permittivity'],
+    #             'relative_permittivity_out': 1.0,
+    #         },
+    #     }
+
+    #     # Add the cable conductors (core, sheath) at their reference position
+    #     conductor_id = 1
+    #     conductor_id = self._add_cable_conductors(model, conductor_id, cable_center)   
+
+    #     # Adiciona o condutor ECC em sua posição calculada
+    #     conductor_id = self._add_ecc_conductor(model, conductor_id, ecc_center)     
+
+    #     # --- 7. Injetar Dados do Duto (Enclosure) ---
+    #     # Este loop atribui os dados do duto ao condutor "host" (ex: 'sheath' do SCC)
+    #     # e define 'enclosure: None' para todas as outras camadas (incluindo as do ECC).
+    #     for k, v in model.items():
+    #         if isinstance(k, int) and k > 0: 
+    #             if v.get('conductor_name') == host_conductor:
+    #                 # Add the enclosure dictionary, including its calculated center point.
+    #                 v['enclosure'] = enclosure_data
+    #                 v['enclosure']['center_point'] = enclosure_center
+    #             else:
+    #                 v['enclosure'] = None
+
+    #     if not self.silent_mode:
+    #         self._show_model(model)
+
+    #     return model
     
     def underground_model(self) -> Dict[str, Any]:
         """

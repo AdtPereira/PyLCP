@@ -2,17 +2,17 @@ import numpy as np
 
 comsol_layout_template = [
     {
-        'base_key': 'rho_g_100_epsr1_1_mf',
+        'key': 'rho_g_100_epsr1_1_mf',
         'label': r'COMSOL ($\rho_e=100, \epsilon_r=1$)',
         'marker': 'o', 's': 35, 'facecolors': 'none', 'edgecolors': 'black', 'zorder': 10
     },
     {
-        'base_key': 'rho_g_100_epsr1_20_mf',
+        'key': 'rho_g_100_epsr1_20_mf',
         'label': r'COMSOL ($\rho_e=100, \epsilon_r=20$)',
         'marker': 'o', 's': 15, 'facecolors': 'black', 'edgecolors': 'none', 'zorder': 10
     },
     {
-        'base_key': 'rho_g_500_epsr1_1_mf',
+        'key': 'rho_g_500_epsr1_1_mf',
         'label': r'COMSOL ($\rho_e=500, \epsilon_r=1$)',
         'marker': 's', 's': 15, 'color': 'black', 'zorder': 10
     }

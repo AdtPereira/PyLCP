@@ -286,21 +286,152 @@ class ComsolPostProcessor:
     """
     def __init__(self, script_file_path: str, autoShow: bool = True):
         self.cmsl_reader = ComsolDataReader(script_file_path, autoShow=autoShow)
-        self.ground_return = self.cmsl_reader.data['cmsl_ground_return_impedance']
-
-        self.frequencies = np.asarray(self.ground_return['freq'])
-        self.angular_frequencies = 2 * np.pi * self.frequencies
-
-    def general_parameters(self):
+        
+    def get_general_parameters(self, cmsl_file_name: str = None) -> dict:
         """
         Retorna os parâmetros gerais extraídos dos dados COMSOL.
         """
+        data = self.cmsl_reader.data.get(cmsl_file_name, None)
+        freq = np.asarray(data['freq'])
+
         return {
-            'frequencies': self.frequencies,
-            'angular_frequencies': self.angular_frequencies,
+            'frequencies': freq,
+            'angular_frequencies': 2 * np.pi * freq,
         }
 
-    def earth_return_parameters(self, base_key: str):
+    def get_coaxial_cable_parameters(self):
+        """
+        Constrói a matriz de impedância [n, 3, 3] simétrica para uma configuração
+        flat de 3 cabos (A, B, C), a partir dos dados do COMSOL.
+
+        A montagem assume uma configuração simétrica:
+        - Z_AA = Z_BB = Z_CC (self, de 'vcoil_1')
+        - Z_AB = Z_BA = Z_BC = Z_CB (mutual adjacente, de 'vcoil_2')
+        - Z_AC = Z_CA (mutual externa, de 'vcoil_3')
+
+        :param base_key: A chave base do cenário COMSOL 
+                        (ex: 'rho_g_100_epsr1_1_mf').
+        :param model: O modelo de linha de transmissão multiconductor.
+        :return: Uma tupla (Z0, freq), onde Z0 é a matriz [n, 3, 3] e 
+                freq é o vetor de frequências [n]. Retorna (None, None) se 
+                os dados não forem encontrados.
+        """
+        general_data = self.get_general_parameters('cmsl_coaxial_cable_impedance')
+        data = self.cmsl_reader.data['cmsl_coaxial_cable_impedance']
+        jw = 1j * general_data['angular_frequencies']
+
+        # z11: internal impedance of core outer surface
+        z11 = data['r11'] + jw * data['l11']
+
+        # z12: core outer insulator impedance
+        z12 = data['r12'] + jw * data['l12']
+
+        # z2i: internal impedance of sheath inner surface
+        z2i = data['r2i'] + jw * data['l2i']
+
+        return {
+            'Zcs': data['coil_impedance'],
+            'z11': z11,
+            'z12': z12,
+            'z2i': z2i,
+        }
+    
+    def get_internal_impedance_elements(self):
+        """
+        Constrói a matriz de impedância [n, 3, 3] simétrica para uma configuração
+        flat de 3 cabos (A, B, C), a partir dos dados do COMSOL.
+
+        A montagem assume uma configuração simétrica:
+        - Z_AA = Z_BB = Z_CC (self, de 'vcoil_1')
+        - Z_AB = Z_BA = Z_BC = Z_CB (mutual adjacente, de 'vcoil_2')
+        - Z_AC = Z_CA (mutual externa, de 'vcoil_3')
+
+        :param base_key: A chave base do cenário COMSOL 
+                        (ex: 'rho_g_100_epsr1_1_mf').
+        :param model: O modelo de linha de transmissão multiconductor.
+        :return: Uma tupla (Z0, freq), onde Z0 é a matriz [n, 3, 3] e 
+                freq é o vetor de frequências [n]. Retorna (None, None) se 
+                os dados não forem encontrados.
+        """
+        general_data = self.get_general_parameters('cmsl_series_impedance_core_excitation')
+        core = self.cmsl_reader.data['cmsl_series_impedance_core_excitation']
+        sheath = self.cmsl_reader.data['cmsl_series_impedance_sheath_excitation']
+        jw = 1j * general_data['angular_frequencies']
+
+        # z11: internal impedance of core outer surface
+        z11_cr = core['r11'] + jw * core['l11']
+        z11_sh = sheath['r11'] + jw * sheath['l11']
+
+        # z12: core insulator impedance
+        z12_cr = core['r12'] + jw * core['l12']
+        z12_sh = sheath['r12'] + jw * sheath['l12']
+
+        # z2i: internal impedance of sheath inner surface
+        z2i_cr = core['r2i'] + jw * core['l2i']
+        z2i_sh = sheath['r2i'] + jw * sheath['l2i']
+
+        # z13: sheath insulator impedance
+        z13_cr = jw * core['l13']
+        z13_sh = jw * sheath['l13']
+
+        # z14: air gap impedance
+        z14_cr = jw * core['l14']
+        z14_sh = jw * sheath['l14']
+
+        # z15: HDPE tube impedance
+        z15_cr = jw * core['l15']
+        z15_sh = jw * sheath['l15']
+
+        return {
+            'core_js': core['core_voltage'],
+            'sheath_js': sheath['sheath_voltage'],
+            'mutual1_js': core['sheath_voltage'],
+            'mutual2_js': sheath['core_voltage'],
+            'core_energy':   z11_cr + z12_cr + z2i_cr + z13_cr + z14_cr + z15_cr,
+            'sheath_energy': z11_sh + z12_sh + z2i_sh + z13_sh + z14_sh + z15_sh,
+            'mutual_energy': z2i_cr
+        }
+
+    def get_internal_impedance_matrix(self, excitation_type: str = 'average'):
+        """
+        Constrói a matriz de impedância [n, 3, 3] simétrica para uma configuração
+        flat de 3 cabos (A, B, C), a partir dos dados do COMSOL.
+
+        A montagem assume uma configuração simétrica:
+        - Z_AA = Z_BB = Z_CC (self, de 'vcoil_1')
+        - Z_AB = Z_BA = Z_BC = Z_CB (mutual adjacente, de 'vcoil_2')
+        - Z_AC = Z_CA (mutual externa, de 'vcoil_3')
+
+        :param base_key: A chave base do cenário COMSOL 
+                        (ex: 'rho_g_100_epsr1_1_mf').
+        :param model: O modelo de linha de transmissão multiconductor.
+        :return: Uma tupla (Z0, freq), onde Z0 é a matriz [n, 3, 3] e 
+                freq é o vetor de frequências [n]. Retorna (None, None) se 
+                os dados não forem encontrados.
+        """
+        N = 2
+        general_data = self.get_general_parameters('cmsl_series_impedance_core_excitation')
+        core = self.cmsl_reader.data['cmsl_series_impedance_core_excitation']
+        sheath = self.cmsl_reader.data['cmsl_series_impedance_sheath_excitation']
+
+        freq = general_data['frequencies']
+        Zi = np.zeros((len(freq), N, N), dtype=complex)
+
+        Zi[:, 0, 0] = core['core_voltage']
+        Zi[:, 1, 1] = sheath['sheath_voltage']   
+
+        if excitation_type == 'core':
+            Zi[:, 0, 1] = core['sheath_voltage']
+        elif excitation_type == 'sheath':
+            Zi[:, 0, 1] = sheath['core_voltage']
+        elif excitation_type == 'average':
+            Zi[:, 0, 1] = 0.5 * (core['sheath_voltage'] + sheath['core_voltage'])
+            
+        Zi[:, 1, 0] = Zi[:, 0, 1]
+
+        return Zi
+    
+    def get_earth_return_parameters(self, base_key: str):
         """
         Constrói a matriz de impedância [n, 3, 3] simétrica para uma configuração
         flat de 3 cabos (A, B, C), a partir dos dados do COMSOL.
@@ -318,8 +449,11 @@ class ComsolPostProcessor:
                 os dados não forem encontrados.
         """
         N = 3
-        freq = self.frequencies
-        jw = 1j * self.angular_frequencies
+        general_data = self.get_general_parameters('cmsl_ground_return_impedance')
+        data = self.cmsl_reader.data['cmsl_ground_return_impedance']
+
+        freq = general_data['frequencies']
+        jw = 1j * general_data['angular_frequencies']
 
         Zg = np.zeros((len(freq), N, N), dtype=complex)
         Yg = np.zeros_like(Zg, dtype=complex)
@@ -345,26 +479,26 @@ class ComsolPostProcessor:
         required_keys = [key_self, key_adj, key_ext]
         
         # 4. Verificar se todas as chaves de dados necessárias existem
-        if not all(key in self.ground_return for key in required_keys):
+        if not all(key in data for key in required_keys):
             print(f"Erro: Faltando uma ou mais chaves para a base_key '{base_key}' nos dados COMSOL.")
             print(f"Chaves necessárias: {required_keys}")
-            print(f"Chaves disponíveis: {list(self.ground_return.keys())}")
+            print(f"Chaves disponíveis: {list(data.keys())}")
             return None, None
 
         # Diagonal (Self-impedances)
-        Zg[:, 0, 0] = self.ground_return[key_self]  # Z_AA
-        Zg[:, 1, 1] = self.ground_return[key_self]  # Z_BB
-        Zg[:, 2, 2] = self.ground_return[key_self]  # Z_CC
+        Zg[:, 0, 0] = data[key_self]  # Z_AA
+        Zg[:, 1, 1] = data[key_self]  # Z_BB
+        Zg[:, 2, 2] = data[key_self]  # Z_CC
 
         # Termos adjacentes (A-B e B-C)
-        Zg[:, 0, 1] = self.ground_return[key_adj]   # Z_AB
-        Zg[:, 1, 0] = self.ground_return[key_adj]   # Z_BA
-        Zg[:, 1, 2] = self.ground_return[key_adj]   # Z_BC
-        Zg[:, 2, 1] = self.ground_return[key_adj]   # Z_CB
+        Zg[:, 0, 1] = data[key_adj]   # Z_AB
+        Zg[:, 1, 0] = data[key_adj]   # Z_BA
+        Zg[:, 1, 2] = data[key_adj]   # Z_BC
+        Zg[:, 2, 1] = data[key_adj]   # Z_CB
         
         # Termos externos (A-C)
-        Zg[:, 0, 2] = self.ground_return[key_ext]   # Z_AC
-        Zg[:, 2, 0] = self.ground_return[key_ext]   # Z_CA
+        Zg[:, 0, 2] = data[key_ext]   # Z_AC
+        Zg[:, 2, 0] = data[key_ext]   # Z_CA
 
         # Earth-Return Admittance based on Vance (1978) formulation
         for i in range(len(freq)):
@@ -379,12 +513,13 @@ class ComsolPostProcessor:
             'gamma_earth': gamma_earth,
         }
     
-    def quasi_tem_approx_matrices(self, internal_matrices, earth_return_params):
+    def get_quasi_tem_approx_matrices(self, internal_matrices, earth_return_params):
         """
         Assembles the final PUL matrices for a vector of frequencies.
         """
-        freq = self.frequencies
-        jw = 1j * self.angular_frequencies
+        general_data = self.get_general_parameters('cmsl_ground_return_impedance')
+        freq = general_data['frequencies']
+        jw = 1j * general_data['angular_frequencies']
         M = 2
 
         z0_jk = earth_return_params['impedance_matrix']         # Shape (num_freq, N, N)

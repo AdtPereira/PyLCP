@@ -95,7 +95,7 @@ def main():
 
     print("Construindo matrizes COMSOL...")
     cmsl_processor = ComsolPostProcessor(__file__)
-    cmsl_params = cmsl_processor.general_parameters()
+    cmsl_params = cmsl_processor.get_general_parameters('cmsl_ground_return_impedance')
     pul = InternalPerUnitParameters(mtl_model_a, cmsl_params['frequencies'])
     internal_matrices = pul.matrices(internal_form='hybrid')
     
@@ -104,8 +104,8 @@ def main():
 
     for key, value in pul_data['comsol']['scenarios'].items():
         print(f"  -> Processando COMSOL para: {key}")
-        earth_return = cmsl_processor.earth_return_parameters(key)
-        quasi_tem = cmsl_processor.quasi_tem_approx_matrices(internal_matrices, earth_return)
+        earth_return = cmsl_processor.get_earth_return_parameters(key)
+        quasi_tem = cmsl_processor.get_quasi_tem_approx_matrices(internal_matrices, earth_return)
         value['earth_return_parameters'] = earth_return
         value['quasi_tem_matrices'] = quasi_tem
     

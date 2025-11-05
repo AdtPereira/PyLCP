@@ -86,6 +86,9 @@ class BaseMTLRepresentation:
         elif self.model.mtl_type == 'hdpe':
             title = 'Single-Core Cable Buried in HDPE-Air Gap Enclosure'
             h_factor = -2
+        elif self.model.mtl_type == 'shared-hdpe':
+            title = 'Single-Core Cable Buried in HDPE-Air Gap Enclosure'
+            h_factor = -2
         elif self.model.mtl_type == 'pipe':
             title = 'Pipe-Type Cable'
             h_factor = 1
@@ -268,11 +271,21 @@ class GroundReturnMTLRepresentation(BaseMTLRepresentation):
         enclosure_center = np.array(enclosure['center_point']) if 'center_point' in enclosure else np.array([0, 0])
         enclosure_type = enclosure.get('type', 'HDPE')
 
-        # Adjust y-position for ground-return systems
+        # --- INÍCIO DA CORREÇÃO ---
+        # Ajusta a posição y para sistemas com retorno pelo solo (ground-return)
+        # Esta lógica DEVE ser idêntica à de _plot_conductor_graphic
         if parameters['h_factor'] != 1:
-            conductor_center = np.array(conductor_data['center_point']) if conductor_data['center_point'] else np.array([0, 0])
-            offset_vector = enclosure_center - conductor_center
-            enclosure_center[1] = parameters['h_factor'] * parameters['max_radius'] + offset_vector[1]  
+            # Obter os parâmetros de escala
+            y_real_enclosure = enclosure['center_point'][1]
+            y_avg = parameters['y_avg']
+            schematic_y_avg = parameters['h_factor'] * parameters['max_radius']
+            
+            # Calcular a nova posição y esquemática para o duto
+            schematic_y_enclosure = schematic_y_avg + (y_real_enclosure - y_avg)
+            
+            # Aplicar a nova posição
+            enclosure_center[1] = schematic_y_enclosure
+        # --- FIM DA CORREÇÃO ---
         
         patch = Wedge(
             center=enclosure_center * self.unit_factor,
@@ -295,6 +308,43 @@ class GroundReturnMTLRepresentation(BaseMTLRepresentation):
             label='air' if 'air' not in used_labels else None,
             zorder=2)
         ax.add_patch(fill_patch)
+
+    # def _plot_enclosure_graphic(self, ax, conductor_data, parameters, used_labels):
+    #     """
+    #     Plots a single cylindrical layer of a cable (as a Circle or Wedge).
+    #     Handles the logic for avoiding duplicate legend entries.
+    #     """
+    #     enclosure = conductor_data['enclosure']
+    #     enclosure_center = np.array(enclosure['center_point']) if 'center_point' in enclosure else np.array([0, 0])
+    #     enclosure_type = enclosure.get('type', 'HDPE')
+
+    #     # Adjust y-position for ground-return systems
+    #     if parameters['h_factor'] != 1:
+    #         conductor_center = np.array(conductor_data['center_point']) if conductor_data['center_point'] else np.array([0, 0])
+    #         offset_vector = enclosure_center - conductor_center
+    #         enclosure_center[1] = parameters['h_factor'] * parameters['max_radius'] + offset_vector[1]  
+        
+    #     patch = Wedge(
+    #         center=enclosure_center * self.unit_factor,
+    #         r=enclosure['outer_radius'] * self.unit_factor,
+    #         theta1=0, theta2=360,
+    #         width=(enclosure['outer_radius'] - enclosure['inner_radius']) * self.unit_factor,
+    #         edgecolor='black',
+    #         facecolor=self.color_map.get(enclosure_type, self.color_map['default_conductor']),
+    #         linestyle='solid',
+    #         label=enclosure_type if enclosure_type not in used_labels else None,
+    #         zorder=3)
+    #     ax.add_patch(patch)
+
+    #     fill_patch = Circle(
+    #         xy=enclosure_center * self.unit_factor,
+    #         radius=enclosure['inner_radius'] * self.unit_factor,
+    #         fill=True,
+    #         edgecolor='black',
+    #         facecolor='ghostwhite',
+    #         label='air' if 'air' not in used_labels else None,
+    #         zorder=2)
+    #     ax.add_patch(fill_patch)
 
     def _schematic_annotations(self, ax, params):
         """Draws annotations like the ground level and depth/height line."""

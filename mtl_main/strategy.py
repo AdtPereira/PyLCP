@@ -163,8 +163,100 @@ class MTLStrategy(ABC):
     #         'horizontal_separation_matrix': horizontal_separation_matrix
     #     }
 
-    @staticmethod
-    def _extract_scc_parameters(mtl: dict) -> dict:
+    # @staticmethod
+    # def _extract_scc_parameters(mtl: dict) -> dict:
+    #     """
+    #     Extracts geometric and physical parameters from a single-core cable
+    #     data structure using descriptive names for clarity. It handles solid
+    #     cores (inner radius = 0) and hollow layers.
+
+    #     Args:
+    #         mtl (dict): The dictionary containing conductor data for the SCC.
+
+    #     Returns:
+    #         dict: A dictionary with the calculated parameters (radii, rho, mu, epsilon).
+    #     """
+    #     scc = {}
+    #     core, sheath, armor = None, None, None
+
+    #     # Identify each layer by its name
+    #     for conductor_data in mtl.values():
+    #         name = conductor_data.get('conductor_name')
+    #         if name == 'core':
+    #             core = conductor_data
+    #         elif name == 'sheath':
+    #             sheath = conductor_data
+    #         elif name == 'armor':
+    #             armor = conductor_data
+        
+    #     # === CORE ===
+    #     if core:
+    #         scc['core_inner_radius'], scc['core_outer_radius'] = core['radius']
+    #         if 'insulation' in core and core['insulation']:
+    #             scc['core_insulation_outer_radius'] = scc['core_outer_radius'] + core['insulation']['thickness']
+    #             scc['core_insulation_permittivity'] = core['insulation']['relative_permittivity'] * sc.epsilon_0
+    #             scc['core_insulation_permeability'] = core['insulation']['relative_permeability'] * sc.mu_0
+            
+    #         # Extract physical properties for the core conductor (layer 1)
+    #         scc['core_resistivity'] = 1 / core['conductivity']
+    #         scc['core_permeability'] = core['relative_permeability'] * sc.mu_0
+    #         scc['core_permittivity'] = core['relative_permittivity'] * sc.epsilon_0
+        
+    #     # === SHEATH ===
+    #     if sheath and scc.get('core_insulation_outer_radius') is not None:
+    #         assert np.isclose(scc['core_insulation_outer_radius'], sheath['radius'][0]), \
+    #             (f"Geometric mismatch: Core's insulation outer radius ({scc['core_insulation_outer_radius']}) "
+    #                  f"does not match sheath's inner radius ({sheath['radius'][0]})")
+
+    #         scc['sheath_inner_radius'], scc['sheath_outer_radius'] = sheath['radius']
+    #         if 'insulation' in sheath and sheath['insulation']:
+    #             scc['sheath_insulation_outer_radius'] = scc['sheath_outer_radius'] + sheath['insulation']['thickness']
+    #             scc['sheath_insulation_permittivity'] = sheath['insulation']['relative_permittivity'] * sc.epsilon_0
+    #             scc['sheath_insulation_permeability'] = sheath['insulation']['relative_permeability'] * sc.mu_0
+
+    #         # Extract physical properties for the sheath conductor (layer 2)
+    #         scc['sheath_resistivity'] = 1 / sheath['conductivity']
+    #         scc['sheath_permeability'] = sheath['relative_permeability'] * sc.mu_0
+    #         scc['sheath_permittivity'] = sheath['relative_permittivity'] * sc.epsilon_0
+
+    #     # === ARMOR ===
+    #     if armor and scc.get('sheath_insulation_outer_radius') is not None:
+    #         assert np.isclose(scc['sheath_insulation_outer_radius'], armor['radius'][0]), \
+    #             (f"Geometric mismatch: Sheath's insulation outer radius ({scc['sheath_insulation_outer_radius']}) "
+    #                  f"does not match armor's inner radius ({armor['radius'][0]})")
+            
+    #         scc['armor_inner_radius'], scc['armor_outer_radius'] = armor['radius']
+    #         if 'insulation' in armor and armor['insulation']:
+    #             scc['armor_insulation_outer_radius'] = scc['armor_outer_radius'] + armor['insulation']['thickness']
+    #             scc['armor_insulation_permittivity'] = armor['insulation']['relative_permittivity'] * sc.epsilon_0
+    #             scc['armor_insulation_permeability'] = armor['insulation']['relative_permeability'] * sc.mu_0
+
+    #         # Extract physical properties for the armor conductor (layer 3)
+    #         scc['armor_resistivity'] = 1 / armor['conductivity']
+    #         scc['armor_permeability'] = armor['relative_permeability'] * sc.mu_0
+    #         scc['armor_permittivity'] = armor['relative_permittivity'] * sc.epsilon_0
+
+    #     return scc
+
+class SingleCoreCableStrategy(MTLStrategy):
+    """Strategy for single-core cable MTLs."""
+
+    def preprocess_mtl_data(self, mtl_input: dict) -> dict:
+        # For single-core cables (scc), we expect integer keys starting from 1.
+        mtl = {key: value for key, value in mtl_input.items() if isinstance(key, int) and key > 0}
+        mtl_ref = {key: value for key, value in mtl_input.items() if key == 0 and value.get('line_type') == 'return' and value.get('conductor_name') == 'soil'}
+        return mtl, mtl_ref
+
+    def validate(self, mtl: dict, mtl_ref: dict, mtl_input: dict):
+        key_conductors = sorted(mtl.keys())
+        key_expected = list(range(1, len(key_conductors) + 1))
+
+        assert len(mtl) > 0, "Single Core Cable-based MTL must have at least one conductor."
+        assert key_conductors == key_expected, "Cable conductor tags must be a sequence starting from 1."
+        # assert mtl_data[0]['line_type'] == 'return', "Conductor with index '0' must be the return path for cables."
+        # assert idx_ref in mtl_data, f"The reference conductor index {idx_ref} must be in the MTL dictionary."
+
+    def _extract_scc_parameters(self, mtl: dict) -> dict:
         """
         Extracts geometric and physical parameters from a single-core cable
         data structure using descriptive names for clarity. It handles solid
@@ -237,24 +329,6 @@ class MTLStrategy(ABC):
             scc['armor_permittivity'] = armor['relative_permittivity'] * sc.epsilon_0
 
         return scc
-    
-class SingleCoreCableStrategy(MTLStrategy):
-    """Strategy for single-core cable MTLs."""
-
-    def preprocess_mtl_data(self, mtl_input: dict) -> dict:
-        # For single-core cables (scc), we expect integer keys starting from 1.
-        mtl = {key: value for key, value in mtl_input.items() if isinstance(key, int) and key > 0}
-        mtl_ref = {key: value for key, value in mtl_input.items() if key == 0 and value.get('line_type') == 'return' and value.get('conductor_name') == 'soil'}
-        return mtl, mtl_ref
-
-    def validate(self, mtl: dict, mtl_ref: dict, mtl_input: dict):
-        key_conductors = sorted(mtl.keys())
-        key_expected = list(range(1, len(key_conductors) + 1))
-
-        assert len(mtl) > 0, "Single Core Cable-based MTL must have at least one conductor."
-        assert key_conductors == key_expected, "Cable conductor tags must be a sequence starting from 1."
-        # assert mtl_data[0]['line_type'] == 'return', "Conductor with index '0' must be the return path for cables."
-        # assert idx_ref in mtl_data, f"The reference conductor index {idx_ref} must be in the MTL dictionary."
 
     def _count_scc_and_conductors(self, mtl_input: dict) -> tuple:
         """
@@ -376,7 +450,7 @@ class SingleCoreCableStrategy(MTLStrategy):
         context.horizontal_separation_matrix = properties['horizontal_separation_matrix']
 
         # Extract and apply SCC geometric parameters
-        context.scc = MTLStrategy._extract_scc_parameters(mtl)
+        context.scc = self._extract_scc_parameters(mtl)
 
         # Conductors Permeability [np.array]
         context.mu = np.array([sc.mu_0 * conductor['relative_permeability'] for conductor in mtl.values()]) 
@@ -407,6 +481,80 @@ class SingleCoreCableInHDPEStrategy(MTLStrategy):
         assert key_conductors == key_expected, "Cable conductor tags must be a sequence starting from 1."
         # assert mtl_data[0]['line_type'] == 'return', "Conductor with index '0' must be the return path for cables."
         # assert idx_ref in mtl_data, f"The reference conductor index {idx_ref} must be in the MTL dictionary."
+
+    def _extract_scc_parameters(self, mtl: dict) -> dict:
+        """
+        Extracts geometric and physical parameters from a single-core cable
+        data structure using descriptive names for clarity. It handles solid
+        cores (inner radius = 0) and hollow layers.
+
+        Args:
+            mtl (dict): The dictionary containing conductor data for the SCC.
+
+        Returns:
+            dict: A dictionary with the calculated parameters (radii, rho, mu, epsilon).
+        """
+        scc = {}
+        core, sheath, armor = None, None, None
+
+        # Identify each layer by its name
+        for conductor_data in mtl.values():
+            name = conductor_data.get('conductor_name')
+            if name == 'core':
+                core = conductor_data
+            elif name == 'sheath':
+                sheath = conductor_data
+            elif name == 'armor':
+                armor = conductor_data
+        
+        # === CORE ===
+        if core:
+            scc['core_inner_radius'], scc['core_outer_radius'] = core['radius']
+            if 'insulation' in core and core['insulation']:
+                scc['core_insulation_outer_radius'] = scc['core_outer_radius'] + core['insulation']['thickness']
+                scc['core_insulation_permittivity'] = core['insulation']['relative_permittivity'] * sc.epsilon_0
+                scc['core_insulation_permeability'] = core['insulation']['relative_permeability'] * sc.mu_0
+            
+            # Extract physical properties for the core conductor (layer 1)
+            scc['core_resistivity'] = 1 / core['conductivity']
+            scc['core_permeability'] = core['relative_permeability'] * sc.mu_0
+            scc['core_permittivity'] = core['relative_permittivity'] * sc.epsilon_0
+        
+        # === SHEATH ===
+        if sheath and scc.get('core_insulation_outer_radius') is not None:
+            assert np.isclose(scc['core_insulation_outer_radius'], sheath['radius'][0]), \
+                (f"Geometric mismatch: Core's insulation outer radius ({scc['core_insulation_outer_radius']}) "
+                     f"does not match sheath's inner radius ({sheath['radius'][0]})")
+
+            scc['sheath_inner_radius'], scc['sheath_outer_radius'] = sheath['radius']
+            if 'insulation' in sheath and sheath['insulation']:
+                scc['sheath_insulation_outer_radius'] = scc['sheath_outer_radius'] + sheath['insulation']['thickness']
+                scc['sheath_insulation_permittivity'] = sheath['insulation']['relative_permittivity'] * sc.epsilon_0
+                scc['sheath_insulation_permeability'] = sheath['insulation']['relative_permeability'] * sc.mu_0
+
+            # Extract physical properties for the sheath conductor (layer 2)
+            scc['sheath_resistivity'] = 1 / sheath['conductivity']
+            scc['sheath_permeability'] = sheath['relative_permeability'] * sc.mu_0
+            scc['sheath_permittivity'] = sheath['relative_permittivity'] * sc.epsilon_0
+
+        # === ARMOR ===
+        if armor and scc.get('sheath_insulation_outer_radius') is not None:
+            assert np.isclose(scc['sheath_insulation_outer_radius'], armor['radius'][0]), \
+                (f"Geometric mismatch: Sheath's insulation outer radius ({scc['sheath_insulation_outer_radius']}) "
+                     f"does not match armor's inner radius ({armor['radius'][0]})")
+            
+            scc['armor_inner_radius'], scc['armor_outer_radius'] = armor['radius']
+            if 'insulation' in armor and armor['insulation']:
+                scc['armor_insulation_outer_radius'] = scc['armor_outer_radius'] + armor['insulation']['thickness']
+                scc['armor_insulation_permittivity'] = armor['insulation']['relative_permittivity'] * sc.epsilon_0
+                scc['armor_insulation_permeability'] = armor['insulation']['relative_permeability'] * sc.mu_0
+
+            # Extract physical properties for the armor conductor (layer 3)
+            scc['armor_resistivity'] = 1 / armor['conductivity']
+            scc['armor_permeability'] = armor['relative_permeability'] * sc.mu_0
+            scc['armor_permittivity'] = armor['relative_permittivity'] * sc.epsilon_0
+
+        return scc
 
     def _count_scc_and_conductors(self, mtl_input: dict) -> tuple:
         """
@@ -574,7 +722,305 @@ class SingleCoreCableInHDPEStrategy(MTLStrategy):
         context.horizontal_separation_matrix = properties['horizontal_separation_matrix']
 
         # Extract and apply SCC geometric parameters
-        context.scc = MTLStrategy._extract_scc_parameters(mtl)
+        context.scc = self._extract_scc_parameters(mtl)
+        context.scc['hdpe'] = self._extract_hdpe_parameters(mtl)
+
+        # Conductors Permeability [np.array]
+        context.mu = np.array([sc.mu_0 * conductor['relative_permeability'] for conductor in mtl.values()]) 
+
+        # Conductors Permittivity [np.array]
+        context.epsilon = np.array([sc.epsilon_0 * conductor['relative_permittivity'] for conductor in mtl.values()]) 
+
+        # Conductors conductivity [np.array]
+        context.sigma = np.array([conductor['conductivity'] for conductor in mtl.values()])
+
+        # Free-Space Permittivity [np.array]
+        context.epsilon_out = np.array([sc.epsilon_0 * conductor['relative_permittivity_out'] for conductor in mtl.values()])
+
+class SingleCoreCableWithECCInHDPEStrategy(MTLStrategy):
+    """Strategy for single-core cable MTLs."""
+
+    def preprocess_mtl_data(self, mtl_input: dict) -> dict:
+        # For single-core cables (scc), we expect integer keys starting from 1.
+        mtl = {key: value for key, value in mtl_input.items() if isinstance(key, int) and key > 0}
+        mtl_ref = {key: value for key, value in mtl_input.items() if key == 0 and value.get('line_type') == 'return' and value.get('conductor_name') == 'soil'}
+        return mtl, mtl_ref
+
+    def validate(self, mtl: dict, mtl_ref: dict, mtl_input: dict):
+        key_conductors = sorted(mtl.keys())
+        key_expected = list(range(1, len(key_conductors) + 1))
+
+        assert len(mtl) > 0, "Single Core Cable-based MTL must have at least one conductor."
+        assert key_conductors == key_expected, "Cable conductor tags must be a sequence starting from 1."
+        # assert mtl_data[0]['line_type'] == 'return', "Conductor with index '0' must be the return path for cables."
+        # assert idx_ref in mtl_data, f"The reference conductor index {idx_ref} must be in the MTL dictionary."
+
+    def _extract_scc_parameters(self, mtl: dict) -> dict:
+        """
+        Extracts geometric and physical parameters from a single-core cable
+        data structure using descriptive names for clarity. It handles solid
+        cores (inner radius = 0) and hollow layers.
+
+        Handles MTL dicts containing multiple cables (e.g., SCC and ECC)
+        by grouping conductors based on their 'center_point'.
+
+        Args:
+            mtl (dict): The dictionary containing conductor data for the SCC.
+
+        Returns:
+            dict: A dictionary where keys are string representations of
+                  'center_point' tuples, and values are the extracted
+                  parameter dictionaries (scc) for each cable.
+        """
+        
+        # 1. Agrupar condutores (core, sheath, armor) por seu center_point
+        cable_systems = defaultdict(lambda: {'core': None, 'sheath': None, 'armor': None})
+        for conductor_data in mtl.values():
+            name = conductor_data.get('conductor_name')
+            center_point = conductor_data.get('center_point')
+            
+            # Ignora componentes não relevantes (ex: solo) ou sem posição
+            if not center_point or name not in ('core', 'sheath', 'armor'):
+                continue
+            
+            # Usa a string da tupla como chave do dicionário
+            cp_key = str(center_point)
+            
+            if cable_systems[cp_key][name] is not None:
+                # Alerta se encontrarmos, por exemplo, dois 'core' no mesmo center_point
+                print(f"Warning: Duplicate conductor name '{name}' found at center_point {cp_key}.")
+            
+            cable_systems[cp_key][name] = conductor_data
+
+        # 2. Processar cada sistema de cabo agrupado
+        all_scc_params = {}
+        for cp_key, components in cable_systems.items():
+            scc = {} # Dicionário de parâmetros para este cabo específico
+            core, sheath, armor = components['core'], components['sheath'], components['armor']
+            
+            # === CORE ===
+            if core:
+                scc['core_inner_radius'], scc['core_outer_radius'] = core['radius']
+                if 'insulation' in core and core['insulation']:
+                    scc['core_insulation_outer_radius'] = scc['core_outer_radius'] + core['insulation']['thickness']
+                    scc['core_insulation_permittivity'] = core['insulation']['relative_permittivity'] * sc.epsilon_0
+                    scc['core_insulation_permeability'] = core['insulation']['relative_permeability'] * sc.mu_0
+                
+                # Extract physical properties for the core conductor (layer 1)
+                scc['core_resistivity'] = 1 / core['conductivity']
+                scc['core_permeability'] = core['relative_permeability'] * sc.mu_0
+                scc['core_permittivity'] = core['relative_permittivity'] * sc.epsilon_0
+            
+            # === SHEATH ===
+            if sheath:
+                # Validação: O 'core' deve existir e ter isolamento para se conectar à 'sheath'
+                if scc.get('core_insulation_outer_radius') is not None:
+                    assert np.isclose(scc['core_insulation_outer_radius'], sheath['radius'][0]), \
+                        (f"Geometric mismatch at {cp_key}: Core's insulation outer radius ({scc['core_insulation_outer_radius']}) "
+                         f"does not match sheath's inner radius ({sheath['radius'][0]})")
+                
+                scc['sheath_inner_radius'], scc['sheath_outer_radius'] = sheath['radius']
+                if 'insulation' in sheath and sheath['insulation']:
+                    scc['sheath_insulation_outer_radius'] = scc['sheath_outer_radius'] + sheath['insulation']['thickness']
+                    scc['sheath_insulation_permittivity'] = sheath['insulation']['relative_permittivity'] * sc.epsilon_0
+                    scc['sheath_insulation_permeability'] = sheath['insulation']['relative_permeability'] * sc.mu_0
+
+                # Extract physical properties for the sheath conductor (layer 2)
+                scc['sheath_resistivity'] = 1 / sheath['conductivity']
+                scc['sheath_permeability'] = sheath['relative_permeability'] * sc.mu_0
+                scc['sheath_permittivity'] = sheath['relative_permittivity'] * sc.epsilon_0
+
+            # === ARMOR ===
+            if armor:
+                 # Validação: A 'sheath' deve existir e ter isolamento para se conectar ao 'armor'
+                if scc.get('sheath_insulation_outer_radius') is not None:
+                    assert np.isclose(scc['sheath_insulation_outer_radius'], armor['radius'][0]), \
+                        (f"Geometric mismatch at {cp_key}: Sheath's insulation outer radius ({scc['sheath_insulation_outer_radius']}) "
+                         f"does not match armor's inner radius ({armor['radius'][0]})")
+                
+                scc['armor_inner_radius'], scc['armor_outer_radius'] = armor['radius']
+                if 'insulation' in armor and armor['insulation']:
+                    scc['armor_insulation_outer_radius'] = scc['armor_outer_radius'] + armor['insulation']['thickness']
+                    scc['armor_insulation_permittivity'] = armor['insulation']['relative_permittivity'] * sc.epsilon_0
+                    scc['armor_insulation_permeability'] = armor['insulation']['relative_permeability'] * sc.mu_0
+
+                # Extract physical properties for the armor conductor (layer 3)
+                scc['armor_resistivity'] = 1 / armor['conductivity']
+                scc['armor_permeability'] = armor['relative_permeability'] * sc.mu_0
+                scc['armor_permittivity'] = armor['relative_permittivity'] * sc.epsilon_0
+            
+            # Adiciona os parâmetros deste cabo ao dicionário principal
+            all_scc_params[cp_key] = scc
+
+        return all_scc_params
+    
+    def _count_scc_and_conductors(self, mtl_input: dict) -> tuple:
+        """
+        Counts the number of (sc) cables (N) and conductors per cable (M)
+        based on the provided data structure.
+        """
+        # 1. Filter to get only active conductors
+        active_conductors = [
+            v for k, v in mtl_input.items()
+            if isinstance(k, int) and v.get('line_type') == 'active'
+        ]
+
+        if not active_conductors:
+            return 0, 0
+
+        # 2. Count the number of cables (N) by finding unique center points
+        num_cables = len(set([cond['center_point'] for cond in active_conductors]))
+
+        # 3. Count conductors per cable (M)
+        total_active_conductors = len(active_conductors)
+        
+        if num_cables > 0:
+            conductors_per_cable = total_active_conductors // num_cables
+        else:
+            conductors_per_cable = 0
+
+        return num_cables, conductors_per_cable
+    
+    def _cable_distance_matrices(self, mtl: dict) -> dict:
+        """
+            Calcula todas as matrizes de distância necessárias para a análise de cabos,
+            incluindo as separações geométricas, de retorno pelo solo, horizontais e verticais.
+
+            Para cada cabo físico, esta função seleciona o componente com o maior raio externo
+            para representá-lo nos cálculos de distância. O agrupamento dos componentes de um
+            mesmo cabo é feito pela coordenada 'center_point' compartilhada.
+        """
+        # 1. Agrupar condutores pela coordenada 'center_point'
+        cable_groups = defaultdict(list)
+        for key, data in mtl.items():
+            # Ignora o condutor de retorno (solo)
+            if data.get('line_type') == 'return':
+                continue
+            
+            if data.get('center_point') is None:
+                continue
+            
+            # Armazena a tupla (chave_original, dados) no grupo correspondente à sua posição
+            cable_groups[tuple(data.get('center_point'))].append((key, data))
+
+        # 2. Para cada grupo (localização), selecionar o condutor com o maior raio externo
+        selected_cables = []
+        for center_point, conductors_in_group in cable_groups.items():
+            if not conductors_in_group:
+                continue
+
+            # Função para calcular o raio externo total de um condutor
+            def get_outer_radius(conductor_tuple):
+                data = conductor_tuple[1]
+                insulation_thickness = (data.get('insulation') or {}).get('thickness', 0)
+                # data['radius'] é uma tupla (raio_interno, raio_externo)
+                return data['radius'][1] + insulation_thickness
+
+            # Encontra o condutor com o raio externo máximo no grupo
+            representative_conductor = max(conductors_in_group, key=get_outer_radius)
+            selected_cables.append(representative_conductor)
+
+        # 3. Ordenar a lista final pela chave original (0, 1, 2...) para garantir consistência
+        cables = sorted(selected_cables, key=lambda item: item[0])
+        
+        N = len(cables)        
+        d_matrix = np.zeros((N, N))
+        D_matrix = np.zeros((N, N))
+        images_vertical_distance_matrix = np.zeros((N, N))
+        horizontal_separation_matrix = np.zeros((N, N))
+
+        for n_idx, (n_tag, n_cable) in enumerate(cables):
+            for m_idx, (m_tag, m_cable) in enumerate(cables):
+                cn, cm = n_cable['center_point'], m_cable['center_point']
+
+                # Horizontal spacing, s = dnm
+                if n_tag == m_tag:
+                    # Self Parameters
+                    s = n_cable['radius'][1] + (n_cable.get('insulation') or {}).get('thickness', 0)
+                else:
+                    s = cn[0] - cm[0] 
+
+                # Physical Distance (d)
+                d_matrix[n_idx, m_idx] = np.sqrt(s ** 2 + (cn[1] - cm[1]) ** 2)
+
+                # Distance to Image (D)
+                D_matrix[n_idx, m_idx] = np.sqrt(s ** 2 + (cn[1] + cm[1]) ** 2)
+
+                # Physical Distances
+                images_vertical_distance_matrix[n_idx, m_idx] = cn[1] + cm[1]
+                horizontal_separation_matrix[n_idx, m_idx] = s
+
+        return {
+            'd_matrix_ground_return': d_matrix,
+            'D_matrix_ground_return': D_matrix,
+            'images_vertical_distance_matrix': images_vertical_distance_matrix,
+            'horizontal_separation_matrix': horizontal_separation_matrix
+        }
+    
+    def _extract_hdpe_parameters(self, mtl: dict) -> dict:
+        """
+        Extracts geometric and physical parameters from a single-core cable
+        data structure using descriptive names for clarity. It handles solid
+        cores (inner radius = 0) and hollow layers.
+
+        Args:
+            mtl (dict): The dictionary containing conductor data for the SCC.
+
+        Returns:
+            dict: A dictionary with the calculated parameters (radii, rho, mu, epsilon).
+        """
+        hdpe = {'core': {}, 'sheath': {}, 'armor': {}}
+        core_enclosure, sheath_enclosure, armor_enclosure = None, None, None
+
+        # Identify each enclosure by its name
+        for conductor_data in mtl.values():
+            name = conductor_data.get('conductor_name')
+            if name == 'core' and conductor_data.get('enclosure') is not None:
+                core_enclosure = conductor_data['enclosure']
+            elif name == 'sheath' and conductor_data.get('enclosure') is not None:
+                sheath_enclosure = conductor_data['enclosure']
+            elif name == 'armor' and conductor_data.get('enclosure') is not None:
+                armor_enclosure = conductor_data['enclosure']
+        
+        # === CORE ===
+        if core_enclosure:
+            pass
+        
+        # === SHEATH ===
+        if sheath_enclosure:
+            hdpe['sheath']['inner_radius'] = sheath_enclosure['inner_radius']
+            hdpe['sheath']['outer_radius'] = sheath_enclosure['outer_radius']
+            
+            if 'insulation' in sheath_enclosure and sheath_enclosure['insulation']:
+                hdpe['sheath']['insulation_permittivity'] = sheath_enclosure['insulation']['relative_permittivity'] * sc.epsilon_0
+
+            # Extract physical properties for the sheath conductor (layer 2)
+            hdpe['sheath']['permittivity'] = sheath_enclosure['relative_permittivity'] * sc.epsilon_0
+
+        # === ARMOR ===
+        if armor_enclosure and hdpe.get('sheath_insulation_outer_radius') is not None:
+            pass
+
+        return hdpe
+    
+    def apply_mtl_ref_properties(self, context, mtl_input: dict) -> None:
+        # Number of single core cables (N) and conductors per cable (M)
+        context.num_sc_cables, context.num_conductors_per_scc = self._count_scc_and_conductors(mtl_input)
+
+    def apply_mtl_properties(self, context, mtl: dict) -> None:
+        """
+        Calculates and applies overhead-line-specific distance matrices to the MTL object
+        by delegating the calculation to a static helper method.
+        """
+        # 1. Delegate the complex calculation to the static method
+        properties = self._cable_distance_matrices(mtl)
+        context.d_matrix_ground_return = properties['d_matrix_ground_return']
+        context.D_matrix_ground_return = properties['D_matrix_ground_return']
+        context.images_vertical_distance_matrix = properties['images_vertical_distance_matrix']
+        context.horizontal_separation_matrix = properties['horizontal_separation_matrix']
+
+        # Extract and apply SCC geometric parameters
+        context.scc = self._extract_scc_parameters(mtl)
         context.scc['hdpe'] = self._extract_hdpe_parameters(mtl)
 
         # Conductors Permeability [np.array]
@@ -785,6 +1231,7 @@ def mtl_strategy_factory(mtl_type: str) -> MTLStrategy:
         'scc': SingleCoreCableStrategy,
         'pipe': CableStrategy,
         'hdpe': SingleCoreCableInHDPEStrategy,
+        'shared-hdpe': SingleCoreCableWithECCInHDPEStrategy,
     }
     
     strategy_class = strategies.get(mtl_type)

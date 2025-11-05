@@ -45,18 +45,19 @@ class BasePlotter:
         right_cfg = config['right_plot']
         data_path = config['data_path'] 
         
-        for series in config['series_to_plot']:
-            # Lógica para buscar os dados usando data_path e a 'key' da série
-            # key = series['key']
-            matrix = self.pul_data[data_path[0]][series['key']][data_path[2]][data_path[3]]
-            
-            # Plotar dados (Ex: Resistência)
-            y1_data = self._calculate_plot_data(matrix[:, p, q], self.w, left_cfg['component'], left_cfg['scale'])
-            ax1.plot(self.f, y1_data, **series['type']['main'])
-            
-            # Plotar dados (Ex: Indutância)
-            y2_data = self._calculate_plot_data(matrix[:, p, q], self.w, right_cfg['component'], right_cfg['scale'])
-            ax2.plot(self.f, y2_data, **series['type']['main'])
+        if self.pul_data['scenarios']:
+            for series in config['series_to_plot']:
+                # Lógica para buscar os dados usando data_path e a 'key' da série
+                # key = series['key']
+                matrix = self.pul_data[data_path[0]][series['key']][data_path[2]][data_path[3]]
+                
+                # Plotar dados (Ex: Resistência)
+                y1_data = self._calculate_plot_data(matrix[:, p, q], self.w, left_cfg['component'], left_cfg['scale'])
+                ax1.plot(self.f, y1_data, **series['type']['main'])
+                
+                # Plotar dados (Ex: Indutância)
+                y2_data = self._calculate_plot_data(matrix[:, p, q], self.w, right_cfg['component'], right_cfg['scale'])
+                ax2.plot(self.f, y2_data, **series['type']['main'])
 
         # --- Bloco COMSOL Genérico ---
         if self.cmsl is not None and 'comsol_series_to_plot' in config:
@@ -64,7 +65,7 @@ class BasePlotter:
             w_cmsl = self.cmsl['angular_frequencies']
             
             for series in config['comsol_series_to_plot']:
-                cmsl_key = series.get('base_key')
+                cmsl_key = series.get('key')
                 cmsl_graph_type = config['comsol_matrix_key']
                 
                 if cmsl_key not in self.cmsl['scenarios']:
@@ -78,7 +79,7 @@ class BasePlotter:
                     cmsl_matrix = self.cmsl['scenarios'][cmsl_key]['quasi_tem_matrices'][cmsl_graph_type]
 
                 # Obter o estilo de plotagem
-                style = {k: v for k, v in series.items() if k != 'base_key'}
+                style = {k: v for k, v in series.items() if k != 'key'}
                 
                 # Plotar dados do subplot esquerdo
                 y1_data_cmsl = self._calculate_plot_data(cmsl_matrix[:, p, q], w_cmsl, left_cfg['component'], left_cfg['scale'])
@@ -109,19 +110,20 @@ class BasePlotter:
         data_path = config['data_path'] 
         
         # --- Bloco Analítico Genérico ---
-        for series in config['series_to_plot']:
-            matrix = self.pul_data[data_path[0]][series['key']][data_path[2]][data_path[3]]
+        if self.pul_data['scenarios']:
+            for series in config['series_to_plot']:
+                matrix = self.pul_data['scenarios'][series['key']][data_path[2]][data_path[3]]
 
-            for value in series['type'].values():
-                p, q = value['p'], value['q']
-                
-                # Plotar dados do subplot esquerdo
-                y1_data = self._calculate_plot_data(matrix[:,p,q], self.w, left_cfg['component'], left_cfg['scale'])                
-                ax1.plot(self.f, y1_data, color=value['color'], linestyle=value['linestyle'], linewidth=value['linewidth'], label=value['label'])
-                
-                # Plotar dados do subplot direito
-                y2_data = self._calculate_plot_data(matrix[:,p,q], self.w, right_cfg['component'], right_cfg['scale'])                
-                ax2.plot(self.f, y2_data, color=value['color'], linestyle=value['linestyle'], linewidth=value['linewidth'], label=value['label'])
+                for value in series['type'].values():
+                    p, q = value['p'], value['q']
+                    
+                    # Plotar dados do subplot esquerdo
+                    y1_data = self._calculate_plot_data(matrix[:, p, q], self.w, left_cfg['component'], left_cfg['scale'])                
+                    ax1.plot(self.f, y1_data, color=value['color'], linestyle=value['linestyle'], linewidth=value['linewidth'], label=value['label'])
+                    
+                    # Plotar dados do subplot direito
+                    y2_data = self._calculate_plot_data(matrix[:, p, q], self.w, right_cfg['component'], right_cfg['scale'])                
+                    ax2.plot(self.f, y2_data, color=value['color'], linestyle=value['linestyle'], linewidth=value['linewidth'], label=value['label'])
             
         # --- Bloco COMSOL Genérico ---
         if self.cmsl is not None and 'comsol_series_to_plot' in config:
@@ -129,29 +131,30 @@ class BasePlotter:
             w_cmsl = self.cmsl['angular_frequencies']
             
             for series in config['comsol_series_to_plot']:
-                cmsl_key = series.get('base_key')
+                cmsl_key = series.get('key')
                 cmsl_graph_type = config['comsol_matrix_key']
                 
                 if cmsl_key not in self.cmsl['scenarios']:
                     print(f"Aviso: Chave COMSOL '{cmsl_key}' não encontrada.")
                     continue
 
-                if cmsl_graph_type in ['impedance_matrix', 'admittance_matrix']:
-                    cmsl_matrix = self.cmsl['scenarios'][cmsl_key]['earth_return_parameters'][cmsl_graph_type]
-
-                elif cmsl_graph_type in ['series_impedance_matrix', 'shunt_admittance_matrix']:
-                    cmsl_matrix = self.cmsl['scenarios'][cmsl_key]['quasi_tem_matrices'][cmsl_graph_type]
-
-                # Obter o estilo de plotagem
-                style = {k: v for k, v in series.items() if k != 'base_key'}
+                if cmsl_graph_type in ['internal_impedance_matrix']:
+                    cmsl_matrix = self.cmsl['scenarios'][cmsl_key][cmsl_graph_type]
                 
-                # Plotar dados do subplot esquerdo
-                y1_data_cmsl = self._calculate_plot_data(cmsl_matrix[:, p, q], w_cmsl, left_cfg['component'], left_cfg['scale'])
-                ax1.scatter(freq, y1_data_cmsl, **style)
-                
-                # Plotar dados do subplot direito
-                y2_data_cmsl = self._calculate_plot_data(cmsl_matrix[:, p, q], w_cmsl, right_cfg['component'], right_cfg['scale'])
-                ax2.scatter(freq, y2_data_cmsl, **style)
+                else:
+                    continue
+
+                for key, value in series['type'].items():
+                    p, q = value['p'], value['q']
+                    style = {k: v for k, v in value.items() if k not in ['p', 'q']}
+
+                    # Plotar dados do subplot esquerdo
+                    y1_data_cmsl = self._calculate_plot_data(cmsl_matrix[:, p, q], w_cmsl, left_cfg['component'], left_cfg['scale'])
+                    ax1.scatter(freq, y1_data_cmsl, **style)
+
+                    # Plotar dados do subplot direito
+                    y2_data_cmsl = self._calculate_plot_data(cmsl_matrix[:, p, q], w_cmsl, right_cfg['component'], right_cfg['scale'])
+                    ax2.scatter(freq, y2_data_cmsl, **style)
 
         # --- Formatação Genérica dos Eixos ---
         self._format_axis(ax1, self.f, self.xlim, left_cfg)
@@ -174,17 +177,18 @@ class BasePlotter:
         data_path = config['data_path'] 
         
         # --- Bloco Analítico Genérico ---
-        for series in config['series_to_plot']:
-            matrix = self.pul_data[data_path[0]][series['key']][data_path[2]][data_path[3]]
+        if self.pul_data['scenarios']:
+            for series in config['series_to_plot']:
+                matrix = self.pul_data[data_path[0]][series['key']][data_path[2]][data_path[3]]
 
-            for key, value in series['type'].items():
-                # Plotar dados do subplot esquerdo
-                y1_data = self._calculate_plot_data(matrix[key], self.w, left_cfg['component'], left_cfg['scale'])                
-                ax1.plot(self.f, y1_data, **value)
-                
-                # Plotar dados do subplot direito
-                y2_data = self._calculate_plot_data(matrix[key], self.w, right_cfg['component'], right_cfg['scale'])
-                ax2.plot(self.f, y2_data, **value)
+                for key, value in series['type'].items():
+                    # Plotar dados do subplot esquerdo
+                    y1_data = self._calculate_plot_data(matrix[key], self.w, left_cfg['component'], left_cfg['scale'])                
+                    ax1.plot(self.f, y1_data, **value)
+                    
+                    # Plotar dados do subplot direito
+                    y2_data = self._calculate_plot_data(matrix[key], self.w, right_cfg['component'], right_cfg['scale'])
+                    ax2.plot(self.f, y2_data, **value)
             
         # --- Bloco COMSOL Genérico ---
         if self.cmsl is not None and 'comsol_series_to_plot' in config:
@@ -192,7 +196,7 @@ class BasePlotter:
             w_cmsl = self.cmsl['angular_frequencies']
             
             for series in config['comsol_series_to_plot']:
-                cmsl_key = series.get('base_key')
+                cmsl_key = series.get('key')
                 cmsl_graph_type = config['comsol_matrix_key']
                 
                 if cmsl_key not in self.cmsl['scenarios']:
@@ -205,16 +209,20 @@ class BasePlotter:
                 elif cmsl_graph_type in ['series_impedance_matrix', 'shunt_admittance_matrix']:
                     cmsl_matrix = self.cmsl['scenarios'][cmsl_key]['quasi_tem_matrices'][cmsl_graph_type]
 
-                # Obter o estilo de plotagem
-                style = {k: v for k, v in series.items() if k != 'base_key'}
-                
-                # Plotar dados do subplot esquerdo
-                y1_data_cmsl = self._calculate_plot_data(cmsl_matrix[:, p, q], w_cmsl, left_cfg['component'], left_cfg['scale'])
-                ax1.scatter(freq, y1_data_cmsl, **style)
-                
-                # Plotar dados do subplot direito
-                y2_data_cmsl = self._calculate_plot_data(cmsl_matrix[:, p, q], w_cmsl, right_cfg['component'], right_cfg['scale'])
-                ax2.scatter(freq, y2_data_cmsl, **style)
+                elif cmsl_graph_type in ['coaxial_cable_impedance', 'internal_impedance_elements']:
+                    cmsl_matrix = self.cmsl['scenarios'][cmsl_key][cmsl_graph_type]
+
+                else:
+                    continue
+
+                for key, value in series['type'].items():
+                    # Plotar dados do subplot esquerdo
+                    y1_data_cmsl = self._calculate_plot_data(cmsl_matrix[key], w_cmsl, left_cfg['component'], left_cfg['scale'])
+                    ax1.scatter(freq, y1_data_cmsl, **value)
+
+                    # Plotar dados do subplot direito
+                    y2_data_cmsl = self._calculate_plot_data(cmsl_matrix[key], w_cmsl, right_cfg['component'], right_cfg['scale'])
+                    ax2.scatter(freq, y2_data_cmsl, **value)
 
         # --- Formatação Genérica dos Eixos ---
         self._format_axis(ax1, self.f, self.xlim, left_cfg)
@@ -241,17 +249,18 @@ class BasePlotter:
         # ex: ['scenarios', '{key}', 'quasi_tem_matrices', 'series_impedance_matrix']
         data_path = config['data_path'] 
         
-        for series in config['series_to_plot']:
-            # Lógica para buscar os dados usando data_path e a 'key' da série
-            item = self.pul_data[data_path[0]][series['key']][data_path[2]][data_path[3]]
-            
-            # Plotar dados do subplot esquerdo
-            y1_data = self._calculate_plot_data(item, self.w, left_cfg['component'], left_cfg['scale'])
-            ax1.plot(self.f, y1_data, **series['type']['main'])
-            
-            # Plotar dados do subplot direito
-            y2_data = self._calculate_plot_data(item, self.w, right_cfg['component'], right_cfg['scale'])
-            ax2.plot(self.f, y2_data, **series['type']['main'])
+        if self.pul_data['scenarios']:
+            for series in config['series_to_plot']:
+                # Lógica para buscar os dados usando data_path e a 'key' da série
+                item = self.pul_data[data_path[0]][series['key']][data_path[2]][data_path[3]]
+                
+                # Plotar dados do subplot esquerdo
+                y1_data = self._calculate_plot_data(item, self.w, left_cfg['component'], left_cfg['scale'])
+                ax1.plot(self.f, y1_data, **series['type']['main'])
+                
+                # Plotar dados do subplot direito
+                y2_data = self._calculate_plot_data(item, self.w, right_cfg['component'], right_cfg['scale'])
+                ax2.plot(self.f, y2_data, **series['type']['main'])
 
         # --- Bloco COMSOL Genérico ---
         if self.cmsl is not None and 'comsol_series_to_plot' in config:
@@ -259,7 +268,7 @@ class BasePlotter:
             w_cmsl = self.cmsl['angular_frequencies']
             
             for series in config['comsol_series_to_plot']:
-                cmsl_key = series.get('base_key')
+                cmsl_key = series.get('key')
                 cmsl_graph_type = config['comsol_matrix_key']
                 
                 if cmsl_key not in self.cmsl['scenarios']:
@@ -270,7 +279,7 @@ class BasePlotter:
                     cmsl_item = self.cmsl['scenarios'][cmsl_key]['earth_return_parameters'][cmsl_graph_type]
 
                 # Obter o estilo de plotagem
-                style = {k: v for k, v in series.items() if k != 'base_key'}
+                style = {k: v for k, v in series.items() if k != 'key'}
                 
                 # Plotar dados do subplot esquerdo
                 y1_data_cmsl = self._calculate_plot_data(cmsl_item, w_cmsl, left_cfg['component'], left_cfg['scale'])
