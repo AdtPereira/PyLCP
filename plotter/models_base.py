@@ -21,6 +21,7 @@ class BasePlotter:
         self.plot_config = plot_config
         self.autoSave = autoSave
         
+        self.mom_so = self.pul_data.get('mom_so', None)
         self.cmsl = self.pul_data.get('comsol', None)
         self.f = pul_data['frequencies']
         self.w = 2 * np.pi * self.f        
@@ -193,37 +194,61 @@ class BasePlotter:
         # --- Bloco COMSOL Genérico ---
         if self.cmsl is not None and 'comsol_series_to_plot' in config:
             freq = self.cmsl['frequencies']
-            w_cmsl = self.cmsl['angular_frequencies']
+            w = self.cmsl['angular_frequencies']
             
             for series in config['comsol_series_to_plot']:
-                cmsl_key = series.get('key')
-                cmsl_graph_type = config['comsol_matrix_key']
+                key = series.get('key')
+                graph_type = config['comsol_matrix_key']
                 
-                if cmsl_key not in self.cmsl['scenarios']:
-                    print(f"Aviso: Chave COMSOL '{cmsl_key}' não encontrada.")
+                if key not in self.cmsl['scenarios']:
+                    print(f"Aviso: Chave COMSOL '{key}' não encontrada.")
                     continue
 
-                if cmsl_graph_type in ['impedance_matrix', 'admittance_matrix']:
-                    cmsl_matrix = self.cmsl['scenarios'][cmsl_key]['earth_return_parameters'][cmsl_graph_type]
+                if graph_type in ['impedance_matrix', 'admittance_matrix']:
+                    matrix = self.cmsl['scenarios'][key]['earth_return_parameters'][graph_type]
 
-                elif cmsl_graph_type in ['series_impedance_matrix', 'shunt_admittance_matrix']:
-                    cmsl_matrix = self.cmsl['scenarios'][cmsl_key]['quasi_tem_matrices'][cmsl_graph_type]
+                elif graph_type in ['series_impedance_matrix', 'shunt_admittance_matrix']:
+                    matrix = self.cmsl['scenarios'][key]['quasi_tem_matrices'][graph_type]
 
-                elif cmsl_graph_type in ['coaxial_cable_impedance', 'internal_impedance_elements']:
-                    cmsl_matrix = self.cmsl['scenarios'][cmsl_key][cmsl_graph_type]
+                elif graph_type in ['coaxial_cable_impedance', 'internal_impedance_elements']:
+                    matrix = self.cmsl['scenarios'][key][graph_type]
 
                 else:
                     continue
 
                 for key, value in series['type'].items():
-                    # Plotar dados do subplot esquerdo
-                    y1_data_cmsl = self._calculate_plot_data(cmsl_matrix[key], w_cmsl, left_cfg['component'], left_cfg['scale'])
+                    y1_data_cmsl = self._calculate_plot_data(matrix[key], w, left_cfg['component'], left_cfg['scale'])
                     ax1.scatter(freq, y1_data_cmsl, **value)
 
-                    # Plotar dados do subplot direito
-                    y2_data_cmsl = self._calculate_plot_data(cmsl_matrix[key], w_cmsl, right_cfg['component'], right_cfg['scale'])
+                    y2_data_cmsl = self._calculate_plot_data(matrix[key], w, right_cfg['component'], right_cfg['scale'])
                     ax2.scatter(freq, y2_data_cmsl, **value)
 
+        # --- Bloco MoM-SO Genérico ---
+        if self.mom_so is not None and 'mom_so_series_to_plot' in config:
+            freq = self.mom_so['frequencies']
+            w = 2 * np.pi * freq
+            
+            for series in config['mom_so_series_to_plot']:
+                key = series.get('key')
+                graph_type = config['mom_so_matrix_key']
+
+                if key not in self.mom_so['scenarios']:
+                    print(f"Aviso: Chave MoM-SO '{key}' não encontrada.")
+                    continue
+
+                if graph_type in ['coaxial_cable_impedance']:
+                    matrix = self.mom_so['scenarios'][key][graph_type]
+
+                else:
+                    continue
+
+                for key, value in series['type'].items():
+                    y1_data = self._calculate_plot_data(matrix[:, 0, 0], w, left_cfg['component'], left_cfg['scale'])
+                    ax1.scatter(freq, y1_data, **value)
+
+                    y2_data = self._calculate_plot_data(matrix[:, 0, 0], w, right_cfg['component'], right_cfg['scale'])
+                    ax2.scatter(freq, y2_data, **value)
+                    
         # --- Formatação Genérica dos Eixos ---
         self._format_axis(ax1, self.f, self.xlim, left_cfg)
         self._format_axis(ax2, self.f, self.xlim, right_cfg)

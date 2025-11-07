@@ -1053,6 +1053,80 @@ class CableStrategy(MTLStrategy):
         assert mtl[0]['line_type'] == 'return', "Conductor with index '0' must be the return path for cables."
         # assert idx_ref in mtl_data, f"The reference conductor index {idx_ref} must be in the MTL dictionary."
 
+    def _extract_scc_parameters(self, mtl: dict) -> dict:
+        """
+        Extracts geometric and physical parameters from a single-core cable
+        data structure using descriptive names for clarity. It handles solid
+        cores (inner radius = 0) and hollow layers.
+
+        Args:
+            mtl (dict): The dictionary containing conductor data for the SCC.
+
+        Returns:
+            dict: A dictionary with the calculated parameters (radii, rho, mu, epsilon).
+        """
+        scc = {}
+        core, sheath, armor = None, None, None
+
+        # Identify each layer by its name
+        for conductor_data in mtl.values():
+            name = conductor_data.get('conductor_name')
+            if name == 'core':
+                core = conductor_data
+            elif name == 'sheath':
+                sheath = conductor_data
+            elif name == 'armor':
+                armor = conductor_data
+        
+        # === CORE ===
+        if core:
+            scc['core_inner_radius'], scc['core_outer_radius'] = core['radius']
+            if 'insulation' in core and core['insulation']:
+                scc['core_insulation_outer_radius'] = scc['core_outer_radius'] + core['insulation']['thickness']
+                scc['core_insulation_permittivity'] = core['insulation']['relative_permittivity'] * sc.epsilon_0
+                scc['core_insulation_permeability'] = core['insulation']['relative_permeability'] * sc.mu_0
+            
+            # Extract physical properties for the core conductor (layer 1)
+            scc['core_resistivity'] = 1 / core['conductivity']
+            scc['core_permeability'] = core['relative_permeability'] * sc.mu_0
+            scc['core_permittivity'] = core['relative_permittivity'] * sc.epsilon_0
+        
+        # === SHEATH ===
+        if sheath and scc.get('core_insulation_outer_radius') is not None:
+            assert np.isclose(scc['core_insulation_outer_radius'], sheath['radius'][0]), \
+                (f"Geometric mismatch: Core's insulation outer radius ({scc['core_insulation_outer_radius']}) "
+                     f"does not match sheath's inner radius ({sheath['radius'][0]})")
+
+            scc['sheath_inner_radius'], scc['sheath_outer_radius'] = sheath['radius']
+            if 'insulation' in sheath and sheath['insulation']:
+                scc['sheath_insulation_outer_radius'] = scc['sheath_outer_radius'] + sheath['insulation']['thickness']
+                scc['sheath_insulation_permittivity'] = sheath['insulation']['relative_permittivity'] * sc.epsilon_0
+                scc['sheath_insulation_permeability'] = sheath['insulation']['relative_permeability'] * sc.mu_0
+
+            # Extract physical properties for the sheath conductor (layer 2)
+            scc['sheath_resistivity'] = 1 / sheath['conductivity']
+            scc['sheath_permeability'] = sheath['relative_permeability'] * sc.mu_0
+            scc['sheath_permittivity'] = sheath['relative_permittivity'] * sc.epsilon_0
+
+        # === ARMOR ===
+        if armor and scc.get('sheath_insulation_outer_radius') is not None:
+            assert np.isclose(scc['sheath_insulation_outer_radius'], armor['radius'][0]), \
+                (f"Geometric mismatch: Sheath's insulation outer radius ({scc['sheath_insulation_outer_radius']}) "
+                     f"does not match armor's inner radius ({armor['radius'][0]})")
+            
+            scc['armor_inner_radius'], scc['armor_outer_radius'] = armor['radius']
+            if 'insulation' in armor and armor['insulation']:
+                scc['armor_insulation_outer_radius'] = scc['armor_outer_radius'] + armor['insulation']['thickness']
+                scc['armor_insulation_permittivity'] = armor['insulation']['relative_permittivity'] * sc.epsilon_0
+                scc['armor_insulation_permeability'] = armor['insulation']['relative_permeability'] * sc.mu_0
+
+            # Extract physical properties for the armor conductor (layer 3)
+            scc['armor_resistivity'] = 1 / armor['conductivity']
+            scc['armor_permeability'] = armor['relative_permeability'] * sc.mu_0
+            scc['armor_permittivity'] = armor['relative_permittivity'] * sc.epsilon_0
+
+        return scc
+    
     def _count_scc_and_conductors_plus_ref(self, mtl_input: dict) -> tuple:
         """
         Counts the number of (sc) cables (N) and conductors per cable (M)
@@ -1092,7 +1166,7 @@ class CableStrategy(MTLStrategy):
         context.theta_pq = distances['theta_pq']
 
         # Extract and apply SCC geometric parameters
-        context.scc = MTLStrategy._extract_scc_parameters(mtl)
+        context.scc = self._extract_scc_parameters(mtl)
 
         # Conductors Permeability [np.array]
         context.mu = np.array([sc.mu_0 * conductor['relative_permeability'] for conductor in mtl.values()]) 

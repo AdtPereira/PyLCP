@@ -52,8 +52,6 @@ def main():
     plotter = HDPEPlotter(__file__, pul_data, PLOT_CONFIG, autoSave=False)
     plotter.hdpe_internal_impedance_matrix()
     plotter.hdpe_internal_impedance_elements()
-
-    # 1. Crie uma lista de configurações para cada esquemático
     GroundReturnMTLRepresentation(__file__, mtl_0, units='millimeter').system_schematic()
     plt.show()
     

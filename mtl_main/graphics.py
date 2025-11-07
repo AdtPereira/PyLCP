@@ -309,43 +309,6 @@ class GroundReturnMTLRepresentation(BaseMTLRepresentation):
             zorder=2)
         ax.add_patch(fill_patch)
 
-    # def _plot_enclosure_graphic(self, ax, conductor_data, parameters, used_labels):
-    #     """
-    #     Plots a single cylindrical layer of a cable (as a Circle or Wedge).
-    #     Handles the logic for avoiding duplicate legend entries.
-    #     """
-    #     enclosure = conductor_data['enclosure']
-    #     enclosure_center = np.array(enclosure['center_point']) if 'center_point' in enclosure else np.array([0, 0])
-    #     enclosure_type = enclosure.get('type', 'HDPE')
-
-    #     # Adjust y-position for ground-return systems
-    #     if parameters['h_factor'] != 1:
-    #         conductor_center = np.array(conductor_data['center_point']) if conductor_data['center_point'] else np.array([0, 0])
-    #         offset_vector = enclosure_center - conductor_center
-    #         enclosure_center[1] = parameters['h_factor'] * parameters['max_radius'] + offset_vector[1]  
-        
-    #     patch = Wedge(
-    #         center=enclosure_center * self.unit_factor,
-    #         r=enclosure['outer_radius'] * self.unit_factor,
-    #         theta1=0, theta2=360,
-    #         width=(enclosure['outer_radius'] - enclosure['inner_radius']) * self.unit_factor,
-    #         edgecolor='black',
-    #         facecolor=self.color_map.get(enclosure_type, self.color_map['default_conductor']),
-    #         linestyle='solid',
-    #         label=enclosure_type if enclosure_type not in used_labels else None,
-    #         zorder=3)
-    #     ax.add_patch(patch)
-
-    #     fill_patch = Circle(
-    #         xy=enclosure_center * self.unit_factor,
-    #         radius=enclosure['inner_radius'] * self.unit_factor,
-    #         fill=True,
-    #         edgecolor='black',
-    #         facecolor='ghostwhite',
-    #         label='air' if 'air' not in used_labels else None,
-    #         zorder=2)
-    #     ax.add_patch(fill_patch)
-
     def _schematic_annotations(self, ax, params):
         """Draws annotations like the ground level and depth/height line."""
         deepest_cond = params['deepest_conductor']

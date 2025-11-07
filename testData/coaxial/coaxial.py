@@ -2,162 +2,86 @@ import sys
 import os
 import time
 import numpy as np
-from pathlib import Path
 import matplotlib.pyplot as plt
 
-# --- Configure project root for module imports (sem alteração) ---
-try:
-    os.system('cls' if os.name == 'nt' else 'clear')
-    project_root = Path(__file__).resolve().parents[2]
-    if str(project_root) not in sys.path:
-        sys.path.insert(0, str(project_root)) 
-    print(f"Project root configured at: {project_root}")
-    case_name = os.path.splitext(os.path.basename(__file__))[0]
-    print(f"Case name identified as: '{case_name}'")
-except IndexError:
-    raise RuntimeError("Could not find project root. Ensure the directory structure is correct.")
-
 # --- Import custom modules ---
+os.system('cls' if os.name == 'nt' else 'clear')
 try:
     from utils.case_utils import *
-    from utils.comsol_data import ComsolDataReader
-    from models import single_core_cables as scc 
-    from plotter.patel_models import PatelModels
+    from utils.comsol_data import ComsolPostProcessor
+    from models.single_core_cable import SingleCoreCableModelGenerator
+    from plotter.scc_plotter import CoaxialCablePlotter
     from mtl_main.graphics import IsolatedMTLRepresentation
     from mtl_main.source import MulticonductorTransmissionLine
     from analytical_forms.single_core_cable import InternalPerUnitParameters
     from mom_so.quasi_static_green import QuasiStatic
     from mom_so.lossless_medium import HomogeneousLosslessMedium, LosslessPostProcessing
+    from .plot_config import PLOT_CONFIG
     print("Core modules imported successfully.")
 except ImportError as e:
     print(f"Error importing modules: {e}")
     sys.exit(1)
 
-# --- Load COMSOL Data ---
-COMSOL_DATA = {}
-try:
-    print(f"--- Instanciando ComsolDataReader para o caso '{case_name}' ---")
-    reader = ComsolDataReader(project_root, case_name)
-    COMSOL_DATA = reader.load_all_results()
-
-    if COMSOL_DATA:
-        reader.show_summary()
-except FileNotFoundError as e:
-    print(f"Aviso: Diretório de dados do COMSOL não encontrado. Detalhes: {e}")
-except Exception as e:
-    print(f"Ocorreu um erro ao carregar os dados do COMSOL: {e}")
-
-
-def verify_constrain_equation(mtl_model):
-    """
-    Verifies the constraint equation by comparing the expected total current
-    with the sum of the calculated conduction current (from Eq. 2.20) and
-    the displacement current from COMSOL.
-    """
-    try:
-        df = COMSOL_DATA['cmsl_core_exc_constrains']
-        # --- Prerequisite: Ensure you have exported these columns from COMSOL ---
-        freq = df['freq'].values
-        Ik = df['coil_current'].values      # Expected total current in the conductor
-        Vs = df['coil_voltage'].values 
-        int_Az = df['core_surface_int_az'].values
-        int_Jdz = df['core_surface_int_jdz'].values
-    except KeyError as e:
-        print(f"\n[ERROR] Missing data column in the exported file: {e}")
-        print("Please ensure you have exported the surface integrals of 'mf.Az' and 'mf.Jdz' from COMSOL.")
-        return
-
-    # --- Physical Parameters ---
-    jw = 1j * 2 * np.pi * freq
-    sigma = 1 / mtl_model.scc['core_resistivity']
-    r2 = mtl_model.scc['core_outer_radius']
-    Sck = np.pi * r2**2
-    
-    # --- Calculation of Current Components ---
-    # Source current density from the coil voltage
-    model_length = 1.0 # Length of the 2D model used for Jsk calculation
-    Jsk = sigma * Vs / model_length
-    
-    # Conduction current, calculated using the terms from the QMS paper (Eq. 2.20)
-    conduction_current = (-jw * sigma * int_Az) + (Sck * Jsk)
-    
-    # The total current is the sum of the conduction and displacement parts
-    calculated_Ik = conduction_current + int_Jdz
-
-    print("\n--- Verifying the Full Constraint Equation (Conduction + Displacement) ---")
-    print(f"{'Frequency (Hz)':<16} | {'Ik Calculated (A)':<30} | {'Ik Expected (A)':<20} | {'Error Relative (%)':<20}")
-    print("-" * 95)
-
-    # Calculate and print the verification for each frequency
-    # Note: We compare against the real part of expected_Ik for error calculation
-    relative_errors = np.abs((calculated_Ik - Ik) / Ik) * 100
-    for i in range(len(freq)):
-        print(f"{freq[i]:<16.2f} | {calculated_Ik[i]:<30.4e} | {Ik[i]:<20.2f} | {relative_errors[i]:<20.4f}")
-
-    # Final verification using numpy.allclose for numerical precision
-    if np.allclose(calculated_Ik.real, Ik):
-        print("\n[SUCCESS] The constraint equation was verified: I_conduction + I_displacement = Ik")
-    else:
-        print("\n[FAILURE] The constraint equation was NOT verified.")
-
-        
 def main():
     """ Main function to run the simulation and plotting using vectorized calculations. """
     st = time.time()    
-    input_json = load_json_parameters(__file__, show_content=True)
-    model = scc.isolated_coaxial_cable(input_json, show_model=True)
-    mtl_model = MulticonductorTransmissionLine(model)
-    # mom_wires = MulticonductorCoaxialCableSystems(mtl_model)
+    model = SingleCoreCableModelGenerator(__file__).isolated_coaxial_cable()
+    mtl = MulticonductorTransmissionLine(model)
 
-    # --- VECTORIZED CALCULATION ---
-    analytical_freqs = np.logspace(0, 6, num=200)
-    numerical_freqs = np.logspace(0, 6, num=31)
-
-    # Analytical Formulation (Ametani et al., 2015)
-    print("Calculating internal parameters for all frequencies...")
-    internal = InternalPerUnitParameters(mtl_model, analytical_freqs)
-    
-    # MoM-SO formulation (Patel, 2014)
-    print("Vectorized numeric routine (MoM-SO)...")
-    green_matrix = QuasiStatic(mtl_model).green_matrix()
-    mom_so = HomogeneousLosslessMedium(mtl_model, numerical_freqs)
-    post_processor = LosslessPostProcessing(mtl_model)
-    z_partial_stack = mom_so.z_partial(green_matrix)    # Partial impedance matrix
-    zs_stack = post_processor.z_total(z_partial_stack)  # Total series impedance matrix
-    verify_constrain_equation(mtl_model)
-
-    # Populate the pul_data dictionary 
     pul_data = {
-        'analytical': {
-            "frequencies": analytical_freqs,
-            "internal_series_parameters": {
-                "bessel": internal.parameters_by_bessel(),
-                "approximation": internal.parameters_approximation(),
-                "hybrid": internal.parameters_hybrid(transition_frequency=1e5)
-            },
-            "internal_matrices": {
-                "bessel": internal.matrices(internal_form='bessel'),
-                "approximation": internal.matrices(internal_form='approximation'),
-                "hybrid": internal.matrices(internal_form='hybrid')
+        'frequencies': np.logspace(0, 6, num=121),
+        'comsol': {
+            'scenarios': {
+                '1': {},
             },
         },
-        'numerical': {
-            "frequencies": numerical_freqs,
-            "partial_impedance_matrix": z_partial_stack,
-            "series_impedance_matrix": zs_stack,
-            "series_resistance_matrix": post_processor.rs_matrix(zs_stack),
-            "series_inductance_matrix": post_processor.ls_matrix(zs_stack, numerical_freqs)
+        'mom_so': {
+            'frequencies': np.logspace(0, 6, num=31),
+            'scenarios': {
+                '1': {
+                    'mtl': mtl,
+                },
+            },
         },
-        'comsol': COMSOL_DATA
+        'scenarios': {
+            '1': {
+                'mtl': mtl,
+            },
+        }
     }
 
-    print(f"End of the routine! Time spent on simulation: {(time.time() - st):.1f} seconds.\n")
-    plotter = PatelModels(pul_data, case_name)
-    plotter.internal_impedance_matrix_js_method()
-    plotter.internal_impedance_matrix_energy_method()
-    plotter.internal_impedance_elements()
-    plotter.internal_admittance_elements()
-    IsolatedMTLRepresentation(mtl_model, case_name, units='millimeter').system_schematic()
+    print("Importing COMSOL data for coaxial cable model...")
+    cmsl_processor = ComsolPostProcessor(__file__)
+    cmsl_params = cmsl_processor.get_general_parameters('cmsl_coaxial_cable_impedance')
+    pul_data['comsol'].update(cmsl_params)
+    for key, value in pul_data['comsol']['scenarios'].items():
+        print(f"  -> Processando COMSOL para: {key}")
+        value['coaxial_cable_impedance'] = cmsl_processor.get_coaxial_cable_parameters()
+
+    print("\nCalculating per-unit-length parameters by Analytical Formulation (Ametani, 2015)")
+    for key, value in pul_data['scenarios'].items():
+        print(f"  -> Calculating internal parameters for Model Case {key}...")
+        
+        pul = InternalPerUnitParameters(value['mtl'], pul_data['frequencies'])
+        value['internal_parameters'] = pul.parameters_hybrid()
+        value['internal_matrices'] = pul.matrices()
+
+    print("\nCalculating per-unit-length parameters by MoM-SO (Patel, 2014)")
+    for key, value in pul_data['mom_so']['scenarios'].items():
+        print(f"  -> Calculating internal impedance matrix for Model Case {key}...")
+
+        green_matrix = QuasiStatic(value['mtl']).green_matrix()
+        mom_so = HomogeneousLosslessMedium(value['mtl'], pul_data['mom_so']['frequencies'])
+        post_processor = LosslessPostProcessing(value['mtl'])
+        z_partial_stack = mom_so.z_partial(green_matrix)
+
+        value['partial_internal_impedance'] = z_partial_stack
+        value['coaxial_cable_impedance'] = post_processor.z_total(z_partial_stack)
+
+    print(f"\nEnd of the routine! Time spent on simulation: {(time.time() - st):.1f} seconds.\n")
+    plotter = CoaxialCablePlotter(__file__, pul_data, PLOT_CONFIG, autoSave=False)
+    plotter.coaxial_cable_internal_impedance_elements()
+    IsolatedMTLRepresentation(__file__, mtl, units='millimeter').system_schematic()
     plt.show()    
 
 if __name__ == "__main__":
