@@ -20,7 +20,9 @@ except IndexError:
 try:
     from utils.case_utils import *
     from utils.comsol_data import ComsolDataReader
-    from models import isolated_wires
+    from models.single_core_cable import SingleCoreCableModelGenerator
+    from mtl_main.source import MulticonductorTransmissionLine
+    from mtl_main.graphics import IsolatedMTLRepresentation
     from .source import BifilarCoatedWirePULParameters as BifilarPul
     print("Core modules imported successfully.")
 except ImportError as e:
@@ -33,7 +35,6 @@ try:
     print(f"--- Instanciando ComsolDataReader para o caso '{case_name}' ---")
     reader = ComsolDataReader(project_root, case_name)
     COMSOL_DATA = reader.load_all_results()
-
     if COMSOL_DATA:
         reader.show_summary()
 except FileNotFoundError as e:
@@ -44,8 +45,7 @@ except Exception as e:
 def main():
     """ Main function to run the simulation and plotting using vectorized calculations. """
     st = time.time()    
-    input_json = load_json_parameters(__file__, show_content=False)
-    model = isolated_wires.circular_conductor_wires(input_json, show_model=False)
+    model = SingleCoreCableModelGenerator(__file__).isolated_wires()
     
     # --- Model setup ---
     pul = BifilarPul(project_root, case_name, model, SUM_MAX=18) 
@@ -58,6 +58,7 @@ def main():
     pul.show_header()    
     pul.plot_srw_rates(COMSOL_DATA)
     pul.plot_capacitance_convergence()    
+    IsolatedMTLRepresentation(__file__, MulticonductorTransmissionLine(model), units='millimeter').system_schematic()
     plt.show()  
 
 if __name__ == "__main__":

@@ -60,8 +60,7 @@ def main():
 
     print("\nCalculating per-unit-length parameters by Analytical Formulation (Ametani, 2015)")
     for key, value in pul_data['scenarios'].items():
-        print(f"  -> Calculating internal parameters for Model Case {key}...")
-        
+        print(f"  -> Calculating internal parameters for Model Case {key}...")        
         pul = InternalPerUnitParameters(value['mtl'], pul_data['frequencies'])
         value['internal_parameters'] = pul.parameters_hybrid()
         value['internal_matrices'] = pul.matrices()
@@ -69,18 +68,18 @@ def main():
     print("\nCalculating per-unit-length parameters by MoM-SO (Patel, 2014)")
     for key, value in pul_data['mom_so']['scenarios'].items():
         print(f"  -> Calculating internal impedance matrix for Model Case {key}...")
-
         green_matrix = QuasiStatic(value['mtl']).green_matrix()
         mom_so = HomogeneousLosslessMedium(value['mtl'], pul_data['mom_so']['frequencies'])
         post_processor = LosslessPostProcessing(value['mtl'])
-        z_partial_stack = mom_so.z_partial(green_matrix)
+        z_partial = mom_so.z_partial(green_matrix)
 
-        value['partial_internal_impedance'] = z_partial_stack
-        value['coaxial_cable_impedance'] = post_processor.z_total(z_partial_stack)
+        value['partial_internal_impedance'] = z_partial
+        value['coaxial_cable_impedance'] = post_processor.z_total(z_partial)
 
     print(f"\nEnd of the routine! Time spent on simulation: {(time.time() - st):.1f} seconds.\n")
     plotter = CoaxialCablePlotter(__file__, pul_data, PLOT_CONFIG, autoSave=False)
-    plotter.coaxial_cable_internal_impedance_elements()
+    plotter.coaxial_cable_impedance()
+    plotter.coaxial_cable_internal_impedance_matrix()
     IsolatedMTLRepresentation(__file__, mtl, units='millimeter').system_schematic()
     plt.show()    
 

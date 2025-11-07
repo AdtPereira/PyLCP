@@ -38,19 +38,17 @@ class BasePlotter:
         Método genérico para plotar uma grandeza complexa em dois subplots 
         (ex: R/L ou G/C).
         """
-        config = self.plot_config[graph_key]
-        p, q = config['p'], config['q']
+        cfg = self.plot_config[graph_key]
+        p, q = cfg['p'], cfg['q']
         fig, (ax1, ax2) = plt.subplots(1, 2, figsize=self.figsize, sharey=False)
-        fig.suptitle(config['suptitle'], fontsize=12, y=0.98)
-        left_cfg = config['left_plot']
-        right_cfg = config['right_plot']
-        data_path = config['data_path'] 
+        fig.suptitle(cfg['suptitle'], fontsize=12, y=0.98)
+        left_cfg = cfg['left_plot']
+        right_cfg = cfg['right_plot']
         
+        # --- Bloco Analítico Genérico ---
         if self.pul_data['scenarios']:
-            for series in config['series_to_plot']:
-                # Lógica para buscar os dados usando data_path e a 'key' da série
-                # key = series['key']
-                matrix = self.pul_data[data_path[0]][series['key']][data_path[2]][data_path[3]]
+            for series in cfg['series_to_plot']:
+                matrix = self.pul_data['scenarios'][series['key']][cfg['path'][0]][cfg['path'][1]]
                 
                 # Plotar dados (Ex: Resistência)
                 y1_data = self._calculate_plot_data(matrix[:, p, q], self.w, left_cfg['component'], left_cfg['scale'])
@@ -61,13 +59,13 @@ class BasePlotter:
                 ax2.plot(self.f, y2_data, **series['type']['main'])
 
         # --- Bloco COMSOL Genérico ---
-        if self.cmsl is not None and 'comsol_series_to_plot' in config:
+        if self.cmsl is not None and 'comsol_series_to_plot' in cfg:
             freq = self.cmsl['frequencies']
             w_cmsl = self.cmsl['angular_frequencies']
             
-            for series in config['comsol_series_to_plot']:
+            for series in cfg['comsol_series_to_plot']:
                 cmsl_key = series.get('key')
-                cmsl_graph_type = config['comsol_matrix_key']
+                cmsl_graph_type = cfg['comsol_matrix_key']
                 
                 if cmsl_key not in self.cmsl['scenarios']:
                     print(f"Aviso: Chave COMSOL '{cmsl_key}' não encontrada.")
@@ -103,17 +101,16 @@ class BasePlotter:
         Método genérico para plotar uma grandeza complexa em dois subplots 
         (ex: R/L ou G/C).
         """
-        config = self.plot_config[graph_key]
+        cfg = self.plot_config[graph_key]
         fig, (ax1, ax2) = plt.subplots(1, 2, figsize=self.figsize, sharey=False)
-        fig.suptitle(config['suptitle'], fontsize=12, y=0.98)
-        left_cfg = config['left_plot']
-        right_cfg = config['right_plot']
-        data_path = config['data_path'] 
+        fig.suptitle(cfg['suptitle'], fontsize=12, y=0.98)
+        left_cfg = cfg['left_plot']
+        right_cfg = cfg['right_plot']
         
         # --- Bloco Analítico Genérico ---
         if self.pul_data['scenarios']:
-            for series in config['series_to_plot']:
-                matrix = self.pul_data['scenarios'][series['key']][data_path[2]][data_path[3]]
+            for series in cfg['series_to_plot']:
+                matrix = self.pul_data['scenarios'][series['key']][cfg['path'][0]][cfg['path'][1]]
 
                 for value in series['type'].values():
                     p, q = value['p'], value['q']
@@ -127,20 +124,20 @@ class BasePlotter:
                     ax2.plot(self.f, y2_data, color=value['color'], linestyle=value['linestyle'], linewidth=value['linewidth'], label=value['label'])
             
         # --- Bloco COMSOL Genérico ---
-        if self.cmsl is not None and 'comsol_series_to_plot' in config:
+        if self.cmsl is not None and 'comsol_series_to_plot' in cfg:
             freq = self.cmsl['frequencies']
-            w_cmsl = self.cmsl['angular_frequencies']
+            w = self.cmsl['angular_frequencies']
             
-            for series in config['comsol_series_to_plot']:
-                cmsl_key = series.get('key')
-                cmsl_graph_type = config['comsol_matrix_key']
+            for series in cfg['comsol_series_to_plot']:
+                key = series.get('key')
+                graph_type = cfg['comsol_matrix_key']
                 
-                if cmsl_key not in self.cmsl['scenarios']:
-                    print(f"Aviso: Chave COMSOL '{cmsl_key}' não encontrada.")
+                if key not in self.cmsl['scenarios']:
+                    print(f"Aviso: Chave COMSOL '{key}' não encontrada.")
                     continue
 
-                if cmsl_graph_type in ['internal_impedance_matrix']:
-                    cmsl_matrix = self.cmsl['scenarios'][cmsl_key][cmsl_graph_type]
+                if graph_type in ['internal_impedance_matrix']:
+                    cmsl_matrix = self.cmsl['scenarios'][key][graph_type]
                 
                 else:
                     continue
@@ -149,13 +146,40 @@ class BasePlotter:
                     p, q = value['p'], value['q']
                     style = {k: v for k, v in value.items() if k not in ['p', 'q']}
 
-                    # Plotar dados do subplot esquerdo
-                    y1_data_cmsl = self._calculate_plot_data(cmsl_matrix[:, p, q], w_cmsl, left_cfg['component'], left_cfg['scale'])
-                    ax1.scatter(freq, y1_data_cmsl, **style)
+                    y1_data = self._calculate_plot_data(cmsl_matrix[:, p, q], w, left_cfg['component'], left_cfg['scale'])
+                    ax1.scatter(freq, y1_data, **style)
 
-                    # Plotar dados do subplot direito
-                    y2_data_cmsl = self._calculate_plot_data(cmsl_matrix[:, p, q], w_cmsl, right_cfg['component'], right_cfg['scale'])
-                    ax2.scatter(freq, y2_data_cmsl, **style)
+                    y2_data = self._calculate_plot_data(cmsl_matrix[:, p, q], w, right_cfg['component'], right_cfg['scale'])
+                    ax2.scatter(freq, y2_data, **style)
+
+        # --- Bloco MoM-SO Genérico ---
+        if self.mom_so is not None and 'mom_so_series_to_plot' in cfg:
+            freq = self.mom_so['frequencies']
+            w = 2 * np.pi * freq
+            
+            for series in cfg['mom_so_series_to_plot']:
+                key = series.get('key')
+                graph_type = cfg['mom_so_matrix_key']
+
+                if key not in self.mom_so['scenarios']:
+                    print(f"Aviso: Chave MoM-SO '{key}' não encontrada.")
+                    continue
+
+                if graph_type in ['partial_internal_impedance']:
+                    matrix = self.mom_so['scenarios'][key][graph_type]
+
+                else:
+                    continue
+
+                for key, value in series['type'].items():
+                    p, q = value['p'], value['q']
+                    style = {k: v for k, v in value.items() if k not in ['p', 'q']}
+                    
+                    y1_data = self._calculate_plot_data(matrix[:, p, q], w, left_cfg['component'], left_cfg['scale'])
+                    ax1.scatter(freq, y1_data, **style)
+
+                    y2_data = self._calculate_plot_data(matrix[:, p, q], w, right_cfg['component'], right_cfg['scale'])
+                    ax2.scatter(freq, y2_data, **style)
 
         # --- Formatação Genérica dos Eixos ---
         self._format_axis(ax1, self.f, self.xlim, left_cfg)
@@ -170,17 +194,16 @@ class BasePlotter:
         Método genérico para plotar uma grandeza complexa em dois subplots 
         (ex: R/L ou G/C).
         """
-        config = self.plot_config[graph_key]
+        cfg = self.plot_config[graph_key]
         fig, (ax1, ax2) = plt.subplots(1, 2, figsize=self.figsize, sharey=False)
-        fig.suptitle(config['suptitle'], fontsize=12, y=0.98)
-        left_cfg = config['left_plot']
-        right_cfg = config['right_plot']
-        data_path = config['data_path'] 
+        fig.suptitle(cfg['suptitle'], fontsize=12, y=0.98)
+        left_cfg = cfg['left_plot']
+        right_cfg = cfg['right_plot']
         
         # --- Bloco Analítico Genérico ---
         if self.pul_data['scenarios']:
-            for series in config['series_to_plot']:
-                matrix = self.pul_data[data_path[0]][series['key']][data_path[2]][data_path[3]]
+            for series in cfg['series_to_plot']:
+                matrix = self.pul_data['scenarios'][series['key']][cfg['path'][0]][cfg['path'][1]]
 
                 for key, value in series['type'].items():
                     # Plotar dados do subplot esquerdo
@@ -192,13 +215,13 @@ class BasePlotter:
                     ax2.plot(self.f, y2_data, **value)
             
         # --- Bloco COMSOL Genérico ---
-        if self.cmsl is not None and 'comsol_series_to_plot' in config:
+        if self.cmsl is not None and 'comsol_series_to_plot' in cfg:
             freq = self.cmsl['frequencies']
             w = self.cmsl['angular_frequencies']
             
-            for series in config['comsol_series_to_plot']:
+            for series in cfg['comsol_series_to_plot']:
                 key = series.get('key')
-                graph_type = config['comsol_matrix_key']
+                graph_type = cfg['comsol_matrix_key']
                 
                 if key not in self.cmsl['scenarios']:
                     print(f"Aviso: Chave COMSOL '{key}' não encontrada.")
@@ -224,13 +247,13 @@ class BasePlotter:
                     ax2.scatter(freq, y2_data_cmsl, **value)
 
         # --- Bloco MoM-SO Genérico ---
-        if self.mom_so is not None and 'mom_so_series_to_plot' in config:
+        if self.mom_so is not None and 'mom_so_series_to_plot' in cfg:
             freq = self.mom_so['frequencies']
             w = 2 * np.pi * freq
             
-            for series in config['mom_so_series_to_plot']:
+            for series in cfg['mom_so_series_to_plot']:
                 key = series.get('key')
-                graph_type = config['mom_so_matrix_key']
+                graph_type = cfg['mom_so_matrix_key']
 
                 if key not in self.mom_so['scenarios']:
                     print(f"Aviso: Chave MoM-SO '{key}' não encontrada.")
@@ -262,39 +285,30 @@ class BasePlotter:
         Método genérico para plotar uma grandeza complexa em dois subplots 
         (ex: R/L ou G/C).
         """
-        config = self.plot_config[graph_key]
+        cfg = self.plot_config[graph_key]
         fig, (ax1, ax2) = plt.subplots(1, 2, figsize=self.figsize, sharey=False)
-        fig.suptitle(config['suptitle'], fontsize=12, y=0.98)
-
-        # --- Configurações dos subplots (ex: 'left_plot', 'right_plot' em config)
-        left_cfg = config['left_plot']
-        right_cfg = config['right_plot']
-        
-        # --- Caminho para os dados (ex: 'data_path' em config)
-        # ex: ['scenarios', '{key}', 'quasi_tem_matrices', 'series_impedance_matrix']
-        data_path = config['data_path'] 
+        fig.suptitle(cfg['suptitle'], fontsize=12, y=0.98)
+        left_cfg = cfg['left_plot']
+        right_cfg = cfg['right_plot']        
         
         if self.pul_data['scenarios']:
-            for series in config['series_to_plot']:
-                # Lógica para buscar os dados usando data_path e a 'key' da série
-                item = self.pul_data[data_path[0]][series['key']][data_path[2]][data_path[3]]
+            for series in cfg['series_to_plot']:
+                item = self.pul_data['scenarios'][series['key']][cfg['path'][0]][cfg['path'][1]]
                 
-                # Plotar dados do subplot esquerdo
                 y1_data = self._calculate_plot_data(item, self.w, left_cfg['component'], left_cfg['scale'])
                 ax1.plot(self.f, y1_data, **series['type']['main'])
                 
-                # Plotar dados do subplot direito
                 y2_data = self._calculate_plot_data(item, self.w, right_cfg['component'], right_cfg['scale'])
                 ax2.plot(self.f, y2_data, **series['type']['main'])
 
         # --- Bloco COMSOL Genérico ---
-        if self.cmsl is not None and 'comsol_series_to_plot' in config:
+        if self.cmsl is not None and 'comsol_series_to_plot' in cfg:
             freq = self.cmsl['frequencies']
             w_cmsl = self.cmsl['angular_frequencies']
             
-            for series in config['comsol_series_to_plot']:
+            for series in cfg['comsol_series_to_plot']:
                 cmsl_key = series.get('key')
-                cmsl_graph_type = config['comsol_matrix_key']
+                cmsl_graph_type = cfg['comsol_matrix_key']
                 
                 if cmsl_key not in self.cmsl['scenarios']:
                     print(f"Aviso: Chave COMSOL '{cmsl_key}' não encontrada.")

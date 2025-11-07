@@ -228,7 +228,7 @@ class BifilarBareWirePULParameters:
         print("\n============== pyMoM MulticonductorBareWireSystems =============")
 
         mtl_model = MulticonductorTransmissionLine(self.mtl_copy)
-        IsolatedMTLRepresentation(mtl_model, self.case_name, units='millimeter').system_schematic()
+        # IsolatedMTLRepresentation(mtl_model, self.case_name, units='millimeter').system_schematic()
         solver = BareWireMoMSolver(mtl_model)
         solver.run_collocation_method()
         solver.run_galerkin_method()
@@ -305,10 +305,10 @@ class BifilarBareWirePULParameters:
         post_processor = LosslessPostProcessing(mtl_model)
 
         # Calculate partial impedance for all frequencies
-        z_partial_stack = mom_so.z_partial(green_matrix)
+        z_partial = mom_so.z_partial(green_matrix)
         
         # Calculate total series impedance for all frequencies
-        zs_stack = post_processor.z_total(z_partial_stack)
+        zs_stack = post_processor.z_total(z_partial)
         
         # Calculate series resistance and inductance for all frequencies
         rs_stack = post_processor.rs_matrix(zs_stack)

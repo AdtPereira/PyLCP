@@ -6,7 +6,6 @@ from pathlib import Path
 from typing import Dict, Any
 
 from utils.case_utils import *
-from mtl_main.graphics import IsolatedMTLRepresentation
 from mtl_main.source import MulticonductorTransmissionLine
 from mtl_paul.py_fortran import FortranRunner
 from analytical_forms.isolated_wires import WiresHomogeneousMedia
@@ -236,7 +235,6 @@ class BifilarCoatedWirePULParameters:
 
         print("\n==============      pyMoM TwoCoatedWireSystem      =============")
         coated_wires_model = MulticonductorTransmissionLine(self.mtl_copy)
-        IsolatedMTLRepresentation(coated_wires_model, self.case_name, units='millimeter').system_schematic()
         coated_wires = MulticonductorCoatedWireSystems(coated_wires_model)
         coated_wires.run_simulation()
         coated_wires.print_results()

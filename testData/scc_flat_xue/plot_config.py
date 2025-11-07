@@ -128,7 +128,7 @@ PLOT_CONFIG = {
         'suptitle': 'Figure 4.19: P.u.l. Self-impedance of phase - a sheath [Xue, 2018]',
         'p': 1, 'q': 1,
         'series_to_plot': XUE_SERIES + DECONTI_SERIES,
-        'data_path': ['scenarios', '{key}', 'quasi_tem_matrices', 'series_impedance_matrix'],
+        'path': ['quasi_tem_matrices', 'series_impedance_matrix'],
         'comsol_series_to_plot': comsol_layout_template,
         'comsol_matrix_key': 'series_impedance_matrix',
         'left_plot': {
@@ -147,7 +147,7 @@ PLOT_CONFIG = {
         'suptitle': 'Figure 4.21a: P.u.l. Mutual-impedance between phase - a and phase - b sheaths [Xue, 2018]',
         'p': 1, 'q': 3,
         'series_to_plot': XUE_SERIES + DECONTI_SERIES,
-        'data_path': ['scenarios', '{key}', 'quasi_tem_matrices', 'series_impedance_matrix'],
+        'path': ['quasi_tem_matrices', 'series_impedance_matrix'],
         'comsol_series_to_plot': comsol_layout_template,
         'comsol_matrix_key': 'series_impedance_matrix',
         'left_plot': {
@@ -166,7 +166,7 @@ PLOT_CONFIG = {
         'suptitle': 'Figure 4.21b: P.u.l. Mutual-impedance between phase - a and phase - c sheaths [Xue, 2018]',
         'p': 1, 'q': 5,
         'series_to_plot': XUE_SERIES + DECONTI_SERIES,
-        'data_path': ['scenarios', '{key}', 'quasi_tem_matrices', 'series_impedance_matrix'],
+        'path': ['quasi_tem_matrices', 'series_impedance_matrix'],
         'comsol_series_to_plot': comsol_layout_template,
         'comsol_matrix_key': 'series_impedance_matrix',
         'left_plot': {
@@ -185,7 +185,7 @@ PLOT_CONFIG = {
         'suptitle': 'Figure 4.23: P.u.l. Self-admittance of phase - a sheath [Xue, 2018]',
         'p': 1, 'q': 1,
         'series_to_plot': XUE_SERIES + VANCE_SERIES + DECONTI_SERIES,
-        'data_path': ['scenarios', '{key}', 'quasi_tem_matrices', 'shunt_admittance_matrix'],
+        'path': ['quasi_tem_matrices', 'shunt_admittance_matrix'],
         'comsol_series_to_plot': comsol_layout_template,
         'comsol_matrix_key': 'shunt_admittance_matrix',
         'left_plot': {
@@ -204,7 +204,7 @@ PLOT_CONFIG = {
         'suptitle': 'Figure 4.25: P.u.l. Mutual-admittance between phase - a and phase - b sheaths [Xue, 2018]',
         'p': 1, 'q': 3,
         'series_to_plot': XUE_SERIES + VANCE_SERIES + DECONTI_SERIES,
-        'data_path': ['scenarios', '{key}', 'quasi_tem_matrices', 'shunt_admittance_matrix'],
+        'path': ['quasi_tem_matrices', 'shunt_admittance_matrix'],
         'comsol_series_to_plot': comsol_layout_template,
         'comsol_matrix_key': 'shunt_admittance_matrix',
         'left_plot': {
@@ -223,7 +223,7 @@ PLOT_CONFIG = {
         'suptitle': 'Figure 4.25a: P.u.l. Mutual-admittance between phase - a and phase - c sheaths [Xue, 2018]',
         'p': 1, 'q': 5,
         'series_to_plot': XUE_SERIES + VANCE_SERIES + DECONTI_SERIES,
-        'data_path': ['scenarios', '{key}', 'quasi_tem_matrices', 'shunt_admittance_matrix'],
+        'path': ['quasi_tem_matrices', 'shunt_admittance_matrix'],
         'comsol_series_to_plot': comsol_layout_template,
         'comsol_matrix_key': 'shunt_admittance_matrix',
         'left_plot': {
@@ -241,7 +241,7 @@ PLOT_CONFIG = {
     'earth_propagation_constant': {
         'suptitle': r'Earth propagation constant, $\gamma_1$',
         'series_to_plot': XUE_SERIES,
-        'data_path': ['scenarios', '{key}', 'earth_return_parameters', 'gamma_earth'],
+        'path': ['earth_return_parameters', 'gamma_earth'],
         'comsol_series_to_plot': comsol_layout_template,
         'comsol_matrix_key': 'gamma_earth',
         'left_plot': {
@@ -258,7 +258,7 @@ PLOT_CONFIG = {
         'suptitle': 'P.u.l. Self earth-return impedance of phase - a [Xue, 2018]',
         'p': 0, 'q': 0,
         'series_to_plot': XUE_SERIES,
-        'data_path': ['scenarios', '{key}', 'earth_return_parameters', 'impedance_matrix'],
+        'path': ['earth_return_parameters', 'impedance_matrix'],
         'comsol_series_to_plot': comsol_layout_template,
         'comsol_matrix_key': 'impedance_matrix',
         'left_plot': {
@@ -275,7 +275,7 @@ PLOT_CONFIG = {
         'suptitle': 'P.u.l. Mutual earth-return impedance between phase - a and phase - b [Xue, 2018]',
         'p': 0, 'q': 1,
         'series_to_plot': XUE_SERIES,
-        'data_path': ['scenarios', '{key}', 'earth_return_parameters', 'impedance_matrix'],
+        'path': ['earth_return_parameters', 'impedance_matrix'],
         'comsol_series_to_plot': comsol_layout_template,
         'comsol_matrix_key': 'impedance_matrix',
         'left_plot': {
@@ -292,7 +292,7 @@ PLOT_CONFIG = {
         'suptitle': 'P.u.l. Mutual earth-return impedance between phase - a and phase - c [Xue, 2018]',
         'p': 0, 'q': 2,
         'series_to_plot': XUE_SERIES,
-        'data_path': ['scenarios', '{key}', 'earth_return_parameters', 'impedance_matrix'],
+        'path': ['earth_return_parameters', 'impedance_matrix'],
         'comsol_series_to_plot': comsol_layout_template,
         'comsol_matrix_key': 'impedance_matrix',
         'left_plot': {
@@ -309,7 +309,7 @@ PLOT_CONFIG = {
         'suptitle': 'P.u.l. Mutual earth-return impedance between phase - b and phase - c [Xue, 2018]',
         'p': 1, 'q': 2,
         'series_to_plot': XUE_SERIES,
-        'data_path': ['scenarios', '{key}', 'earth_return_parameters', 'impedance_matrix'],
+        'path': ['earth_return_parameters', 'impedance_matrix'],
         'comsol_series_to_plot': comsol_layout_template,
         'comsol_matrix_key': 'impedance_matrix',
         'left_plot': {
@@ -326,7 +326,7 @@ PLOT_CONFIG = {
         'suptitle': 'P.u.l. Self earth-return admittance of phase - a [Xue, 2018]',
         'p': 0, 'q': 0,
         'series_to_plot': XUE_SERIES + VANCE_SERIES,
-        'data_path': ['scenarios', '{key}', 'earth_return_parameters', 'admittance_matrix'],
+        'path': ['earth_return_parameters', 'admittance_matrix'],
         'comsol_series_to_plot': comsol_layout_template,
         'comsol_matrix_key': 'admittance_matrix',
         'left_plot': {
@@ -343,7 +343,7 @@ PLOT_CONFIG = {
         'suptitle': 'P.u.l. Mutual earth-return admittance between phase - a and phase - b [Xue, 2018]',
         'p': 0, 'q': 1,
         'series_to_plot': XUE_SERIES + VANCE_SERIES,
-        'data_path': ['scenarios', '{key}', 'earth_return_parameters', 'admittance_matrix'],
+        'path': ['earth_return_parameters', 'admittance_matrix'],
         'comsol_series_to_plot': comsol_layout_template,
         'comsol_matrix_key': 'admittance_matrix',
         'left_plot': {
@@ -360,7 +360,7 @@ PLOT_CONFIG = {
         'suptitle': 'P.u.l. Mutual earth-return admittance between phase - a and phase - c [Xue, 2018]',
         'p': 0, 'q': 2,
         'series_to_plot': XUE_SERIES + VANCE_SERIES,
-        'data_path': ['scenarios', '{key}', 'earth_return_parameters', 'admittance_matrix'],
+        'path': ['earth_return_parameters', 'admittance_matrix'],
         'comsol_series_to_plot': comsol_layout_template,
         'comsol_matrix_key': 'admittance_matrix',
         'left_plot': {

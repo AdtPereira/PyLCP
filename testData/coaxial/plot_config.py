@@ -43,30 +43,30 @@ PLOT_TPL_CAPACITANCE = {
 }
 
 PLOT_CONFIG = {
-    'internal_impedance_matrix': {
-        'suptitle': r'Series Impedance Matrix of a single core cable installed in HDPE tube [Lafaia, 2015; Yin, 1990]',
+    'partial_internal_impedance': {
+        'suptitle': r'Series Impedance Matrix of a single core cable',
         'series_to_plot': [
             {
                 'key': '1',
                 'type': {
-                    'cc': {'p': 0, 'q': 0, 'color': 'black', 'linestyle': '-',  'linewidth': 1.5, 'label': r'$Z_{cc}$: core self-resistance (Neglecting HDPE tube)'},
-                    'cs': {'p': 0, 'q': 1, 'color': 'black', 'linestyle': ':',  'linewidth': 1.5, 'label': r'$Z_{cs}$: core-sheath mutual resistance (Neglecting HDPE tube)'},
-                    'ss': {'p': 1, 'q': 1, 'color': 'black', 'linestyle': '--', 'linewidth': 1.5, 'label': r'$Z_{ss}$: sheath self-resistance (Neglecting HDPE tube)'},
+                    'cc': {'p': 0, 'q': 0, 'color': 'black', 'linestyle': '-',  'linewidth': 1.5, 'label': r'$Z_{cc}$: core self-resistance'},
+                    'cs': {'p': 0, 'q': 1, 'color': 'black', 'linestyle': ':',  'linewidth': 1.5, 'label': r'$Z_{cs}$: core-sheath mutual resistance'},
+                    'ss': {'p': 1, 'q': 1, 'color': 'black', 'linestyle': '--', 'linewidth': 1.5, 'label': r'$Z_{ss}$: sheath self-resistance'},
                 }
             },
         ],
-        'data_path': ['scenarios', '{key}', 'internal_matrices', 'impedance_matrix'],
-        'comsol_series_to_plot': [
+        'path': ['internal_matrices', 'impedance_matrix'],
+        'mom_so_series_to_plot': [
             {
                 'key': '1',
                 'type': {
-                    'cc': {'p': 0, 'q': 0, 'marker': 'o', 's': 15, 'facecolors': 'none', 'edgecolors': 'black', 'zorder': 2, 'label': 'Comsol (mf)'},
+                    'cc': {'p': 0, 'q': 0, 'marker': 'o', 's': 15, 'facecolors': 'none', 'edgecolors': 'black', 'zorder': 2, 'label': 'MoM-SO'},
                     'cs': {'p': 0, 'q': 1, 'marker': 'o', 's': 15, 'facecolors': 'none', 'edgecolors': 'black', 'zorder': 2, 'label': ''},
                     'ss': {'p': 1, 'q': 1, 'marker': 'o', 's': 15, 'facecolors': 'none', 'edgecolors': 'black', 'zorder': 2, 'label': ''},
                 }
             },
         ],
-        'comsol_matrix_key': 'internal_impedance_matrix',
+        'mom_so_matrix_key': 'partial_internal_impedance',
         'left_plot': {
             **PLOT_TPL_RESISTANCE,
             'label': r'Resistance $(\Omega/km)$',
@@ -76,12 +76,12 @@ PLOT_CONFIG = {
         'right_plot': {
             **PLOT_TPL_INDUCTANCE,
             'label': r'Inductance $(mH/km)$',
-            'y_lim': (0, 0.35),
+            'y_lim': (0, 1.0),
             'legend': False,
         }
     },
 
-    'coaxial_cable': {
+    'coaxial_cable_impedance': {
         'suptitle': r'P.u.l. series impedance of a single core cable with sheath path return [Patel, 2014; AMETANI, 2015]',
         'series_to_plot': [
             {
@@ -94,7 +94,7 @@ PLOT_CONFIG = {
                 }
             },
         ],
-        'data_path': ['scenarios', '{key}', 'internal_parameters', 'zcs'],
+        'path': ['internal_parameters', 'zcs'],
         'comsol_series_to_plot': [
             {
                 'key': '1',
@@ -131,9 +131,9 @@ PLOT_CONFIG = {
     },
 
     'internal_impedance_elements': {
-        'suptitle': r'Series Impedance Matrix of a single core cable installed in HDPE tube [Lafaia, 2015; Yin, 1990]',
+        'suptitle': r'Series Impedance Matrix of a single core cable',
         'series_to_plot': [],
-        'data_path': [],
+        'path': [],
         'comsol_series_to_plot': [
             {
                 'key': '1',

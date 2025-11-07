@@ -863,9 +863,9 @@ class InternalPerUnitParameters:
         Ye = self.jw[:, np.newaxis, np.newaxis] * inv_Pi
 
         return {
+            'impedance_matrix': Zi,             # 3D Array: (freq, cond, cond)
             'resistance_matrix': Ri,            # 3D Array: (freq, cond, cond)
             'inductance_matrix': Li,            # 3D Array: (freq, cond, cond)
-            'impedance_matrix': Zi,             # 3D Array: (freq, cond, cond)
             'shunt_admittance_matrix': Ye,      # 3D Array: (freq, cond, cond)
             'potential_coefficient_matrix': Pi, # 2D Array (freq-independent)
             'capacitance_matrix': inv_Pi        # 2D Array (freq-independent)

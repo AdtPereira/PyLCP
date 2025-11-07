@@ -55,7 +55,7 @@ PLOT_CONFIG = {
                 }
             },
         ],
-        'data_path': ['scenarios', '{key}', 'internal_matrices', 'impedance_matrix'],
+        'path': ['internal_matrices', 'impedance_matrix'],
         'comsol_series_to_plot': [
             {
                 'key': '1',
@@ -94,7 +94,7 @@ PLOT_CONFIG = {
                 }
             },
         ],
-        'data_path': ['scenarios', '{key}', 'internal_parameters', 'zcs'],
+        'path': ['internal_parameters', 'zcs'],
         'comsol_series_to_plot': [
             {
                 'key': '1',
@@ -124,7 +124,7 @@ PLOT_CONFIG = {
     'internal_impedance_elements': {
         'suptitle': r'Series Impedance Matrix of a single core cable installed in HDPE tube [Lafaia, 2015; Yin, 1990]',
         'series_to_plot': [],
-        'data_path': [],
+        'path': [],
         'comsol_series_to_plot': [
             {
                 'key': '1',

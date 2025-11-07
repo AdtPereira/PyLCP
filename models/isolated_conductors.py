@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 This script provides an object-oriented, parametric method to generate 
 the MODEL dictionary for various arrangements of single-core cables.
@@ -15,7 +14,7 @@ import numpy as np
 from typing import Dict, Any, Tuple
 from utils.case_utils import UNITS_DATA
 
-class SingleCoreCableModelGenerator:
+class IsolatedConductorsModelGenerator:
     """
     A class to generate parametric models for single-core cable arrangements.
     """
@@ -121,6 +120,7 @@ class SingleCoreCableModelGenerator:
             'potential_to_infinity': 1.0,
             'fourier_order': self.fourier_order,
         }
+
         return conductor_id + 1
 
     def _add_cable_conductors(self, 

@@ -61,7 +61,6 @@ class HomogeneousLosslessMedium():
 
     # Surface admittance operator [np.array]
     # Equation (2.20) [1]
-    # CHANGED: Now returns a vector of results, one for each frequency.
     def ynp_for_solid(self, n, p):
         """
         This method calculates the surface admittance operator for a solid conductor, Yn(p).
@@ -84,7 +83,6 @@ class HomogeneousLosslessMedium():
 
     # chi_n function [int]
     # Equation (11) [3]
-    # NOTE: This function is naturally vectorized as scipy special functions operate element-wise.
     def chi_n(self, n, alfa, beta):
         """
         This function calculates the qui_n function.
@@ -126,7 +124,6 @@ class HomogeneousLosslessMedium():
     # Surface admittance operator for hollow conductors [np.array]
     # Equation (2.31) [1]
     # Equation (10) [3]
-    # CHANGED: Now returns a 2x2 matrix where each element is a vector of results.
     def ynp_for_hollow(self, n, cp):
         inner_radius = np.array([c['radius'][0] for c in self.model.mtl.values()])
         outer_radius = np.array([c['radius'][1] for c in self.model.mtl.values()])
@@ -199,7 +196,6 @@ class HomogeneousLosslessMedium():
 
     # Matrix Ys [np.array]
     # Equation (2.38) [1]
-    # CHANGED: Now builds a 3D matrix Ys of shape (n_freqs, N, N)
     def ys_matrix(self):
         """
         Builds the block-diagonal Ys matrix for all frequencies at once.
@@ -241,8 +237,7 @@ class HomogeneousLosslessMedium():
 
     # Matrix Z [np.array]
     # Equation (2.61) [1]
-    # CHANGED: Now loops internally over frequencies because lu_solve is not vectorized.
-    def z_partial(self, green_matrix):
+    def z_partial(self, G):
         """
         Calculates the partial impedance matrix Z for all frequencies.
         
@@ -252,30 +247,30 @@ class HomogeneousLosslessMedium():
         Returns:
             np.ndarray: A 3D array of shape (n_frequencies, n_conductors, n_conductors).
         """
-        n_freqs = len(self.frequencies)
-        n_conds = len(self.model.mtl.values())
+        n = len(self.frequencies)
+        N = len(self.model.mtl.values())
         
         # Pre-calculate frequency-dependent and independent matrices
-        ys = self.ys_matrix() # 3D: (n_freqs, N, N)
-        u = self.u_matrix()   # 2D: (N, n_conds)
-        jwu0 = 1j * self.w * sc.mu_0 # 1D: (n_freqs,)
+        I = np.eye(self.model.N)
+        ys = self.ys_matrix()           # 3D: (ns, N, N)
+        U = self.u_matrix()             # 2D: (N, n)
+        jwu0 = 1j * self.w * sc.mu_0    # 1D: (n,)
         
         # Pre-allocate result array
-        z_partial_stack = np.zeros((n_freqs, n_conds, n_conds), dtype=np.complex128)
+        z_partial = np.zeros((n, N, N), dtype=np.complex128)
         
         # Loop over each frequency
-        for i in range(n_freqs):
-            # Slicing the 3D matrix to get the 2D matrix for the i-th frequency
-            ys_slice = ys[i, :, :]
-            jwu0_scalar = jwu0[i]
+        for i in range(n):
+            Ys = ys[i, :, :]
+            M = I - jwu0[i] * (Ys @ G)
             
-            matrix = np.eye(self.model.N) - jwu0_scalar * (ys_slice @ green_matrix)
-            lu, piv = lu_factor(matrix)
+            # Calcula A = U.T @ (M**-1) @ (Ys @ U)
+            A = U.T @ lu_solve(lu_factor(M), Ys @ U)
 
-            solution = lu_solve((lu, piv), ys_slice @ u)
-            z_partial_stack[i, :, :] = u.T @ solution
+            # Calcula Z = A**-1
+            z_partial[i, :, :] = lu_solve(lu_factor(A), np.eye(A.shape[0]))
             
-        return z_partial_stack
+        return z_partial
 
     # Generalized Capacitance Matrix [np.array]
     def generalized_capacitance_matrix(self, green_matrix):
@@ -311,38 +306,38 @@ class HomogeneousLosslessMedium():
 
     # Maxwellian Capacitance Matrix [np.array]
     def maxwellian_capacitance_matrix(self, generalized_capacitance_matrix: np.ndarray) -> np.ndarray:
-            """
-            Calculates the physical (Maxwellian) capacitance matrix from the
-            generalized matrix using a vectorized approach based on Eq. 5.21 of Clayton Paul.
+        """
+        Calculates the physical (Maxwellian) capacitance matrix from the
+        generalized matrix using a vectorized approach based on Eq. 5.21 of Clayton Paul.
 
-            The formula C_ij = c_ij - ( (sum of row i) * (sum of col j) ) / (total sum of c)
-            is implemented using NumPy slicing and outer product for efficiency.
-            """
-            gc = generalized_capacitance_matrix
+        The formula C_ij = c_ij - ( (sum of row i) * (sum of col j) ) / (total sum of c)
+        is implemented using NumPy slicing and outer product for efficiency.
+        """
+        gc = generalized_capacitance_matrix
 
-            # --- Input validation ---
-            assert isinstance(gc, np.ndarray), "Input must be a NumPy array."
-            total_sum = np.sum(gc)
-            assert total_sum != 0, "The total sum of the generalized matrix cannot be zero."
-            assert gc.ndim == 2 and gc.shape[0] == gc.shape[1], "Input must be a square 2D matrix."
-            assert gc.shape[0] >= 2, "The generalized matrix must be at least 2x2."
+        # --- Input validation ---
+        assert isinstance(gc, np.ndarray), "Input must be a NumPy array."
+        total_sum = np.sum(gc)
+        assert total_sum != 0, "The total sum of the generalized matrix cannot be zero."
+        assert gc.ndim == 2 and gc.shape[0] == gc.shape[1], "Input must be a square 2D matrix."
+        assert gc.shape[0] >= 2, "The generalized matrix must be at least 2x2."
 
-            # --- Vectorized Calculation ---
-            
-            # Extract the submatrix c_ij (excluding the reference conductor at index 0)
-            c_ij_submatrix = gc[1:, 1:]
+        # --- Vectorized Calculation ---
+        
+        # Extract the submatrix c_ij (excluding the reference conductor at index 0)
+        c_ij_submatrix = gc[1:, 1:]
 
-            # Calculate sum of rows and columns, excluding the reference conductor
-            row_sums = np.sum(gc, axis=1)[1:]
-            col_sums = np.sum(gc, axis=0)[1:]
+        # Calculate sum of rows and columns, excluding the reference conductor
+        row_sums = np.sum(gc, axis=1)[1:]
+        col_sums = np.sum(gc, axis=0)[1:]
 
-            # Calculate the outer product of the row and column sums to create the adjustment matrix
-            adjustment_matrix = np.outer(row_sums, col_sums) / total_sum
-            
-            # Apply the formula in a single vectorized operation
-            matrix_c = c_ij_submatrix - adjustment_matrix
+        # Calculate the outer product of the row and column sums to create the adjustment matrix
+        adjustment_matrix = np.outer(row_sums, col_sums) / total_sum
+        
+        # Apply the formula in a single vectorized operation
+        matrix_c = c_ij_submatrix - adjustment_matrix
 
-            return matrix_c
+        return matrix_c
 
 class LosslessPostProcessing():
     """ This class contains the post-processing parameters for the system. """
@@ -431,9 +426,7 @@ class LosslessPostProcessing():
 
     # Matrix Z_full [np.array]
     # Equation (A.12) [1]
-    # CHANGED: Now loops internally over the frequency dimension of z_partial_stack.
-
-    def z_total(self, z_partial_stack):
+    def z_total(self, z_partial):
         """
         Calculates the full impedance matrix Zs for all frequencies.
 
@@ -443,34 +436,26 @@ class LosslessPostProcessing():
         Returns:
             np.ndarray: A 3D array of shape (n_frequencies, n_active_lines, n_active_lines).
         """
-        n_freqs = z_partial_stack.shape[0]
-        n_active = len(self.active_lines)
-        z_total_stack = np.zeros((n_freqs, n_active, n_active), dtype=np.complex128)
+        n = z_partial.shape[0]
+        n_act = len(self.active_lines)
+        z_total = np.zeros((n, n_act, n_act), dtype=np.complex128)
 
-        s = self.s_incident_matrix()
-        q = self.q_incident_matrix()
+        S = self.s_incident_matrix()
+        Q = self.q_incident_matrix()
 
         # Loop over each frequency's z_partial matrix
-        for i in range(n_freqs):
-            z_partial_slice = z_partial_stack[i, :, :]
-            lu, piv = lu_factor(z_partial_slice)
-            
-            # This is equivalent to S.T @ inv(Q @ inv(Zp) @ Q.T) @ S
-            # Which simplifies to S.T @ (Q Zp^{-1} Q^T)^{-1} @ S
-            # The calculation seems to be different from the equation reference. Assuming the code is correct:
-            # S.T @ (Q Zp^{-1} Q.T) @ S
-            qz_inv_qt = q @ lu_solve((lu, piv), q.T)
-            z_total_stack[i, :, :] = s.T @ qz_inv_qt @ s
+        for i in range(n):
+            Zp = z_partial[i, :, :]
+            qz_inv_qt = Q @ Zp @ Q.T
+            z_total[i, :, :] = S.T @ qz_inv_qt @ S
 
-        return z_total_stack
+        return z_total
 
     # Matriz Rs [np.array]
-    # NOTE: np.real is vectorized, so no changes needed.
     def rs_matrix(self, z_total_stack):
         return np.real(z_total_stack)
 
     # Matriz Ls [np.array]
-    # CHANGED: Now accepts frequencies array for vectorized calculation.
     def ls_matrix(self, z_total_stack, frequencies):
         w = 2 * np.pi * np.asarray(frequencies)
         # Reshape w to (n_freqs, 1, 1) for broadcasting with (n_freqs, N, N) matrix

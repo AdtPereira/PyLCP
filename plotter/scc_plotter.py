@@ -40,9 +40,8 @@ class CoaxialCablePlotter(BasePlotter):
         super().__init__(file_path, pul_data, plot_config, autoSave=autoSave)
 
     def coaxial_cable_internal_impedance_matrix(self):
-        for key in ['internal_impedance_matrix']:
+        for key in ['partial_internal_impedance']:
             self._plot_matricial_upper_triangular(key)
 
-    def coaxial_cable_internal_impedance_elements(self):
-        for key in ['coaxial_cable']:
-            self._plot_non_matricial_list_parameter(key)
+    def coaxial_cable_impedance(self):
+        self._plot_non_matricial_list_parameter('coaxial_cable_impedance')
