@@ -364,7 +364,7 @@ class SingleCoreCableModels:
         plt.tight_layout(rect=[0, 0, 1, 0.96])
 
         if self.autoSave:
-            save_figure_multiformat(fig, self.results_dir, base_filename=f'impedance_parameters_{graph_key}')
+            save_figure(fig, self.results_dir, base_filename=f'impedance_parameters_{graph_key}')
 
     def _impedance_subplots(self, graph_key):
         """
@@ -511,7 +511,7 @@ class SingleCoreCableModels:
             plt.tight_layout(rect=[0, 0, 1, 0.96])
 
         if self.autoSave:
-            save_figure_multiformat(fig, self.results_dir, base_filename=f'{graph_key}')
+            save_figure(fig, self.results_dir, base_filename=f'{graph_key}')
 
     def _admittance_subplots(self, graph_key):
         """
@@ -658,7 +658,7 @@ class SingleCoreCableModels:
             plt.tight_layout(rect=[0, 0, 1, 0.96])
 
         if self.autoSave:
-            save_figure_multiformat(fig, self.results_dir, base_filename=f'{graph_key}')
+            save_figure(fig, self.results_dir, base_filename=f'{graph_key}')
 
     def _potential_subplots(self, graph_key):
         config = self.xue_plot_configs[graph_key]
@@ -772,7 +772,7 @@ class SingleCoreCableModels:
             plt.tight_layout(rect=[0, 0, 1, 0.96])
 
         if self.autoSave:
-            save_figure_multiformat(fig, self.results_dir, base_filename=f'{graph_key}')
+            save_figure(fig, self.results_dir, base_filename=f'{graph_key}')
 
     def ground_return_impedance(self, graph_key='ground_return_impedance'):
         config = self.prysmian_plot_configs[graph_key]
@@ -796,7 +796,7 @@ class SingleCoreCableModels:
         plt.tight_layout(rect=[0, 0, 1, 0.96])
 
         if self.autoSave:
-            save_figure_multiformat(fig, self.results_dir, base_filename=f'ground_return_impedance')
+            save_figure(fig, self.results_dir, base_filename=f'ground_return_impedance')
 
     def series_impedance_earth_return(self):
         self._impedance_subplots(graph_key='earth_return_impedance')

@@ -100,7 +100,7 @@ class MoMVisualizer:
         ax.set_ylim(0, max(cap_odd_col + cap_even_col) * 1.1)
         ax.grid(False)
         ax.legend()
-        save_figure_multiformat(fig, self.results_dir, base_filename='convergence_rates')
+        save_figure(fig, self.results_dir, base_filename='convergence_rates')
         plt.tight_layout()
 
     def plot_collocation_points(self):
@@ -253,7 +253,7 @@ class MoMVisualizer:
         ax.grid(True, linestyle='--', alpha=0.6)
         ax.set_xticks(np.arange(0, 361, 90)); ax.set_xlim(0, 360)
         ax.legend()
-        save_figure_multiformat(fig, self.results_dir, base_filename='surface_charge_density')
+        save_figure(fig, self.results_dir, base_filename='surface_charge_density')
         plt.tight_layout()
 
     def plot_harmonic_coefficients(self):
@@ -313,7 +313,7 @@ class MoMVisualizer:
         ax.set_ylim(bottom=-0.05)
         ax.set_xticks(np.arange(1, NF + 1))
         ax.grid(True, which='major', axis='y', linestyle='--', alpha=0.7)
-        save_figure_multiformat(fig, self.results_dir, base_filename='harmonic_coefficients')
+        save_figure(fig, self.results_dir, base_filename='harmonic_coefficients')
         plt.tight_layout()
 
     def print_terminal_results(self):

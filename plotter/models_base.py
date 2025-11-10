@@ -94,7 +94,7 @@ class BasePlotter:
         
         plt.tight_layout(rect=[0, 0, 1, 0.96])
         if self.autoSave:
-            save_figure_multiformat(fig, self.results_dir, base_filename=f'{graph_key}')
+            save_figure(fig, self.results_dir, base_filename=f'{graph_key}')
 
     def _plot_matricial_upper_triangular(self, graph_key):
         """
@@ -187,7 +187,7 @@ class BasePlotter:
         
         plt.tight_layout(rect=[0, 0, 1, 0.96])
         if self.autoSave:
-            save_figure_multiformat(fig, self.results_dir, base_filename=f'{graph_key}')
+            save_figure(fig, self.results_dir, base_filename=f'{graph_key}')
 
     def _plot_non_matricial_list_parameter(self, graph_key):
         """
@@ -278,7 +278,7 @@ class BasePlotter:
         
         plt.tight_layout(rect=[0, 0, 1, 0.96])
         if self.autoSave:
-            save_figure_multiformat(fig, self.results_dir, base_filename=f'{graph_key}')
+            save_figure(fig, self.results_dir, base_filename=f'{graph_key}')
 
     def _plot_non_matricial_parameter(self, graph_key):
         """
@@ -334,7 +334,7 @@ class BasePlotter:
         
         plt.tight_layout(rect=[0, 0, 1, 0.96])
         if self.autoSave:
-            save_figure_multiformat(fig, self.results_dir, base_filename=f'{graph_key}')
+            save_figure(fig, self.results_dir, base_filename=f'{graph_key}')
             
     def _calculate_plot_data(self, data, w, component_type, scale):
         if component_type == 'real':

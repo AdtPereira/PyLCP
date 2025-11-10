@@ -111,7 +111,7 @@ class DeContiModels:
         plt.tight_layout(rect=[0, 0, 1, 0.96])
 
         if self.autoSave:
-            save_figure_multiformat(fig, self.results_dir, base_filename=f'{graph_key}')
+            save_figure(fig, self.results_dir, base_filename=f'{graph_key}')
 
     def _impedance_subplots(self, graph_key, graph_form='norm_and_angle'):
         config = self.plot_configs[graph_key]
@@ -178,7 +178,7 @@ class DeContiModels:
                 plt.tight_layout(rect=[0, 0, 1, 0.96])
 
         if self.autoSave:
-            save_figure_multiformat(fig, self.results_dir, base_filename=f'{graph_key}_{graph_form}')
+            save_figure(fig, self.results_dir, base_filename=f'{graph_key}_{graph_form}')
 
     def _potential_subplots(self, graph_key):
         config = self.plot_configs[graph_key]
@@ -214,7 +214,7 @@ class DeContiModels:
         plt.tight_layout(rect=[0, 0, 1, 0.96])
 
         if self.autoSave:
-            save_figure_multiformat(fig, self.results_dir, base_filename=f'{graph_key}')
+            save_figure(fig, self.results_dir, base_filename=f'{graph_key}')
 
     def fig_3(self, graph_form='norm_and_angle'):
         """Plots the data corresponding to Figure 3 from the reference."""

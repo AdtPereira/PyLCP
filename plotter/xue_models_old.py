@@ -297,7 +297,7 @@ class XueModels:
         plt.tight_layout(rect=[0, 0, 1, 0.96])
 
         if self.autoSave:
-            save_figure_multiformat(fig, self.results_dir, base_filename=f'series_impedance_{graph_key}')
+            save_figure(fig, self.results_dir, base_filename=f'series_impedance_{graph_key}')
 
     def _scc_shunt_admittance_subplots(self, graph_key):
         """
@@ -330,7 +330,7 @@ class XueModels:
         plt.tight_layout(rect=[0, 0, 1, 0.96])
 
         if self.autoSave:
-            save_figure_multiformat(fig, self.results_dir, base_filename=f'shunt_admittance_{graph_key}')
+            save_figure(fig, self.results_dir, base_filename=f'shunt_admittance_{graph_key}')
 
     def _scc_earth_return_impedance_subplots(self, graph_key):
         """
@@ -387,7 +387,7 @@ class XueModels:
         plt.tight_layout(rect=[0, 0, 1, 0.96])
 
         if self.autoSave:
-            save_figure_multiformat(fig, self.results_dir, base_filename=f'{graph_key}')
+            save_figure(fig, self.results_dir, base_filename=f'{graph_key}')
 
     def _scc_earth_return_admittance_subplots(self, graph_key):
         """
@@ -443,7 +443,7 @@ class XueModels:
         plt.tight_layout(rect=[0, 0, 1, 0.96])
 
         if self.autoSave:
-            save_figure_multiformat(fig, self.results_dir, base_filename=f'{graph_key}')
+            save_figure(fig, self.results_dir, base_filename=f'{graph_key}')
 
     def _overhead_series_impedance_subplots(self, graph_key):
         """

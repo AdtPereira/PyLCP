@@ -60,6 +60,26 @@ def format_scientific_notation(value, precision=1):
     exponent_int = int(exponent)
     return fr'{base} \times 10^{{{exponent_int}}}'
 
+def format_complex_number(z_complex):
+    """
+    Formata um número complexo para exibição em string.
+    Ex: (1.23E+0 + 4.56E-1i)
+    """
+    if z_complex == 0:
+        return "0"
+
+    real_part = f"{np.real(z_complex):.4E}"
+    imag_part = f"{np.imag(z_complex):.4E}"
+
+    # Ajuste para garantir que "E+0" seja tratado se for o caso
+    real_part = real_part.replace('E+00', '').replace('E-00', '').replace('0.0000', '0')
+    imag_part = imag_part.replace('E+00', '').replace('E-00', '').replace('0.0000', '0')
+
+    if np.imag(z_complex) >= 0:
+        return f"{real_part} + {imag_part}i"
+
+    return f"{real_part} {imag_part}i"
+
 def matrix_viewer(matrix: np.ndarray, title: str, columns_name: Optional[list] = None) -> pd.DataFrame:
     """
     Formata e exibe uma matriz NumPy como um DataFrame do pandas com um título.
@@ -159,7 +179,7 @@ def verify_kelvin_functions(q = 1.5):
     print(f"Re[...] = {ber_p_from_bessel:>10.6f} -> Matches ber'(q)? {np.isclose(ber_p_ref, ber_p_from_bessel)}")
     print(f"Im[...] = {bei_p_from_bessel:>10.6f} -> Matches bei'(q)? {np.isclose(bei_p_ref, bei_p_from_bessel)}")
 
-def save_figure_multiformat(fig, results_dir, base_filename, formats=['png']):
+def save_figure(fig, results_dir, base_filename, formats=['png']):
     """
     Saves a figure to multiple file formats in the case's results directory.
 

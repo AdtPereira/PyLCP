@@ -36,7 +36,7 @@ def main():
             },
         },
         'mom_so': {
-            'frequencies': np.logspace(0, 6, num=31),
+            'frequencies': np.logspace(0, 5.9, num=31),
             'scenarios': {
                 '1': {
                     'mtl': mtl,

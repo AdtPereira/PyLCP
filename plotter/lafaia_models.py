@@ -124,7 +124,7 @@ class LafaiaModels:
         ax2.set_title(r'Internal Inductance, $L_{cs}$')
         plt.tight_layout(rect=[0, 0, 1, 0.96])
         if self.autoSave:
-            save_figure_multiformat(fig, self.results_dir, base_filename='internal_impedance_elements')
+            save_figure(fig, self.results_dir, base_filename='internal_impedance_elements')
 
     def internal_impedance_matrix_js_method(self):
         """
@@ -199,7 +199,7 @@ class LafaiaModels:
         ax2.set_title(r'Internal Inductance, $L$')
         plt.tight_layout(rect=[0, 0, 1, 0.96])
         if self.autoSave:
-            save_figure_multiformat(fig, self.results_dir, base_filename='internal_impedance_matrix_js_method')
+            save_figure(fig, self.results_dir, base_filename='internal_impedance_matrix_js_method')
 
     def internal_impedance_matrix_energy_method(self):
         """
@@ -271,7 +271,7 @@ class LafaiaModels:
         ax2.set_title(r'Internal Inductance, $L$')
         plt.tight_layout(rect=[0, 0, 1, 0.96])
         if self.autoSave:
-            save_figure_multiformat(fig, self.results_dir, base_filename='internal_impedance_matrix_energy_method')
+            save_figure(fig, self.results_dir, base_filename='internal_impedance_matrix_energy_method')
 
     def internal_admittance_elements(self):
         """
@@ -342,4 +342,4 @@ class LafaiaModels:
 
         plt.tight_layout(rect=[0, 0, 1, 0.95])
         if self.autoSave:
-            save_figure_multiformat(fig, self.results_dir, base_filename='internal_admittance_matrix')
+            save_figure(fig, self.results_dir, base_filename='internal_admittance_matrix')

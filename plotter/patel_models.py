@@ -96,7 +96,7 @@ class PatelModels:
         ax2.grid(True, which='both', linestyle='--', linewidth=0.5)
         ax2.set_title('Internal Inductance, $L_{cs}$')
         plt.tight_layout(rect=[0, 0, 1, 0.96])
-        save_figure_multiformat(fig, self.results_dir, base_filename='patel_internal_impedance_elements')
+        save_figure(fig, self.results_dir, base_filename='patel_internal_impedance_elements')
 
     def internal_impedance_matrix_js_method(self):
         """
@@ -160,7 +160,7 @@ class PatelModels:
         ax2.grid(True, which='both', linestyle='--', linewidth=0.5)
         ax2.set_title('Internal Inductance, $L_{cs}$')
         plt.tight_layout(rect=[0, 0, 1, 0.96])
-        save_figure_multiformat(fig, self.results_dir, base_filename='patel_internal_impedance_matrix_js_method')
+        save_figure(fig, self.results_dir, base_filename='patel_internal_impedance_matrix_js_method')
 
     def internal_impedance_matrix_energy_method(self):
         """
@@ -216,7 +216,7 @@ class PatelModels:
         ax2.grid(True, which='both', linestyle='--', linewidth=0.5)
         ax2.set_title('Internal Inductance, $L_{cs}$')
         plt.tight_layout(rect=[0, 0, 1, 0.96])
-        save_figure_multiformat(fig, self.results_dir, base_filename='patel_internal_impedance_matrix_energy_method')
+        save_figure(fig, self.results_dir, base_filename='patel_internal_impedance_matrix_energy_method')
 
     def internal_admittance_elements(self):
         """
@@ -246,4 +246,4 @@ class PatelModels:
         ax2.grid(True, which='both', linestyle='--', linewidth=0.5)
         ax2.set_title('Internal Capacitance, $C$')
         plt.tight_layout(rect=[0, 0, 1, 0.96])
-        save_figure_multiformat(fig, self.results_dir, base_filename='patel_internal_admittance_elements')
+        save_figure(fig, self.results_dir, base_filename='patel_internal_admittance_elements')

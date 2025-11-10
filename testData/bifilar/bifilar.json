@@ -1,0 +1,28 @@
+{
+  "type": "bare_wires",
+  "name": "Isolated Bifilar bare-wire line",
+  "note": "Modified Clements (1974) problem with conductor radii rw = 10mm",
+  "arrangement": {
+    "unit": "meter",
+    "type": null,
+    "num_conductors": 2,
+    "spacing": 0.100,
+    "fourier_order": 0,
+    "idx_ref_conductor": 0
+  },
+  "soil": null,
+  "frequency":{
+    "spacing": "log",
+    "min_Hz": 1.0E0,
+    "max_Hz": 1.0E6,
+    "steps_per_decade": 5
+  },  
+  "cable_definition": {
+    "core": {
+      "inner_radius": 0.0,
+      "outer_radius": 0.010,
+      "conductivity_S_per_m": 5.8E7,
+      "insulation": null
+    }
+  }
+}

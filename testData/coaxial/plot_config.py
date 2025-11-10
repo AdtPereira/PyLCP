@@ -28,6 +28,13 @@ PLOT_TPL_INDUCTANCE = {
     'yscale': 'linear',
 }
 
+PLOT_TPL_REACTANCE = {
+    'component': 'imag',
+    'scale': 1e3,
+    'xscale': 'log',
+    'yscale': 'log',
+}
+
 PLOT_TPL_CONDUCTANCE = {
     'component': 'real',
     'scale': 1e3,
@@ -73,10 +80,15 @@ PLOT_CONFIG = {
             'y_lim': (1E-3, 1E1),
             'legend': True,
         },
+        # 'right_plot': {
+        #     **PLOT_TPL_INDUCTANCE,
+        #     'label': r'Inductance $(mH/km)$',
+        #     'y_lim': (0, 1.0),
+        #     'legend': False,
+        # },
         'right_plot': {
-            **PLOT_TPL_INDUCTANCE,
-            'label': r'Inductance $(mH/km)$',
-            'y_lim': (0, 1.0),
+            **PLOT_TPL_REACTANCE,
+            'label': r'Reactance $(\Omega/km)$',
             'legend': False,
         }
     },

@@ -457,7 +457,7 @@ class BifilarBareWirePULParameters:
 
         fig, ax = plt.subplots(figsize=self.figsize)
         self._configure_plot_appearance(ax, r'Series Resistance p.u.l. ($\Omega$/km)', resistance_data)
-        save_figure_multiformat(fig, self.results_dir, base_filename='pul_series_resistance')
+        save_figure(fig, self.results_dir, base_filename='pul_series_resistance')
         plt.tight_layout()
 
     def plot_inductance_results(self):
@@ -482,7 +482,7 @@ class BifilarBareWirePULParameters:
 
         fig, ax = plt.subplots(figsize=self.figsize)
         self._configure_plot_appearance(ax, 'Series Inductance p.u.l. (mH/km)', inductance_data, yscale='linear')
-        save_figure_multiformat(fig, self.results_dir, base_filename='pul_series_inductance')
+        save_figure(fig, self.results_dir, base_filename='pul_series_inductance')
         plt.tight_layout()
 
     def plot_capacitance_results(self):
@@ -508,7 +508,7 @@ class BifilarBareWirePULParameters:
 
         fig, ax = plt.subplots(figsize=self.figsize)
         self._configure_plot_appearance(ax, 'Capacitance p.u.l. (nF/km)', capacitante_data, yscale='linear')
-        save_figure_multiformat(fig, self.results_dir, base_filename='pul_shunt_capacitance')
+        save_figure(fig, self.results_dir, base_filename='pul_shunt_capacitance')
         plt.tight_layout()
 
     def plot_srw_rates(self):
@@ -553,7 +553,7 @@ class BifilarBareWirePULParameters:
         ax.set_ylim(10, 90)
         ax.legend()
         ax.grid(True, linestyle='--', linewidth=0.5)
-        save_figure_multiformat(fig, self.results_dir, base_filename='ratio_srw_capacitance')
+        save_figure(fig, self.results_dir, base_filename='ratio_srw_capacitance')
         plt.tight_layout()
 
     def plot_generalized_capacitance_convergence(self):
@@ -618,7 +618,7 @@ class BifilarBareWirePULParameters:
         ax1.set_ylabel('Generalized Capacitance Matrix, $CGEN$ (pF/m)', fontsize=11)
         ax1.set_title('Auto-Capacitance Term $CGEN_{00}$')
         ax2.set_title('Mutual Capacitance Term $CGEN_{01}$')
-        save_figure_multiformat(fig, self.results_dir, base_filename='generalized_capacitance_convergence')
+        save_figure(fig, self.results_dir, base_filename='generalized_capacitance_convergence')
         plt.tight_layout(rect=[0, 0, 1, 0.96])
 
     def plot_free_space_capacitance_convergence(self):
@@ -688,6 +688,6 @@ class BifilarBareWirePULParameters:
         # ax.legend(loc='upper center', fontsize=9, ncol=legend_items_count, bbox_to_anchor=(0.5, 1.1), fancybox=True)
         ax.legend(loc='lower right', fontsize=10)
         ax.grid(False)
-        save_figure_multiformat(fig, self.results_dir, base_filename='free_space_capacitance_convergence')
+        save_figure(fig, self.results_dir, base_filename='free_space_capacitance_convergence')
         plt.tight_layout()
     

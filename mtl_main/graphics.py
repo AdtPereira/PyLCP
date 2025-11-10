@@ -231,7 +231,7 @@ class IsolatedMTLRepresentation(BaseMTLRepresentation):
 
         self._finalize_plot(ax, parameters['title'])
         if self.autoSave:
-            save_figure_multiformat(fig, self.results_dir, base_filename)
+            save_figure(fig, self.results_dir, base_filename)
 
 class GroundReturnMTLRepresentation(BaseMTLRepresentation):
     """
@@ -260,7 +260,7 @@ class GroundReturnMTLRepresentation(BaseMTLRepresentation):
         self._finalize_plot(ax, parameters['title'], x_margin_scale)
 
         if self.autoSave:
-            save_figure_multiformat(fig, self.results_dir, base_filename)
+            save_figure(fig, self.results_dir, base_filename)
 
     def _plot_enclosure_graphic(self, ax, conductor_data, parameters, used_labels):
         """
