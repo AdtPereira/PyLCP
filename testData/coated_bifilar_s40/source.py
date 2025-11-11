@@ -265,7 +265,7 @@ class BifilarCoatedWirePULParameters:
             temp_mtl[1]['center_point'] = (separation, 0.0)
 
             wires = WiresHomogeneousMedia(temp_mtl)
-            le_wires = wires.n_wires_inductance_matrix()
+            le_wires = wires.n_wires_external_inductance_matrix()
             pul_bifilar = wires.bifilar_pul_inductance_and_capacitance()
 
             self.srw_data[ratio] = {

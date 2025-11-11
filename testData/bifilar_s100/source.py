@@ -15,7 +15,7 @@ from mom_so.lossless_medium import HomogeneousLosslessMedium, LosslessPostProces
 from mom.bare_wire_systems import BareWireMoMSolver
 from plotter.mom_models import MoMVisualizer
 
-class BifilarBareWirePULParameters:
+class BifilarPULParameters:
     """
     The ConvergenceAnalyzer class is a tool designed to perform and visualize a convergence analysis 
     for the electrical parameters of multiconductor transmission lines (MTLs). 
@@ -39,13 +39,13 @@ class BifilarBareWirePULParameters:
         self.case_name = case_name
         self.comsol_data = comsol_data
         self.mtl_copy = copy.deepcopy(mtl)
-        self.freq_range = {'ana': np.logspace(0, 6, num=200),   'mom': np.logspace(0, 6, num=31)}
+        self.freq_range = {'ana': np.logspace(0, 5, num=51),   'mom': np.logspace(0, 5, num=51)}
         self.srw_ratios = {'ana': np.linspace(2.1, 8, num=300), 'mom': np.linspace(2.1, 8, num=20)}
         self.N = len([key for key in mtl.keys() if isinstance(key, int)])
         self.results_df = None
 
         # Extrai parâmetros e prepara o executor do Fortran
-        self._bifilar_analytical_solution()
+        self._analytical_solution()
 
         # Parâmetros de dados
         self.srw_data = {}
@@ -60,6 +60,7 @@ class BifilarBareWirePULParameters:
         self.c_factor = 1e12  # F/m to nF/km
         self.l_factor = 1e6   # H/m to mH/km
         self.r_factor = 1e3   # Ohm/m to Ohm/km
+        self.x_factor = 1e3   # Ohm/m to Ohm/km
         self.figsize = (12, 5)
         self.pt1 = 63
         self.pt2 = 10
@@ -68,14 +69,14 @@ class BifilarBareWirePULParameters:
         self.plot_params = {
             'linestyles': [':', '-.', '--', '-', ':', '-.', '--'],
             'markers': ['o', 's', '^', 'd', 'v', '<', '>'],
-            'colors': ['black', 'gray', 'lightgray', 'darkgray', 'dimgray', 'silver', 'gainsboro']
+            'colors': ['black', 'gray', 'darkgray', 'dimgray', 'silver', 'gainsboro', 'lightgray']
         }
 
         # Assumes the script is run from the project's root directory.
         self.results_dir = os.path.join('testData', self.case_name, 'Results')
         os.makedirs(self.results_dir, exist_ok=True)
 
-    def _bifilar_analytical_solution(self):
+    def _analytical_solution(self):
         """Calcula a solução analítica para fios nus como referência."""
         R = self.mtl_copy[0]['radius'][1]
         D = np.linalg.norm(np.array(self.mtl_copy[0]['center_point']) - np.array(self.mtl_copy[1]['center_point']))
@@ -83,7 +84,7 @@ class BifilarBareWirePULParameters:
         from scipy.constants import epsilon_0
         self.analytical_bifilar_capacitance = (np.pi * epsilon_0) / np.arccosh(0.5*self.DR_ratio)
 
-    def _configure_plot_appearance(self, ax, ylabel, data_to_plot, yscale='log'):
+    def _cfg_plot_appearance(self, ax, ylabel, data_to_plot, yscale='log'):
         """
         Função auxiliar para configurar um único subplot.
 
@@ -118,13 +119,13 @@ class BifilarBareWirePULParameters:
 
         ax.set_xscale('log')
         ax.set_yscale(yscale)
-        ax.set_xlim(1E0, 1E6)
+        ax.set_xlim(1E0, 1E5)
         ax.set_xlabel('Frequency (Hz)')
         ax.set_ylabel(ylabel)
         ax.legend()
-        ax.grid(False)
+        ax.grid(True, which='both', linestyle='--', linewidth=0.5)
 
-    def _configure_plot_matrix_appearance(self, ax, ylabel, data_to_plot, yscale='log', ylim=None):
+    def _cfg_plot_matrix_appearance(self, ax, ylabel, data_to_plot, yscale='log', ylim=None):
         """
         Função auxiliar para configurar um subplot para os elementos da matriz de resistência (R11, R12, R22).
 
@@ -166,13 +167,13 @@ class BifilarBareWirePULParameters:
 
         ax.set_xscale('log')
         ax.set_yscale(yscale)
-        ax.set_xlim(1E0, 1E6)
+        ax.set_xlim(1E0, 1E5)
         if ylim is not None:
             ax.set_ylim(ylim)
         ax.set_xlabel('Frequency (Hz)')
         ax.set_ylabel(ylabel)
         ax.legend()
-        ax.grid(False)
+        ax.grid(True, which='both', linestyle='--', linewidth=0.5)
         
     def show_header(self):
         """Exibe o cabeçalho do script."""
@@ -201,7 +202,7 @@ class BifilarBareWirePULParameters:
         print("\n==============         Analytical Processing       =============")
 
         bifilar_wires = WiresHomogeneousMedia(self.mtl_copy)
-        le_wires = bifilar_wires.n_wires_inductance_matrix()
+        le_wires = bifilar_wires.n_wires_external_inductance_matrix()
         c_wires = bifilar_wires.n_wires_capacitance_matrix(le_wires)
         pul_bifilar = bifilar_wires.bifilar_pul_inductance_and_capacitance()
 
@@ -290,10 +291,10 @@ class BifilarBareWirePULParameters:
         }
         
         fig1, ax1 = plt.subplots(figsize=self.figsize)
-        self._configure_plot_appearance(ax1, r'Series Resistance p.u.l. ($\Omega$/km)', resistance_data)
+        self._cfg_plot_appearance(ax1, r'Series Resistance p.u.l. ($\Omega$/km)', resistance_data)
 
         fig2, ax2 = plt.subplots(figsize=self.figsize)
-        self._configure_plot_appearance(ax2, 'Series Inductance p.u.l. (mH/km)', inductance_data, yscale='linear')
+        self._cfg_plot_appearance(ax2, 'Series Inductance p.u.l. (mH/km)', inductance_data, yscale='linear')
         
         save_figure(fig1, self.results_dir, base_filename='pul_series_resistance')
         save_figure(fig2, self.results_dir, base_filename='pul_series_inductance')
@@ -309,15 +310,15 @@ class BifilarBareWirePULParameters:
         zp_matrices = [data['zp'] for data in self.mom_so_data.values()]
 
         # Extrai os componentes da matriz (assumindo matriz 2x2)
-        r11 = [np.real(zp[0, 0]) * self.r_factor for zp in zp_matrices]
-        r12 = [np.real(zp[0, 1]) * self.r_factor for zp in zp_matrices]
-        r22 = [np.real(zp[1, 1]) * self.r_factor for zp in zp_matrices]
-        x11 = [np.imag(zp[0, 0]) * self.r_factor for zp in zp_matrices]
-        x12 = [np.imag(zp[0, 1]) * self.r_factor for zp in zp_matrices]
-        z22 = [np.imag(zp[1, 1]) * self.r_factor for zp in zp_matrices]
-        l11 = np.array(x11) / w
-        l12 = np.array(x12) / w 
-        l22 = np.array(z22) / w
+        r11 = np.array([np.real(zp[0, 0]) * self.r_factor for zp in zp_matrices])
+        r12 = np.array([np.real(zp[0, 1]) * self.r_factor for zp in zp_matrices])
+        r22 = np.array([np.real(zp[1, 1]) * self.r_factor for zp in zp_matrices])
+        x11 = np.array([np.imag(zp[0, 0]) * self.x_factor for zp in zp_matrices])
+        x12 = np.array([np.imag(zp[0, 1]) * self.x_factor for zp in zp_matrices])
+        z22 = np.array([np.imag(zp[1, 1]) * self.x_factor for zp in zp_matrices])
+        l11 = np.array([np.imag(zp[0, 0]) * self.l_factor for zp in zp_matrices]) / w
+        l12 = np.array([np.imag(zp[0, 1]) * self.l_factor for zp in zp_matrices]) / w
+        l22 = np.array([np.imag(zp[1, 1]) * self.l_factor for zp in zp_matrices]) / w
 
         resistance_matrix_data = {
             '11': {'data': (freq, r11), 'label': '$R_{11}$'},
@@ -341,7 +342,7 @@ class BifilarBareWirePULParameters:
         fig2, ax2 = plt.subplots(figsize=self.figsize)
         fig3, ax3 = plt.subplots(figsize=self.figsize)
 
-        self._configure_plot_matrix_appearance(
+        self._cfg_plot_matrix_appearance(
             ax1, 
             r'Partial Resistance Matrix p.u.l. ($\Omega$/km)', 
             resistance_matrix_data,
@@ -349,14 +350,14 @@ class BifilarBareWirePULParameters:
             ylim=(1e-2, 1e1)
         )
 
-        self._configure_plot_matrix_appearance(
+        self._cfg_plot_matrix_appearance(
             ax2, 
             r'Partial Reactance Matrix p.u.l. ($\Omega$/km)', 
             reactance_matrix_data,
             yscale='log',
         )
 
-        self._configure_plot_matrix_appearance(
+        self._cfg_plot_matrix_appearance(
             ax3, 
             r'Partial Inductance Matrix p.u.l. (mH/km)', 
             inductance_matrix_data,

@@ -23,7 +23,7 @@ try:
     from models.single_core_cable import SingleCoreCableModelGenerator
     from mtl_main.source import MulticonductorTransmissionLine
     from mtl_main.graphics import IsolatedMTLRepresentation
-    from .source import BifilarBareWirePULParameters as BifilarPul
+    from .source import BifilarPULParameters as BifilarPul
     print("Core modules imported successfully.")
 except ImportError as e:
     print(f"Error importing modules: {e}")
@@ -44,8 +44,8 @@ def main():
     pul.show_header()
     pul.plot_impedance_results()
     pul.plot_partial_impedance_matrix()
-    # pul.print_impedance_matrix()
-    # IsolatedMTLRepresentation(__file__, mtl_model, units='millimeter').system_schematic()
+    pul.print_impedance_matrix()
+    IsolatedMTLRepresentation(__file__, mtl_model, units='millimeter').system_schematic()
     plt.show()
 
 if __name__ == "__main__":

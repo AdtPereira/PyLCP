@@ -299,7 +299,35 @@ class ComsolPostProcessor:
             'angular_frequencies': 2 * np.pi * freq,
         }
 
-    def get_coaxial_cable_parameters(self):
+    def get_bifilar_data(self, excitation_type: str = 'average'):
+        N = 2
+        general_data = self.get_general_parameters('cmsl_series_impedance_matrix')
+        data = self.cmsl_reader.data['cmsl_series_impedance_matrix']
+        freq = general_data['frequencies']
+        jw = 1j * general_data['angular_frequencies']
+        Zp = np.zeros((len(freq), N, N), dtype=complex)
+        Zs = np.zeros((len(freq), N-1, N-1), dtype=complex)
+
+        Zp[:, 0, 0] = data['v11']
+        Zp[:, 1, 1] = data['v22'] 
+
+        if excitation_type == 'conductor_1':
+            Zp[:, 0, 1] = data['v12']
+        elif excitation_type == 'conductor_2':
+            Zp[:, 0, 1] = data['v21']
+        elif excitation_type == 'average':
+            Zp[:, 0, 1] = 0.5 * (data['v21'] + data['v12'])
+
+        Zp[:, 1, 0] = Zp[:, 0, 1]
+
+        Zs[:, 0, 0] = data['single_coil_voltage']
+
+        return {
+            'partial_impedance_matrix': Zp,
+            'series_impedance_matrix': Zs,
+        }        
+
+    def get_coaxial_cable_data(self):
         """
         Constrói a matriz de impedância [n, 3, 3] simétrica para uma configuração
         flat de 3 cabos (A, B, C), a partir dos dados do COMSOL.

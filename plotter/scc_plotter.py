@@ -45,3 +45,4 @@ class CoaxialCablePlotter(BasePlotter):
 
     def coaxial_cable_impedance(self):
         self._plot_non_matricial_list_parameter('coaxial_cable_impedance')
+

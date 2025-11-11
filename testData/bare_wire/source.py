@@ -262,7 +262,7 @@ class BifilarBareWirePULParameters:
         print("\n==============         Analytical Processing       =============")
 
         bifilar_wires = WiresHomogeneousMedia(self.mtl_copy)
-        le_wires = bifilar_wires.n_wires_inductance_matrix()
+        le_wires = bifilar_wires.n_wires_external_inductance_matrix()
         c_wires = bifilar_wires.n_wires_capacitance_matrix(le_wires)
         pul_bifilar = bifilar_wires.bifilar_pul_inductance_and_capacitance()
 
@@ -354,7 +354,7 @@ class BifilarBareWirePULParameters:
             mtl_local[1]['center_point'] = (separation, 0.0)
 
             wires = WiresHomogeneousMedia(mtl_local)
-            le_wires = wires.n_wires_inductance_matrix()
+            le_wires = wires.n_wires_external_inductance_matrix()
             pul_bifilar = wires.bifilar_pul_inductance_and_capacitance()
 
             self.srw_data[ratio] = {

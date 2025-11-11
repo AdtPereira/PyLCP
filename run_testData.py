@@ -2,7 +2,8 @@ import subprocess
 import sys
 
 SCRIPTS_TO_RUN = [
-    "testData.bare_bifilar_s21.bare_bifilar_s21",
+    # "testData.bare_bifilar_s21.bare_bifilar_s21",
+    "testData.bifilar.bifilar",
     # "testData.coated_bifilar_s40.coated_bifilar_s40",
     "testData.coaxial.coaxial",
     "testData.hdpe_220kV_2000mm2.hdpe_220kV_2000mm2",
