@@ -1,5 +1,3 @@
-import numpy as np
-
 PLOT_TPL_REAL = {
     'component': 'real',
     'scale': 1e0,
@@ -111,7 +109,7 @@ PLOT_CONFIG = {
             **PLOT_TPL_INDUCTANCE,
             'label': r'Inductance $(mH/km)$',
             # 'y_lim': (0.1, 0.15),
-            'legend': True,
+            'legend': False,
         },
         
         # --- Configurações Específicas ---
@@ -149,7 +147,7 @@ PLOT_CONFIG = {
         'left_plot': {
             **PLOT_TPL_RESISTANCE,
             'label': r'Resistance, $R_{11}$ $(\Omega/km)$',
-            'y_lim': (1E-2, 1E1),
+            'y_lim': (1E-2, 1E2),
             'legend': True,
         },
 

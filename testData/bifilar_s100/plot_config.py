@@ -111,11 +111,11 @@ PLOT_CONFIG = {
             **PLOT_TPL_INDUCTANCE,
             'label': r'Inductance $(mH/km)$',
             'y_lim': (0.8, 2.2),
-            'legend': True,
+            'legend': False,
         },
         
-        # --- Configurações Específicas ---
         'suptitle': r'P.u.l. Partial Impedance Matrix of a bifilar transmission line',
+        
         'data_series': [
             # --- Série MoM-SO ---
             {
@@ -160,7 +160,6 @@ PLOT_CONFIG = {
             'legend': True,
         },
         
-        # --- Configurações Específicas ---
         'suptitle': r'P.u.l. Series Impedance Matrix of a bifilar transmission line',
         
         'data_series': [

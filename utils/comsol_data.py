@@ -172,7 +172,7 @@ class ComsolDataReader:
             self.show_summary()
 
         print(f"Project root configured at: {project_root}")
-        print(f"--- Instanciando ComsolDataReader para o caso '{case_name}' ---")
+        print(f"\nInstanciando ComsolDataReader para o caso '{case_name}' ---")
         
         if not self.results_path.is_dir():
             raise FileNotFoundError(
@@ -304,7 +304,6 @@ class ComsolPostProcessor:
         general_data = self.get_general_parameters('cmsl_series_impedance_matrix')
         data = self.cmsl_reader.data['cmsl_series_impedance_matrix']
         freq = general_data['frequencies']
-        jw = 1j * general_data['angular_frequencies']
         Zp = np.zeros((len(freq), N, N), dtype=complex)
         Zs = np.zeros((len(freq), N-1, N-1), dtype=complex)
 
@@ -327,7 +326,35 @@ class ComsolPostProcessor:
             'series_impedance_matrix': Zs,
         }        
 
-    def get_coaxial_cable_data(self):
+    def get_coaxial_series_impedance_matrix(self):
+        """
+        Constrói a matriz de impedância [n, 3, 3] simétrica para uma configuração
+        flat de 3 cabos (A, B, C), a partir dos dados do COMSOL.
+
+        A montagem assume uma configuração simétrica:
+        - Z_AA = Z_BB = Z_CC (self, de 'vcoil_1')
+        - Z_AB = Z_BA = Z_BC = Z_CB (mutual adjacente, de 'vcoil_2')
+        - Z_AC = Z_CA (mutual externa, de 'vcoil_3')
+
+        :param base_key: A chave base do cenário COMSOL 
+                        (ex: 'rho_g_100_epsr1_1_mf').
+        :param model: O modelo de linha de transmissão multiconductor.
+        :return: Uma tupla (Z0, freq), onde Z0 é a matriz [n, 3, 3] e 
+                freq é o vetor de frequências [n]. Retorna (None, None) se 
+                os dados não forem encontrados.
+        """
+        N = 2
+        general_data = self.get_general_parameters('cmsl_coaxial_cable_impedance')
+        data = self.cmsl_reader.data['cmsl_coaxial_cable_impedance']
+        freq = general_data['frequencies']
+        Zs = np.zeros((len(freq), N-1, N-1), dtype=complex)
+
+        # Zs: series impedance matrix
+        Zs[:, 0, 0] = data['coil_impedance']
+
+        return Zs
+    
+    def get_coaxial_cable_parameters(self):
         """
         Constrói a matriz de impedância [n, 3, 3] simétrica para uma configuração
         flat de 3 cabos (A, B, C), a partir dos dados do COMSOL.

@@ -1,5 +1,3 @@
-import numpy as np
-
 PLOT_TPL_REAL = {
     'component': 'real',
     'scale': 1e0,
@@ -48,22 +46,6 @@ PLOT_TPL_CAPACITANCE = {
     'xscale': 'log',
     'yscale': 'linear',
 }
-
-# BIFILAR_Z_TPL = {
-#     'plot_function': '_plot_matricial_upper_triangular',
-#     'left_plot': {
-#         **PLOT_TPL_RESISTANCE,
-#         'label': r'Resistance $(\Omega/km)$',
-#         'y_lim': (1E-2, 1E1),
-#         'legend': True,
-#     },
-#     'right_plot': {
-#         **PLOT_TPL_INDUCTANCE,
-#         'label': r'Inductance $(mH/km)$',
-#         'y_lim': (0.8, 2.2),
-#         'legend': False,
-#     },
-# }
 
 SCATTER_STYLES = {
     'analytical_1': {
@@ -127,7 +109,7 @@ PLOT_CONFIG = {
             **PLOT_TPL_INDUCTANCE,
             'label': r'Inductance $(mH/km)$',
             'y_lim': (0.8, 2.2),
-            'legend': True,
+            'legend': False,
         },
         
         # --- Configurações Específicas ---
@@ -165,7 +147,7 @@ PLOT_CONFIG = {
         'left_plot': {
             **PLOT_TPL_RESISTANCE,
             'label': r'Resistance, $R_{11}$ $(\Omega/km)$',
-            'y_lim': (1E-2, 1E1),
+            'y_lim': (1E-2, 1E2),
             'legend': True,
         },
 

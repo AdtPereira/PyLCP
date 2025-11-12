@@ -7,14 +7,14 @@
     "type": null,
     "num_conductors": 2,
     "spacing": 0.021,
-    "fourier_order": 4,
+    "fourier_order": 8,
     "idx_ref_conductor": 0
   },
   "soil": null,
-  "frequency":{
+  "frequency_driver":{
     "spacing": "log",
     "min_Hz": 1.0E0,
-    "max_Hz": 1.0E5,
+    "max_Hz": 1.0E6,
     "steps_per_decade": 5
   },  
   "cable_definition": {

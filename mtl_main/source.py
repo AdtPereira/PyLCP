@@ -42,7 +42,7 @@ class MulticonductorTransmissionLine:
 
         mtl_input = copy.deepcopy(model)
         self.mtl_type = mtl_input.get('type', 'unknown')
-        self.mtl_frequency = mtl_input.get('frequency', {})  
+        self.mtl_frequency = mtl_input.get('frequency_driver', {})  
         self.mtl_idx_ref = mtl_input.get('idx_ref_conductor', 0)
 
         # MULTICONDUCTOR TRANSMISSION LINES PARAMETERS
@@ -78,34 +78,75 @@ class MulticonductorTransmissionLine:
         # Número de coeficientes harmônicos de Fourier por condutor
         self.NF = self.NF_List[self.mtl_idx_ref]        
 
-    # def _count_scc_and_conductors(self):
-    #     """
-    #     Counts the number of (sc) cables (N) and conductors per cable (M)
-    #     based on the provided data structure.
-    #     """
-    #     # 1. Filter to get only active conductors
-    #     active_conductors = [
-    #         v for k, v in self.mtl.items()
-    #         if isinstance(k, int) and v.get('line_type') == 'active'
-    #     ]
-
-    #     if not active_conductors:
-    #         return 0, 0
-
-    #     # 2. Count the number of cables (N) by finding unique center points
-    #     center_points = [cond['center_point'] for cond in active_conductors]
-    #     num_cables = len(set(center_points))
-
-    #     # 3. Count conductors per cable (M)
-    #     total_active_conductors = len(active_conductors)
+    # Method to generate the PUL data structure
+    def get_pul_data_structure(self):
+        """
+        Gera a estrutura de dados base para os parâmetros por unidade de comprimento (PUL),
+        usando os dados de frequência do 'frequency_driver' do modelo.
         
-    #     if num_cables > 0:
-    #         conductors_per_cable = total_active_conductors // num_cables
-    #     else:
-    #         conductors_per_cable = 0
+        A resolução de frequência para o método 'analytical' é definida como 4x
+        a resolução do 'mom_so' (steps_per_decade).
+        
+        Retorna:
+            dict: Um dicionário estruturado para armazenar dados PUL.
+        """
+        
+        freq = self.mtl_frequency
+        
+        # Tenta gerar frequências dinamicamente a partir do model
+        if freq and freq.get('spacing') == 'log':
+            min_hz = freq.get('min_Hz', 1.0)
+            max_hz = freq.get('max_Hz', 1e6)
+            
+            # Passos por década para mom_so (numérico)
+            steps_per_decade = freq.get('steps_per_decade', 5) # Default 5
+            
+            # ATUALIZADO: Passos por década para analytical (4x mom_so)
+            steps_per_decade_analytical = steps_per_decade * 4
 
-    #     return num_cables, conductors_per_cable
+            start_log = np.log10(min_hz)
+            stop_log = np.log10(max_hz)
+            num_decades = stop_log - start_log
+            
+            # Calcula num_points para mom_so
+            num_mom_so = int((num_decades * steps_per_decade) + 1)
+            
+            # Calcula num_points para analytical
+            num_analytical = int((num_decades * steps_per_decade_analytical) + 1)
+            
+            freq = np.logspace(start_log, stop_log, num=num_mom_so)
+            freq_analytical = np.logspace(start_log, stop_log, num=num_analytical)
 
+        else:
+            # Fallback para valores estáticos (caso frequency_driver falhe)
+            # (Padrão: 5 steps/decade para mom_so -> 31 pontos)
+            freq = np.logspace(0, 6, num=31)
+            # (Padrão: 20 steps/decade para analytical (4*5) -> 121 pontos)
+            freq_analytical = np.logspace(0, 6, num=121)
+
+        pul_data = {
+            'comsol': {
+                'frequencies': freq,
+                'scenarios': {
+                    '1': {},
+                },
+            },
+            'mom_so': {
+                'frequencies': freq,
+                'scenarios': {
+                    '1': {'mtl': self},  # 'self' é a instância mtl
+                },
+            },
+            'analytical': {
+                'frequencies': freq_analytical,
+                'scenarios': {
+                    '1': {'mtl': self},  # 'self' é a instância mtl
+                },
+            },
+        }
+        return pul_data
+    
+    # Helper method to define MTL surfaces
     def _define_mtl_surfaces(self):
         """
         Defines the surfaces for all conductors and their insulations,
@@ -266,4 +307,3 @@ class MulticonductorTransmissionLine:
             current_row += row_sizes[i]
 
         return matrix
-

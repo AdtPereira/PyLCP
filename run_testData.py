@@ -2,12 +2,14 @@ import subprocess
 import sys
 
 SCRIPTS_TO_RUN = [
-    # "testData.bare_bifilar_s21.bare_bifilar_s21",
-    "testData.bifilar.bifilar",
+    # "testData.bare_bifilar.bare_bifilar",
+    "testData.bifilar_s21.bifilar_s21",
+    "testData.bifilar_s25.bifilar_s25",
+    "testData.bifilar_s100.bifilar_s100",
     # "testData.coated_bifilar_s40.coated_bifilar_s40",
-    "testData.coaxial.coaxial",
-    "testData.hdpe_220kV_2000mm2.hdpe_220kV_2000mm2",
-    "testData.hdpe_225kV_2000mm2.hdpe_225kV_2000mm2",
+    # "testData.coaxial.coaxial",
+    # "testData.hdpe_220kV_2000mm2.hdpe_220kV_2000mm2",
+    # "testData.hdpe_225kV_2000mm2.hdpe_225kV_2000mm2",
     # "testData.ohtl_single_deConti.ohtl_single_deConti",
     # "testData.ohtl_single_deConti_deri.ohtl_single_deConti_deri",
     # "testData.ohtl_single_lima.ohtl_single_lima",
@@ -17,7 +19,7 @@ SCRIPTS_TO_RUN = [
     # "testData.scc_132kV_xue.scc_132kV_xue",
     # "testData.scc_138kV_prysmian.scc_138kV_prysmian",
     # "testData.scc_flat_deConti.scc_flat_deConti",
-    "testData.scc_flat_xue.scc_flat_xue",
+    # "testData.scc_flat_xue.scc_flat_xue",
     # "testData.scc_single_deConti.scc_single_deConti",
     # "testData.scc_trefoil_xue.scc_trefoil_xue",
 ]
@@ -32,9 +34,6 @@ def main():
     for script_module in SCRIPTS_TO_RUN:
         print(f"\n>>> Running module: {script_module}")
         
-        # We can't easily check if a module exists without trying to import it,
-        # so we'll let subprocess handle the error if it's not found.
-
         try:
             # --- CHANGE 2: Add the '-m' flag to run as a module ---
             result = subprocess.run(

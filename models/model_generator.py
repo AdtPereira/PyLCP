@@ -15,7 +15,7 @@ import numpy as np
 from typing import Dict, Any, Tuple
 from utils.case_utils import UNITS_DATA
 
-class SingleCoreCableModelGenerator:
+class BaseModelGenerator:
     """
     A class to generate parametric models for single-core cable arrangements.
     """
@@ -82,7 +82,7 @@ class SingleCoreCableModelGenerator:
             
         return parameters
 
-    def _add_single_layer(self, 
+    def add_single_layer(self, 
                           model: Dict[str, Any], 
                           conductor_id: int, 
                           center_point: Tuple[float, float], 
@@ -124,7 +124,7 @@ class SingleCoreCableModelGenerator:
         }
         return conductor_id + 1
 
-    def _add_cable_conductors(self, 
+    def add_cable_conductors(self, 
                                 model: Dict[str, Any], 
                                 conductor_id: int, 
                                 center_point: Tuple[float, float]) -> int:
@@ -132,15 +132,15 @@ class SingleCoreCableModelGenerator:
         Adds all defined conductive layers (core, sheath, armor) for a single cable.
         """
         if self.core:
-            conductor_id = self._add_single_layer(model, conductor_id, center_point, self.core, 'core')
+            conductor_id = self.add_single_layer(model, conductor_id, center_point, self.core, 'core')
         if self.sheath:
-            conductor_id = self._add_single_layer(model, conductor_id, center_point, self.sheath, 'sheath')
+            conductor_id = self.add_single_layer(model, conductor_id, center_point, self.sheath, 'sheath')
         if self.armor:
-            conductor_id = self._add_single_layer(model, conductor_id, center_point, self.armor, 'armor')
+            conductor_id = self.add_single_layer(model, conductor_id, center_point, self.armor, 'armor')
         
         return conductor_id
     
-    def _add_ecc_conductor(self,
+    def add_ecc_conductor(self,
                            model: Dict[str, Any],
                            conductor_id: int,
                            center_point: Tuple[float, float]) -> int:
@@ -149,10 +149,10 @@ class SingleCoreCableModelGenerator:
         em seu 'center_point' específico.
         """
         if self.ecc:
-            conductor_id = self._add_single_layer(model, conductor_id, center_point, self.ecc, 'ecc')
+            conductor_id = self.add_single_layer(model, conductor_id, center_point, self.ecc, 'ecc')
         return conductor_id
     
-    def _calculate_ecc_center_trig(self,
+    def calculate_ecc_center_trig(self,
                                    enclosure_center: Tuple[float, float],
                                    R_enc: float,
                                    R_scc: float,
@@ -205,11 +205,133 @@ class SingleCoreCableModelGenerator:
         return (ecc_center_x, ecc_center_y)
     
     @staticmethod
-    def _show_model(model: Dict[str, Any]):
+    def show_model(model: Dict[str, Any]):
         """Prints the generated model dictionary in a readable format."""
         print(f"\n--- Generated Model: {model.get('name', 'N/A')} ---")
         print(json.dumps(model, indent=2, default=str))
         print("---------------------------------------------------\n")
+
+class IsolatedModels(BaseModelGenerator):
+    """
+    A class to generate parametric models for single-core cable arrangements.
+    """
+
+    def __init__(self, file_path: str, silent_mode: bool = False):
+        """
+        Initializes the generator with cable and environmental definitions.
+
+        Args:
+            input_json (Dict[str, Any]): A dictionary containing the definitions
+                                         for the cable, soil, and arrangement.
+        """
+        super().__init__(file_path, silent_mode)
+
+    def isolated_coaxial_cable(self) -> Dict[str, Any]:
+        """
+        Generates a model for a single isolated coaxial cable.
+        """
+        model = {
+            'name': self.input_data.get('name', 'ISOLATED_COAXIAL_SCC'),
+            'type': 'coaxial',
+            'note': self.input_data.get('note', 'A parametric isolated coaxial SCC model.'),
+            'idx_ref_conductor': 0,
+            0: {
+                'line_id': 0,
+                'conductor_name': self.reference.get('name', 'sheath'),
+                'line_type': 'return',
+                'line_return': None,
+                'center_point': (0.0, 0.0),
+                'radius': [self.reference['inner_radius'], self.reference['outer_radius']],
+                'conductivity': self.reference['conductivity_S_per_m'],
+                'subconductors': None,
+                'insulation': None,
+                'conductor_layers': None,
+                'relative_permeability': 1.0,
+                'relative_permittivity': 1.0,
+                'relative_permittivity_out': 1.0,
+                'potential_to_infinity': -1.0,
+                'fourier_order': 0,
+            },
+        }
+
+        # For a coaxial cable, there is only one center point at the origin
+        self.add_cable_conductors(model, 1, (0.0, 0.0))
+
+        if not self.silent_mode:
+            self.show_model(model)
+
+        return model
+
+    def isolated_wires(self) -> Dict[str, Any]:
+        """
+        Generates a model for a single isolated coaxial cable.
+        """
+        N = self.arrangement.get('num_conductors', 2)
+        idx_ref_conductor = int(self.arrangement.get('idx_ref_conductor', 0))
+
+        model = {
+            'name': self.input_data.get('name', 'unknown'),
+            'type': self.input_data.get('type', 'unknown'),
+            'note': self.input_data.get('note', 'unknown'),
+            'idx_ref_conductor': idx_ref_conductor,
+            'frequency_driver': self.driver_frequency,
+        }
+
+        for i in range(N):
+            x_coordinate = i * self.arrangement.get('spacing', 0)
+
+            if self.core is not None:
+                insulation_data = self.core.get('insulation')
+                insulation_dict = None
+            
+                if insulation_data:
+                    insulation_dict = {
+                        'name': f"conductor_{i}_insulation",
+                        'type': insulation_data.get('type', 'insulation'),
+                        'center_point': (x_coordinate, 0.0),
+                        'thickness': insulation_data['thickness'],
+                        'relative_permittivity': insulation_data['relative_permittivity'],
+                        'relative_permeability': 1.0,
+                        'fourier_order': self.fourier_order,
+                    }
+
+                model[i] = {
+                    'line_id': i,
+                    'conductor_name': f"conductor_{i}",
+                    'line_type': 'active' if i != idx_ref_conductor else 'return',
+                    'line_return':  idx_ref_conductor if i != idx_ref_conductor else None,
+                    'center_point': (x_coordinate, 0.0),
+                    'radius': [self.core['inner_radius'], self.core['outer_radius']],
+                    'conductivity': self.core.get('conductivity_S_per_m', 0),
+                    'subconductors': None,
+                    'insulation': insulation_dict,
+                    'conductor_layers': None,
+                    'relative_permeability': 1.0,
+                    'relative_permittivity': 1.0,
+                    'relative_permittivity_out': 1.0,
+                    'potential_to_infinity': 1.0 if i != idx_ref_conductor else -1.0,
+                    'fourier_order': self.fourier_order,
+                }
+
+        if not self.silent_mode:
+            self.show_model(model)
+
+        return model
+
+class SingleCoreCableModels(BaseModelGenerator):
+    """
+    A class to generate parametric models for single-core cable arrangements.
+    """
+
+    def __init__(self, file_path: str, silent_mode: bool = False):
+        """
+        Initializes the generator with cable and environmental definitions.
+
+        Args:
+            input_json (Dict[str, Any]): A dictionary containing the definitions
+                                         for the cable, soil, and arrangement.
+        """
+        super().__init__(file_path, silent_mode)
 
     def concentric_hdpe_enclosed_model(self, host_conductor: str = 'sheath') -> Dict[str, Any]:
         """
@@ -253,7 +375,7 @@ class SingleCoreCableModelGenerator:
 
         conductor_id = 1
         # Add the cable conductors (core, sheath) at their reference position
-        conductor_id = self._add_cable_conductors(model, conductor_id, cable_center)
+        conductor_id = self.add_cable_conductors(model, conductor_id, cable_center)
 
         # --- Inject Enclosure Data into Host Conductor ---
         # Find the host conductor's entry in the generated model.
@@ -267,7 +389,7 @@ class SingleCoreCableModelGenerator:
                     v['enclosure'] = None
 
         if not self.silent_mode:
-            self._show_model(model)
+            self.show_model(model)
 
         return model
     
@@ -324,7 +446,7 @@ class SingleCoreCableModelGenerator:
 
         conductor_id = 1
         # Add the cable conductors (core, sheath) at their reference position
-        conductor_id = self._add_cable_conductors(model, conductor_id, cable_center)
+        conductor_id = self.add_cable_conductors(model, conductor_id, cable_center)
 
         # --- Inject Enclosure Data into Host Conductor ---
         # Find the host conductor's entry in the generated model.
@@ -338,7 +460,7 @@ class SingleCoreCableModelGenerator:
                     v['enclosure'] = None
 
         if not self.silent_mode:
-            self._show_model(model)
+            self.show_model(model)
 
         return model
 
@@ -387,7 +509,7 @@ class SingleCoreCableModelGenerator:
 
         # --- 4. Posição do ECC (Restrição 3) ---
         # Delega o cálculo trigonométrico para o método privado
-        ecc_center = self._calculate_ecc_center_trig(
+        ecc_center = self.calculate_ecc_center_trig(
             enclosure_center=enclosure_center,
             R_enc=enclosure_inner_radius,
             R_scc=cable_outer_radius,
@@ -417,10 +539,10 @@ class SingleCoreCableModelGenerator:
         conductor_id = 1
         
         # Adiciona o SCC no 'cable_center' (calculado para repousar no fundo)
-        conductor_id = self._add_cable_conductors(model, conductor_id, cable_center)
+        conductor_id = self.add_cable_conductors(model, conductor_id, cable_center)
 
         # Adiciona o ECC no 'ecc_center' (calculado para estar no "canto")
-        conductor_id = self._add_ecc_conductor(model, conductor_id, ecc_center)
+        conductor_id = self.add_ecc_conductor(model, conductor_id, ecc_center)
 
         # --- 7. Injetar Dados do Duto (Enclosure) ---
         for k, v in model.items():
@@ -433,7 +555,7 @@ class SingleCoreCableModelGenerator:
                     v['enclosure'] = None
 
         if not self.silent_mode:
-            self._show_model(model)
+            self.show_model(model)
 
         return model
 
@@ -471,10 +593,10 @@ class SingleCoreCableModelGenerator:
 
         conductor_id = 1
         for cp in center_points:
-            conductor_id = self._add_cable_conductors(model, conductor_id, cp)
+            conductor_id = self.add_cable_conductors(model, conductor_id, cp)
 
         if not self.silent_mode:
-            self._show_model(model)
+            self.show_model(model)
 
         return model
     
@@ -504,10 +626,10 @@ class SingleCoreCableModelGenerator:
 
         conductor_id = 1
         for cp in center_points:
-            conductor_id = self._add_cable_conductors(model, conductor_id, cp)
+            conductor_id = self.add_cable_conductors(model, conductor_id, cp)
 
         if not self.silent_mode:
-            self._show_model(model)
+            self.show_model(model)
 
         return model
 
@@ -538,105 +660,13 @@ class SingleCoreCableModelGenerator:
 
         conductor_id = 1
         for cp in center_points:
-            conductor_id = self._add_cable_conductors(model, conductor_id, cp)
+            conductor_id = self.add_cable_conductors(model, conductor_id, cp)
 
         if not self.silent_mode:
-            self._show_model(model)
+            self.show_model(model)
 
         return model
 
-    def isolated_coaxial_cable(self) -> Dict[str, Any]:
-        """
-        Generates a model for a single isolated coaxial cable.
-        """
-        model = {
-            'name': self.input_data.get('name', 'ISOLATED_COAXIAL_SCC'),
-            'type': 'coaxial',
-            'note': self.input_data.get('note', 'A parametric isolated coaxial SCC model.'),
-            'idx_ref_conductor': 0,
-            0: {
-                'line_id': 0,
-                'conductor_name': self.reference.get('name', 'sheath'),
-                'line_type': 'return',
-                'line_return': None,
-                'center_point': (0.0, 0.0),
-                'radius': [self.reference['inner_radius'], self.reference['outer_radius']],
-                'conductivity': self.reference['conductivity_S_per_m'],
-                'subconductors': None,
-                'insulation': None,
-                'conductor_layers': None,
-                'relative_permeability': 1.0,
-                'relative_permittivity': 1.0,
-                'relative_permittivity_out': 1.0,
-                'potential_to_infinity': -1.0,
-                'fourier_order': 0,
-            },
-        }
-
-        # For a coaxial cable, there is only one center point at the origin
-        self._add_cable_conductors(model, 1, (0.0, 0.0))
-
-        if not self.silent_mode:
-            self._show_model(model)
-
-        return model
-
-    def isolated_wires(self) -> Dict[str, Any]:
-        """
-        Generates a model for a single isolated coaxial cable.
-        """
-        N = self.arrangement.get('num_conductors', 2)
-        idx_ref_conductor = int(self.arrangement.get('idx_ref_conductor', 0))
-
-        model = {
-            'name': self.input_data.get('name', 'unknown'),
-            'type': self.input_data.get('type', 'unknown'),
-            'note': self.input_data.get('note', 'unknown'),
-            'idx_ref_conductor': idx_ref_conductor,
-            'frequency_driver': self.driver_frequency,
-        }
-
-        for i in range(N):
-            x_coordinate = i * self.arrangement.get('spacing', 0)
-
-            if self.core is not None:
-                insulation_data = self.core.get('insulation')
-                insulation_dict = None
-            
-                if insulation_data:
-                    insulation_dict = {
-                        'name': f"conductor_{i}_insulation",
-                        'type': insulation_data.get('type', 'insulation'),
-                        'center_point': (x_coordinate, 0.0),
-                        'thickness': insulation_data['thickness'],
-                        'relative_permittivity': insulation_data['relative_permittivity'],
-                        'relative_permeability': 1.0,
-                        'fourier_order': self.fourier_order,
-                    }
-
-                model[i] = {
-                    'line_id': i,
-                    'conductor_name': f"conductor_{i}",
-                    'line_type': 'active' if i != idx_ref_conductor else 'return',
-                    'line_return':  idx_ref_conductor if i != idx_ref_conductor else None,
-                    'center_point': (x_coordinate, 0.0),
-                    'radius': [self.core['inner_radius'], self.core['outer_radius']],
-                    'conductivity': self.core.get('conductivity_S_per_m', 0),
-                    'subconductors': None,
-                    'insulation': insulation_dict,
-                    'conductor_layers': None,
-                    'relative_permeability': 1.0,
-                    'relative_permittivity': 1.0,
-                    'relative_permittivity_out': 1.0,
-                    'potential_to_infinity': 1.0 if i != idx_ref_conductor else -1.0,
-                    'fourier_order': self.fourier_order,
-                }
-
-        if not self.silent_mode:
-            self._show_model(model)
-
-        return model
-    
     def simple_trefoil(self) -> Dict[str, Any]:
         """
         Gera um modelo para um arranjo trifólio (trefoil) de três fases de cabos SCC.
@@ -685,9 +715,10 @@ class SingleCoreCableModelGenerator:
 
         conductor_id = 1
         for cp in center_points:
-            conductor_id = self._add_cable_conductors(model, conductor_id, cp)
+            conductor_id = self.add_cable_conductors(model, conductor_id, cp)
 
         if not self.silent_mode:
-            self._show_model(model)
+            self.show_model(model)
 
         return model
+   
