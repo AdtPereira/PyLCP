@@ -7,7 +7,7 @@ SCRIPTS_TO_RUN = [
     "testData.bifilar_s25.bifilar_s25",
     "testData.bifilar_s100.bifilar_s100",
     # "testData.coated_bifilar_s40.coated_bifilar_s40",
-    # "testData.coaxial.coaxial",
+    "testData.coaxial.coaxial",
     # "testData.hdpe_220kV_2000mm2.hdpe_220kV_2000mm2",
     # "testData.hdpe_225kV_2000mm2.hdpe_225kV_2000mm2",
     # "testData.ohtl_single_deConti.ohtl_single_deConti",

@@ -31,25 +31,23 @@ def main():
 
     print("Importing COMSOL data for coaxial cable model...")
     cmsl_processor = ComsolPostProcessor(__file__)
-    for key, value in pul_data['comsol']['scenarios'].items():
-        print(f"  -> Processing COMSOL data for Model Case {key}...")
-        
+    for value in pul_data['comsol']['scenarios'].values():
         value['series_impedance_matrix'] = cmsl_processor.get_coaxial_series_impedance_matrix()
         value['coaxial_cable_parameters'] = cmsl_processor.get_coaxial_cable_parameters()
+        value['internal_impedance_matrix'] = cmsl_processor.get_scc_internal_impedance_elements(excitation_type='core')
 
     print("\nCalculating per-unit-length parameters by Analytical Formulation (Ametani, 2015)")
-    for key, value in pul_data['analytical']['scenarios'].items():
-        print(f"  -> Calculating internal parameters for Model Case {key}...")
+    for value in pul_data['analytical']['scenarios'].values():        
         freq = pul_data['analytical']['frequencies']
         pul = InternalPerUnitParameters(value['mtl'], freq)
         parameters = pul.parameters_hybrid()['zcs']
 
         value['series_impedance_matrix'] = parameters['Zcs'][:, np.newaxis, np.newaxis]
         value['coaxial_cable_parameters'] = parameters
+        value['internal_impedance_matrix'] = pul.matrices()['impedance_matrix']
 
     print("\nCalculating per-unit-length parameters by MoM-SO (Patel, 2014)")
-    for key, value in pul_data['mom_so']['scenarios'].items():
-        print(f"  -> Calculating internal impedance matrix for Model Case {key}...")
+    for value in pul_data['mom_so']['scenarios'].values():
         green_matrix = QuasiStatic(value['mtl']).green_matrix()
         mom_so = HomogeneousLosslessMedium(value['mtl'], pul_data['mom_so']['frequencies'])
         post_processor = LosslessPostProcessing(value['mtl'])
@@ -61,10 +59,12 @@ def main():
 
     print(f"\nEnd of the routine! Time spent on simulation: {(time.time() - st):.1f} seconds.\n")
     plotter = BasePlotter(__file__, pul_data, PLOT_CONFIG, autoSave=False)
-    plotter.plot_graph(['series_impedance_matrix'])
-    plotter.plot_graph(['coaxial_cable_parameters'])
-    # plotter.coaxial_cable_impedance()
-    # plotter.coaxial_cable_internal_impedance_matrix()
+    graph_list = ['series_impedance_matrix',
+                  'coaxial_cable_parameters',
+                  'internal_impedance_matrix_js_method',
+                  'internal_impedance_matrix_energy_method',
+                  'internal_impedance_matrix_comparison']
+    plotter.plot_graph(graph_list)
     IsolatedMTLRepresentation(__file__, mtl, units='millimeter').system_schematic()
     plt.show()    
 

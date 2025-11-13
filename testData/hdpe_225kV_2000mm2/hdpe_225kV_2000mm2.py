@@ -82,8 +82,8 @@ def main():
     for key, value in pul_data['comsol']['scenarios'].items():
         print(f"  -> Processando COMSOL para: {key}")
         value['coaxial_cable_impedance'] = cmsl_processor.get_coaxial_cable_parameters()
-        value['internal_impedance_matrix'] = cmsl_processor.get_internal_impedance_matrix()
-        value['internal_impedance_elements'] = cmsl_processor.get_internal_impedance_elements()
+        value['internal_impedance_matrix'] = cmsl_processor.get_internal_impedance_js_method()
+        value['internal_impedance_elements'] = cmsl_processor.get_scc_internal_impedance_elements()
     
     print("\nCalculating per-unit-length parameters and quasi-TEM matrices for all scenarios...")
     for key, value in pul_data['scenarios'].items():

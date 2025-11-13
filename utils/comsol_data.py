@@ -391,63 +391,7 @@ class ComsolPostProcessor:
             'z2i': z2i,
         }
     
-    def get_internal_impedance_elements(self):
-        """
-        Constrói a matriz de impedância [n, 3, 3] simétrica para uma configuração
-        flat de 3 cabos (A, B, C), a partir dos dados do COMSOL.
-
-        A montagem assume uma configuração simétrica:
-        - Z_AA = Z_BB = Z_CC (self, de 'vcoil_1')
-        - Z_AB = Z_BA = Z_BC = Z_CB (mutual adjacente, de 'vcoil_2')
-        - Z_AC = Z_CA (mutual externa, de 'vcoil_3')
-
-        :param base_key: A chave base do cenário COMSOL 
-                        (ex: 'rho_g_100_epsr1_1_mf').
-        :param model: O modelo de linha de transmissão multiconductor.
-        :return: Uma tupla (Z0, freq), onde Z0 é a matriz [n, 3, 3] e 
-                freq é o vetor de frequências [n]. Retorna (None, None) se 
-                os dados não forem encontrados.
-        """
-        general_data = self.get_general_parameters('cmsl_series_impedance_core_excitation')
-        core = self.cmsl_reader.data['cmsl_series_impedance_core_excitation']
-        sheath = self.cmsl_reader.data['cmsl_series_impedance_sheath_excitation']
-        jw = 1j * general_data['angular_frequencies']
-
-        # z11: internal impedance of core outer surface
-        z11_cr = core['r11'] + jw * core['l11']
-        z11_sh = sheath['r11'] + jw * sheath['l11']
-
-        # z12: core insulator impedance
-        z12_cr = core['r12'] + jw * core['l12']
-        z12_sh = sheath['r12'] + jw * sheath['l12']
-
-        # z2i: internal impedance of sheath inner surface
-        z2i_cr = core['r2i'] + jw * core['l2i']
-        z2i_sh = sheath['r2i'] + jw * sheath['l2i']
-
-        # z13: sheath insulator impedance
-        z13_cr = jw * core['l13']
-        z13_sh = jw * sheath['l13']
-
-        # z14: air gap impedance
-        z14_cr = jw * core['l14']
-        z14_sh = jw * sheath['l14']
-
-        # z15: HDPE tube impedance
-        z15_cr = jw * core['l15']
-        z15_sh = jw * sheath['l15']
-
-        return {
-            'core_js': core['core_voltage'],
-            'sheath_js': sheath['sheath_voltage'],
-            'mutual1_js': core['sheath_voltage'],
-            'mutual2_js': sheath['core_voltage'],
-            'core_energy':   z11_cr + z12_cr + z2i_cr + z13_cr + z14_cr + z15_cr,
-            'sheath_energy': z11_sh + z12_sh + z2i_sh + z13_sh + z14_sh + z15_sh,
-            'mutual_energy': z2i_cr
-        }
-
-    def get_internal_impedance_matrix(self, excitation_type: str = 'average'):
+    def get_scc_internal_impedance_elements(self, excitation_type: str = 'core'):
         """
         Constrói a matriz de impedância [n, 3, 3] simétrica para uma configuração
         flat de 3 cabos (A, B, C), a partir dos dados do COMSOL.
@@ -468,24 +412,80 @@ class ComsolPostProcessor:
         general_data = self.get_general_parameters('cmsl_series_impedance_core_excitation')
         core = self.cmsl_reader.data['cmsl_series_impedance_core_excitation']
         sheath = self.cmsl_reader.data['cmsl_series_impedance_sheath_excitation']
-
         freq = general_data['frequencies']
-        Zi = np.zeros((len(freq), N, N), dtype=complex)
+        jw = 1j * 2 * np.pi * freq
 
-        Zi[:, 0, 0] = core['core_voltage']
-        Zi[:, 1, 1] = sheath['sheath_voltage']   
+        # z11: internal impedance of core outer surface
+        z11_cr = core['r11'] + jw * core['l11']
+        z11_sh = sheath['r2i'] + jw * sheath['l2i']
+
+        # z12: core insulator impedance
+        z12_cr = core['r12'] + jw * core['l12']
+        z12_sh = sheath['r12'] + jw * sheath['l12']
+
+        # z2i: internal impedance of sheath inner surface
+        z2i_cr = core['r2i'] + jw * core['l2i']
+        z2i_sh = sheath['r11'] + jw * sheath['l11']
+
+        # z13: sheath insulator impedance
+        z13_cr, z13_sh = 0, 0
+        if 'l13' in core and 'l13' in sheath:
+            z13_cr = jw * core['l13']
+            z13_sh = jw * sheath['l13']
+
+        # z14: air gap impedance
+        z14_cr, z14_sh = 0, 0
+        if 'l14' in core and 'l14' in sheath:   
+            z14_cr = jw * core['l14']
+            z14_sh = jw * sheath['l14']
+
+        # z15: HDPE tube impedance
+        z15_cr, z15_sh = 0, 0
+        if 'l15' in core and 'l15' in sheath:
+            z15_cr = jw * core['l15']
+            z15_sh = jw * sheath['l15']
+
+        Zi_energy = np.zeros((len(freq), N, N), dtype=complex)
+        Zi_js = np.zeros((len(freq), N, N), dtype=complex)
+        Z11 = z11_cr + z12_cr + z2i_cr + z13_cr + z14_cr + z15_cr
+        Z22 = z11_sh + z12_sh + z2i_sh + z13_sh + z14_sh + z15_sh
+        
+        Zi_energy[:, 0, 0] = Z11
+        Zi_energy[:, 1, 1] = Z22
+
+        Zi_js[:, 0, 0] = core['core_voltage']
+        Zi_js[:, 1, 1] = sheath['sheath_voltage']
 
         if excitation_type == 'core':
-            Zi[:, 0, 1] = core['sheath_voltage']
+            mutual_js = core['sheath_voltage']
+            mutual_energy = 0.5 * z2i_cr
+            Zi_js[:, 0, 1] = core['sheath_voltage']
+            Zi_js[:, 1, 0] = core['sheath_voltage']
+            Zi_energy[:, 0, 1] = mutual_energy
+            Zi_energy[:, 1, 0] = mutual_energy
+        
         elif excitation_type == 'sheath':
-            Zi[:, 0, 1] = sheath['core_voltage']
-        elif excitation_type == 'average':
-            Zi[:, 0, 1] = 0.5 * (core['sheath_voltage'] + sheath['core_voltage'])
-            
-        Zi[:, 1, 0] = Zi[:, 0, 1]
+            mutual_js = sheath['core_voltage']
+            mutual_energy = z2i_sh
+            Zi_js[:, 0, 1] = sheath['core_voltage']
+            Zi_js[:, 1, 0] = sheath['core_voltage']
+            Zi_energy[:, 0, 1] = mutual_energy
+            Zi_energy[:, 1, 0] = mutual_energy
+        
+        else:
+            raise ValueError("excitation_type deve ser 'core' ou 'sheath'.")
+        
+        return {
+            'js_method': Zi_js,
+            'energy_method': Zi_energy,
+            'self_core_js': core['core_voltage'],
+            'self_sheath_js': sheath['sheath_voltage'],
+            'mutual_js': mutual_js,
+            'self_core_energy': Z11,
+            'self_sheath_energy': Z22,
+            'mutual_energy': mutual_energy
+        }
 
-        return Zi
-    
     def get_earth_return_parameters(self, base_key: str):
         """
         Constrói a matriz de impedância [n, 3, 3] simétrica para uma configuração

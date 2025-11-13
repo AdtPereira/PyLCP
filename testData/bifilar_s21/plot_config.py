@@ -96,7 +96,7 @@ SCATTER_STYLES = {
 
 PLOT_CONFIG = {
     'partial_impedance_matrix': {
-        'plot_function': '_plot_matricial_upper_triangular',
+        'plot_function': '_plot_matricial_parameters',
 
         'left_plot': {
             **PLOT_TPL_RESISTANCE,
@@ -142,7 +142,7 @@ PLOT_CONFIG = {
     },
     
     'series_impedance_matrix': {
-        'plot_function': '_plot_matricial_upper_triangular',
+        'plot_function': '_plot_matricial_parameters',
         
         'left_plot': {
             **PLOT_TPL_RESISTANCE,
