@@ -58,7 +58,7 @@ SCATTER_STYLES = {
     },
     'mom_so_1': {
         'marker': 'o',
-        's': 18,  
+        's': 40,  
         'edgecolors': 'black',
         'facecolors': 'none',
         'zorder': 2,
@@ -94,17 +94,17 @@ PLOT_CONFIG = {
         
         'data_series': [
             # --- COMSOL Formulation ---
-            # {
-            #     'source': 'comsol',
-            #     'scenario_key': '1',
-            #     'data_path': ['internal_impedance_matrix', 'js_method'], 
-            #     'plot_style': 'scatter',
-            #     'series': { 
-            #         'cc': {'p': 0, 'q': 0, **SCATTER_STYLES['comsol_1'], 'label': 'Comsol, mf'},
-            #         'cs': {'p': 0, 'q': 1, **SCATTER_STYLES['comsol_1']},
-            #         'ss': {'p': 1, 'q': 1, **SCATTER_STYLES['comsol_1']},
-            #     }
-            # },
+            {
+                'source': 'comsol',
+                'scenario_key': '1',
+                'data_path': ['internal_impedance_matrix', 'js_method'], 
+                'plot_style': 'scatter',
+                'series': { 
+                    'cc': {'p': 0, 'q': 0, **SCATTER_STYLES['comsol_1'], 'label': 'Comsol, mf'},
+                    'cs': {'p': 0, 'q': 1, **SCATTER_STYLES['comsol_1']},
+                    'ss': {'p': 1, 'q': 1, **SCATTER_STYLES['comsol_1']},
+                }
+            },
             
             # --- MoM-SO Formulation ---
             {
