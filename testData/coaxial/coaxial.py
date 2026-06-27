@@ -56,18 +56,16 @@ def main():
 
         value['series_impedance_matrix'] = z_total
         value['coaxial_cable_parameters'] = {'Zcs': z_total[:, 0, 0]}
-        value['internal_impedance_matrix'] = z_partial
 
     print(f"\nEnd of the routine! Time spent on simulation: {(time.time() - st):.1f} seconds.\n")
     plotter = BasePlotter(__file__, pul_data, PLOT_CONFIG, autoSave=False)
-    graph_list = ['internal_impedance_matrix_js_method']
-    # graph_list = ['series_impedance_matrix',
-    #               'coaxial_cable_parameters',
-    #               'internal_impedance_matrix_js_method',
-    #               'internal_impedance_matrix_energy_method',
-    #               'internal_impedance_matrix_comparison']
+    graph_list = ['series_impedance_matrix',
+                  'coaxial_cable_parameters',
+                  'internal_impedance_matrix_js_method',
+                  'internal_impedance_matrix_energy_method',
+                  'internal_impedance_matrix_comparison']
     plotter.plot_graph(graph_list)
-    # IsolatedMTLRepresentation(__file__, mtl, units='millimeter').system_schematic()
+    IsolatedMTLRepresentation(__file__, mtl, units='millimeter').system_schematic()
     plt.show()    
 
 if __name__ == "__main__":

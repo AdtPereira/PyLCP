@@ -58,7 +58,7 @@ SCATTER_STYLES = {
     },
     'mom_so_1': {
         'marker': 'o',
-        's': 18,  
+        's': 40,  
         'edgecolors': 'black',
         'facecolors': 'none',
         'zorder': 2,
@@ -86,7 +86,7 @@ PLOT_CONFIG = {
         'right_plot': {
             **PLOT_TPL_INDUCTANCE,
             'label': r'Inductance $(mH/km)$',
-            'y_lim': (0.0, 0.9),
+            'y_lim': (0.0, 0.2),
             'legend': False,
         },
         
@@ -94,28 +94,15 @@ PLOT_CONFIG = {
         
         'data_series': [
             # --- COMSOL Formulation ---
-            # {
-            #     'source': 'comsol',
-            #     'scenario_key': '1',
-            #     'data_path': ['internal_impedance_matrix', 'js_method'], 
-            #     'plot_style': 'scatter',
-            #     'series': { 
-            #         'cc': {'p': 0, 'q': 0, **SCATTER_STYLES['comsol_1'], 'label': 'Comsol, mf'},
-            #         'cs': {'p': 0, 'q': 1, **SCATTER_STYLES['comsol_1']},
-            #         'ss': {'p': 1, 'q': 1, **SCATTER_STYLES['comsol_1']},
-            #     }
-            # },
-            
-            # --- MoM-SO Formulation ---
             {
-                'source': 'mom_so',
+                'source': 'comsol',
                 'scenario_key': '1',
-                'data_path': ['internal_impedance_matrix'], 
+                'data_path': ['internal_impedance_matrix', 'js_method'], 
                 'plot_style': 'scatter',
                 'series': { 
-                    'cc': {'p': 0, 'q': 0, **SCATTER_STYLES['mom_so_1'], 'label': 'MoM-SO'},
-                    'cs': {'p': 0, 'q': 1, **SCATTER_STYLES['mom_so_1']},
-                    'ss': {'p': 1, 'q': 1, **SCATTER_STYLES['mom_so_1']},
+                    'cc': {'p': 0, 'q': 0, **SCATTER_STYLES['comsol_1'], 'label': 'Comsol, mf'},
+                    'cs': {'p': 0, 'q': 1, **SCATTER_STYLES['comsol_1']},
+                    'ss': {'p': 1, 'q': 1, **SCATTER_STYLES['comsol_1']},
                 }
             },
             

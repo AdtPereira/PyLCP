@@ -8,7 +8,7 @@
     "num_conductors": 1,
     "burial_depth": null,
     "spacing": null,
-    "fourier_order": 0,
+    "fourier_order": 8,
     "idx_ref_conductor": 0
   },
   "soil": null,
