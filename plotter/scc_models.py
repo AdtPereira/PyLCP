@@ -733,7 +733,7 @@ class SingleCoreCableModels:
                 idx_i, idx_j = 0, 0
             elif graph_key == 'potential_coefficients_composition_sheath':
                 idx_i, idx_j = 1, 1
-            elif graph_key == 'potential_coeff_core_sheath':
+            elif graph_key == 'potential_coefficients_composition_core_sheath':
                 idx_i, idx_j = 0, 1
             else:
                 raise ValueError("Invalid graph_key for potential coefficients.")

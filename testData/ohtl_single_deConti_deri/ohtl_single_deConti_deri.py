@@ -56,9 +56,9 @@ def main():
     print("PUL parameters calculated.")
 
     print(f"End of simulations! Time spent: {(time.time() - st):.1f} seconds.\n")
-    plotter = DeContiModels(pul_data)
+    plotter = DeContiModels(__file__, pul_data)
     plotter.log_matricial_pul_parameters(pul_data)
-    GroundReturnMTLRepresentation(mtl_model, case_name, units='millimeter').system_schematic()
+    GroundReturnMTLRepresentation(__file__, mtl_model, units='millimeter').system_schematic()
     plt.show()    
 
 if __name__ == "__main__":

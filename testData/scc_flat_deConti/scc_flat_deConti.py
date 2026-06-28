@@ -26,7 +26,7 @@ except ImportError as e:
 def main():
     """ Main function to run the simulation and plotting using vectorized calculations. """
     st = time.time()    
-    cmsl_reader = ComsolDataReader(__file__)
+    # cmsl_reader = ComsolDataReader(__file__)
     model = SingleCoreCableModelGenerator(__file__).underground_model()
     
     # Define models for different physical scenarios

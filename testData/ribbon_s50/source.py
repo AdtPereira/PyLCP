@@ -31,6 +31,7 @@ class RibbonCoatedCablesPULParameters:
 
         self.project_root = project_root
         self.case_name = case_name
+        self.script_file_path = Path(__file__).parent / f'{case_name}.py'
         self.mtl_copy = copy.deepcopy(mtl)
         self.freq_range = {'ana': np.logspace(0, 6, num=200), 'mom': np.logspace(0, 6, num=30)}
         self.srw_ratios = {'ana': np.linspace(4.0, 10.0, num=300), 'mom': np.linspace(4.0, 10.0, num=40)}
@@ -237,6 +238,10 @@ class RibbonCoatedCablesPULParameters:
         if self.tulip_runner is None:
             self._prepare_tulip_runner()
 
+        if self.tulip_runner is None:
+            print("Aviso: PyTulip não disponível (executável não encontrado). Etapa ignorada.")
+            return
+
         self.tulip_runner.run()
         
         if not self.tulip_runner.output_filepath.is_file():
@@ -271,7 +276,7 @@ class RibbonCoatedCablesPULParameters:
 
         print("\n==============      pyMoM TwoCoatedWireSystem      =============")
         coated_wires_model = MulticonductorTransmissionLine(self.mtl_copy)
-        IsolatedMTLRepresentation(coated_wires_model, self.case_name, units='millimeter').system_schematic()
+        IsolatedMTLRepresentation(self.script_file_path, coated_wires_model, units='millimeter').system_schematic()
         coated_wires = MulticonductorCoatedWireSystems(coated_wires_model)
         coated_wires.run_simulation()
         coated_wires.print_results()
@@ -350,8 +355,12 @@ class RibbonCoatedCablesPULParameters:
 
         if self.tulip_runner is None:
             self._prepare_tulip_runner()
+
+        if self.tulip_runner is None:
+            print("Aviso: PyTulip não disponível. Resultados Tulip serão omitidos.")
+        else:
             self.tulip_runner.run()
-        
+
         results = []
         for k in range(0, self.sum_max):
             temp_mtl = copy.deepcopy(self.mtl_copy)
@@ -376,8 +385,8 @@ class RibbonCoatedCablesPULParameters:
                 'C0 (RIBBON.FOR)':   self.runner.CAP0_matrix if self.fortran_base_params is not None else np.nan,
                 'CGEN (RIBBON.FOR)': self.runner.CGEN0_matrix if self.fortran_base_params is not None else np.nan,
                 'C (MoM.PY)':        mom_coated.C_maxwellian if mom_coated.C_maxwellian is not None else np.nan,
-                'C (SEMBA-TULIP)':   self.tulip_runner.C_matrix if self.tulip_runner.C_matrix is not None else np.nan,
-                'L (SEMBA-TULIP)':   self.tulip_runner.L_matrix if self.tulip_runner.L_matrix is not None else np.nan,
+                'C (SEMBA-TULIP)':   self.tulip_runner.C_matrix if self.tulip_runner is not None and self.tulip_runner.C_matrix is not None else np.nan,
+                'L (SEMBA-TULIP)':   self.tulip_runner.L_matrix if self.tulip_runner is not None and self.tulip_runner.L_matrix is not None else np.nan,
             })
             print(f"  Complete for k = {k}.")
 

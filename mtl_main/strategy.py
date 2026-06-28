@@ -1281,6 +1281,7 @@ class OverheadLineStrategy(MTLStrategy):
         context.d_matrix_ground_return = properties['d_matrix_ground_return']
         context.D_matrix_ground_return = properties['D_matrix_ground_return']
         context.vertical_separation_matrix = properties['vertical_separation_matrix']
+        context.images_vertical_distance_matrix = properties['vertical_separation_matrix']
         context.horizontal_separation_matrix = properties['horizontal_separation_matrix']
 
         # Conductors Permeability [np.array]

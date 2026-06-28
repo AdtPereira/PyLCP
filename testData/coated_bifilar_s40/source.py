@@ -259,22 +259,28 @@ class BifilarCoatedWirePULParameters:
         print("\n==============         SRW RATES EVALUATION        =============")
 
         # Cria a configuração da linha bifilar dinamicamente para cada razão.
+        _dummy_f = np.array([1.0])
         for ratio in self.srw_ratios['ana']:
             temp_mtl = copy.deepcopy(self.mtl_copy)
+            temp_mtl['type'] = 'bare_wires'
+            for key in temp_mtl.keys():
+                if isinstance(key, int):
+                    temp_mtl[key]['insulation'] = None
             separation = ratio * temp_mtl[0]['radius'][1]
             temp_mtl[1]['center_point'] = (separation, 0.0)
 
-            wires = WiresHomogeneousMedia(temp_mtl)
-            le_wires = wires.n_wires_external_inductance_matrix()
-            pul_bifilar = wires.bifilar_pul_inductance_and_capacitance()
+            mtl_obj = MulticonductorTransmissionLine(temp_mtl)
+            wires = WiresHomogeneousMedia(mtl_obj, _dummy_f)
+            le_wires = wires.n_wires_external_inductance()['L_ext']
+            pul_bifilar = wires.bifilar_static_params()
 
             self.srw_data[ratio] = {
-                'le_wires':     self.l_factor * le_wires,
+                'le_wires':     self.l_factor * le_wires.item(),
                 'le_exact':     self.l_factor * pul_bifilar['inductance']['exact'],
                 'le_bifilar':   self.l_factor * pul_bifilar['inductance']['approximate'],
                 'c_exact':      self.c_factor * pul_bifilar['capacitance']['exact'],
                 'c_approx':     self.c_factor * pul_bifilar['capacitance']['approximate'],
-                'c_wires':      self.c_factor * wires.n_wires_capacitance_matrix(le_wires),
+                'c_wires':      self.c_factor * wires.n_wires_capacitance(le_wires)['C_pul'].item(),
             }
 
         for ratio in self.srw_ratios['mom']:
@@ -426,15 +432,16 @@ class BifilarCoatedWirePULParameters:
         }
 
         fig, ax = plt.subplots(figsize=self.figsize)
-         # Comsol Data Plotting
-        srw_cmsl = comsol_data['cmsl_shunt_parameters']['srw_rate']
-        cap0_cmsl, cap_cmsl = comsol_data['cmsl_shunt_parameters']['capacitance_analytic'], comsol_data['cmsl_shunt_parameters']['capacitance_ec_intwe']
-        if srw_cmsl is not None and cap_cmsl is not None:
-            ax.plot(srw_cmsl, cap_cmsl * self.c_factor, label='COMSOL',
-                     linestyle='none', marker='s', markersize=10, fillstyle='none', markeredgecolor='darkblue', zorder=3)
-            
-            ax.plot(srw_cmsl, cap0_cmsl * self.c_factor,
-                     linestyle='none', marker='s', markersize=10, fillstyle='none', markeredgecolor='darkblue', zorder=3)
+        # Comsol Data Plotting
+        if comsol_data and 'cmsl_shunt_parameters' in comsol_data:
+            srw_cmsl = comsol_data['cmsl_shunt_parameters']['srw_rate']
+            cap0_cmsl = comsol_data['cmsl_shunt_parameters']['capacitance_analytic']
+            cap_cmsl = comsol_data['cmsl_shunt_parameters']['capacitance_ec_intwe']
+            if srw_cmsl is not None and cap_cmsl is not None:
+                ax.plot(srw_cmsl, cap_cmsl * self.c_factor, label='COMSOL',
+                         linestyle='none', marker='s', markersize=10, fillstyle='none', markeredgecolor='darkblue', zorder=3)
+                ax.plot(srw_cmsl, cap0_cmsl * self.c_factor,
+                         linestyle='none', marker='s', markersize=10, fillstyle='none', markeredgecolor='darkblue', zorder=3)
             
         for key, data in capacitante_data.items():
             freq, value = data['data']
