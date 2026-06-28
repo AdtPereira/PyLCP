@@ -74,8 +74,8 @@ def main():
     plotter.internal_impedance()
     plotter.nahman_holt_comparison()
     plotter.internal_tubular_characteristics()
-    GroundReturnMTLRepresentation(mtl_solid, case_name, units='millimeter').system_schematic(base_filename='system_schematic_solid')
-    GroundReturnMTLRepresentation(mtl_tubular, case_name, units='millimeter').system_schematic(base_filename='system_schematic_tubular')
+    GroundReturnMTLRepresentation(__file__, mtl_solid, units='millimeter').system_schematic(base_filename='system_schematic_solid')
+    GroundReturnMTLRepresentation(__file__, mtl_tubular, units='millimeter').system_schematic(base_filename='system_schematic_tubular')
     plt.show()
 
 if __name__ == "__main__":

@@ -2,9 +2,11 @@
 """ It is a Python script that contains the main function and a class called User. """
 
 import os
+import json
 import numpy as np
 import pandas as pd
 import scipy.special as ss
+from pathlib import Path
 from typing import Optional
 
 UNITS_DATA = {
@@ -178,6 +180,36 @@ def verify_kelvin_functions(q = 1.5):
     print("\n[Test 2] Values derived from sqrt(j) * I_1(q * sqrt(j)):")
     print(f"Re[...] = {ber_p_from_bessel:>10.6f} -> Matches ber'(q)? {np.isclose(ber_p_ref, ber_p_from_bessel)}")
     print(f"Im[...] = {bei_p_from_bessel:>10.6f} -> Matches bei'(q)? {np.isclose(bei_p_ref, bei_p_from_bessel)}")
+
+def load_json_parameters(script_file_path: str, show_content: bool = False) -> dict:
+    """
+    Loads parameters from a JSON file with the same base name as the calling script.
+
+    Args:
+        script_file_path: The __file__ attribute from the calling script.
+        show_content: If True, prints the loaded content to the console.
+
+    Returns:
+        dict: Parameters loaded from the JSON file.
+    """
+    script_path = Path(script_file_path).resolve()
+    model_path = script_path.parent / f"{script_path.stem}.json"
+
+    if not model_path.exists():
+        raise FileNotFoundError(f"Parameter file not found: {model_path}")
+
+    with open(model_path, 'r') as f:
+        parameters = json.load(f)
+
+    print(f"Successfully loaded parameters from: {model_path}")
+
+    if show_content:
+        print(f"\n--- Content of {model_path.name} ---")
+        print(json.dumps(parameters, indent=2))
+        print("--------------------------------------\n")
+
+    return parameters
+
 
 def save_figure(fig, results_dir, base_filename, formats=['png']):
     """

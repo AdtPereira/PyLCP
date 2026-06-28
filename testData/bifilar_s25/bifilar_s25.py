@@ -30,12 +30,12 @@ def main():
 
     print("Importing COMSOL data for cable model...")
     cmsl_processor = ComsolPostProcessor(__file__)
+    series_impedance_terms = cmsl_processor.get_bifilar_data()
     for key, value in pul_data['comsol']['scenarios'].items():
         print(f"  -> Processando COMSOL para: {key}")
-        
-        series_impedance_terms = cmsl_processor.get_bifilar_data()
-        value['partial_impedance_matrix'] = series_impedance_terms['partial_impedance_matrix']
-        value['series_impedance_matrix'] = series_impedance_terms['series_impedance_matrix']
+        if series_impedance_terms is not None:
+            value['partial_impedance_matrix'] = series_impedance_terms['partial_impedance_matrix']
+            value['series_impedance_matrix'] = series_impedance_terms['series_impedance_matrix']
 
     print("\n===  Calculating per-unit-length parameters by Analytical Formulation (Ametani, 2015) ===")
     for key, value in pul_data['analytical']['scenarios'].items():

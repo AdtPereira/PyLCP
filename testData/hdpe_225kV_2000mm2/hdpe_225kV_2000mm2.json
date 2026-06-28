@@ -1,7 +1,7 @@
 {
   "type": "HDPE",
-  "name": "225 kV XLPE underground single-core cable under HDPE tube",
-  "note": "An Lafaia et al. (2018) 225 kV XLPE underground cable model.",
+  "name": "220-225 kV XLPE underground single-core cable under HDPE tube",
+  "note": "1. Lafaia et al. 2015. Modeling of an Underground Cable Installed in a Poly-Ethylene Tube for Transient Simulations. The Institute of Electrical Engineers of Japan #IEEJ-2196 2025-09-09. 2. LAFAIA et al.: FIELD TEST AND SIMULATION OF TRANSIENTS ON THE RTE 225 kV CABLE. IEEE TRANSACTIONS ON POWER DELIVERY, VOL. 32, NO. 2, APRIL 2017. DOI 10.1109/TPWRD.2015.2506733",
   "arrangement": {
     "unit": "meter",
     "type": "single",

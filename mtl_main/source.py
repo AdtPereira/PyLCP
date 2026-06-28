@@ -182,7 +182,7 @@ class MulticonductorTransmissionLine:
                 insulation = conductor['insulation']
                 # Add the insulation surface
                 all_surfaces.append({
-                    'type': insulation['name'],
+                    'type': 'primary_insulation',
                     'tag': key,
                     'radius': conductor['radius'][1] + insulation['thickness'],
                     'center_point': insulation['center_point'],

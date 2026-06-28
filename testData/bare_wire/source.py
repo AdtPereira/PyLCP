@@ -250,34 +250,32 @@ class BifilarBareWirePULParameters:
     def run_analytical(self):
         """
         Executa a simulação analítica da impedância da linha de transmissão.
-
-        Args:
-            mtl_config (dict): Dicionário de configuração da linha de transmissão.
-            frequencies (np.ndarray): Array de frequências para a análise.
-
-        Returns:
-            tuple: Uma tupla contendo três listas: impedâncias série,
-                resistências de alta frequência e indutâncias externas.
         """
         print("\n==============         Analytical Processing       =============")
 
-        bifilar_wires = WiresHomogeneousMedia(self.mtl_copy)
-        le_wires = bifilar_wires.n_wires_external_inductance_matrix()
-        c_wires = bifilar_wires.n_wires_capacitance_matrix(le_wires)
-        pul_bifilar = bifilar_wires.bifilar_pul_inductance_and_capacitance()
+        f_ana = self.freq_range['ana']
+        mtl_obj = MulticonductorTransmissionLine(self.mtl_copy)
+        bifilar_wires = WiresHomogeneousMedia(mtl_obj, f_ana)
 
-        for freq in self.freq_range['ana']:
-            z_s, r_hf = bifilar_wires.bifilar_pul_series_impedance(freq)
+        le_wires = bifilar_wires.n_wires_external_inductance()['L_ext']
+        c_wires  = bifilar_wires.n_wires_capacitance(le_wires)['C_pul']
+        pul_bifilar = bifilar_wires.bifilar_static_params()
+
+        impedance = bifilar_wires.bifilar_series_impedance()
+        Zs  = impedance['series_impedance_matrix']   # (N_freq, 1, 1)
+        Rhf = impedance['high_frequency_limit']      # (N_freq, 1, 1): R_hf + jw*L_ext
+
+        for i, freq in enumerate(f_ana):
             self.analytical_data[freq] = {
-                'rhf':          self.r_factor * r_hf,
-                'rs':           self.r_factor * np.real(z_s),
-                'ls':           self.l_factor * np.imag(z_s) / (2 * np.pi * freq),
-                'le_wires':     self.l_factor * le_wires.item(),
-                'le_exact':     self.l_factor * pul_bifilar['inductance']['exact'],
-                'le_bifilar':   self.l_factor * pul_bifilar['inductance']['approximate'],
-                'c_exact':      self.c_factor * pul_bifilar['capacitance']['exact'],
-                'c_approx':     self.c_factor * pul_bifilar['capacitance']['approximate'],
-                'c_wires':      self.c_factor * c_wires.item(),
+                'rhf':       self.r_factor * np.real(Rhf[i, 0, 0]),
+                'rs':        self.r_factor * np.real(Zs[i, 0, 0]),
+                'ls':        self.l_factor * np.imag(Zs[i, 0, 0]) / (2 * np.pi * freq),
+                'le_wires':  self.l_factor * le_wires.item(),
+                'le_exact':  self.l_factor * pul_bifilar['inductance']['exact'],
+                'le_bifilar':self.l_factor * pul_bifilar['inductance']['approximate'],
+                'c_exact':   self.c_factor * pul_bifilar['capacitance']['exact'],
+                'c_approx':  self.c_factor * pul_bifilar['capacitance']['approximate'],
+                'c_wires':   self.c_factor * c_wires.item(),
             }
 
     def run_mom_so(self):
@@ -348,22 +346,25 @@ class BifilarBareWirePULParameters:
         print("\n==============         SRW RATES EVALUATION        =============")
 
         mtl_local = copy.deepcopy(self.mtl_copy)
-        
+        _dummy_f = np.array([1.0])  # static params don't depend on frequency
+
         for ratio in self.srw_ratios['ana']:
             separation = ratio * mtl_local[0]['radius'][1]
             mtl_local[1]['center_point'] = (separation, 0.0)
 
-            wires = WiresHomogeneousMedia(mtl_local)
-            le_wires = wires.n_wires_external_inductance_matrix()
-            pul_bifilar = wires.bifilar_pul_inductance_and_capacitance()
+            mtl_obj = MulticonductorTransmissionLine(mtl_local)
+            wires = WiresHomogeneousMedia(mtl_obj, _dummy_f)
+            le_wires = wires.n_wires_external_inductance()['L_ext']
+            c_wires  = wires.n_wires_capacitance(le_wires)['C_pul']
+            pul_bifilar = wires.bifilar_static_params()
 
             self.srw_data[ratio] = {
-                'le_wires':     self.l_factor * le_wires,
-                'le_exact':     self.l_factor * pul_bifilar['inductance']['exact'],
-                'le_bifilar':   self.l_factor * pul_bifilar['inductance']['approximate'],
-                'c_exact':      self.c_factor * pul_bifilar['capacitance']['exact'],
-                'c_approx':     self.c_factor * pul_bifilar['capacitance']['approximate'],
-                'c_wires':      self.c_factor * wires.n_wires_capacitance_matrix(le_wires),
+                'le_wires':  self.l_factor * le_wires.item(),
+                'le_exact':  self.l_factor * pul_bifilar['inductance']['exact'],
+                'le_bifilar':self.l_factor * pul_bifilar['inductance']['approximate'],
+                'c_exact':   self.c_factor * pul_bifilar['capacitance']['exact'],
+                'c_approx':  self.c_factor * pul_bifilar['capacitance']['approximate'],
+                'c_wires':   self.c_factor * c_wires.item(),
             }
         
         for ratio in self.srw_ratios['mom']:
