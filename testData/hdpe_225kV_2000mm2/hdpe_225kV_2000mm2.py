@@ -6,7 +6,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 # --- Import custom modules ---
-os.system('cls' if os.name == 'nt' else 'clear')
 try:
     from utils.case_utils import *
     from utils.comsol_data import ComsolPostProcessor
@@ -22,10 +21,36 @@ except ImportError as e:
     print(f"Error importing modules: {e}")
     sys.exit(1)
 
+def compare_capacitance(pul_data: dict, c_comsol: dict = None) -> None:
+    """
+    Print a comparison table of C_11 and C_22 (capacitance matrix diagonal)
+    for the four proposed models plus the COMSOL reference (energy method).
+    Both values are frequency-independent, expressed in µF/km.
+    """
+    rows = {}
+    labels = {'1': 'Underground', '2': 'Area-weighted ERS', '3': 'GMD case 3.1'}
+    for key, label in labels.items():
+        cap = pul_data['scenarios'][key]['internal_matrices']['capacitance_matrix']
+        rows[label] = {'c11': cap[0, 0], 'c22': cap[1, 1]}
+
+    col_w = 26
+    print("\n" + "=" * 62)
+    print("  Per-Unit-Length Capacitance  [uF/km]")
+    print("=" * 62)
+    print(f"  {'Model':<{col_w}} {'C_11':>12}  {'C_22':>12}")
+    print("-" * 62)
+    for label, vals in rows.items():
+        print(f"  {label:<{col_w}} {vals['c11'] * 1e9:>12.4f}  {vals['c22'] * 1e9:>12.4f}")
+    if c_comsol is not None:
+        print("-" * 62)
+        print(f"  {'COMSOL (energy method)':<{col_w}} {c_comsol['c11'] * 1e9:>12.4f}  {c_comsol['c22'] * 1e9:>12.4f}")
+    print("=" * 62 + "\n")
+
 def main():
     """
     Main function to run the simulation and plotting.
     """
+    os.system('cls' if os.name == 'nt' else 'clear')
     st = time.time()    
     model_generator = SingleCoreCableModelGenerator(__file__)    
     model_0 = model_generator.eccentric_hdpe_enclosed_model()
@@ -82,9 +107,15 @@ def main():
     for key, value in pul_data['comsol']['scenarios'].items():
         print(f"  -> Processando COMSOL para: {key}")
         value['coaxial_cable_impedance'] = cmsl_processor.get_coaxial_cable_parameters()
-        value['internal_impedance_matrix'] = cmsl_processor.get_internal_impedance_js_method()
-        value['internal_impedance_elements'] = cmsl_processor.get_scc_internal_impedance_elements()
+        scc_elements = cmsl_processor.get_scc_internal_impedance_elements()
+        value['internal_impedance_matrix'] = scc_elements
+        value['internal_impedance_elements'] = scc_elements
     
+    pul_data['analytical'] = {
+        'frequencies': pul_data['frequencies'],
+        'scenarios': pul_data['scenarios'],
+    }
+
     print("\nCalculating per-unit-length parameters and quasi-TEM matrices for all scenarios...")
     for key, value in pul_data['scenarios'].items():
         print(f"Calculating internal parameters for Model Case {key}...")
@@ -92,6 +123,7 @@ def main():
         value['internal_parameters'] = pul.parameters_hybrid()
         value['internal_matrices'] = pul.matrices()
             
+    compare_capacitance(pul_data, cmsl_processor.get_shunt_capacitance_elements())
     print(f"End of the routine! Time spent on simulation: {(time.time() - st):.1f} seconds.\n")
     plotter = HDPEPlotter(__file__, pul_data, PLOT_CONFIG, autoSave=False)
     plotter.hdpe_internal_impedance_matrix()
@@ -107,7 +139,7 @@ def main():
         schematic = GroundReturnMTLRepresentation(
             __file__,
             config['mtl'], 
-            autoSave=False, 
+            autoSave=True, 
             units='millimeter'
         )
         schematic.system_schematic(base_filename=config['filename'])

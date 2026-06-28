@@ -10,11 +10,12 @@ os.system('cls' if os.name == 'nt' else 'clear')
 try:
     from utils.case_utils import *
     from utils.comsol_data import ComsolDataReader
-    from plotter.xue_models import XueModels
+    from plotter.scc_plotter import SCCPlotter
     from models.single_core_cable import SingleCoreCableModelGenerator
     from mtl_main.graphics import GroundReturnMTLRepresentation
     from mtl_main.source import MulticonductorTransmissionLine
     from analytical_forms.single_core_cable import InternalPerUnitParameters, PerUnitParameters
+    from .plot_config import PLOT_CONFIG
     print("Core modules imported successfully.")
 except ImportError as e:
     print(f"Error importing modules: {e}")
@@ -23,7 +24,7 @@ except ImportError as e:
 def main():
     """ Main function to run the simulation and plotting using vectorized calculations. """
     st = time.time()    
-    cmsl_reader = ComsolDataReader(__file__)
+    # cmsl_reader = ComsolDataReader(__file__)
     model = SingleCoreCableModelGenerator(__file__).simple_trefoil()
     
     # --- Model setup ---
@@ -80,19 +81,15 @@ def main():
     for key, value in pul_data['scenarios'].items():
         print(f"Calculating scenario: {key}...")
         pul = PerUnitParameters(value['mtl'], pul_data['frequencies'])
-
         earth_return = pul.earth_return_parameters(value['zg_form'], value['yg_form'])
-        quasi_tem = pul.quasi_tem_approx_matrices(internal_matrices, earth_return)
-        
+        quasi_tem = pul.quasi_tem_approx_matrices(internal_matrices, earth_return)        
         value['earth_return_parameters'] = earth_return
         value['quasi_tem_matrices'] = quasi_tem
     
     print(f"End of the routine! Time spent on simulation: {(time.time() - st):.1f} seconds.\n")
-    plotter = XueModels(__file__, pul_data)
-    plotter.plot_fig419()
-    plotter.plot_fig421()
-    plotter.scc_shunt_admittance_matrix()
     GroundReturnMTLRepresentation(__file__, mtl_model_a, units='centimeter').system_schematic()
+    plotter = SCCPlotter(__file__, pul_data, PLOT_CONFIG, autoSave=False)
+    plotter.scc_series_impedance_matrix(graph_key_list=['fig419'])
     plt.show()    
 
 if __name__ == "__main__":

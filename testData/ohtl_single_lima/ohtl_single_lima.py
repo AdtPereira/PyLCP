@@ -89,7 +89,7 @@ def main():
     plotter.characteristic_impedance_matrix()
     plotter.characteristic_impedance_nakagawa()
     plotter.characteristic_impedance_quasi_tem()
-    GroundReturnMTLRepresentation(mtl_model_a, case_name, units='millimeter').system_schematic()
+    GroundReturnMTLRepresentation(__file__, mtl_model_a, units='millimeter').system_schematic()
     plt.show()
 
 if __name__ == "__main__":

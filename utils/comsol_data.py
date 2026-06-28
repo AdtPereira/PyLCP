@@ -175,9 +175,7 @@ class ComsolDataReader:
         print(f"\nInstanciando ComsolDataReader para o caso '{case_name}' ---")
         
         if not self.results_path.is_dir():
-            raise FileNotFoundError(
-                f"O diretório Results não foi encontrado para o caso '{case_name}' em: {self.results_path}"
-            )
+            print(f"  Aviso: diretório Results não encontrado para o caso '{case_name}'. Dados COMSOL ignorados.")
         
     def load_all_results(self) -> dict[str, pd.DataFrame]:
         """
@@ -292,6 +290,9 @@ class ComsolPostProcessor:
         Retorna os parâmetros gerais extraídos dos dados COMSOL.
         """
         data = self.cmsl_reader.data.get(cmsl_file_name, None)
+        if data is None:
+            print(f"  Aviso: arquivo COMSOL '{cmsl_file_name}.txt' não encontrado. Dados COMSOL ignorados.")
+            return None
         freq = np.asarray(data['freq'])
 
         return {
@@ -302,6 +303,8 @@ class ComsolPostProcessor:
     def get_bifilar_data(self, excitation_type: str = 'average'):
         N = 2
         general_data = self.get_general_parameters('cmsl_series_impedance_matrix')
+        if general_data is None:
+            return None
         data = self.cmsl_reader.data['cmsl_series_impedance_matrix']
         freq = general_data['frequencies']
         Zp = np.zeros((len(freq), N, N), dtype=complex)
@@ -410,6 +413,11 @@ class ComsolPostProcessor:
         """
         N = 2
         general_data = self.get_general_parameters('cmsl_series_impedance_core_excitation')
+        if general_data is None:
+            return None
+        if 'cmsl_series_impedance_sheath_excitation' not in self.cmsl_reader.data:
+            print("  Aviso: arquivo COMSOL 'cmsl_series_impedance_sheath_excitation.txt' não encontrado. Dados COMSOL ignorados.")
+            return None
         core = self.cmsl_reader.data['cmsl_series_impedance_core_excitation']
         sheath = self.cmsl_reader.data['cmsl_series_impedance_sheath_excitation']
         freq = general_data['frequencies']
@@ -484,6 +492,18 @@ class ComsolPostProcessor:
             'self_core_energy': Z11,
             'self_sheath_energy': Z22,
             'mutual_energy': mutual_energy
+        }
+
+    def get_shunt_capacitance_elements(self) -> dict:
+        """
+        Returns C_11 (core) and C_22 (sheath) self-capacitances per unit length
+        from the COMSOL shunt parameters file, computed via the energy method.
+        Both values are frequency-independent; the first row is used.
+        """
+        df = self.cmsl_reader.data['cmsl_shunt_params']
+        return {
+            'c11': float(df['ccc_energy'].iloc[0]),
+            'c22': float(df['css_energy'].iloc[0]),
         }
 
     def get_earth_return_parameters(self, base_key: str):

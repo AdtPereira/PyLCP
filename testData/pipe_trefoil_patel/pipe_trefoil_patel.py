@@ -48,7 +48,7 @@ def main():
     mtl_model = MulticonductorTransmissionLine(MODEL)
 
     print(f"End of the routine! Time spent on simulation: {(time.time() - st):.1f} seconds.\n")
-    IsolatedMTLRepresentation(mtl_model, case_name, units='millimeter').system_schematic()
+    IsolatedMTLRepresentation(__file__, mtl_model, units='millimeter').system_schematic()
     plt.show()    
 
 if __name__ == "__main__":

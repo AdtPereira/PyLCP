@@ -29,7 +29,12 @@ class BasePlotter:
         self.results_dir = os.path.join('testData', self.script_path.stem, 'Results')
         os.makedirs(self.results_dir, exist_ok=True)
         
-        self.xlim = tuple(pul_data['analytical']['frequencies'][[0, -1]])
+        _freq_src = (pul_data.get('analytical')
+                     or pul_data.get('mom_so')
+                     or pul_data.get('comsol')
+                     or pul_data)
+        _freqs = _freq_src.get('frequencies', np.array([1.0, 1e6]))
+        self.xlim = tuple(_freqs[[0, -1]])
         self.figsize = (12, 5)
 
     def plot_graph(self, graph_key_list):
@@ -111,13 +116,14 @@ class BasePlotter:
         right_cfg = cfg['right_plot']
         
         # --- Bloco Único de Plotagem ---
-        for series_def in cfg.get('data_series', []):            
+        for series_def in cfg.get('data_series', []):
             # 1. Buscar os dados usando o helper
             matrix, freq = self._get_data_from_source(series_def)
-            w = 2 * np.pi * freq
-            
+
             if matrix is None:
                 continue # Helper já emitiu o aviso
+
+            w = 2 * np.pi * freq
 
             plot_style_func_ax1 = ax1.plot if series_def.get('plot_style', 'line') == 'line' else ax1.scatter
             plot_style_func_ax2 = ax2.plot if series_def.get('plot_style', 'line') == 'line' else ax2.scatter
