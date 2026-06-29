@@ -41,13 +41,14 @@ def main():
 
     cmsl_processor = ComsolPostProcessor(__file__)
     cmsl_params = cmsl_processor.get_general_parameters('cmsl_coaxial_cable_impedance')
-    pul_data['comsol'].update(cmsl_params)
-    for key, value in pul_data['comsol']['scenarios'].items():
-        print(f"  -> Processando COMSOL para: {key}")
-        value['coaxial_cable_impedance'] = cmsl_processor.get_coaxial_cable_parameters()
-        scc_elements = cmsl_processor.get_scc_internal_impedance_elements()
-        value['internal_impedance_matrix'] = scc_elements
-        value['internal_impedance_elements'] = scc_elements
+    if cmsl_params is not None:
+        pul_data['comsol'].update(cmsl_params)
+        for key, value in pul_data['comsol']['scenarios'].items():
+            print(f"  -> Processando COMSOL para: {key}")
+            value['coaxial_cable_impedance'] = cmsl_processor.get_coaxial_cable_parameters()
+            scc_elements = cmsl_processor.get_scc_internal_impedance_elements()
+            value['internal_impedance_matrix'] = scc_elements
+            value['internal_impedance_elements'] = scc_elements
     
     print(f"End of the routine! Time spent on simulation: {(time.time() - st):.1f} seconds.\n")
     plotter = HDPEPlotter(__file__, pul_data, PLOT_CONFIG, autoSave=False)
