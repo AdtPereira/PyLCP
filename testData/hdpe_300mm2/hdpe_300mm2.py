@@ -103,14 +103,18 @@ def main():
 
     cmsl_processor = ComsolPostProcessor(__file__)
     cmsl_params = cmsl_processor.get_general_parameters('cmsl_coaxial_cable_impedance')
-    pul_data['comsol'].update(cmsl_params)
-    for key, value in pul_data['comsol']['scenarios'].items():
-        print(f"  -> Processando COMSOL para: {key}")
-        value['coaxial_cable_impedance'] = cmsl_processor.get_coaxial_cable_parameters()
-        scc_elements = cmsl_processor.get_scc_internal_impedance_elements()
-        value['internal_impedance_matrix'] = scc_elements
-        value['internal_impedance_elements'] = scc_elements
-    
+    if cmsl_params is not None:
+        pul_data['comsol'].update(cmsl_params)
+        for key, value in pul_data['comsol']['scenarios'].items():
+            print(f"  -> Processando COMSOL para: {key}")
+            value['coaxial_cable_impedance'] = cmsl_processor.get_coaxial_cable_parameters()
+            scc_elements = cmsl_processor.get_scc_internal_impedance_elements()
+            value['internal_impedance_matrix'] = scc_elements
+            value['internal_impedance_elements'] = scc_elements
+    else:
+        print("  Aviso: Processamento COMSOL ignorado (dados não disponíveis).")
+        pul_data['comsol'] = {}
+
     pul_data['analytical'] = {
         'frequencies': pul_data['frequencies'],
         'scenarios': pul_data['scenarios'],
@@ -122,8 +126,9 @@ def main():
         pul = InternalPerUnitParameters(value['mtl'], pul_data['frequencies'])
         value['internal_parameters'] = pul.parameters_hybrid()
         value['internal_matrices'] = pul.matrices()
-            
-    compare_capacitance(pul_data, cmsl_processor.get_shunt_capacitance_elements())
+
+    c_comsol = cmsl_processor.get_shunt_capacitance_elements() if cmsl_params is not None else None
+    compare_capacitance(pul_data, c_comsol)
     print(f"End of the routine! Time spent on simulation: {(time.time() - st):.1f} seconds.\n")
     plotter = HDPEPlotter(__file__, pul_data, PLOT_CONFIG, autoSave=True)
     plotter.hdpe_internal_impedance_matrix()
@@ -132,16 +137,11 @@ def main():
     # 1. Crie uma lista de configurações para cada esquemático
     schematic_configs = [
         {'mtl': mtl_0, 'filename': 'schematic_original_hdpe'},
-        {'mtl': mtl_1, 'filename': 'schematic_ignored_hdpe'},
+        # {'mtl': mtl_1, 'filename': 'schematic_ignored_hdpe'},
     ]
 
     for config in schematic_configs:
-        schematic = GroundReturnMTLRepresentation(
-            __file__,
-            config['mtl'], 
-            autoSave=True, 
-            units='millimeter'
-        )
+        schematic = GroundReturnMTLRepresentation(__file__, config['mtl'], autoSave=True, units='millimeter')
         schematic.system_schematic(base_filename=config['filename'])
     plt.show()
     

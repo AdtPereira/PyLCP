@@ -1,0 +1,4 @@
+w 2*pi*freq ""
+delta_coax sqrt(2/(2*pi*freq_coax*mur_coax*mu0_const*sigma1)) ""
+freq_coax "10^6 [Hz]" ""
+mur_coax 1 "relative permeability of dielectric"

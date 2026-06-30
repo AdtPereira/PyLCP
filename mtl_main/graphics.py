@@ -313,24 +313,40 @@ class GroundReturnMTLRepresentation(BaseMTLRepresentation):
         """Draws annotations like the ground level and depth/height line."""
         deepest_cond = params['deepest_conductor']
         deepest_cond_x = deepest_cond['center_point'][0]
-        
-        # Calculate the schematic y-position of the deepest conductor
+
+        # Calculate the schematic y-position of the deepest conductor center
         y_real_deepest = params['y_min']
         y_avg = params['y_avg']
         schematic_y_avg = params['h_factor'] * params['max_radius']
         schematic_y_deepest = schematic_y_avg + (y_real_deepest - y_avg)
-        
+
         schematic_y_scaled = schematic_y_deepest * self.unit_factor
-        
-        dim_x_arrow = (deepest_cond_x + params['max_radius'] * 3.5) * self.unit_factor
-        ax.annotate('', xy=(dim_x_arrow, 0), xycoords='data', 
+
+        # Place arrow just outside the cable outer edge
+        dim_x_arrow = (deepest_cond_x + params['max_radius'] * 1.5) * self.unit_factor
+        tick_half = params['max_radius'] * 0.3 * self.unit_factor
+
+        # Double-headed arrow from ground surface to conductor center
+        ax.annotate('', xy=(dim_x_arrow, 0), xycoords='data',
                     xytext=(dim_x_arrow, schematic_y_scaled), textcoords='data',
                     arrowprops=dict(arrowstyle='<->', color='black', lw=1, zorder=3))
-        
+
+        # Horizontal tick marks at both ends of the arrow (dimension-line convention)
+        ax.plot([dim_x_arrow - tick_half, dim_x_arrow + tick_half], [0, 0],
+                color='black', lw=1, zorder=3)
+        ax.plot([dim_x_arrow - tick_half, dim_x_arrow + tick_half],
+                [schematic_y_scaled, schematic_y_scaled],
+                color='black', lw=1, zorder=3)
+
+        # Cross marker at the conductor center to show the reference point
+        ax.plot(deepest_cond_x * self.unit_factor, schematic_y_scaled,
+                'k+', markersize=8, markeredgewidth=1.5, zorder=6)
+
         real_h = abs(y_real_deepest)
         label_text = f'h = {real_h:.2f} m'
-        
-        ax.text(dim_x_arrow, schematic_y_scaled / 2, label_text, ha='center', va='center', fontsize=9, 
+
+        ax.text(dim_x_arrow + tick_half * 0.3, schematic_y_scaled / 2, label_text,
+                ha='left', va='center', fontsize=9,
                 zorder=3, bbox=dict(boxstyle='square,pad=0.3', fc='white', ec='none', alpha=0.8))
 
         ax.axhline(y=0, color='darkgreen', linestyle=':', linewidth=1.5, zorder=2)

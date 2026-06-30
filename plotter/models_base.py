@@ -116,6 +116,7 @@ class BasePlotter:
         right_cfg = cfg['right_plot']
         
         # --- Bloco Único de Plotagem ---
+        any_plotted = False
         for series_def in cfg.get('data_series', []):
             # 1. Buscar os dados usando o helper
             matrix, freq = self._get_data_from_source(series_def)
@@ -131,22 +132,28 @@ class BasePlotter:
             # 2. Iterar sobre os elementos da matriz a plotar
             for key, value in series_def['series'].items():
                 p, q = value['p'], value['q']
-                
+
                 # Copia o estilo, removendo chaves de controle
                 style = {k: v for k, v in value.items() if k not in ['p', 'q']}
 
                 # Plotar dados do subplot esquerdo
                 y1_data = self._calculate_plot_data(matrix[:, p, q], w, left_cfg)
                 plot_style_func_ax1(freq, y1_data, **style)
-                
+
                 # Plotar dados do subplot direito
                 y2_data = self._calculate_plot_data(matrix[:, p, q], w, right_cfg)
                 plot_style_func_ax2(freq, y2_data, **style)
+                any_plotted = True
+
+        if not any_plotted:
+            plt.close(fig)
+            print(f"Aviso: Nenhum dado disponível para '{graph_key}'. Gráfico ignorado.")
+            return
 
         # --- Formatação Genérica dos Eixos ---
         self._format_axis(ax1, self.xlim, left_cfg)
         self._format_axis(ax2, self.xlim, right_cfg)
-        
+
         plt.tight_layout(rect=[0, 0, 1, 0.96])
         if self.autoSave:
             save_figure(fig, self.results_dir, base_filename=f'{graph_key}')
@@ -165,59 +172,48 @@ class BasePlotter:
         right_cfg = cfg['right_plot']
         
         # --- Bloco Único de Plotagem ---
-        for series_def in cfg.get('data_series', []):            
+        any_plotted = False
+        for series_def in cfg.get('data_series', []):
             # 1. Buscar os dados (deve ser uma lista/array de arrays)
             data_list, freq = self._get_data_from_source(series_def)
-            
+
             if data_list is None:
                 continue # Helper já emitiu o aviso
 
             w = 2 * np.pi * freq
-            
+
             plot_style_func = ax1.plot if series_def.get('plot_style', 'line') == 'line' else ax1.scatter
             plot_style_func_ax2 = ax2.plot if series_def.get('plot_style', 'line') == 'line' else ax2.scatter
 
-            # 2. Iterar sobre os elementos da lista a plotar
-            # 'series' é um dict onde 'value' contém o 'idx' (índice da lista)
-            # e o resto é o estilo de plotagem.
             for key, value in series_def['series'].items():
-                
-                # if 'idx' not in value:
-                #     print(f"Aviso: 'idx' não encontrado em series['{key}'] para {graph_key}.")
-                #     continue
-                    
-                # idx = value['idx']
-                
-                # Copia o estilo, removendo chaves de controle
                 style = {k: v for k, v in value.items() if k != 'idx'}
 
                 try:
-                    # Acessa o item específico da lista/array.
-                    # Se data_list for (n_freq, n_elements), pegamos [:, idx]
-                    # Se data_list for uma lista de (n_freq,), pegamos [idx]
                     if isinstance(data_list, np.ndarray) and data_list.ndim == 2:
                         data_item = data_list[:, key]
                     else:
-                        data_item = data_list[key] # Assume lista de arrays
-                
+                        data_item = data_list[key]
+
                 except (IndexError, TypeError, KeyError) as e:
                     print(f"Aviso: Não foi possível acessar o índice {key} para {series_def['source']}['{series_def['scenario_key']}']. Erro: {e}")
                     continue
 
-                # Plotar dados do subplot esquerdo
                 y1_data = self._calculate_plot_data(data_item, w, left_cfg)
                 plot_style_func(freq, y1_data, **style)
-                
-                # Plotar dados do subplot direito
+
                 y2_data = self._calculate_plot_data(data_item, w, right_cfg)
                 plot_style_func_ax2(freq, y2_data, **style)
+                any_plotted = True
+
+        if not any_plotted:
+            plt.close(fig)
+            print(f"Aviso: Nenhum dado disponível para '{graph_key}'. Gráfico ignorado.")
+            return
 
         # --- Formatação Genérica dos Eixos ---
-        # Note a remoção de 'self.f' da chamada, para alinhar com o
-        # método '_plot_matricial_upper_triangular' já revisado.
         self._format_axis(ax1, self.xlim, left_cfg)
         self._format_axis(ax2, self.xlim, right_cfg)
-        
+
         plt.tight_layout(rect=[0, 0, 1, 0.96])
         if self.autoSave:
             save_figure(fig, self.results_dir, base_filename=f'{graph_key}')

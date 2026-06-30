@@ -223,33 +223,57 @@ class ComsolDataReader:
         full_header_str = ' '.join([h.replace('%', '').strip() for h in header_lines])
         parts = re.split(r'(\([^)]+\))', full_header_str)
         
-        column_names = []
+        raw_names = []
         i = 0
         while i < len(parts) - 1:
             var_name = parts[i].strip()
             unit = parts[i+1].strip()
             if var_name:
-                column_names.append(f"{var_name} {unit}")
+                raw_names.append(f"{var_name} {unit}")
             i += 2
-        num_cols = len(column_names)
+        num_cols = len(raw_names)
+
+        # Make raw column names unique before DataFrame creation so that
+        # duplicate exports (e.g. two excitations in the same file) don't
+        # cause df[col] to return a DataFrame instead of a Series.
+        seen_raw = {}
+        unique_raw = []
+        for name in raw_names:
+            if name in seen_raw:
+                seen_raw[name] += 1
+                unique_raw.append(f"{name}#{seen_raw[name]}")
+            else:
+                seen_raw[name] = 0
+                unique_raw.append(name)
 
         all_values_str = " ".join(data_lines).split()
         if not all_values_str: raise ValueError("Nenhum dado encontrado no arquivo.")
         if len(all_values_str) % num_cols != 0:
             raise ValueError(f"Incompatibilidade de dados: {len(all_values_str)} valores não é múltiplo de {num_cols} colunas.")
-        
+
         data_array = np.array(all_values_str).reshape(-1, num_cols)
-        df = pd.DataFrame(data_array, columns=column_names)
+        df = pd.DataFrame(data_array, columns=unique_raw)
 
         for col in df.columns:
             if df[col].astype(str).str.contains('i').any():
-                df[col] = df[col].str.replace('i', 'j', regex=False).apply(complex)
+                df[col] = df[col].astype(str).str.replace('i', 'j', regex=False).apply(complex)
             else:
                 df[col] = pd.to_numeric(df[col], errors='coerce')
 
-        clean_names = {col: re.sub(r'[^a-z0-9_]+', '_', re.sub(r'\s*\([^)]+\)', '', col.lower())).strip('_') for col in df.columns}
-        df.rename(columns=clean_names, inplace=True)
-        
+        # Clean names: strip units and special chars, then re-deduplicate with _N suffix.
+        seen_clean = {}
+        final_names = []
+        for col in df.columns:
+            base = re.sub(r'#\d+$', '', col)  # remove disambiguation marker
+            clean = re.sub(r'[^a-z0-9_]+', '_', re.sub(r'\s*\([^)]+\)', '', base.lower())).strip('_')
+            if clean in seen_clean:
+                seen_clean[clean] += 1
+                final_names.append(f"{clean}_{seen_clean[clean]}")
+            else:
+                seen_clean[clean] = 0
+                final_names.append(clean)
+        df.columns = final_names
+
         return df
 
     def show_summary(self, head_rows: int = 5):
