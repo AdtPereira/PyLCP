@@ -2,9 +2,10 @@ import subprocess
 import sys
 
 SCRIPTS_TO_RUN = [
-    "testData.hdpe_220kV_2000mm2.hdpe_220kV_2000mm2",
-    "testData.hdpe_225kV_2000mm2.hdpe_225kV_2000mm2",
     "testData.hdpe_300mm2.hdpe_300mm2",
+    "testData.hdpe_2000mm2.hdpe_2000mm2",
+    "testData.hdpe_ecc_300mm2.hdpe_ecc_300mm2",
+    "testData.hdpe_ecc_2000mm2.hdpe_ecc_2000mm2",
 ]
 
 def main():

@@ -6,7 +6,7 @@
     "unit": "meter",
     "type": "single",
     "num_conductors": 1,
-    "burial_depth": 1.230,
+    "burial_depth": 1.23,
     "spacing": 0.350,
     "fourier_order": 4,
     "idx_ref_conductor": 0

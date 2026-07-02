@@ -2,7 +2,7 @@ import subprocess
 import sys
 
 SCRIPTS_TO_RUN = [
-    "testData.coaxial.coaxial",
+    "testData.coaxial_patel.coaxial_patel",
 ]
 
 def main():
