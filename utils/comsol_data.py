@@ -518,6 +518,42 @@ class ComsolPostProcessor:
             'mutual_energy': mutual_energy
         }
 
+    def get_internal_impedance_elements(self) -> dict:
+        """
+        Retorna a impedância interna medida (r11 + jwL11) do arquivo
+        'cmsl_internal_impedance.txt' para um condutor sólido único.
+        """
+        general_data = self.get_general_parameters('cmsl_internal_impedance')
+        if general_data is None:
+            return None
+        data = self.cmsl_reader.data['cmsl_internal_impedance']
+        jw = 1j * general_data['angular_frequencies']
+
+        return {
+            'frequencies': general_data['frequencies'],
+            'r11': data['r11'].to_numpy(),
+            'l11': data['l11'].to_numpy(),
+            'Zi_measured': data['r11'].to_numpy() + jw * data['l11'].to_numpy(),
+        }
+
+    def get_bare_and_hollow_wire_internal_impedance(self) -> dict:
+        """
+        Retorna a impedância interna medida via método Js (tensão da bobina de
+        excitação sob corrente unitária) do arquivo
+        'cmsl_bare_and_hollow_wire_internal_impedance.txt', para os condutores
+        sólido (bare wire) e oco (hollow/tubular) de single_deConti.
+        """
+        general_data = self.get_general_parameters('cmsl_bare_and_hollow_wire_internal_impedance')
+        if general_data is None:
+            return None
+        data = self.cmsl_reader.data['cmsl_bare_and_hollow_wire_internal_impedance']
+
+        return {
+            'frequencies': general_data['frequencies'],
+            'Zi_measured': data['solid_conductor_coil_voltage'].to_numpy(),
+            'Zi_hollow': data['hollow_conductor_coil_voltage'].to_numpy(),
+        }
+
     def get_shunt_capacitance_elements(self) -> dict:
         """
         Returns C_11 (core) and C_22 (sheath) self-capacitances per unit length

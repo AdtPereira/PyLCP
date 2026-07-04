@@ -11,25 +11,24 @@ from mom.bare_wire_systems import BareWireMoMSolver
 
 class MoMVisualizer:
     """
-    Calcula a capacitância e distribuição de carga para sistemas de fios nus
-    usando o Método dos Momentos (MoM) com expansão em séries harmônicas.
+    Computes the capacitance and charge distribution for bare-wire systems
+    using the Method of Moments (MoM) with harmonic series expansion.
 
-    Esta classe utiliza uma instância de MulticonductorTransmissionLine (MTL)
-    para obter os parâmetros geométricos e elétricos do sistema. Ela então
-    executa a simulação completa do MoM, preenchendo seus próprios atributos 
-    de resultado.
+    This class uses a MulticonductorTransmissionLine (MTL) instance to
+    obtain the system's geometric and electrical parameters. It then runs
+    the full MoM simulation, populating its own result attributes.
 
-    Executa a simulação completa do MoM, preenchendo todos os atributos de 
-    resultado. A construção da matriz D agora inclui os termos de expansão
-    constante, cossenoidal e senoidal, conforme as expressões (20a), (20b)
-    e (20c) de Clements (1975).    
+    Runs the full MoM simulation, populating all result attributes. The
+    construction of the D matrix now includes the constant, cosine, and
+    sine expansion terms, per expressions (20a), (20b) and (20c) of
+    Clements (1975).
 
-    Nesta classe, a ordem máxima da harmônica é definida por 'k',
-    enquanto NF (número de coeficientes) é derivado como 2*k + 1.
+    In this class, the maximum harmonic order is defined by 'k', while
+    NF (number of coefficients) is derived as 2*k + 1.
     """
     def __init__(self, solver: BareWireMoMSolver, case_name: str = ""):
         if solver.mom_data['collocation'] is {} and solver.mom_data['galerkin'] is {}:
-            raise ValueError("O objeto solver fornecido não foi executado. Chame solver.run_...() primeiro.")
+            raise ValueError("The provided solver object has not been run. Call solver.run_...() first.")
         
         self.solver = solver
         self.case_name = case_name
@@ -45,12 +44,12 @@ class MoMVisualizer:
         os.makedirs(self.results_dir, exist_ok=True)
 
     def plot_convergence_rates(self, mtl: dict, nf_max=20):
-        """ Plota a convergência da capacitância em função de NF, usando um modelo base. """
-        print(f"\nGerando gráfico de convergência até NF={nf_max}...")
-        
-        C_FACTOR = 1e12  # Fator de conversão para pF/m
-        
-        # Extrai R e D da configuração base para calcular o valor exato.
+        """ Plots capacitance convergence as a function of NF, using a base model. """
+        print(f"\nGenerating convergence plot up to NF={nf_max}...")
+
+        C_FACTOR = 1e12  # Conversion factor to pF/m
+
+        # Extract R and D from the base configuration to compute the exact value.
         R = mtl[0]['radius'][1]
         center1 = np.array(mtl[0]['center_point'])
         center2 = np.array(mtl[1]['center_point'])
@@ -63,7 +62,7 @@ class MoMVisualizer:
         cap_odd_gal, cap_even_gal = [], []
 
         for nf in nf_range:
-            print(f"  Calculando NF={nf}...", end='\r')
+            print(f"  Computing NF={nf}...", end='\r')
             temp_mtl = copy.deepcopy(mtl)
             temp_mtl[0]['fourier_order'] = nf
             temp_mtl[1]['fourier_order'] = nf
@@ -92,9 +91,9 @@ class MoMVisualizer:
         ax.plot(nf_odd, cap_odd_gal, linestyle='none', marker='o', markersize=4, color='red', label='MoM Galerkin')
         ax.plot(nf_even, cap_even_gal, linestyle='none', marker='o', markersize=4, color='red')
         
-        ax.set_title(f'Convergência da Capacitância para D/R = {D/R:.2f}')
-        ax.set_xlabel('NF - Número de Coeficientes de Fourier por Fio')
-        ax.set_ylabel('Capacitância (pF/m)')
+        ax.set_title(f'Capacitance Convergence for D/R = {D/R:.2f}')
+        ax.set_xlabel('NF - Number of Fourier Coefficients per Wire')
+        ax.set_ylabel('Capacitance (pF/m)')
         ax.set_xticks(np.arange(0, nf_max + 1, 2))
         ax.set_xlim(0, nf_max); ax.set_ylim(bottom=0)
         ax.set_ylim(0, max(cap_odd_col + cap_even_col) * 1.1)
@@ -105,14 +104,14 @@ class MoMVisualizer:
 
     def plot_collocation_points(self):
         """
-        Gera um gráfico interativo dos pontos de colocação usando Plotly,
-        refletindo a nova estrutura de dicionário de self.collocation_data.
+        Generates an interactive plot of the collocation points using Plotly,
+        reflecting self.collocation_data's dictionary structure.
         """
         plot_data = []
-        surfaces = self.solver.model.surfaces        
+        surfaces = self.solver.model.surfaces
         collocation_data = self.solver.mom_data['collocation']['data']
-        
-        # Itera sobre cada 'tag' de condutor no dicionário (ex: 0, 1)
+
+        # Iterate over each conductor 'tag' in the dictionary (e.g. 0, 1)
         for tag, conductor_surfaces in collocation_data.items():
             for surface_type, surface_data in conductor_surfaces.items():                
                 matching_surface = next(s for s in surfaces if s['tag'] == tag and s['type'] == surface_type)
@@ -136,7 +135,7 @@ class MoMVisualizer:
                 x1=surface['center_point'][0] + surface['radius'], y1=surface['center_point'][1] + surface['radius'],
                 line_color="Black", fillcolor="LightGray", opacity=0.7)
 
-        # 4. Adicionar os pontos de colocação a partir do DataFrame
+        # 4. Add the collocation points from the DataFrame
         for pt_type, color, symbol in [('Source', 'blue', 'circle'), ('Observation', 'red', 'x-thin')]:
             df_subset = df[df['type'] == pt_type]
             fig.add_trace(go.Scatter(
@@ -144,50 +143,50 @@ class MoMVisualizer:
                 mode='markers',
                 marker=dict(color=color, symbol=symbol, size=8, line=dict(width=1, color='DarkSlateGrey')),
                 name=pt_type,
-                
-                # Atualiza o customdata e o hovertemplate para exibir as novas informações
+
+                # Update customdata and hovertemplate to display the new information
                 customdata=df_subset[['tag', 'surface', 'radius', 'angle_rad']],
                 hovertemplate=(
                     f"<b>{pt_type}</b><br>"
-                    "Condutor (tag): %{customdata[0]}<br>"
-                    "Superfície: %{customdata[1]}<br>"
-                    "Coord X: %{x:.4f} m<br>"
-                    "Coord Y: %{y:.4f} m<br>"
-                    "Ângulo: %{customdata[3]:.3f} rad<br>"
-                    "Raio: %{customdata[2]:.4f} m"
+                    "Conductor (tag): %{customdata[0]}<br>"
+                    "Surface: %{customdata[1]}<br>"
+                    "X Coord: %{x:.4f} m<br>"
+                    "Y Coord: %{y:.4f} m<br>"
+                    "Angle: %{customdata[3]:.3f} rad<br>"
+                    "Radius: %{customdata[2]:.4f} m"
                     "<extra></extra>"
                 )
             ))
 
-        # 5. Configurar o layout do gráfico (não muda)
+        # 5. Configure the plot layout (unchanged)
         fig.update_layout(
-            title='Mapa Interativo de Pontos de Colocação',
-            xaxis_title='Coordenada X (m)',
-            yaxis_title='Coordenada Y (m)',
+            title='Interactive Collocation Points Map',
+            xaxis_title='X Coordinate (m)',
+            yaxis_title='Y Coordinate (m)',
             yaxis_scaleanchor="x",
             yaxis_scaleratio=1,
-            legend_title_text='Tipo de Ponto',
+            legend_title_text='Point Type',
             template='plotly_white'
         )
         fig.show()
  
     def plot_surface_charge_density(self, tag_to_plot=1, comsol_data: dict = None):
         """
-        Plota a densidade de carga para um condutor específico, alinhando
-        dinamicamente a solução exata com a geometria real do sistema.
+        Plots the charge density for a specific conductor, dynamically
+        aligning the exact solution with the system's actual geometry.
 
         Args:
-            tag_to_plot (int): A 'tag' do condutor para o qual a densidade de
-                            carga será plotada.
+            tag_to_plot (int): The 'tag' of the conductor for which the charge
+                            density will be plotted.
         """
         mtl = self.solver.model.mtl
         surfaces = self.solver.model.surfaces
         tag_to_plot = self.conductor_tag
 
-        # 1. Obter dados do condutor a ser plotado e de seu par
+        # 1. Get data for the conductor to be plotted and its pair
         all_tags = list(mtl.keys())
         if len(all_tags) != 2:
-            print("Erro: plot_charge_density foi projetado para sistemas de 2 condutores.")
+            print("Error: plot_charge_density was designed for 2-conductor systems.")
             return
         other_tag = next(tag for tag in all_tags if tag != tag_to_plot)
 
@@ -199,7 +198,7 @@ class MoMVisualizer:
         D = np.linalg.norm(center_plot - center_other)
         DR_ratio = D / R
 
-        # 2. Calcular a Solução Analítica com Alinhamento e Sinal Corretos
+        # 2. Compute the Analytical Solution with Correct Alignment and Sign
         theta_plot = np.linspace(0, 2 * np.pi, 360)
         vec_to_other = center_other - center_plot
         angle_of_max_charge = np.arctan2(vec_to_other[1], vec_to_other[0])
@@ -209,7 +208,7 @@ class MoMVisualizer:
         numerator = (DR_ratio**2 / 4) - 1
         charge_density_exact = (self.solver.C_exact_bare_wires * delta_v / R) * (numerator / denominator)
 
-        # 3. Reconstruir a Solução MoM para o Condutor Correto
+        # 3. Reconstruct the MoM Solution for the Correct Conductor
         nfs_per_surface = [2 * s['fourier_order'] + 1 for s in surfaces]
         offsets = np.cumsum([0] + nfs_per_surface)        
         surface_index = next(i for i, s in enumerate(surfaces) if s['tag'] == tag_to_plot and s['type'] == 'conductor')
@@ -231,12 +230,12 @@ class MoMVisualizer:
             charge_density_col += coeffs_col[2*k-1] * cos_kt + coeffs_col[2*k] * sin_kt
             charge_density_gal += coeffs_gal[2*k-1] * cos_kt + coeffs_gal[2*k] * sin_kt
 
-        # 4. Geração do Gráfico
+        # 4. Plot Generation
         plt.style.use('default')
         fig, ax = plt.subplots(figsize=self.figsize)
-        ax.plot(np.rad2deg(theta_plot), charge_density_exact * 1e9, 'k-', linewidth=1, label='Solução Exata')
+        ax.plot(np.rad2deg(theta_plot), charge_density_exact * 1e9, 'k-', linewidth=1, label='Exact Solution')
         ax.plot(np.rad2deg(theta_plot), charge_density_gal * 1e9, 'b--', linewidth=1, label=f'MoM Galerkin')
-        ax.plot(np.rad2deg(theta_plot), charge_density_col * 1e9, 'b:', linewidth=1, label=f'MoM Colocação')
+        ax.plot(np.rad2deg(theta_plot), charge_density_col * 1e9, 'b:', linewidth=1, label=f'MoM Collocation')
 
         # --- Plot COMSOL Data if provided ---
         if comsol_data is not None and isinstance(comsol_data, dict):
@@ -248,8 +247,8 @@ class MoMVisualizer:
         
         ax.set_xlim(0, 360)
         ax.set_ylim(bottom=0)
-        ax.set_title(f'Distribuição de Carga (Condutor {tag_to_plot}) com D/R = {DR_ratio:.2f}')
-        ax.set_xlabel('Ângulo (Graus)'); ax.set_ylabel('Densidade de Carga (nC/m²)')
+        ax.set_title(f'Charge Distribution (Conductor {tag_to_plot}) with D/R = {DR_ratio:.2f}')
+        ax.set_xlabel('Angle (Degrees)'); ax.set_ylabel('Charge Density (nC/m²)')
         ax.grid(True, linestyle='--', alpha=0.6)
         ax.set_xticks(np.arange(0, 361, 90)); ax.set_xlim(0, 360)
         ax.legend()
@@ -258,56 +257,57 @@ class MoMVisualizer:
 
     def plot_harmonic_coefficients(self):
         """
-        Reproduz e expande a Figura 4(c) de Clements (1975), mostrando a magnitude
-        de todos os coeficientes da série harmônica com indexação ajustada.
+        Reproduces and extends Figure 4(c) from Clements (1975), showing the
+        magnitude of all harmonic series coefficients with adjusted indexing.
 
-        O gráfico mostra a razão entre a magnitude de cada coeficiente harmônico
-        e a magnitude do coeficiente constante. A plotagem segue a convenção:
-        - j=1: Termo Constante
-        - j=2, 4, 6,...: Coeficientes Cossenoidais
-        - j=3, 5, 7,...: Coeficientes Senoidais
+        The plot shows the ratio between the magnitude of each harmonic
+        coefficient and the magnitude of the constant coefficient. The
+        plotting follows the convention:
+        - j=1: Constant Term
+        - j=2, 4, 6,...: Cosine Coefficients
+        - j=3, 5, 7,...: Sine Coefficients
         """
         NF = self.solver.NF
         sigma_coeffs_col = self.solver.mom_data['collocation'].get('sigma_coeffs', None)
         sigma_coeffs_gal = self.solver.mom_data['galerkin'].get('sigma_coeffs', None)
-        
-        # Isola os coeficientes do primeiro condutor
+
+        # Isolate the coefficients of the first conductor
         c1_gal = sigma_coeffs_gal[:NF]
         c1_col = sigma_coeffs_col[:NF]
 
-        # j=2, 4, 6,...: Coeficientes Cossenoidais (índices 1, 3, 5,... no código)
-        plot_j_cos = np.arange(1, NF, 2) + 1 
+        # j=2, 4, 6,...: Cosine Coefficients (indices 1, 3, 5,... in the code)
+        plot_j_cos = np.arange(1, NF, 2) + 1
         ratio_cos_gal = np.abs(c1_gal[np.arange(1, NF, 2)]) / np.abs(c1_gal[0])
         ratio_cos_col = np.abs(c1_col[np.arange(1, NF, 2)]) / np.abs(c1_col[0])
 
-        # j=3, 5, 7,...: Coeficientes Senoidais (índices 2, 4, 6,... no código)
-        plot_j_sin = np.arange(2, NF, 2) + 1 
+        # j=3, 5, 7,...: Sine Coefficients (indices 2, 4, 6,... in the code)
+        plot_j_sin = np.arange(2, NF, 2) + 1
         ratio_sin_gal = np.abs(c1_gal[np.arange(2, NF, 2)]) / np.abs(c1_gal[0])
         ratio_sin_col = np.abs(c1_col[np.arange(2, NF, 2)]) / np.abs(c1_col[0])
 
-        # --- Geração do Gráfico ---
+        # --- Plot Generation ---
         plt.style.use('default')
         fig, ax = plt.subplots(figsize=self.figsize)
 
-        # Plota cada série com um marcador distinto
+        # Plot each series with a distinct marker
         ax.plot([1], [1.0], marker='s', markersize=6, linestyle='none',
-                fillstyle='none', markeredgecolor='black', label='Termo Constante (j=1)')
+                fillstyle='none', markeredgecolor='black', label='Constant Term (j=1)')
 
         ax.plot(plot_j_cos, ratio_cos_gal, marker='^', markersize=6, linestyle='none',
-                fillstyle='none', markeredgecolor='black', label='Coeficientes Cossenoidais (Galerkin)')
-        
+                fillstyle='none', markeredgecolor='black', label='Cosine Coefficients (Galerkin)')
+
         ax.plot(plot_j_cos, ratio_cos_col, marker='^', markersize=6, linestyle='none',
-                fillstyle='none', markeredgecolor='red', label='Coeficientes Cossenoidais (Colocação)')
+                fillstyle='none', markeredgecolor='red', label='Cosine Coefficients (Collocation)')
 
         ax.plot(plot_j_sin, ratio_sin_gal, marker='o', markersize=4, linestyle='none',
-                fillstyle='none', markeredgecolor='black', label='Coeficientes Senoidais (Galerkin)')
-        
-        ax.plot(plot_j_sin, ratio_sin_col, marker='o', markersize=4, linestyle='none',
-                fillstyle='none', markeredgecolor='red', label='Coeficientes Senoidais (Colocação)')
+                fillstyle='none', markeredgecolor='black', label='Sine Coefficients (Galerkin)')
 
-        ax.set_title(f'Magnitude Normalizada dos Coeficientes Harmônicos (d/a = {self.solver.DR_ratio:.1f})', fontsize=14)
+        ax.plot(plot_j_sin, ratio_sin_col, marker='o', markersize=4, linestyle='none',
+                fillstyle='none', markeredgecolor='red', label='Sine Coefficients (Collocation)')
+
+        ax.set_title(f'Normalized Magnitude of Harmonic Coefficients (d/a = {self.solver.DR_ratio:.1f})', fontsize=14)
         ax.set_ylabel(r'$|\alpha_{nj} / \alpha_{n1}|$', fontsize=12)
-        ax.set_xlabel('Índice do Coeficiente (j)', fontsize=12)
+        ax.set_xlabel('Coefficient Index (j)', fontsize=12)
         ax.legend()
         ax.set_xlim(left=0)
         ax.set_ylim(bottom=-0.05)
@@ -317,7 +317,7 @@ class MoMVisualizer:
         plt.tight_layout()
 
     def print_terminal_results(self):
-        """Imprime um resumo dos resultados da simulação."""
+        """Prints a summary of the simulation results."""
 
         for method in ['collocation', 'galerkin']:
             mom_data = self.solver.mom_data[method]
@@ -333,7 +333,7 @@ class MoMVisualizer:
                 matrix_viewer(mom_data['maxwellian_capacitance'], "Maxwellian Bifilar Capacitance (MoM) (F/m)")
                 
             else:
-                print(f"\nNenhum dado disponível para o método {method.capitalize()}. Execute o solver primeiro.")
+                print(f"\nNo data available for the {method.capitalize()} method. Run the solver first.")
             
         print("\n")
     

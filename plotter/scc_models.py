@@ -35,8 +35,8 @@ class SingleCoreCableModels:
 
         def _generate_comsol_series(template, coil_suffix):
             """
-            Gera uma lista de dicionários para plotagem, combinando um template de layout
-            com um sufixo específico para a chave de dados.
+            Generates a list of plotting dictionaries, combining a layout
+            template with a specific suffix for the data key.
             """
             series_list = []
             for item_template in template:
@@ -689,31 +689,31 @@ class SingleCoreCableModels:
             plt.tight_layout(rect=[0, 0, 1, 0.96])
 
         elif graph_key == 'internal_potential':
-            # Pega a matriz Pi, que é constante com a frequência
+            # Get the Pi matrix, which is constant with frequency
             Pi = self.pul_data['internal_matrices']['potential_coefficient_matrix']
 
-            # 1. Define os elementos da matriz a serem plotados, com seus rótulos e estilos
+            # 1. Define the matrix elements to plot, with their labels and styles
             elements_to_plot = [
                 {'index': (0, 0), 'label': '$P_{00}$', 'color': 'black', 'linestyle': '-'},
                 {'index': (0, 1), 'label': '$P_{01}$', 'color': 'red',   'linestyle': '--'},
                 {'index': (1, 1), 'label': '$P_{11}$', 'color': 'blue',  'linestyle': ':'},
             ]
 
-            # 2. Itera sobre a lista para plotar cada elemento
+            # 2. Iterate over the list to plot each element
             for value in elements_to_plot:
-                # Cria arrays repetindo os valores para corresponder ao eixo de frequência
+                # Create arrays repeating the values to match the frequency axis
                 Pi_norm = np.full(len(self.f), np.abs(Pi[value['index']])) * 1e-9
                 Pi_angle = np.full(len(self.f), np.angle(Pi[value['index']], deg=True))
 
-                # Plota os dados com o rótulo e estilo definidos
+                # Plot the data with the defined label and style
                 plot_style = {'color': value['color'], 'linestyle': value['linestyle'], 'label': value['label']}
                 ax1.plot(self.f, Pi_norm, **plot_style)
                 ax2.plot(self.f, Pi_angle, **plot_style)
 
-            # Configurações dos eixos (o restante do código permanece o mesmo)
+            # Axis configuration (the rest of the code is unchanged)
             ax1.set_xscale('log')
             ax1.set_xlim(self.xlim)
-            ax1.legend(fontsize='small')  # A legenda agora mostrará os rótulos definidos
+            ax1.legend(fontsize='small')  # The legend will now show the defined labels
             ax1.set_xlabel('Frequency (Hz)')
             ax1.set_ylabel(fr'$|P| \times 10^9 \, (\Omega m s^{{-1}})$')
             ax1.grid(True, which='both', linestyle='--', linewidth=0.5)
@@ -721,7 +721,7 @@ class SingleCoreCableModels:
 
             ax2.set_xscale('log')
             ax2.set_xlim(self.xlim)
-            ax2.legend(fontsize='small')  # A legenda agora mostrará os rótulos definidos
+            ax2.legend(fontsize='small')  # The legend will now show the defined labels
             ax2.set_xlabel('Frequency (Hz)')
             ax2.set_ylabel(fr'Angle of $P$ (Degrees)')
             ax2.grid(True, which='both', linestyle='--', linewidth=0.5)

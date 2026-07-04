@@ -12,7 +12,7 @@ class SCCPlotter(BasePlotter):
         self._scc_xlim = (_freq[0], _freq[-1]) if _freq is not None else self.xlim
 
     def _plot_scc_matrix(self, graph_key):
-        """Plota parâmetros matriciais usando o formato de config 'series_to_plot' + 'path' + 'p'/'q'."""
+        """Plots matricial parameters using the 'series_to_plot' + 'path' + 'p'/'q' config format."""
         cfg = self.plot_config[graph_key]
         p, q = cfg['p'], cfg['q']
         path = cfg['path']
@@ -50,7 +50,7 @@ class SCCPlotter(BasePlotter):
                         ax1.scatter(comsol_freq, self._calculate_plot_data(matrix[:, p, q], comsol_w, left_cfg), **style)
                         ax2.scatter(comsol_freq, self._calculate_plot_data(matrix[:, p, q], comsol_w, right_cfg), **style)
                     except (KeyError, TypeError, IndexError):
-                        print(f"Aviso: Dados COMSOL não encontrados para '{key}' com caminho {comsol_path}.")
+                        print(f"Warning: COMSOL data not found for '{key}' with path {comsol_path}.")
 
         self._format_axis(ax1, self._scc_xlim, left_cfg)
         self._format_axis(ax2, self._scc_xlim, right_cfg)
@@ -59,7 +59,7 @@ class SCCPlotter(BasePlotter):
             save_figure(fig, self.results_dir, base_filename=graph_key)
 
     def _plot_scc_scalar(self, graph_key):
-        """Plota parâmetros escalares (1D por frequência) usando o formato de config 'series_to_plot' + 'path'."""
+        """Plots scalar parameters (1D over frequency) using the 'series_to_plot' + 'path' config format."""
         cfg = self.plot_config[graph_key]
         path = cfg['path']
         fig, (ax1, ax2) = plt.subplots(1, 2, figsize=self.figsize, sharey=False)
@@ -97,7 +97,7 @@ class SCCPlotter(BasePlotter):
                         ax1.scatter(comsol_freq, self._calculate_plot_data(data, comsol_w, left_cfg), **style)
                         ax2.scatter(comsol_freq, self._calculate_plot_data(data, comsol_w, right_cfg), **style)
                     except (KeyError, TypeError, IndexError):
-                        print(f"Aviso: Dados COMSOL não encontrados para '{key}' [{path[:-1]} + '{comsol_key}'].")
+                        print(f"Warning: COMSOL data not found for '{key}' [{path[:-1]} + '{comsol_key}'].")
 
         self._format_axis(ax1, self._scc_xlim, left_cfg)
         self._format_axis(ax2, self._scc_xlim, right_cfg)

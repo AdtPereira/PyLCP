@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 from pathlib import Path
 from utils.case_utils import *
 from mtl_main.source import MulticonductorTransmissionLine
+from .models_base import BasePlotter
 
 class DeContiModels:
     """
@@ -227,7 +228,7 @@ class DeContiModels:
     def log_matricial_pul_parameters(self, discrete_pul_data, scale_units=True):
         """ Generates a terminal log report by slicing the discrete vectorized results. """
         def _matrix_to_string(matrix: np.ndarray) -> str:
-            # ... (função auxiliar sem alteração)
+            # ... (helper function, unchanged)
             lines = []
             s_rows = [[f"{val:11.4e}" for val in row] for row in matrix]
             for row in s_rows:
@@ -235,7 +236,7 @@ class DeContiModels:
             return "\n".join(lines)
 
         def _print_real_matrix(name: str, matrix_data: np.ndarray, unit: str):
-            # ... (função auxiliar sem alteração)
+            # ... (helper function, unchanged)
             lines = _matrix_to_string(matrix_data).split('\n')
             num_rows = len(lines)
             middle_row_idx = num_rows // 2
@@ -256,20 +257,20 @@ class DeContiModels:
 
         print("\n--- Per-Unit-Length (PUL) Parameters Report (Discrete Frequencies) ---")
         
-        # Itera sobre as frequências discretas e seus índices
+        # Iterate over the discrete frequencies and their indices
         for i, freq in enumerate(discrete_pul_data.get('frequencies', [])):
             print("\n" + "="*80)
             print(f"Frequency: {freq:,.0f} Hz")
             print("="*80)
             w = 2 * np.pi * freq
 
-            # Itera sobre as matrizes (Zs, Ysh, etc.)
+            # Iterate over the matrices (Zs, Ysh, etc.)
             for name, matrix_key in param_mapping.items():
                 if matrix_key in discrete_pul_data:
                     matrix_3d = discrete_pul_data[matrix_key]
                     matrix = matrix_3d[i, :, :]
-                    
-                    # (Lógica de impressão das matrizes, sem alteração)
+
+                    # (Matrix printing logic, unchanged)
                     if 'Z' in name: unit = "[Ohm/m]"
                     elif 'Y' in name: unit = "[S/m]"
                     else: unit = ""
@@ -289,7 +290,7 @@ class DeContiModels:
                     
                     if name == '[Zs]':
                         l_matrix = (matrix.imag / w)
-                        # ... (resto da lógica de L e C sem alteração)
+                        # ... (rest of the L and C logic, unchanged)
                         l_unit = '[H/m]'
                         if scale_units:
                             l_matrix *= 1e6
@@ -305,61 +306,82 @@ class DeContiModels:
                         _print_real_matrix('[C]', c_matrix, c_unit)
         print("\n" + "="*80)
 
-class InternalLinesModels:
+class InternalLinesModels(BasePlotter):
     """
-    Classe para gerar gráficos a partir dos resultados vetorizados
-    do módulo de linhas aéreas.
+    Class to generate plots from the vectorized results of the
+    overhead-line module.
     """
-    def __init__(self, pul_data: dict, pul_data_tubular: dict, model: MulticonductorTransmissionLine):
+    def __init__(self, file_path: str, pul_data: dict, pul_data_tubular: dict,
+                 model: MulticonductorTransmissionLine, model_tubular: MulticonductorTransmissionLine = None,
+                 comsol: dict = None, autoSave: bool = True):
         """
-        Inicializa o plotter com os dados das simulações tubular e sólida.
+        Initializes the plotter with the tubular and solid simulation data.
 
         Args:
-            pul_data_tubular (dict): Dicionário com os resultados do modelo tubular.
-            pul_data_solid (dict): Dicionário com os resultados do modelo sólido equivalente.
-            model_tubular (MulticonductorTransmissionLine): Objeto do modelo MTL tubular.
+            file_path (str): Path of the calling script (used to locate Results/).
+            pul_data (dict): Dictionary with the solid model's results.
+            pul_data_tubular (dict): Dictionary with the tubular model's results.
+            model (MulticonductorTransmissionLine): Solid MTL model object.
+            model_tubular (MulticonductorTransmissionLine, optional): Tubular/hollow
+                MTL model object, used to extract the correct (ri, ro) in the
+                hollow-conductor-specific plots. If omitted, uses `model`'s geometry.
+            comsol (dict, optional): Internal impedance measured via COMSOL
+                (see ComsolPostProcessor.get_bare_and_hollow_wire_internal_impedance).
+                'Zi_measured' refers to the solid conductor (overlay in
+                internal_impedance()/internal_solid_conductors()) and 'Zi_hollow' to
+                the hollow conductor (overlay in hollow_conductor_impedance()/
+                internal_hollow_conductors()).
         """
-        self.pul_data = pul_data
+        super().__init__(file_path, pul_data, plot_config={}, autoSave=autoSave)
         self.pul_data_tubular = pul_data_tubular
         self.model = model
+        self.model_tubular = model_tubular
+        self.comsol = comsol
         self.f = pul_data_tubular['frequencies']
         self.w = 2 * np.pi * self.f
 
-        # Skin Depth (m)
+        # Skin depth (m) — depends only on the material's mu/sigma, which are
+        # the same for the solid and tubular models (only the radius geometry differs).
         self.skin_depth = 1 / np.sqrt(self.model.mu * np.pi * self.f * self.model.sigma)
 
         # Plotter Parameters
         self.figsize = (12, 5)
 
+    def _conductor_radius(self, p, tubular=False):
+        """Returns (ri, ro) of conductor 'p' (ri=0 if solid)."""
+        model = self.model_tubular if (tubular and self.model_tubular is not None) else self.model
+        conductor = model.mtl[p + 1]
+        radius = conductor['radius']
+        return (radius[0], radius[1]) if isinstance(radius, list) else (0.0, radius)
+
     def internal_solid_conductors(self, p=0):
         """
-        Gera o gráfico das características de impedância interna de um condutor
-        cilíndrico sólido com base nos dados de simulação vetorizados.
+        Generates the internal-impedance characteristics plot for a solid
+        cylindrical conductor, based on the vectorized simulation data.
 
         Args:
-            p (int): O índice do condutor a ser analisado (padrão é 0).
+            p (int): Index of the conductor to analyze (default is 0).
         """
-        conductor = self.model.mtl[p+1]
-        ro = conductor['radius'][1] if isinstance(conductor['radius'], list) else conductor['radius']
+        _, ro = self._conductor_radius(p)
 
-        # Extrai os parâmetros DC (matrizes 2D) e pega o valor diagonal para o condutor 'p'
+        # Extract the DC parameters (2D matrices) and take the diagonal value for conductor 'p'
         Ri_cc = self.pul_data['internal']['Ri_cc'][p, p].real
         Li_cc = self.pul_data['internal']['Li_cc'][p, p].real
 
-        # Extrai a impedância de Bessel (matriz 3D) e fatia para obter o vetor do condutor 'p'
-        # A fatia [:, p, p] pega o elemento da diagonal (p, p) para todas as frequências (:)
+        # Extract the Bessel impedance (3D matrix) and slice to get the vector for conductor 'p'
+        # The [:, p, p] slice takes the diagonal (p, p) element for all frequencies (:)
         Zi = self.pul_data['internal']['Zi_bessel'][:, p, p]
-        
-        # Calcula a indutância interna a partir da reatância
+
+        # Compute the internal inductance from the reactance
         Li = np.divide(Zi.imag, self.w, out=np.zeros_like(self.w), where=self.w != 0)
 
-        # Os cálculos das razões já são vetorizados
+        # The ratio calculations are already vectorized
         R_ratio = Zi.real / Ri_cc
         wL_R_ratio = Zi.imag / Ri_cc
         L_ratio = Li / Li_cc
         wL_div_R = np.divide(Zi.imag, Zi.real, out=np.zeros_like(Zi.imag), where=Zi.real != 0)
 
-        # --- Configuração do Gráfico (sem alteração na lógica) ---
+        # --- Plot Configuration (logic unchanged) ---
         plt.style.use('default')
         fig, ax = plt.subplots(figsize=self.figsize)
         sigma_str = format_scientific_notation(self.model.sigma[p])
@@ -371,6 +393,21 @@ class InternalLinesModels:
         ax.plot(x_axis, wL_div_R,   'g-', lw=1, label=r"$\omega L_i / R_i$")
         ax.plot(x_axis, L_ratio,    'r-', lw=1, label=r"$L_i / L_{i(cc)}$")
 
+        if self.comsol is not None:
+            f_cmsl = self.comsol['frequencies']
+            w_cmsl = 2 * np.pi * f_cmsl
+            skin_depth_cmsl = 1 / np.sqrt(self.model.mu * np.pi * f_cmsl * self.model.sigma)
+            x_cmsl = ro / skin_depth_cmsl
+            Zi_cmsl = self.comsol['Zi_measured']
+            Li_cmsl = np.divide(Zi_cmsl.imag, w_cmsl, out=np.zeros_like(w_cmsl), where=w_cmsl != 0)
+            wL_div_R_cmsl = np.divide(Zi_cmsl.imag, Zi_cmsl.real, out=np.zeros_like(Zi_cmsl.imag), where=Zi_cmsl.real != 0)
+
+            scatter_kwargs = dict(marker='o', s=25, facecolors='none', zorder=10)
+            ax.scatter(x_cmsl, Zi_cmsl.real / Ri_cc,   edgecolors='k', label='COMSOL', **scatter_kwargs)
+            ax.scatter(x_cmsl, Zi_cmsl.imag / Ri_cc,   edgecolors='b', **scatter_kwargs)
+            ax.scatter(x_cmsl, wL_div_R_cmsl,          edgecolors='g', **scatter_kwargs)
+            ax.scatter(x_cmsl, Li_cmsl / Li_cc,        edgecolors='r', **scatter_kwargs)
+
         ax.set_xscale('log')
         ax.set_xlabel(r'$(r_o / \delta)$', fontsize=12)
         ax.set_xlim(left=1e-1, right=max(x_axis))
@@ -379,137 +416,287 @@ class InternalLinesModels:
         ax.tick_params(axis='both', which='major', labelsize=12)
         ax.legend(fontsize=12, frameon=True)
         plt.tight_layout(rect=[0, 0, 1, 1])
+        if self.autoSave:
+            save_figure(fig, self.results_dir, base_filename='internal_solid_conductors')
 
     def internal_impedance(self, p=0):
         """
-        Este método gera gráficos comparativos da impedância interna de um condutor
-        usando a formulação exata, a aproximação de Nahman e Holt, e uma terceira
-        aproximação.
+        This method generates comparison plots of a conductor's internal
+        impedance using the exact formulation, the Nahman and Holt
+        approximation, and a third approximation.
 
-        Os gráficos gerados são:
-        1. Módulo da impedância interna |Z'_i| vs. Frequência.
-        2. Ângulo da impedância interna arg(Z'_i) vs. Frequência (em graus).
+        The generated plots are:
+        1. Internal impedance magnitude |Z'_i| vs. Frequency.
+        2. Internal impedance angle arg(Z'_i) vs. Frequency (in degrees).
         """
-        # Pega as propriedades do condutor especificado 'p'
-        conductor = self.model.mtl[p+1]
-        ro = conductor['radius'][1] if isinstance(conductor['radius'], list) else conductor['radius']
-        
-        # Extrai os parâmetros DC (matrizes 2D) e pega o valor diagonal para o condutor 'p'
+        # Get the properties of the specified conductor 'p'
+        _, ro = self._conductor_radius(p)
+
+        # Extract the DC parameters (2D matrices) and take the diagonal value for conductor 'p'
         Zi_bessel = self.pul_data['internal']['Zi_bessel'][:, p, p]
-        Zi_kelvin = self.pul_data['internal']['Zi_kelvin'][:, p, p]    
+        Zi_kelvin = self.pul_data['internal']['Zi_kelvin'][:, p, p]
 
         plt.style.use('default')
         fig, (ax1, ax2) = plt.subplots(1, 2, figsize=self.figsize)
         sigma_str = format_scientific_notation(self.model.sigma[p])
-        fig.suptitle(fr'Comparação de Modelos de Impedância Interna ($\sigma={sigma_str}$ S/m, $r_o={ro*1e3:.1f}$ mm)', fontsize=14, y=0.98)
+        fig.suptitle(fr'Internal Impedance Model Comparison ($\sigma={sigma_str}$ S/m, $r_o={ro*1e3:.1f}$ mm)', fontsize=14, y=0.98)
 
-        # --- Gráfico 1: Módulo ---
-        ax1.set_title('Módulo da Impedância')
+        # --- Plot 1: Magnitude ---
+        ax1.set_title('Impedance Magnitude')
         ax1.plot(self.f, np.abs(Zi_bessel), 'k-', label='Bessel')
         ax1.plot(self.f, np.abs(Zi_kelvin), 'r--', lw=1, label='Kelvin')
+        if self.comsol is not None:
+            ax1.scatter(self.comsol['frequencies'], np.abs(self.comsol['Zi_measured']),
+                        marker='o', s=12, facecolors='none', edgecolors='black', zorder=10, label='COMSOL')
         ax1.set_xscale('log')
         ax1.set_xlim(left=min(self.f), right=max(self.f))
         # ax1.set_ylim(0, np.max(mod_bessel) * 1.1)
-        ax1.set_xlabel('Frequência (Hz)', fontsize=12)
-        ax1.set_ylabel(r"Módulo $|Z_i|$ ($\Omega / m$)", fontsize=12)
+        ax1.set_xlabel('Frequency (Hz)', fontsize=12)
+        ax1.set_ylabel(r"Magnitude $|Z_i|$ ($\Omega / m$)", fontsize=12)
         ax1.grid(True, which="both", ls=":", color='0.7')
         ax1.legend(loc='upper left')
 
-        # --- Gráfico 2: Ângulo ---
-        ax2.set_title('Ângulo da Impedância')
+        # --- Plot 2: Angle ---
+        ax2.set_title('Impedance Angle')
         ax2.plot(self.f, np.angle(Zi_bessel, deg=True), 'k-', lw=1, label='Bessel')
         ax2.plot(self.f, np.angle(Zi_kelvin, deg=True), 'r--', lw=1, label='Kelvin')
+        if self.comsol is not None:
+            ax2.scatter(self.comsol['frequencies'], np.angle(self.comsol['Zi_measured'], deg=True),
+                        marker='o', s=12, facecolors='none', edgecolors='black', zorder=10, label='COMSOL')
         ax2.set_xscale('log')
         ax2.set_xlim(left=min(self.f), right=max(self.f))
         # ax2.set_ylim(0, np.max(angle_bessel) * 1.1)
-        ax2.set_xlabel('Frequência (Hz)', fontsize=12)
-        ax2.set_ylabel(r"Ângulo $Z_i$ (Graus)", fontsize=12)
+        ax2.set_xlabel('Frequency (Hz)', fontsize=12)
+        ax2.set_ylabel(r"Angle $Z_i$ (Degrees)", fontsize=12)
         ax2.grid(True, which="both", ls=":", color='0.7')
         ax2.legend(loc='upper left')
         plt.tight_layout(rect=[0, 0, 1, 0.95])
+        if self.autoSave:
+            save_figure(fig, self.results_dir, base_filename='internal_impedance')
 
-    def nahman_holt_comparison(self, p=0):
+    def internal_hollow_conductors(self, p=0):
         """
-        Este método gera gráficos comparativos da impedância interna de um condutor
-        usando a formulação exata, a aproximação de Nahman e Holt, e uma terceira
-        aproximação.
+        Generates the internal-impedance characteristics plot for a hollow
+        (hollow/tubular) conductor, analogous to internal_solid_conductors(),
+        based on the tubular model's vectorized simulation data.
 
-        Os gráficos gerados são:
-        1. Módulo da impedância interna |Z'_i| vs. Frequência.
-        2. Ângulo da impedância interna arg(Z'_i) vs. Frequência (em graus).
+        Args:
+            p (int): Index of the conductor to analyze (default is 0).
         """
-        # Pega as propriedades do condutor especificado 'p'
-        conductor = self.model.mtl[p+1]
-        ro = conductor['radius'][1] if isinstance(conductor['radius'], list) else conductor['radius']
-        
-        # Extrai os parâmetros DC (matrizes 2D) e pega o valor diagonal para o condutor 'p'
-        Zi_bessel = self.pul_data['internal']['Zi_bessel'][:, p, p]
-        Zi_nahman = self.pul_data['internal']['Zi_nahman'][:, p, p]  
-        Zi_approx = self.pul_data['internal']['Zi_approx'][:, p, p]  
-        
+        ri, ro = self._conductor_radius(p, tubular=True)
+        sigma_model = self.model_tubular if self.model_tubular is not None else self.model
+
+        # Extract the DC parameters (2D matrices) and take the diagonal value for conductor 'p'
+        Ri_cc = self.pul_data_tubular['internal']['Ri_cc'][p, p].real
+        Li_cc = self.pul_data_tubular['internal']['Li_cc'][p, p].real
+
+        # Extract the Bessel impedance (3D matrix) and slice to get the vector for conductor 'p'
+        Zi = self.pul_data_tubular['internal']['Zi_bessel'][:, p, p]
+
+        # Compute the internal inductance from the reactance
+        Li = np.divide(Zi.imag, self.w, out=np.zeros_like(self.w), where=self.w != 0)
+
+        # The ratio calculations are already vectorized
+        R_ratio = Zi.real / Ri_cc
+        wL_R_ratio = Zi.imag / Ri_cc
+        L_ratio = Li / Li_cc
+        wL_div_R = np.divide(Zi.imag, Zi.real, out=np.zeros_like(Zi.imag), where=Zi.real != 0)
+
+        plt.style.use('default')
+        fig, ax = plt.subplots(figsize=self.figsize)
+        sigma_str = format_scientific_notation(sigma_model.sigma[p])
+        fig.suptitle(fr'Internal parameters for hollow bare-wire conductor with $\sigma={sigma_str}$ S/m, '
+                     fr'$r_o={ro*1e3:.2f}$ mm, $r_i={ri*1e3:.2f}$ mm', fontsize=13, y=0.97)
+
+        x_axis = ro / self.skin_depth
+        ax.plot(x_axis, R_ratio,    'k-', lw=1, label=r"$R_i / R_{i(cc)}$")
+        ax.plot(x_axis, wL_R_ratio, 'b-', lw=1, label=r"$\omega L_i / R_{i(cc)}$")
+        ax.plot(x_axis, wL_div_R,   'g-', lw=1, label=r"$\omega L_i / R_i$")
+        ax.plot(x_axis, L_ratio,    'r-', lw=1, label=r"$L_i / L_{i(cc)}$")
+
+        if self.comsol is not None and self.comsol.get('Zi_hollow') is not None:
+            f_cmsl = self.comsol['frequencies']
+            w_cmsl = 2 * np.pi * f_cmsl
+            skin_depth_cmsl = 1 / np.sqrt(self.model.mu * np.pi * f_cmsl * self.model.sigma)
+            x_cmsl = ro / skin_depth_cmsl
+            Zi_cmsl = self.comsol['Zi_hollow']
+            Li_cmsl = np.divide(Zi_cmsl.imag, w_cmsl, out=np.zeros_like(w_cmsl), where=w_cmsl != 0)
+            wL_div_R_cmsl = np.divide(Zi_cmsl.imag, Zi_cmsl.real, out=np.zeros_like(Zi_cmsl.imag), where=Zi_cmsl.real != 0)
+
+            scatter_kwargs = dict(marker='o', s=25, facecolors='none', zorder=10)
+            ax.scatter(x_cmsl, Zi_cmsl.real / Ri_cc,   edgecolors='k', label='COMSOL', **scatter_kwargs)
+            ax.scatter(x_cmsl, Zi_cmsl.imag / Ri_cc,   edgecolors='b', **scatter_kwargs)
+            ax.scatter(x_cmsl, wL_div_R_cmsl,          edgecolors='g', **scatter_kwargs)
+            ax.scatter(x_cmsl, Li_cmsl / Li_cc,        edgecolors='r', **scatter_kwargs)
+
+        ax.set_xscale('log')
+        ax.set_xlabel(r'$(r_o / \delta)$', fontsize=12)
+        ax.set_xlim(left=1e-1, right=max(x_axis))
+        ax.set_ylim(0, max(np.max(R_ratio), np.max(wL_R_ratio)) * 0.15)
+        ax.grid(True, which="both", ls="--", color='0.7')
+        ax.tick_params(axis='both', which='major', labelsize=12)
+        ax.legend(fontsize=12, frameon=True)
+        plt.tight_layout(rect=[0, 0, 1, 1])
+        if self.autoSave:
+            save_figure(fig, self.results_dir, base_filename='internal_hollow_conductors')
+
+    def hollow_conductor_impedance(self, p=0):
+        """
+        This method generates comparison plots of the internal impedance of a
+        hollow (hollow/tubular) conductor, analogous to internal_impedance(),
+        using the exact (Bessel) formulation vs. COMSOL (Kelvin does not
+        apply to tubular conductors).
+
+        The generated plots are:
+        1. Internal impedance magnitude |Z'_i| vs. Frequency.
+        2. Internal impedance angle arg(Z'_i) vs. Frequency (in degrees).
+        """
+        ri, ro = self._conductor_radius(p, tubular=True)
+        sigma_model = self.model_tubular if self.model_tubular is not None else self.model
+
+        # Zi_kelvin is not plotted here: kelvin_impedance_solid_wires() is only
+        # valid for solid conductors and returns 'inf' for tubular conductors (see
+        # analytical_forms/overhead_lines.py), so the comparison is restricted to
+        # Bessel (valid for both solid and tubular) vs. COMSOL.
+        Zi_bessel = self.pul_data_tubular['internal']['Zi_bessel'][:, p, p]
+
         plt.style.use('default')
         fig, (ax1, ax2) = plt.subplots(1, 2, figsize=self.figsize)
-        sigma_str = format_scientific_notation(self.model.sigma[p])
-        fig.suptitle(fr'Comparação de Modelos de Impedância Interna ($\sigma={sigma_str}$ S/m, $r_o={ro*1e3:.1f}$ mm)', fontsize=14, y=0.98)
+        sigma_str = format_scientific_notation(sigma_model.sigma[p])
+        fig.suptitle(fr'Internal Impedance Model Comparison — Hollow Conductor '
+                     fr'($\sigma={sigma_str}$ S/m, $r_o={ro*1e3:.2f}$ mm, $r_i={ri*1e3:.2f}$ mm)', fontsize=14, y=0.98)
 
-        # --- Gráfico 1: Módulo ---
-        ax1.set_title('Módulo da Impedância')
-        ax1.plot(self.f, np.abs(Zi_bessel), 'k-', label='Exactly')
-        ax1.plot(self.f, np.abs(Zi_nahman), 'r-', lw=1, label='Nahman e Holt')
-        ax1.plot(self.f, np.abs(Zi_approx), 'g--', lw=1, label='Nahman e Holt (Modified)')
+        comsol_hollow = self.comsol.get('Zi_hollow') if self.comsol is not None else None
+
+        # --- Plot 1: Magnitude ---
+        ax1.set_title('Impedance Magnitude')
+        ax1.plot(self.f, np.abs(Zi_bessel), 'k-', label='Bessel')
+        if comsol_hollow is not None:
+            ax1.scatter(self.comsol['frequencies'], np.abs(comsol_hollow),
+                        marker='o', s=12, facecolors='none', edgecolors='black', zorder=10, label='COMSOL')
         ax1.set_xscale('log')
         ax1.set_xlim(left=min(self.f), right=max(self.f))
-        ax1.set_ylim(0, np.max(np.abs(Zi_bessel)) * 1.1)
-        ax1.set_xlabel('Frequência (Hz)', fontsize=12)
-        ax1.set_ylabel(r"Módulo $|Z_i|$ ($\Omega / m$)", fontsize=12)
+        ax1.set_xlabel('Frequency (Hz)', fontsize=12)
+        ax1.set_ylabel(r"Magnitude $|Z_i|$ ($\Omega / m$)", fontsize=12)
         ax1.grid(True, which="both", ls=":", color='0.7')
         ax1.legend(loc='upper left')
 
-        # --- Gráfico 2: Ângulo ---
-        ax2.set_title('Ângulo da Impedância')
-        ax2.plot(self.f, np.angle(Zi_bessel, deg=True), 'k-', lw=1, label='Exactly')
-        ax2.plot(self.f, np.angle(Zi_nahman, deg=True), 'r-', lw=1, label='Nahman e Holt')
-        ax2.plot(self.f, np.angle(Zi_approx, deg=True), 'g--', lw=1, label='Nahman e Holt (Modified)')
+        # --- Plot 2: Angle ---
+        ax2.set_title('Impedance Angle')
+        ax2.plot(self.f, np.angle(Zi_bessel, deg=True), 'k-', lw=1, label='Bessel')
+        if comsol_hollow is not None:
+            ax2.scatter(self.comsol['frequencies'], np.angle(comsol_hollow, deg=True),
+                        marker='o', s=12, facecolors='none', edgecolors='black', zorder=10, label='COMSOL')
         ax2.set_xscale('log')
         ax2.set_xlim(left=min(self.f), right=max(self.f))
-        ax2.set_ylim(0, np.max(np.angle(Zi_bessel, deg=True)) * 1.1)
-        ax2.set_xlabel('Frequência (Hz)', fontsize=12)
-        ax2.set_ylabel(r"Ângulo $Z_i$ (Graus)", fontsize=12)
+        ax2.set_xlabel('Frequency (Hz)', fontsize=12)
+        ax2.set_ylabel(r"Angle $Z_i$ (Degrees)", fontsize=12)
         ax2.grid(True, which="both", ls=":", color='0.7')
         ax2.legend(loc='upper left')
         plt.tight_layout(rect=[0, 0, 1, 0.95])
+        if self.autoSave:
+            save_figure(fig, self.results_dir, base_filename='hollow_conductor_impedance')
+
+    def nahman_holt_comparison(self, p=0):
+        """
+        This method generates comparison plots of a conductor's internal
+        impedance using the exact formulation, the Nahman and Holt
+        approximation, and a third approximation.
+
+        The generated plots are:
+        1. Internal impedance magnitude |Z'_i| vs. Frequency.
+        2. Internal impedance angle arg(Z'_i) vs. Frequency (in degrees).
+        """
+        # Get the properties of the specified conductor 'p'
+        _, ro = self._conductor_radius(p)
+
+        # Extract the DC parameters (2D matrices) and take the diagonal value for conductor 'p'
+        Zi_bessel = self.pul_data['internal']['Zi_bessel'][:, p, p]
+        Zi_nahman = self.pul_data['internal']['Zi_nahman'][:, p, p]
+        Zi_approx = self.pul_data['internal']['Zi_approx'][:, p, p]
+
+        plt.style.use('default')
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=self.figsize)
+        sigma_str = format_scientific_notation(self.model.sigma[p])
+        fig.suptitle(fr'Internal Impedance Model Comparison ($\sigma={sigma_str}$ S/m, $r_o={ro*1e3:.1f}$ mm)', fontsize=14, y=0.98)
+
+        # --- Plot 1: Magnitude ---
+        ax1.set_title('Impedance Magnitude')
+        ax1.plot(self.f, np.abs(Zi_bessel), 'k-', label='Exactly')
+        ax1.plot(self.f, np.abs(Zi_nahman), 'r-', lw=1, label='Nahman and Holt')
+        ax1.plot(self.f, np.abs(Zi_approx), 'g--', lw=1, label='Nahman and Holt (Modified)')
+        ax1.set_xscale('log')
+        ax1.set_xlim(left=min(self.f), right=max(self.f))
+        ax1.set_ylim(0, np.max(np.abs(Zi_bessel)) * 1.1)
+        ax1.set_xlabel('Frequency (Hz)', fontsize=12)
+        ax1.set_ylabel(r"Magnitude $|Z_i|$ ($\Omega / m$)", fontsize=12)
+        ax1.grid(True, which="both", ls=":", color='0.7')
+        ax1.legend(loc='upper left')
+
+        # --- Plot 2: Angle ---
+        ax2.set_title('Impedance Angle')
+        ax2.plot(self.f, np.angle(Zi_bessel, deg=True), 'k-', lw=1, label='Exactly')
+        ax2.plot(self.f, np.angle(Zi_nahman, deg=True), 'r-', lw=1, label='Nahman and Holt')
+        ax2.plot(self.f, np.angle(Zi_approx, deg=True), 'g--', lw=1, label='Nahman and Holt (Modified)')
+        ax2.set_xscale('log')
+        ax2.set_xlim(left=min(self.f), right=max(self.f))
+        ax2.set_ylim(0, np.max(np.angle(Zi_bessel, deg=True)) * 1.1)
+        ax2.set_xlabel('Frequency (Hz)', fontsize=12)
+        ax2.set_ylabel(r"Angle $Z_i$ (Degrees)", fontsize=12)
+        ax2.grid(True, which="both", ls=":", color='0.7')
+        ax2.legend(loc='upper left')
+        plt.tight_layout(rect=[0, 0, 1, 0.95])
+        if self.autoSave:
+            save_figure(fig, self.results_dir, base_filename='nahman_holt_comparison')
 
     def internal_tubular_characteristics(self, p=0):
         """
-        Gera um gráfico comparativo da impedância interna de um condutor tubular
-        com a de um condutor sólido, usando dados pré-calculados.
+        Generates a plot comparing a tubular conductor's internal impedance
+        with that of a solid conductor, using pre-calculated data.
 
         Args:
-            p (int): O índice do condutor a ser analisado.
+            p (int): Index of the conductor to analyze.
         """
-        conductor = self.model.mtl[p+1]
-        ri, ro = conductor['radius'] if isinstance(conductor['radius'], list) else (0, conductor['radius'])
+        ri, ro = self._conductor_radius(p, tubular=True)
+        sigma_model = self.model_tubular if self.model_tubular is not None else self.model
 
-        # Acessa a matriz 3D 'Zi_bessel' diretamente, sem a chave aninhada.
+        # Access the 3D 'Zi_bessel' matrix directly, without the nested key.
         Zi_tubular = self.pul_data_tubular['internal']['Zi_bessel'][:, p, p]
         Zi_solid = self.pul_data['internal']['Zi_bessel'][:, p, p]
 
-        # --- 2. Cálculo das Razões e Plotagem ---
+        # --- Ratio Calculation and Plotting ---
 
-        R_ratio = np.divide(Zi_tubular.real, Zi_solid.real, 
+        R_ratio = np.divide(Zi_tubular.real, Zi_solid.real,
                             out=np.ones_like(self.f), where=Zi_solid.real != 0)
         L_ratio = np.divide(Zi_tubular.imag, Zi_solid.imag,
                             out=np.ones_like(self.f), where=Zi_solid.imag != 0)
-        
+
         plt.style.use('default')
         fig, ax = plt.subplots(figsize=self.figsize)
-        sigma_str = format_scientific_notation(self.model.sigma[p])
+        sigma_str = format_scientific_notation(sigma_model.sigma[p])
         fig.suptitle(f'Internal parameters for tubular bare-wire conductor with\n'
                      fr'$\sigma={sigma_str}$ S/m, $r_o={ro*1e3:.2f}$ mm, $r_i = {ri*1e3:.2f}$ mm', fontsize=12)
 
         x_axis = ro / self.skin_depth
         ax.plot(x_axis, R_ratio, 'k-', lw=1.5, label=r"$R_{i(\text{tubular})} / R_{i(\text{solid})}$")
         ax.plot(x_axis, L_ratio, 'r--', lw=1.5, label=r"$L_{i(\text{tubular})} / L_{i(\text{solid})}$")
+
+        if (self.comsol is not None and self.comsol.get('Zi_hollow') is not None
+                and self.comsol.get('Zi_measured') is not None):
+            f_cmsl = self.comsol['frequencies']
+            skin_depth_cmsl = 1 / np.sqrt(self.model.mu * np.pi * f_cmsl * self.model.sigma)
+            x_cmsl = ro / skin_depth_cmsl
+            Zi_hollow_cmsl = self.comsol['Zi_hollow']
+            Zi_solid_cmsl = self.comsol['Zi_measured']
+
+            R_ratio_cmsl = np.divide(Zi_hollow_cmsl.real, Zi_solid_cmsl.real,
+                                      out=np.ones_like(f_cmsl), where=Zi_solid_cmsl.real != 0)
+            L_ratio_cmsl = np.divide(Zi_hollow_cmsl.imag, Zi_solid_cmsl.imag,
+                                      out=np.ones_like(f_cmsl), where=Zi_solid_cmsl.imag != 0)
+
+            scatter_kwargs = dict(marker='o', s=25, facecolors='none', zorder=10)
+            ax.scatter(x_cmsl, R_ratio_cmsl, edgecolors='k', label='COMSOL', **scatter_kwargs)
+            ax.scatter(x_cmsl, L_ratio_cmsl, edgecolors='r', **scatter_kwargs)
 
         ax.set_xlabel(r'$(r_o / \delta)$', fontsize=12)
         ax.set_xlim(0, 8)
@@ -518,5 +705,7 @@ class InternalLinesModels:
         ax.tick_params(axis='both', which='major', labelsize=12)
         ax.legend(fontsize=12, frameon=True)
         plt.tight_layout(rect=[0, 0.02, 1, 0.95])
+        if self.autoSave:
+            save_figure(fig, self.results_dir, base_filename='internal_tubular_characteristics')
 
     

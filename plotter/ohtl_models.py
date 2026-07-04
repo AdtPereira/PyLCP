@@ -4,7 +4,7 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 from utils.case_utils import save_figure
 
-# Chaves retornadas por PerUnitParameters.pul_matrices()
+# Keys returned by PerUnitParameters.pul_matrices()
 _SERIES_Z  = 'series_impedance_matrix'
 _SHUNT_Y   = 'shunt_admittance_matrix'
 _EARTH_Z   = 'earth-return_impedance_matrix'
@@ -14,15 +14,15 @@ _ZC        = 'characteristic_impedance_matrix'
 
 class OverheadLineModels:
     """
-    Camada de dados e plotagem para linhas aéreas de transmissão (OHTL).
-    Análogo a SingleCoreCableModels (scc_models.py) para cabos subterrâneos.
+    Data and plotting layer for overhead transmission lines (OHTL).
+    Analogous to SingleCoreCableModels (scc_models.py) for underground cables.
 
-    Espera pul_data com formato FLAT:
+    Expects pul_data in FLAT format:
         pul_data[scenario_key][matrix_key]  →  ndarray (n_freq, N, N)
         pul_data['frequencies']              →  ndarray (n_freq,)
         pul_data['comsol']                   →  dict | None
 
-    Cada serie em series_to_plot tem a forma:
+    Each series in series_to_plot has the form:
         {'key': <str>, 'type': {'main': {matplotlib kwargs}}}
     """
 
@@ -40,8 +40,8 @@ class OverheadLineModels:
         os.makedirs(self.results_dir, exist_ok=True)
 
         # ------------------------------------------------------------------
-        # Séries genéricas — formulações de impedância de retorno por terra
-        # (usadas em ohtl_single_xue, ohtl_single_lima, ohtl_single_deConti)
+        # Generic series — earth-return impedance formulations
+        # (used in ohtl_single_xue, ohtl_single_lima, ohtl_single_deConti)
         # ------------------------------------------------------------------
 
         self.xue_series = [
@@ -145,7 +145,7 @@ class OverheadLineModels:
         ]
 
         # ------------------------------------------------------------------
-        # Configurações de gráficos
+        # Plot configurations
         # ------------------------------------------------------------------
 
         self.xue_plot_configs = {
@@ -213,11 +213,11 @@ class OverheadLineModels:
         }
 
     # ------------------------------------------------------------------
-    # Métodos de plotagem internos
+    # Internal plotting methods
     # ------------------------------------------------------------------
 
     def _impedance_subplots(self, graph_key: str, configs: dict):
-        """Plota resistance (esq.) e inductance (dir.) a partir de matriz complexa."""
+        """Plots resistance (left) and inductance (right) from a complex matrix."""
         cfg = configs[graph_key]
         p, q = cfg['p'], cfg['q']
         matrix_key = cfg['matrix_key']
@@ -250,7 +250,7 @@ class OverheadLineModels:
             save_figure(fig, self.results_dir, base_filename=graph_key)
 
     def _admittance_subplots(self, graph_key: str, configs: dict):
-        """Plota conductance (esq.) e capacitance (dir.) a partir de matriz complexa."""
+        """Plots conductance (left) and capacitance (right) from a complex matrix."""
         cfg = configs[graph_key]
         p, q = cfg['p'], cfg['q']
         matrix_key = cfg['matrix_key']
@@ -282,7 +282,7 @@ class OverheadLineModels:
             save_figure(fig, self.results_dir, base_filename=graph_key)
 
     def _propagation_subplots(self, graph_key: str, configs: dict):
-        """Plota attenuation (esq.) e phase velocity normalizada (dir.)."""
+        """Plots attenuation (left) and normalized phase velocity (right)."""
         import scipy.constants as sc
         cfg = configs[graph_key]
         p, q = cfg['p'], cfg['q']
@@ -328,7 +328,7 @@ class OverheadLineModels:
             save_figure(fig, self.results_dir, base_filename=graph_key)
 
     # ------------------------------------------------------------------
-    # Métodos públicos — Xue
+    # Public methods — Xue
     # ------------------------------------------------------------------
 
     def series_impedance_matrix(self):
@@ -341,7 +341,7 @@ class OverheadLineModels:
         self._impedance_subplots('earth_return_impedance', self.xue_plot_configs)
 
     # ------------------------------------------------------------------
-    # Métodos públicos — Lima
+    # Public methods — Lima
     # ------------------------------------------------------------------
 
     def propagation_constant_forms(self):

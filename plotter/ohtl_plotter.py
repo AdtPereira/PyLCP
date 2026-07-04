@@ -6,19 +6,19 @@ from .models_base import BasePlotter
 
 class OHTLPlotter(BasePlotter):
     """
-    Plotter config-driven para linhas aéreas de transmissão (OHTL).
-    Análogo a SCCPlotter (scc_plotter.py) para cabos subterrâneos.
+    Config-driven plotter for overhead transmission lines (OHTL).
+    Analogous to SCCPlotter (scc_plotter.py) for underground cables.
 
-    Espera pul_data com formato FLAT:
+    Expects pul_data in FLAT format:
         pul_data[scenario_key][matrix_key]  →  ndarray (n_freq, N, N)
         pul_data['frequencies']              →  ndarray (n_freq,)
 
-    O plot_config segue o mesmo esquema de BasePlotter, com chaves adicionais:
+    plot_config follows the same schema as BasePlotter, with additional keys:
         'series_to_plot': [{'key': <str>, 'type': {'main': {kwargs}}}]
-        'matrix_key': <str>    — chave dentro de pul_data[scenario_key]
-        'p', 'q': <int>        — índices matriciais
-        'path': [<str>, ...]   — navegação dentro de pul_data[scenario_key] (opcional,
-                                  substitui matrix_key quando a estrutura é mais profunda)
+        'matrix_key': <str>    — key inside pul_data[scenario_key]
+        'p', 'q': <int>        — matrix indices
+        'path': [<str>, ...]   — navigation inside pul_data[scenario_key] (optional,
+                                  replaces matrix_key when the structure is deeper)
     """
 
     def __init__(self, file_path: str, pul_data: dict, plot_config: dict, autoSave: bool = True):
@@ -28,13 +28,13 @@ class OHTLPlotter(BasePlotter):
         self._ohtl_xlim = (_freq[0], _freq[-1]) if _freq is not None else self.xlim
 
     # ------------------------------------------------------------------
-    # Métodos internos de plotagem (análogos a _plot_scc_matrix)
+    # Internal plotting methods (analogous to _plot_scc_matrix)
     # ------------------------------------------------------------------
 
     def _plot_ohtl_matrix(self, graph_key: str):
         """
-        Plota parâmetros matriciais usando formato FLAT de pul_data.
-        Suporta 'matrix_key' (simples) ou 'path' (navegação arbitrária).
+        Plots matricial parameters using the FLAT pul_data format.
+        Supports 'matrix_key' (simple) or 'path' (arbitrary navigation).
         """
         cfg = self.plot_config[graph_key]
         p, q = cfg['p'], cfg['q']
@@ -56,7 +56,7 @@ class OHTLPlotter(BasePlotter):
                 for k in path:
                     matrix = matrix[k]
             except (KeyError, TypeError):
-                print(f"Aviso: caminho {path} não encontrado para '{series['key']}'.")
+                print(f"Warning: path {path} not found for '{series['key']}'.")
                 continue
 
             style = series['type']['main']
@@ -71,7 +71,7 @@ class OHTLPlotter(BasePlotter):
 
     def _plot_ohtl_propagation(self, graph_key: str):
         """
-        Plota constante de propagação: attenuation (esq.) e phase velocity (dir.).
+        Plots the propagation constant: attenuation (left) and phase velocity (right).
         """
         import scipy.constants as sc
         cfg  = self.plot_config[graph_key]
@@ -127,7 +127,7 @@ class OHTLPlotter(BasePlotter):
             save_figure(fig, self.results_dir, base_filename=graph_key)
 
     # ------------------------------------------------------------------
-    # Métodos públicos
+    # Public methods
     # ------------------------------------------------------------------
 
     def ohtl_series_impedance_matrix(self, graph_key: str = 'series_impedance_matrix'):

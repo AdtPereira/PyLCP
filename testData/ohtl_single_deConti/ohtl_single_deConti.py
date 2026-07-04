@@ -23,6 +23,7 @@ except IndexError:
 # --- Import custom modules ---
 try:
     from utils.case_utils import *
+    from utils.comsol_data import ComsolPostProcessor
     from models import overhead_lines
     from mtl_main.graphics import GroundReturnMTLRepresentation
     from mtl_main.source import MulticonductorTransmissionLine
@@ -69,9 +70,17 @@ def main():
     pul_data_tubular['internal'] = InternalPerUnitParameters(mtl_tubular, frequencies).all_terms()
 
     print(f"End of simulations! Time spent: {(time.time() - st):.1f} seconds.\n")
-    plotter = InternalLinesModels(pul_data, pul_data_tubular, mtl_solid)
+
+    print("Loading COMSOL internal impedance results...")
+    cmsl_processor = ComsolPostProcessor(__file__)
+    cmsl_internal = cmsl_processor.get_bare_and_hollow_wire_internal_impedance()
+
+    plotter = InternalLinesModels(__file__, pul_data, pul_data_tubular, mtl_solid, model_tubular=mtl_tubular,
+                                  comsol=cmsl_internal, autoSave=True)
     plotter.internal_solid_conductors()
     plotter.internal_impedance()
+    plotter.internal_hollow_conductors()
+    plotter.hollow_conductor_impedance()
     plotter.nahman_holt_comparison()
     plotter.internal_tubular_characteristics()
     GroundReturnMTLRepresentation(__file__, mtl_solid, units='millimeter').system_schematic(base_filename='system_schematic_solid')
