@@ -12,7 +12,7 @@ class SCCPlotter(BasePlotter):
         self._scc_xlim = (_freq[0], _freq[-1]) if _freq is not None else self.xlim
 
     def _plot_scc_matrix(self, graph_key):
-        """Plota parâmetros matriciais usando o formato de config 'series_to_plot' + 'path' + 'p'/'q'."""
+        """Plots matricial parameters using the 'series_to_plot' + 'path' + 'p'/'q' config format."""
         cfg = self.plot_config[graph_key]
         p, q = cfg['p'], cfg['q']
         path = cfg['path']
@@ -50,7 +50,7 @@ class SCCPlotter(BasePlotter):
                         ax1.scatter(comsol_freq, self._calculate_plot_data(matrix[:, p, q], comsol_w, left_cfg), **style)
                         ax2.scatter(comsol_freq, self._calculate_plot_data(matrix[:, p, q], comsol_w, right_cfg), **style)
                     except (KeyError, TypeError, IndexError):
-                        print(f"Aviso: Dados COMSOL não encontrados para '{key}' com caminho {comsol_path}.")
+                        print(f"Warning: COMSOL data not found for '{key}' with path {comsol_path}.")
 
         self._format_axis(ax1, self._scc_xlim, left_cfg)
         self._format_axis(ax2, self._scc_xlim, right_cfg)
@@ -59,7 +59,7 @@ class SCCPlotter(BasePlotter):
             save_figure(fig, self.results_dir, base_filename=graph_key)
 
     def _plot_scc_scalar(self, graph_key):
-        """Plota parâmetros escalares (1D por frequência) usando o formato de config 'series_to_plot' + 'path'."""
+        """Plots scalar parameters (1D over frequency) using the 'series_to_plot' + 'path' config format."""
         cfg = self.plot_config[graph_key]
         path = cfg['path']
         fig, (ax1, ax2) = plt.subplots(1, 2, figsize=self.figsize, sharey=False)
@@ -97,7 +97,7 @@ class SCCPlotter(BasePlotter):
                         ax1.scatter(comsol_freq, self._calculate_plot_data(data, comsol_w, left_cfg), **style)
                         ax2.scatter(comsol_freq, self._calculate_plot_data(data, comsol_w, right_cfg), **style)
                     except (KeyError, TypeError, IndexError):
-                        print(f"Aviso: Dados COMSOL não encontrados para '{key}' [{path[:-1]} + '{comsol_key}'].")
+                        print(f"Warning: COMSOL data not found for '{key}' [{path[:-1]} + '{comsol_key}'].")
 
         self._format_axis(ax1, self._scc_xlim, left_cfg)
         self._format_axis(ax2, self._scc_xlim, right_cfg)
@@ -131,11 +131,12 @@ class HDPEPlotter(BasePlotter):
 
     def hdpe_internal_impedance_matrix(self):
         for key in ['internal_impedance_matrix']:
-            self._plot_matricial_parameters(key)
+            self._plot_matrix_parameters(key)
 
     def hdpe_internal_impedance_elements(self):
         for key in ['coaxial_cable', 'internal_impedance_elements']:
-            self._plot_non_matricial_parameters(key)
+            self._plot_non_matrix_parameters(key)
+
 
 class CoaxialCablePlotter(BasePlotter):
     def __init__(self, file_path: str, pul_data: dict, plot_config: dict, autoSave: bool = True):
@@ -143,7 +144,7 @@ class CoaxialCablePlotter(BasePlotter):
 
     def coaxial_cable_internal_impedance_matrix(self):
         for key in ['partial_internal_impedance']:
-            self._plot_matricial_parameters(key)
+            self._plot_matrix_parameters(key)
 
     def coaxial_cable_impedance(self):
-        self._plot_non_matricial_parameters('coaxial_cable_impedance')
+        self._plot_non_matrix_parameters('coaxial_cable_impedance')

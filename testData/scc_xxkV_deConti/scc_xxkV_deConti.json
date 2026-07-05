@@ -1,0 +1,27 @@
+{
+  "type": "scc",
+  "note": "DE CONTI buried bare-wire. Ref.: Example 6A, p.157, 2023",
+  "arrangement": {
+    "unit": "meter",
+    "type": "single",
+    "num_conductors": 1,
+    "burial_depth": 2.0,
+    "spacing": null,
+    "fourier_order": 10,
+    "idx_ref_conductor": 0
+  },
+  "soil": {
+    "conductivity_S_per_m": 0.01,
+    "relative_permittivity": 10.0
+  },
+  "cable_definition": {
+    "core": {
+      "inner_radius": 0.0,
+      "outer_radius": 0.040,
+      "conductivity_S_per_m": 5.2E7,
+      "insulation": null
+    },
+    "sheath": null,
+    "armor": null
+  }
+}

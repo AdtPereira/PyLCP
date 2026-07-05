@@ -38,7 +38,9 @@ import matplotlib.pyplot as plt
 os.system('cls' if os.name == 'nt' else 'clear')
 try:
     from utils.case_utils import *
-    from plotter.scc_models import SingleCoreCableModels
+    from utils.comsol_data import ComsolPostProcessor
+    from plotter.scc_models import PrysmianCableModels
+    from .plot_config import PLOT_CONFIG
     from models.single_core_cable import SingleCoreCableModelGenerator
     from mtl_main.graphics import GroundReturnMTLRepresentation
     from mtl_main.source import MulticonductorTransmissionLine
@@ -54,8 +56,12 @@ def main():
     model = SingleCoreCableModelGenerator(__file__).underground_model()
     mtl_model = MulticonductorTransmissionLine(model)
 
+    print("Loading COMSOL internal impedance results...")
+    cmsl_processor = ComsolPostProcessor(__file__)
+    scc_internal_cmsl = cmsl_processor.get_scc_internal_impedance_matrix_combined()
+
     pul_data = {
-        'comsol': None, # cmsl_reader.data,
+        'comsol': scc_internal_cmsl,
         'frequencies': np.logspace(0, 7, num=121),
         'logger_data': {
             'frequencies': [1e2, 1e4, 1e5],
@@ -105,8 +111,12 @@ def main():
         value['earth_return_parameters'] = earth_return
         value['quasi_tem_matrices'] = quasi_tem
 
+    # Alias consumed by BasePlotter's generic engine (source='analytical'),
+    # used by ground_return_impedance().
+    pul_data['analytical'] = {'frequencies': pul_data['frequencies'], 'scenarios': pul_data['scenarios']}
+
     print(f"End of the routine! Time spent on simulation: {(time.time() - st):.1f} seconds.\n")
-    plotter = SingleCoreCableModels(__file__, pul_data)
+    plotter = PrysmianCableModels(__file__, pul_data, PLOT_CONFIG)
     plotter.internal_impedance_parameters(graph_key='core')
     plotter.internal_impedance_parameters(graph_key='sheath')
     plotter.internal_impedance_parameters(graph_key='core_sheath')

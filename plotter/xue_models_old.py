@@ -347,28 +347,28 @@ class XueModels:
             ax1.plot(self.f, np.real(zg[:, p, q]) * 1e3, **series['type']['main'])
             ax2.plot(self.f, np.imag(zg[:, p, q]) / self.w * 1e6, **series['type']['main'])
 
-        # --- Bloco COMSOL MODIFICADO ---
-        # Lendo dados pré-processados de self.cmsl (pul_data['comsol'])
+        # --- MODIFIED COMSOL Block ---
+        # Reading pre-processed data from self.cmsl (pul_data['comsol'])
         if self.cmsl is not None and 'comsol_series_to_plot' in config:
             for series in config['comsol_series_to_plot']:
-                # Obter a chave de dados, ex: 'p100_er1'
+                # Get the data key, e.g. 'p100_er1'
                 comsol_key = series.get('base_key')
                 assert comsol_key is not None, "base_key must be provided in comsol_series_to_plot"
 
-                # Acessar os dados COMSOL pré-processados
+                # Access the pre-processed COMSOL data
                 if comsol_key in self.cmsl:
                     comsol_data = self.cmsl[comsol_key]
                     freq = comsol_data['freq']
                     cmsl_zg = comsol_data['Zg']
                     
-                    # Obter o estilo de plotagem, removendo a chave de dados
+                    # Get the plotting style, removing the data key
                     style = {k: v for k, v in series.items() if k != 'base_key'}
                     
-                    # Plotar os dados
+                    # Plot the data
                     ax1.scatter(freq, np.real(cmsl_zg[:, p, q]) * 1e3, **style)
                     ax2.scatter(freq, np.imag(cmsl_zg[:, p, q]) / (2 * np.pi * freq) * 1e6, **style)
                 else:
-                    print(f"Aviso: Chave de dados COMSOL '{comsol_key}' não encontrada em pul_data['comsol'].")
+                    print(f"Warning: COMSOL data key '{comsol_key}' not found in pul_data['comsol'].")
             
         ax1.set_xscale('log')
         ax1.set_yscale('log')
@@ -404,28 +404,28 @@ class XueModels:
             ax1.plot(self.f, np.real(Yg[:, p, q]) * 1e3, **series['type']['main'])
             ax2.plot(self.f, np.imag(Yg[:, p, q]) / self.w * 1e6, **series['type']['main'])
 
-        # --- Bloco COMSOL MODIFICADO ---
-        # Lendo dados pré-processados de self.cmsl (pul_data['comsol'])
+        # --- MODIFIED COMSOL Block ---
+        # Reading pre-processed data from self.cmsl (pul_data['comsol'])
         if self.cmsl is not None and 'comsol_series_to_plot' in config:
             for series in config['comsol_series_to_plot']:
-                # Obter a chave de dados, ex: 'p100_er1'
+                # Get the data key, e.g. 'p100_er1'
                 comsol_key = series.get('base_key')
                 assert comsol_key is not None, "base_key must be provided in comsol_series_to_plot"
 
-                # Acessar os dados COMSOL pré-processados
+                # Access the pre-processed COMSOL data
                 if comsol_key in self.cmsl:
                     comsol_data = self.cmsl[comsol_key]
                     freq = comsol_data['freq']
-                    cmsl_yg = comsol_data['Yg'] # <-- Mudança aqui para Yg
+                    cmsl_yg = comsol_data['Yg'] # <-- Changed to Yg here
                     
-                    # Obter o estilo de plotagem, removendo a chave de dados
+                    # Get the plotting style, removing the data key
                     style = {k: v for k, v in series.items() if k != 'base_key'}
                     
-                    # Plotar os dados
+                    # Plot the data
                     ax1.scatter(freq, np.real(cmsl_yg[:, p, q]) * 1e3, **style)
                     ax2.scatter(freq, np.imag(cmsl_yg[:, p, q]) / (2 * np.pi * freq) * 1e6, **style)
                 else:
-                    print(f"Aviso: Chave de dados COMSOL '{comsol_key}' não encontrada em pul_data['comsol'].")
+                    print(f"Warning: COMSOL data key '{comsol_key}' not found in pul_data['comsol'].")
 
         ax1.set_xscale('log')
         ax1.set_xlim(self.xlim)

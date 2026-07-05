@@ -365,25 +365,21 @@ class SingleCoreCableModelGenerator:
         assert enclosure_data is not None, "Enclosure definition must be provided for shared enclosure model."
         assert self.ecc is not None, "ECC conductor data must be provided for shared enclosure model."
         
-        # --- 3. Cálculo de Posição (Lógica Corrigida) ---
-        
-        # 3.1. O Duto (Enclosure) é o ponto de referência
-        # 'burial_depth' agora define o centro do duto.
-        enclosure_center = (0.0, -self.arrangement['burial_depth'])
+        # --- 3. Cálculo de Posição ---
 
-        # 3.2. Obter raios para cálculo
+        # 3.1. 'burial_depth' define o centro do SCC (convenção padrão de instalação).
         cable_outer_radius = host_conductor_data['outer_radius'] + (host_insulation['thickness'] if host_insulation else 0)
         enclosure_inner_radius = enclosure_data['inner_radius']
-        
+
         # Validações de geometria
         assert enclosure_inner_radius > cable_outer_radius, "Enclosure inner radius must be larger than cable outer radius."
         total_width_check = cable_outer_radius + 2 * ecc_outer_radius + cable_outer_radius
         assert total_width_check < (2 * enclosure_inner_radius), "The cable and ECC do not fit side by side within the HDPE enclosure."
 
-        # 3.3. O centro do SCC (Cabo) é calculado relativo ao Duto
-        # O cabo repousa no fundo, então é deslocado para baixo.
+        # 3.2. O SCC repousa no fundo do duto; o centro do duto fica vertical_offset acima.
         vertical_offset = enclosure_inner_radius - cable_outer_radius
-        cable_center = (enclosure_center[0], enclosure_center[1] - vertical_offset)
+        cable_center = (0.0, -self.arrangement['burial_depth'])
+        enclosure_center = (cable_center[0], cable_center[1] + vertical_offset)
 
         # --- 4. Posição do ECC (Restrição 3) ---
         # Delega o cálculo trigonométrico para o método privado

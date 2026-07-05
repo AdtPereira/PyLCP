@@ -55,7 +55,7 @@ class BaseMTLRepresentation:
         """
         active_conductors = [c for c in self.model.mtl.values() if c.get('line_type') == 'active']
         core_conductor = active_conductors[0] if active_conductors else None
-        
+
         # Calculate the average vertical position and find the deepest conductor
         unique_centers = list(set(tuple(c['center_point']) for c in active_conductors))
         y_avg, y_min = 0, 0
@@ -65,6 +65,19 @@ class BaseMTLRepresentation:
             y_avg = sum(y_coords) / len(y_coords)
             y_min = min(y_coords)
             deepest_conductor = next((c for c in active_conductors if c['center_point'][1] == y_min), core_conductor)
+
+        # For HDPE types the burial depth is referenced to the SCC core centre,
+        # not to whichever conductor happens to sit deepest (e.g. the ECC).
+        if self.model.mtl_type in ('hdpe', 'shared-hdpe'):
+            scc_core = next(
+                (c for c in active_conductors if c.get('conductor_name') == 'core'),
+                deepest_conductor,
+            )
+            depth_ref_conductor = scc_core
+            y_depth_ref = scc_core['center_point'][1]
+        else:
+            depth_ref_conductor = deepest_conductor
+            y_depth_ref = y_min
 
         max_radius = 0
         if core_conductor:
@@ -102,6 +115,8 @@ class BaseMTLRepresentation:
         return {
             'core_conductor': core_conductor,
             'deepest_conductor': deepest_conductor,
+            'depth_ref_conductor': depth_ref_conductor,
+            'y_depth_ref': y_depth_ref,
             'max_radius': max_radius,
             'h_factor': h_factor,
             'title': title,
@@ -311,11 +326,11 @@ class GroundReturnMTLRepresentation(BaseMTLRepresentation):
 
     def _schematic_annotations(self, ax, params):
         """Draws annotations like the ground level and depth/height line."""
-        deepest_cond = params['deepest_conductor']
+        deepest_cond = params['depth_ref_conductor']
         deepest_cond_x = deepest_cond['center_point'][0]
 
-        # Calculate the schematic y-position of the deepest conductor center
-        y_real_deepest = params['y_min']
+        # Calculate the schematic y-position of the depth-reference conductor centre
+        y_real_deepest = params['y_depth_ref']
         y_avg = params['y_avg']
         schematic_y_avg = params['h_factor'] * params['max_radius']
         schematic_y_deepest = schematic_y_avg + (y_real_deepest - y_avg)

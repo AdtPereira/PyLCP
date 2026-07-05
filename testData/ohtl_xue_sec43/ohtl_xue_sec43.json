@@ -1,0 +1,22 @@
+{
+  "type": "overhead",
+  "note": "A XUE's overhead line. Ref.: Xue, H. (2018). General formulation and accurate evaluation of earth-return parameters. Sec. 4.3. Pg. 44.",
+  "arrangement": {
+    "height_m": 10.0,
+    "spacing_m": null
+  },
+  "soil": {
+    "conductivity_S_per_m": 0.01,
+    "relative_permittivity": 1.0
+  },
+  "cable_definition": {
+    "core": {
+      "inner_radius_m": 0.0,
+      "outer_radius_m": 0.01,
+      "conductivity_S_per_m": 5.952381E7,
+      "insulation": null
+    },
+    "sheath": null,
+    "armor": null
+  }
+}

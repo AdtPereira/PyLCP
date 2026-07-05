@@ -316,6 +316,36 @@ model = {
 
 ---
 
+## Fluxo de Trabalho Git
+
+O desenvolvimento contínuo ocorre na branch `ipst_2027`. A `main` recebe atualizações periódicas via merge.
+
+### Branches
+
+| Branch | Papel |
+|--------|-------|
+| `main` | Versão estável — recebe merges de `ipst_2027` |
+| `ipst_2027` | Desenvolvimento ativo — commits do dia a dia |
+
+### Sincronizar `ipst_2027` com `main` (antes de iniciar trabalho novo)
+
+```bash
+git checkout ipst_2027
+git merge main
+git push origin ipst_2027
+```
+
+### Promover trabalho de `ipst_2027` para `main`
+
+```bash
+git checkout main
+git merge ipst_2027
+git push origin main
+git checkout ipst_2027
+```
+
+---
+
 ## Referências Bibliográficas
 
 1. **Paul, C. R.** (2008). *Analysis of Multiconductor Transmission Lines*, 2nd ed. Wiley-IEEE Press.
