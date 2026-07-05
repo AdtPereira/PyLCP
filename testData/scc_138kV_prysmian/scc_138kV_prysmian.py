@@ -39,7 +39,8 @@ os.system('cls' if os.name == 'nt' else 'clear')
 try:
     from utils.case_utils import *
     from utils.comsol_data import ComsolPostProcessor
-    from plotter.scc_models import SingleCoreCableModels
+    from plotter.scc_models import PrysmianCableModels
+    from .plot_config import PLOT_CONFIG
     from models.single_core_cable import SingleCoreCableModelGenerator
     from mtl_main.graphics import GroundReturnMTLRepresentation
     from mtl_main.source import MulticonductorTransmissionLine
@@ -110,8 +111,12 @@ def main():
         value['earth_return_parameters'] = earth_return
         value['quasi_tem_matrices'] = quasi_tem
 
+    # Alias consumed by BasePlotter's generic engine (source='analytical'),
+    # used by ground_return_impedance().
+    pul_data['analytical'] = {'frequencies': pul_data['frequencies'], 'scenarios': pul_data['scenarios']}
+
     print(f"End of the routine! Time spent on simulation: {(time.time() - st):.1f} seconds.\n")
-    plotter = SingleCoreCableModels(__file__, pul_data)
+    plotter = PrysmianCableModels(__file__, pul_data, PLOT_CONFIG)
     plotter.internal_impedance_parameters(graph_key='core')
     plotter.internal_impedance_parameters(graph_key='sheath')
     plotter.internal_impedance_parameters(graph_key='core_sheath')

@@ -9,6 +9,7 @@ os.system('cls' if os.name == 'nt' else 'clear')
 try:
     from utils.case_utils import *
     from plotter.scc_models import SingleCoreCableModels
+    from .plot_config import PLOT_CONFIG
     from models.single_core_cable import SingleCoreCableModelGenerator
     from mtl_main.graphics import GroundReturnMTLRepresentation
     from mtl_main.source import MulticonductorTransmissionLine
@@ -61,9 +62,20 @@ def main():
 
         value['earth_return_parameters'] = earth_return
         value['quasi_tem_matrices'] = quasi_tem
-    
+
+    # Alias consumed by BasePlotter's generic engine (source='analytical'),
+    # plus a synthetic 'internal' scenario for the internal_* graphs.
+    pul_data['analytical'] = {'frequencies': pul_data['frequencies'], 'scenarios': pul_data['scenarios']}
+    Pi = internal_matrices['potential_coefficient_matrix']
+    Pi_3d = np.ones_like(pul_data['frequencies'])[:, None, None] * Pi[None, :, :]
+    pul_data['analytical']['scenarios']['internal'] = {
+        'impedance_matrix': internal_matrices['impedance_matrix'],
+        'shunt_admittance_matrix': internal_matrices['shunt_admittance_matrix'],
+        'potential_coefficient_matrix': Pi_3d,
+    }
+
     print(f"End of the routine! Time spent on simulation: {(time.time() - st):.1f} seconds.\n")
-    plotter = SingleCoreCableModels(__file__, pul_data, autoSave=True)
+    plotter = SingleCoreCableModels(__file__, pul_data, PLOT_CONFIG, autoSave=True)
     plotter.potential_coefficients_composition(conductor='core_sheath')
     plotter.potential_coefficients_composition(conductor='core')
     plotter.potential_coefficients_composition(conductor='sheath')
@@ -75,9 +87,9 @@ def main():
     plotter.series_impedance_earth_return()
     plotter.series_impedance_internal()
     plotter.series_impedance_matrix()
-    plotter.shunt_admittance_composition(condutor='core_sheath')
-    plotter.shunt_admittance_composition(condutor='core')
-    plotter.shunt_admittance_composition(condutor='sheath')
+    plotter.shunt_admittance_composition(conductor='core_sheath')
+    plotter.shunt_admittance_composition(conductor='core')
+    plotter.shunt_admittance_composition(conductor='sheath')
     plotter.shunt_admittance_earth_return()
     plotter.shunt_admittance_internal()
     plotter.shunt_admittance_matrix()

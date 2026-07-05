@@ -10,6 +10,7 @@ try:
     from utils.case_utils import *
     from utils.comsol_data import ComsolPostProcessor
     from plotter.scc_models import SingleCoreCableModels
+    from .plot_config import PLOT_CONFIG
     from models.single_core_cable import SingleCoreCableModelGenerator
     from mtl_main.graphics import GroundReturnMTLRepresentation
     from mtl_main.source import MulticonductorTransmissionLine
@@ -66,9 +67,20 @@ def main():
 
         value['earth_return_parameters'] = earth_return
         value['quasi_tem_matrices'] = quasi_tem
-    
+
+    # Alias consumed by BasePlotter's generic engine (source='analytical'),
+    # plus a synthetic 'internal' scenario for the internal_* graphs.
+    pul_data['analytical'] = {'frequencies': pul_data['frequencies'], 'scenarios': pul_data['scenarios']}
+    Pi = internal_matrices['potential_coefficient_matrix']
+    Pi_3d = np.ones_like(pul_data['frequencies'])[:, None, None] * Pi[None, :, :]
+    pul_data['analytical']['scenarios']['internal'] = {
+        'impedance_matrix': internal_matrices['impedance_matrix'],
+        'shunt_admittance_matrix': internal_matrices['shunt_admittance_matrix'],
+        'potential_coefficient_matrix': Pi_3d,
+    }
+
     print(f"End of the routine! Time spent on simulation: {(time.time() - st):.1f} seconds.\n")
-    plotter = SingleCoreCableModels(__file__, pul_data, autoSave=True)
+    plotter = SingleCoreCableModels(__file__, pul_data, PLOT_CONFIG, autoSave=True)
     plotter.potential_coefficients_composition(conductor='core_sheath')
     plotter.potential_coefficients_composition(conductor='core')
     plotter.potential_coefficients_composition(conductor='sheath')

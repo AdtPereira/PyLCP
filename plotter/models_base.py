@@ -218,62 +218,6 @@ class BasePlotter:
         if self.autoSave:
             save_figure(fig, self.results_dir, base_filename=f'{graph_key}')
 
-    # def _plot_non_matricial_parameter(self, graph_key):
-    #     """
-    #     Generic method to plot a complex quantity across two subplots
-    #     (e.g. R/L or G/C).
-    #     """
-    #     cfg = self.plot_config[graph_key]
-    #     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=self.figsize, sharey=False)
-    #     fig.suptitle(cfg['suptitle'], fontsize=12, y=0.98)
-    #     left_cfg = cfg['left_plot']
-    #     right_cfg = cfg['right_plot']
-
-    #     if self.pul_data['scenarios']:
-    #         for series in cfg['series_to_plot']:
-    #             item = self.pul_data['scenarios'][series['key']][cfg['path'][0]][cfg['path'][1]]
-
-    #             y1_data = self._calculate_plot_data(item, self.w, left_cfg['component'], left_cfg['scale'])
-    #             ax1.plot(self.f, y1_data, **series['type']['main'])
-
-    #             y2_data = self._calculate_plot_data(item, self.w, right_cfg['component'], right_cfg['scale'])
-    #             ax2.plot(self.f, y2_data, **series['type']['main'])
-
-    #     # --- Generic COMSOL Block ---
-    #     if self.cmsl is not None and 'comsol_series_to_plot' in cfg:
-    #         freq = self.cmsl['frequencies']
-    #         w_cmsl = self.cmsl['angular_frequencies']
-
-    #         for series in cfg['comsol_series_to_plot']:
-    #             cmsl_key = series.get('key')
-    #             cmsl_graph_type = cfg['comsol_matrix_key']
-
-    #             if cmsl_key not in self.cmsl['scenarios']:
-    #                 print(f"Warning: COMSOL key '{cmsl_key}' not found.")
-    #                 continue
-
-    #             if cmsl_graph_type in ['gamma_earth']:
-    #                 cmsl_item = self.cmsl['scenarios'][cmsl_key]['earth_return_parameters'][cmsl_graph_type]
-
-    #             # Get the plotting style
-    #             style = {k: v for k, v in series.items() if k != 'key'}
-
-    #             # Plot data on the left subplot
-    #             y1_data_cmsl = self._calculate_plot_data(cmsl_item, w_cmsl, left_cfg['component'], left_cfg['scale'])
-    #             ax1.scatter(freq, y1_data_cmsl, **style)
-
-    #             # Plot data on the right subplot
-    #             y2_data_cmsl = self._calculate_plot_data(cmsl_item, w_cmsl, right_cfg['component'], right_cfg['scale'])
-    #             ax2.scatter(freq, y2_data_cmsl, **style)
-
-    #     # --- Generic Axis Formatting ---
-    #     self._format_axis(ax1, self.f, self.xlim, left_cfg)
-    #     self._format_axis(ax2, self.f, self.xlim, right_cfg)
-
-    #     plt.tight_layout(rect=[0, 0, 1, 0.96])
-    #     if self.autoSave:
-    #         save_figure(fig, self.results_dir, base_filename=f'{graph_key}')
-
     def _calculate_plot_data(self, data, w, cfg):
         component_type = cfg.get('component', 'real')
         scale = cfg.get('scale', 1.0)
@@ -283,6 +227,10 @@ class BasePlotter:
             return np.imag(data) * scale
         elif component_type == 'imag_div_w':
             return np.imag(data) / w * scale
+        elif component_type == 'abs':
+            return np.abs(data) * scale
+        elif component_type == 'angle_deg':
+            return np.angle(data, deg=True) * scale
         # ... other transformations ...
         
     def _format_axis(self, ax, xlim, cfg):
@@ -295,4 +243,6 @@ class BasePlotter:
            ax.legend(fontsize='small')
         ax.set_xlabel('Frequency (Hz)')
         ax.set_ylabel(cfg['label'])
+        if 'title' in cfg:
+            ax.set_title(cfg['title'])
         ax.grid(True, which='both', linestyle='--', linewidth=0.5)

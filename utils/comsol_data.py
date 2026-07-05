@@ -560,6 +560,11 @@ class ComsolPostProcessor:
         measured via the Js method (coil voltage under core/sheath excitation),
         from 'internal_impedance_matrix_core_excitation.txt' and
         'internal_impedance_matrix_sheath_excitation.txt'.
+
+        Returned in the standard 'scenarios' shape expected by
+        BasePlotter._get_data_from_source(source='comsol'), under a single
+        synthetic scenario key 'measured' (there is only one measured matrix,
+        not per-analytical-scenario data).
         """
         N = 2
         general_data = self.get_general_parameters('internal_impedance_matrix_core_excitation')
@@ -581,7 +586,9 @@ class ComsolPostProcessor:
 
         return {
             'frequencies': freq,
-            'impedance_matrix': Zi,
+            'scenarios': {
+                'measured': {'impedance_matrix': Zi},
+            },
         }
 
     def get_shunt_capacitance_elements(self) -> dict:
