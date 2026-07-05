@@ -28,7 +28,8 @@ try:
     from mtl_main.graphics import GroundReturnMTLRepresentation
     from mtl_main.source import MulticonductorTransmissionLine
     from analytical_forms.overhead_lines import InternalPerUnitParameters, PerUnitParameters
-    from plotter.xue_models import XueModels
+    from plotter.ohtl_plotter import OHTLPlotter
+    from .plot_config import PLOT_CONFIG
     print("Core modules imported successfully.")
 except ImportError as e:
     print(f"Error importing modules: {e}")
@@ -38,7 +39,7 @@ except ImportError as e:
 COMSOL_DATA = {}
 try:
     print(f"--- Instanciando ComsolDataReader para o caso '{case_name}' ---")
-    reader = ComsolDataReader(project_root, case_name)
+    reader = ComsolDataReader(__file__)
     COMSOL_DATA = reader.load_all_results()
     if COMSOL_DATA:
         reader.show_summary()
@@ -73,11 +74,8 @@ def main():
     }
 
     # --- VECTORIZED CALCULATION ---
-    numerical_freqs = np.logspace(0, 6, num=51)
-
-    pul_data = {
-        'comsol': COMSOL_DATA,
-        'frequencies': numerical_freqs}
+    numerical_freqs = np.logspace(3, 9, num=200)
+    pul_data = {'comsol': COMSOL_DATA, 'frequencies': numerical_freqs}
 
     # Calculate internal parameters ONCE, as the cable geometry is the same for all scenarios.
     print("Calculating internal parameters for all frequencies...")
@@ -92,14 +90,14 @@ def main():
         pul_data[key] = pul.pul_matrices(zi, zg_form=value['zg_form'])
 
     print(f"End of simulations! Time spent: {(time.time() - st):.1f} seconds.\n")
-    plotter = XueModels(pul_data)
-    plotter.overhead_series_impedance_matrix()
-    # plotter.plot_fig43()
-    # plotter.plot_fig45()
-    # plotter.plot_fig46()
-    # plotter.plot_fig47()
-    # plotter.plot_fig48()
-    # GroundReturnMTLRepresentation(mtl_model, case_name, units='millimeter').system_schematic()
+    plotter = OHTLPlotter(__file__, pul_data, PLOT_CONFIG, autoSave=True)
+    plotter.ohtl_series_impedance_matrix('fig42')
+    plotter.ohtl_series_impedance_matrix('fig43')
+    plotter.ohtl_shunt_admittance_matrix('fig45')
+    plotter.ohtl_shunt_admittance_matrix('fig46')
+    plotter.ohtl_propagation_constant('fig47')
+    plotter.ohtl_propagation_constant('fig48')
+    GroundReturnMTLRepresentation(__file__, mtl_model, units='millimeter').system_schematic()
     plt.show()
 
 if __name__ == "__main__":

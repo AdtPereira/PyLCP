@@ -7,10 +7,11 @@ SCRIPTS_TO_RUN = [
     "testData.bifilar_s25.bifilar_s25",
     "testData.bifilar_s100.bifilar_s100",
     "testData.coated_bifilar_s40.coated_bifilar_s40",
-    "testData.coaxial.coaxial",
-    "testData.hdpe_220kV_2000mm2.hdpe_220kV_2000mm2",
-    "testData.hdpe_225kV_2000mm2.hdpe_225kV_2000mm2",
+    "testData.coaxial_patel.coaxial_patel",
     "testData.hdpe_300mm2.hdpe_300mm2",
+    "testData.hdpe_2000mm2.hdpe_2000mm2",
+    "testData.hdpe_ecc_300mm2.hdpe_ecc_300mm2",
+    "testData.hdpe_ecc_2000mm2.hdpe_ecc_2000mm2",
     "testData.ohtl_single_deConti.ohtl_single_deConti",
     "testData.ohtl_single_deConti_deri.ohtl_single_deConti_deri",
     "testData.ohtl_single_lima.ohtl_single_lima",
@@ -23,8 +24,8 @@ SCRIPTS_TO_RUN = [
     "testData.scc_flat_andreata.scc_flat_andreata",
     "testData.scc_flat_deConti.scc_flat_deConti",
     "testData.scc_flat_xue.scc_flat_xue",
-    "testData.scc_single_deConti.scc_single_deConti",
     "testData.scc_trefoil_xue.scc_trefoil_xue",
+    "testData.scc_xxkV_deConti.scc_xxkV_deConti",
 ]
 
 def main():

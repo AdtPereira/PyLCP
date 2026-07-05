@@ -1,19 +1,20 @@
 {
   "type": "overhead",
-  "note": "An DE CONTI buried bare-wire. Ref.: Example xx, p.xxx, 2021",
+  "note": "De Conti (Lima e Tomasevich, 2015) overhead line model. Ref.: Example 5.1, p.112, 2023",
   "arrangement": {
     "height_m": 10.0,
     "spacing_m": null
   },
   "soil": {
     "conductivity_S_per_m": 0.005,
-    "relative_permittivity": 5.0
+    "relative_permittivity": 5.0,
+    "external_conductance_S_per_m": 18.641e-12
   },
   "cable_definition": {
     "core": {
       "inner_radius_m": 0.0,
-      "outer_radius_m": 0.0005,
-      "conductivity_S_per_m": 5.8E7,
+      "outer_radius_m": 0.010,
+      "conductivity_S_per_m": 6.496E7,
       "insulation": null
     },
     "sheath": null,

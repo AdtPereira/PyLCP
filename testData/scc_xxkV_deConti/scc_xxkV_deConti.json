@@ -1,6 +1,6 @@
 {
   "type": "scc",
-  "note": "An DE CONTI buried bare-wire. Ref.: Example 6A, p.157, 2023",
+  "note": "DE CONTI buried bare-wire. Ref.: Example 6A, p.157, 2023",
   "arrangement": {
     "unit": "meter",
     "type": "single",
@@ -18,7 +18,7 @@
     "core": {
       "inner_radius": 0.0,
       "outer_radius": 0.040,
-      "conductivity_S_per_m": 5.168618E7,
+      "conductivity_S_per_m": 5.2E7,
       "insulation": null
     },
     "sheath": null,

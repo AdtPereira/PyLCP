@@ -2,9 +2,9 @@ import subprocess
 import sys
 
 SCRIPTS_TO_RUN = [
-    "testData.ohtl_single_deConti.ohtl_single_deConti",
-    "testData.ohtl_single_deConti_deri.ohtl_single_deConti_deri",
-    "testData.ohtl_single_lima.ohtl_single_lima",
+    "testData.ohtl_deConti_ex51.ohtl_deConti_ex51",
+    "testData.ohtl_deConti_ex94a.ohtl_deConti_ex94a",
+    "testData.ohtl_deConti_sec912.ohtl_deConti_sec912",
     "testData.ohtl_single_xue.ohtl_single_xue",
 ]
 

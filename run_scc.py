@@ -5,6 +5,7 @@ SCRIPTS_TO_RUN = [
     "testData.scc_34kV_andreata.scc_34kV_andreata",
     "testData.scc_132kV_xue.scc_132kV_xue",
     "testData.scc_138kV_prysmian.scc_138kV_prysmian",
+    "testData.scc_xxkV_deConti.scc_xxkV_deConti",
 ]
 
 def main():

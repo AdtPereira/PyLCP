@@ -63,6 +63,19 @@ class OHTLPlotter(BasePlotter):
             ax1.plot(freq, self._calculate_plot_data(matrix[:, p, q], w, left_cfg),  **style)
             ax2.plot(freq, self._calculate_plot_data(matrix[:, p, q], w, right_cfg), **style)
 
+        comsol_key = cfg.get('comsol_key')
+        if comsol_key and self.cmsl is not None and comsol_key in self.cmsl:
+            comsol_df = self.cmsl[comsol_key]
+            comsol_col = cfg.get('comsol_column', 'coil_impedance')
+            comsol_style = cfg.get('comsol_style', {
+                'label': 'COMSOL (mf)', 'marker': 'o', 'facecolors': 'black', 's': 10, 'zorder': 2,
+            })
+            c_freq = comsol_df['freq'].to_numpy()
+            c_w = 2 * np.pi * c_freq
+            c_vals = comsol_df[comsol_col].to_numpy()
+            ax1.scatter(c_freq, self._calculate_plot_data(c_vals, c_w, left_cfg),  **comsol_style)
+            ax2.scatter(c_freq, self._calculate_plot_data(c_vals, c_w, right_cfg), **comsol_style)
+
         self._format_axis(ax1, self._ohtl_xlim, left_cfg)
         self._format_axis(ax2, self._ohtl_xlim, right_cfg)
         plt.tight_layout(rect=[0, 0, 1, 0.96])
@@ -85,6 +98,7 @@ class OHTLPlotter(BasePlotter):
         w    = 2 * np.pi * freq
         x_lim = cfg.get('x_lim', {})
         y_lim = cfg.get('y_lim', {})
+        y_scale = cfg.get('y_scale', {})
 
         for series in cfg.get('series_to_plot', []):
             scenario = self.pul_data.get(series['key'])
@@ -103,6 +117,7 @@ class OHTLPlotter(BasePlotter):
             ax2.plot(freq, w / gamma_v.imag / sc.c, **style)
 
         ax1.set_xscale('log')
+        ax1.set_yscale(y_scale.get('attenuation', 'linear'))
         ax1.set_xlim(x_lim.get('attenuation', self._ohtl_xlim))
         if 'attenuation' in y_lim:
             ax1.set_ylim(y_lim['attenuation'])
@@ -113,6 +128,7 @@ class OHTLPlotter(BasePlotter):
         ax1.grid(True, which='both', linestyle='--', linewidth=0.5)
 
         ax2.set_xscale('log')
+        ax2.set_yscale(y_scale.get('phase_velocity', 'linear'))
         ax2.set_xlim(x_lim.get('phase_velocity', self._ohtl_xlim))
         if 'phase_velocity' in y_lim:
             ax2.set_ylim(y_lim['phase_velocity'])

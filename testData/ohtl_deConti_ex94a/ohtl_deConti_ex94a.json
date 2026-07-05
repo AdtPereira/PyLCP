@@ -1,6 +1,6 @@
 {
   "type": "overhead",
-  "note": "An DE CONTI buried bare-wire. Ref.: Example 9.4.A, p.458, 2021",
+  "note": "DE CONTI single-phase (bare-wire) overhead transmission line. Ref.: Example 9.4.A, p.458, 2021",
   "arrangement": {
     "height_m": 8.40,
     "spacing_m": null
