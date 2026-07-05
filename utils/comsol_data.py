@@ -591,6 +591,49 @@ class ComsolPostProcessor:
             },
         }
 
+    def get_scc_internal_impedance_matrix_combined(self) -> dict:
+        """
+        Returns the SCC internal impedance matrix [Zi] (core + sheath, 2x2)
+        measured via the Js method, from a single combined file
+        'cmsl_internal_impedance_matrix.txt' holding both excitations in one
+        table: data1(...) = core excitation (mf.VCoil_core_i0: core coil
+        voltage, self-term; mf.VCoil_sheath_0: sheath coil voltage, mutual
+        term, sheath held at zero current) and data2(...) = sheath excitation
+        (mf.VCoil_core_0: core coil voltage, mutual term, core held at zero
+        current; mf.VCoil_sheath_i0: sheath coil voltage, self-term).
+
+        The four column names each contain their own inner parenthesis (e.g.
+        'data1(mf.VCoil_core_i0)'), which the generic parser's unit-stripping
+        regex collapses down to positional placeholders 'data1'/'data1_1'/
+        'data2'/'data2_1' — read here by column order (as they appear in the
+        file), not by semantic name. The mutual term is taken from the core-
+        excitation reading ('data1_1'), matching the convention used by
+        get_scc_internal_impedance_matrix() for the two-file format.
+
+        Returned in the standard 'scenarios' shape expected by
+        BasePlotter._get_data_from_source(source='comsol').
+        """
+        N = 2
+        general_data = self.get_general_parameters('cmsl_internal_impedance_matrix')
+        if general_data is None:
+            return None
+
+        data = self.cmsl_reader.data['cmsl_internal_impedance_matrix']
+        freq = general_data['frequencies']
+
+        Zi = np.zeros((len(freq), N, N), dtype=complex)
+        Zi[:, 0, 0] = data['data1']    # data1(mf.VCoil_core_i0): core excitation, core voltage (self)
+        Zi[:, 0, 1] = data['data1_1']  # data1(mf.VCoil_sheath_0): core excitation, sheath voltage (mutual)
+        Zi[:, 1, 0] = data['data1_1']
+        Zi[:, 1, 1] = data['data2_1']  # data2(mf.VCoil_sheath_i0): sheath excitation, sheath voltage (self)
+
+        return {
+            'frequencies': freq,
+            'scenarios': {
+                'measured': {'impedance_matrix': Zi},
+            },
+        }
+
     def get_shunt_capacitance_elements(self) -> dict:
         """
         Returns C_11 (core) and C_22 (sheath) self-capacitances per unit length

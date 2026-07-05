@@ -131,11 +131,12 @@ class HDPEPlotter(BasePlotter):
 
     def hdpe_internal_impedance_matrix(self):
         for key in ['internal_impedance_matrix']:
-            self._plot_matricial_parameters(key)
+            self._plot_matrix_parameters(key)
 
     def hdpe_internal_impedance_elements(self):
         for key in ['coaxial_cable', 'internal_impedance_elements']:
-            self._plot_non_matricial_parameters(key)
+            self._plot_non_matrix_parameters(key)
+
 
 class CoaxialCablePlotter(BasePlotter):
     def __init__(self, file_path: str, pul_data: dict, plot_config: dict, autoSave: bool = True):
@@ -143,7 +144,7 @@ class CoaxialCablePlotter(BasePlotter):
 
     def coaxial_cable_internal_impedance_matrix(self):
         for key in ['partial_internal_impedance']:
-            self._plot_matricial_parameters(key)
+            self._plot_matrix_parameters(key)
 
     def coaxial_cable_impedance(self):
-        self._plot_non_matricial_parameters('coaxial_cable_impedance')
+        self._plot_non_matrix_parameters('coaxial_cable_impedance')

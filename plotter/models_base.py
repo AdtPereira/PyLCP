@@ -104,7 +104,7 @@ class BasePlotter:
             print(f"Warning: data path {series_def['data_path']} not found for {source_type}['{scenario_key}'].")
             return None, None
 
-    def _plot_matricial_parameters(self, graph_key):
+    def _plot_matrix_parameters(self, graph_key):
         """
         Generic (refactored) method to plot matricial data from
         multiple sources.
@@ -158,7 +158,7 @@ class BasePlotter:
         if self.autoSave:
             save_figure(fig, self.results_dir, base_filename=f'{graph_key}')
 
-    def _plot_non_matricial_parameters(self, graph_key):
+    def _plot_non_matrix_parameters(self, graph_key):
         """
         Generic (refactored) method to plot parameters stored in
         lists, from multiple sources.

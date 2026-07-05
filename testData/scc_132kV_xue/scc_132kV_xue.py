@@ -28,7 +28,7 @@ def main():
 
     print("Loading COMSOL internal impedance results...")
     cmsl_processor = ComsolPostProcessor(__file__)
-    scc_internal_cmsl = cmsl_processor.get_scc_internal_impedance_matrix()
+    scc_internal_cmsl = cmsl_processor.get_scc_internal_impedance_matrix_combined()
 
     # 1. ESTRUTURA DE DADOS CENTRALIZADA
     pul_data = {

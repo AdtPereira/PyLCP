@@ -72,28 +72,28 @@ class SingleCoreCableModels(BasePlotter):
     # ------------------------------------------------------------------
 
     def series_impedance_matrix(self):
-        self._plot_matricial_parameters('series_impedance_matrix')
+        self._plot_matrix_parameters('series_impedance_matrix')
 
     def shunt_admittance_matrix(self):
-        self._plot_matricial_parameters('shunt_admittance_matrix')
+        self._plot_matrix_parameters('shunt_admittance_matrix')
 
     def series_impedance_earth_return(self):
-        self._plot_matricial_parameters('earth_return_impedance')
+        self._plot_matrix_parameters('earth_return_impedance')
 
     def shunt_admittance_earth_return(self):
-        self._plot_matricial_parameters('earth_return_admittance')
+        self._plot_matrix_parameters('earth_return_admittance')
 
     def potential_coefficients_earth_return(self):
-        self._plot_matricial_parameters('earth_return_potential')
+        self._plot_matrix_parameters('earth_return_potential')
 
     def series_impedance_internal(self):
-        self._plot_matricial_parameters('internal_impedance')
+        self._plot_matrix_parameters('internal_impedance')
 
     def shunt_admittance_internal(self):
-        self._plot_matricial_parameters('internal_admittance')
+        self._plot_matrix_parameters('internal_admittance')
 
     def potential_coefficients_internal(self):
-        self._plot_matricial_parameters('internal_potential')
+        self._plot_matrix_parameters('internal_potential')
 
     # ------------------------------------------------------------------
     # "Composition" plots — dedicated engine (needs to assemble a computed
@@ -244,7 +244,7 @@ class PrysmianCableModels(BasePlotter):
         self.w = 2 * np.pi * self.f
 
     def ground_return_impedance(self):
-        self._plot_matricial_parameters('ground_return_impedance')
+        self._plot_matrix_parameters('ground_return_impedance')
 
     def internal_impedance_parameters(self, graph_key):
         """
