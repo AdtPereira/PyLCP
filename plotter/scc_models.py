@@ -6,15 +6,93 @@ from utils.case_utils import *
 
 class SingleCoreCableModels:
     """
-    A highly refactored class to handle plotting for the Xue model results.
-    It uses a configuration-driven approach to generate complex subplot figures.
-    This version is adapted for the vectorized data structure.
+    Plotter for per-unit-length (PUL) parameters of single-core cable (SCC) case
+    studies, bundling two independent analyses in one class:
+
+    1. **Xue-style coaxial cable** (core + sheath, flat scenario dict under
+       ``pul_data['scenarios']``): series impedance/admittance matrices, their
+       decomposition into internal/earth-return/series terms, and potential
+       coefficients, compared against the Magalhães/Xue integral formulation,
+       De Conti/Vance approximations, and (optionally) COMSOL FEM results.
+       Used by e.g. ``scc_132kV_xue.py``, ``scc_34kV_andreata.py``.
+    2. **Prysmian 138 kV cable** (core/sheath decomposed into surface-impedance
+       components, under ``pul_data['internal_parameters']``): compares the
+       exact closed-form Bessel decomposition [Ametani, 2015] against COMSOL
+       (Js method, core/sheath excitation) for the assembled self/mutual
+       impedance matrix. Used by ``scc_138kV_prysmian.py``.
+
+    Which mode applies is determined per-method by which ``pul_data`` keys it
+    reads — see the "Expected pul_data" section below. Plot styling (colors,
+    labels, titles) is defined internally in ``self.xue_plot_configs`` /
+    ``self.prysmian_plot_configs`` (built in ``__init__``), keyed by the
+    ``graph_key`` string each public method passes to its private engine.
+
+    Expected pul_data (Xue-style methods):
+        pul_data['frequencies']                    ndarray (n_freq,)
+        pul_data['comsol']                          dict | None — see below
+        pul_data['internal_matrices']               from InternalPerUnitParameters.matrices():
+            {'resistance_matrix', 'inductance_matrix', 'impedance_matrix',
+             'shunt_admittance_matrix', 'potential_coefficient_matrix'}
+        pul_data['scenarios'][scenario_key] = {
+            'mtl': MulticonductorTransmissionLine,
+            'earth_return_parameters': {'impedance_matrix', 'admittance_matrix',
+                                         'potential_coefficient'},
+            'quasi_tem_matrices': {'series_impedance_matrix', 'shunt_admittance_matrix',
+                                    'potential_coefficient'},
+        }
+
+    Expected pul_data (Prysmian-style methods):
+        pul_data['frequencies']                    ndarray (n_freq,)
+        pul_data['comsol']                          dict | None — see below
+        pul_data['internal_parameters']             from InternalPerUnitParameters.parameters_hybrid()
+                                                     (or .parameters_by_bessel()):
+            {'zcs': {'z11', 'z12', 'z2i'}, 'zs3': {'z20', 'z23'}, 'z2m': ...}
+        pul_data['scenarios'][scenario_key]['earth_return_parameters']['impedance_matrix']
+            (only for ground_return_impedance())
+
+    COMSOL overlay (pul_data['comsol']):
+        A dict with ``{'frequencies': ndarray, 'impedance_matrix': ndarray (n_freq, 2, 2)}``,
+        as returned by ``ComsolPostProcessor.get_scc_internal_impedance_matrix()``
+        (Js method: core/sheath excitation coil voltage). The overlay is only
+        physically meaningful for the *assembled* self/mutual impedance matrix
+        — i.e. the 'internal_impedance' branch of series_impedance_internal(),
+        the 'internal_term' curve of series_impedance_composition(), and the
+        'core_sheath' branch of internal_impedance_parameters() — because COMSOL
+        cannot resolve the decomposed surface components (z11/z12/z2i/z20/z23/z2m)
+        shown in the 'core'/'sheath'/'internal_parameters' plots. Pass ``None``
+        (or omit the key) to disable the overlay.
+
+    Note on z2m/z3m oscillation:
+        The closed-form Bessel formula for a tube's inner/outer mutual impedance
+        (z2m, z3m) genuinely decays through a rapidly-shrinking sign oscillation
+        at high frequency (confirmed against exponentially-scaled Bessel functions
+        and arbitrary-precision arithmetic — not a numerical artifact). Plots that
+        include z2m/z3m auto-floor their resistance y-axis just below the smallest
+        of the other (non-oscillating) curves to hide that decorative tail.
+
+    Output: each plot is saved (when autoSave=True) to
+    ``testData/<case_name>/Results/<base_filename>.png`` via utils.case_utils.save_figure,
+    where <case_name> is derived from the calling script's filename (see file_path).
+
+    Architecture note: this class predates the project's config-driven
+    BasePlotter convention (plotter/models_base.py), used by SCCPlotter,
+    HDPEPlotter, OHTLPlotter and others — it does not inherit BasePlotter and
+    keeps its PLOT_CONFIG-equivalent dicts internal rather than injected. It is
+    a candidate for a future migration to that pattern.
     """
     def __init__(self, file_path: str, pul_data: dict, autoSave: bool = True):
         """
-        Initializes the XueModels class with the provided per-unit-length data.
-        :param file_path: Path to the current file.
-        :param pul_data: Dictionary containing per-unit-length data and frequencies.
+        Initializes the SingleCoreCableModels plotter with the provided
+        per-unit-length data.
+
+        Args:
+            file_path (str): Path of the calling script (typically ``__file__``);
+                its stem names the ``testData/<stem>/Results`` output directory.
+            pul_data (dict): Per-unit-length data — see the class docstring's
+                "Expected pul_data" section for the shape required by each
+                public method.
+            autoSave (bool): If True (default), each plot is saved to
+                ``Results/`` as a PNG when generated.
         """
         self.script_path = Path(file_path)
         self.autoSave = autoSave
@@ -294,7 +372,7 @@ class SingleCoreCableModels:
                 ]
             },
             'sheath': {
-                'suptitle': fr'Prysmian 138 kV SCC P.u.l. parameters of sheath conductor, $z_{{s3}} [2]$',
+                'suptitle': fr'Prysmian 138 kV SCC P.u.l. parameters of sheath conductor, $z_{{s3}}$ [Ametani, 2015]',
                 'resistance_title': 'P.u.l. resistance',
                 'inductance_title': 'P.u.l. inductance',
                 'series_to_plot': [
@@ -305,17 +383,18 @@ class SingleCoreCableModels:
                 ]
             },
             'core_sheath': {
-                'suptitle': fr'Prysmian 138 kV SCC P.u.l. Internal Impedance Matrix, $[z_{{i}}]$ [2]',
+                'suptitle': fr'Prysmian 138 kV SCC P.u.l. Internal Impedance Matrix, $[z_{{i}}]$ [Ametani, 2015]',
                 'resistance_title': 'P.u.l. resistance',
                 'inductance_title': 'P.u.l. inductance',
+                'resistance_ylim_bottom': 1e-4,
                 'series_to_plot': [
-                    {'key': 'Zcc', 'label': r'$z_{cc} = z_{cs} + z_{s3} - 2z_{2m}$: Core self-impedance ', 'color': 'black', 'linestyle': '-', 'linewidth': 1.0},
-                    {'key': 'Zcs', 'label': r'$z_{cs} = z_{20} + z_{23} - z_{2m}$: Mutual impedance between the core and sheath ', 'color': 'darkblue',  'linestyle': '--', 'linewidth': 1.0},
+                    {'key': 'Zcc', 'label': r'$z_{cc} = z_{cs} + z_{s3} - 2z_{2m}$: Core self-impedance', 'color': 'black', 'linestyle': '-', 'linewidth': 1.0},
+                    {'key': 'Zcs', 'label': r'$z_{cs} = z_{20} + z_{23} - z_{2m}$: Mutual impedance between the core and sheath', 'color': 'darkblue',  'linestyle': '--', 'linewidth': 1.0},
                     {'key': 'Zss', 'label': r'$z_{ss} = z_{20} + z_{23}$: Sheath self-impedance', 'color': 'darkgreen', 'linestyle': ':', 'linewidth': 1.0},
                 ]
             },
             'internal_parameters': {
-                'suptitle': fr'Prysmian 138 kV SCC P.u.l. parameters of SCC [2]',
+                'suptitle': fr'Prysmian 138 kV SCC P.u.l. parameters of SCC [Ametani, 2015]',
                 'resistance_title': 'P.u.l. resistance',
                 'inductance_title': 'P.u.l. inductance',
                 'series_to_plot': [
@@ -339,32 +418,79 @@ class SingleCoreCableModels:
         """Generic plotting function for impedance-like data."""
         config = self.prysmian_plot_configs[graph_key]
         fig, (ax1, ax2) = plt.subplots(1, 2, figsize=self.figsize, sharey=False)
-        fig.suptitle(config['suptitle'], fontsize=12, y=0.98)
+        # fig.suptitle(config['suptitle'], fontsize=12, y=0.98)
 
         for series_config in config['series_to_plot']:
             z = impedance_data[series_config['key']]
-            style = {k: series_config[k] for k in ['label', 'color', 'linestyle', 'linewidth']}            
+            style = {k: series_config[k] for k in ['label', 'color', 'linestyle', 'linewidth']}
             ax1.plot(self.f, np.real(z) * 1e3, **style)
             ax2.plot(self.f, np.imag(z) / self.w * 1e6, **style)
 
+        # COMSOL (Js method, core/sheath excitation) only measures the direct
+        # self/mutual impedance matrix [Zi] — i.e. Zcc/Zss/Zcs in the 'core_sheath'
+        # plot — not the decomposed surface components (z11/z12/z2i/z20/z23/z2m)
+        # shown in the 'core'/'sheath'/'internal_parameters' plots, so the overlay
+        # is restricted to 'core_sheath'.
+        if graph_key == 'core_sheath' and self.cmsl is not None and self.cmsl.get('impedance_matrix') is not None:
+            Zi_cmsl = self.cmsl['impedance_matrix']
+            f_cmsl = self.cmsl['frequencies']
+            w_cmsl = 2 * np.pi * f_cmsl
+            comsol_index = {'Zcc': (0, 0), 'Zss': (1, 1), 'Zcs': (0, 1)}
+            for i, series_config in enumerate(config['series_to_plot']):
+                idx_i, idx_j = comsol_index[series_config['key']]
+                label = 'COMSOL' if i == 0 else None
+                scatter_kwargs = dict(marker='o', s=8, facecolors='none', edgecolors=series_config['color'], zorder=10, label=label)
+                ax1.scatter(f_cmsl, Zi_cmsl[:, idx_i, idx_j].real * 1e3, **scatter_kwargs)
+                ax2.scatter(f_cmsl, Zi_cmsl[:, idx_i, idx_j].imag / w_cmsl * 1e6, **scatter_kwargs)
+
         # Configure axes
         ax1.set_xscale('log')
+        ax1.set_yscale('log')
         ax1.set_xlim(self.xlim)
         ax1.set_xlabel('Frequency (Hz)')
         ax1.set_ylabel(fr'Resistance $(\Omega/km)$')
         ax1.grid(True, which='both', linestyle='--', linewidth=0.5)
         ax1.legend(fontsize='small')
-        
+        ax1.set_title(config['resistance_title'])
+
+        # z2m/z3m (mutual impedance between a tube's inner/outer surfaces) decays
+        # through a genuine, rapidly shrinking sign-oscillation at high frequency
+        # (confirmed against exponentially-scaled Bessel functions and arbitrary-
+        # precision arithmetic — not a numerical artifact). On a log axis this
+        # produces a long tail of ever-smaller "arcs" that clutters the plot without
+        # being physically relevant. Floor the axis just below the smallest of the
+        # other (non-oscillating) curves to hide that tail without clipping real data.
+        oscillating_keys = {'z2m', 'z3m'}
+        plotted_keys = {series_config['key'] for series_config in config['series_to_plot']}
+        if plotted_keys & oscillating_keys:
+            stable_values = np.concatenate([
+                np.abs(np.real(impedance_data[series_config['key']]))
+                for series_config in config['series_to_plot']
+                if series_config['key'] not in oscillating_keys
+            ]) * 1e3
+            stable_values = stable_values[stable_values > 0]
+            if stable_values.size:
+                ax1.set_ylim(bottom=stable_values.min() * 1e-1)
+
+        # Explicit resistance floor override (e.g. 'core_sheath', which doesn't
+        # oscillate but still benefits from trimming the very small tail below
+        # the physically relevant range).
+        if 'resistance_ylim_bottom' in config:
+            ax1.set_ylim(bottom=config['resistance_ylim_bottom'])
+
         ax2.set_xscale('log')
         ax2.set_xlim(self.xlim)
-        ax2.legend(fontsize='small')
         ax2.set_xlabel('Frequency (Hz)')
         ax2.set_ylabel(fr'Inductance $(mH/km)$')
         ax2.grid(True, which='both', linestyle='--', linewidth=0.5)
+        ax2.set_title(config['inductance_title'])
         plt.tight_layout(rect=[0, 0, 1, 0.96])
 
         if self.autoSave:
-            save_figure(fig, self.results_dir, base_filename=f'impedance_parameters_{graph_key}')
+            base_filename = f'impedance_parameters_{graph_key}'
+            if 'parameters' in graph_key:
+                base_filename = f'impedance_{graph_key}'
+            save_figure(fig, self.results_dir, base_filename=base_filename)
 
     def _impedance_subplots(self, graph_key):
         """
@@ -414,6 +540,19 @@ class SingleCoreCableModels:
                 ax1.plot(self.f, Ri[:, value['index'][0], value['index'][1]] * 1e3, **plot_style)
                 ax2.plot(self.f, Li[:, value['index'][0], value['index'][1]] * 1e6, **plot_style)
 
+            if self.cmsl is not None and self.cmsl.get('impedance_matrix') is not None:
+                Zi_cmsl = self.cmsl['impedance_matrix']
+                f_cmsl = self.cmsl['frequencies']
+                w_cmsl = 2 * np.pi * f_cmsl
+                scatter_kwargs = dict(marker='o', s=8, facecolors='none', zorder=10)
+                for i, value in enumerate(elements_to_plot):
+                    idx_i, idx_j = value['index']
+                    label = 'COMSOL' if i == 0 else None
+                    ax1.scatter(f_cmsl, Zi_cmsl[:, idx_i, idx_j].real * 1e3,
+                                edgecolors=value['color'], label=label, **scatter_kwargs)
+                    ax2.scatter(f_cmsl, Zi_cmsl[:, idx_i, idx_j].imag / w_cmsl * 1e6,
+                                edgecolors=value['color'], label=label, **scatter_kwargs)
+
             ax1.set_xscale('log')
             ax1.set_yscale('log')
             ax1.set_xlim(self.xlim)
@@ -422,7 +561,7 @@ class SingleCoreCableModels:
             ax1.set_ylabel(fr'$R \, (\Omega/km)$')
             ax1.grid(True, which='both', linestyle='--', linewidth=0.5)
             ax1.set_title(config['resistance_title'])
-            
+
             ax2.set_xscale('log')
             ax2.set_xlim(self.xlim)
             ax2.legend(fontsize='small')
@@ -432,7 +571,7 @@ class SingleCoreCableModels:
             ax2.set_title(config['inductance_title'])
             plt.tight_layout(rect=[0, 0, 1, 0.96])
 
-        if graph_key in ['series_impedance_matrix']:            
+        if graph_key in ['series_impedance_matrix']:
             for series in config['series_to_plot']:
                 Zs = self.pul_data['scenarios'][series['key']]['quasi_tem_matrices']['series_impedance_matrix']
                 ax1.plot(self.f, np.real(Zs[:, 0, 0]) * 1e3, **series['type']['self-core'])
@@ -491,6 +630,17 @@ class SingleCoreCableModels:
                 ax2.plot(self.f, np.imag(Zg[:, 0, 0]) / self.w * 1e6, **series['type']['earth_return_term'])
                 ax2.plot(self.f, np.imag(Zs[:, idx_i, idx_j]) / self.w * 1e6, **series['type']['series_term'])
                 ax2.plot(self.f, np.imag(Zt[:, idx_i, idx_j]) / self.w * 1e6, **series['type']['series_composition'])
+
+            # COMSOL only measures the internal impedance matrix (Js method), so the
+            # overlay applies exclusively to the 'internal_term' curve, not to the
+            # earth-return/series/series-composition terms.
+            if self.cmsl is not None and self.cmsl.get('impedance_matrix') is not None:
+                Zi_cmsl = self.cmsl['impedance_matrix']
+                f_cmsl = self.cmsl['frequencies']
+                w_cmsl = 2 * np.pi * f_cmsl
+                scatter_kwargs = dict(marker='o', s=8, facecolors='none', edgecolors='blue', zorder=10, label='COMSOL (Internal)')
+                ax1.scatter(f_cmsl, Zi_cmsl[:, idx_i, idx_j].real * 1e3, **scatter_kwargs)
+                ax2.scatter(f_cmsl, Zi_cmsl[:, idx_i, idx_j].imag / w_cmsl * 1e6, **scatter_kwargs)
 
             ax1.set_xscale('log')
             ax1.set_yscale('log')
@@ -792,7 +942,6 @@ class SingleCoreCableModels:
         
         ax2.set(xscale='log', xlim=self.xlim, xlabel='Frequency (Hz)', ylabel=r'$L_g \, (\mu H/m)$')
         ax2.grid(True, which='both', linestyle='--', linewidth=0.5)
-        ax2.legend(fontsize='small')        
         plt.tight_layout(rect=[0, 0, 1, 0.96])
 
         if self.autoSave:
@@ -803,6 +952,7 @@ class SingleCoreCableModels:
     
     def internal_impedance_parameters(self, graph_key):
         data = self.pul_data['internal_parameters']
+        impedance_data = {}
 
         if graph_key == 'core':
             z11 = data['zcs']['z11']
@@ -845,14 +995,14 @@ class SingleCoreCableModels:
     def shunt_admittance_matrix(self):
         self._admittance_subplots(graph_key='shunt_admittance_matrix')
 
-    def series_impedance_composition(self, condutor='core'):
-        self._impedance_subplots(graph_key='series_impedance_composition_{}'.format(condutor))
+    def series_impedance_composition(self, conductor='core'):
+        self._impedance_subplots(graph_key='series_impedance_composition_{}'.format(conductor))
 
-    def shunt_admittance_composition(self, condutor='core'):
-        self._admittance_subplots(graph_key='shunt_admittance_composition_{}'.format(condutor))
+    def shunt_admittance_composition(self, conductor='core'):
+        self._admittance_subplots(graph_key='shunt_admittance_composition_{}'.format(conductor))
 
-    def potential_coefficients_composition(self, condutor='core'):
-        self._potential_subplots(graph_key='potential_coefficients_composition_{}'.format(condutor))
+    def potential_coefficients_composition(self, conductor='core'):
+        self._potential_subplots(graph_key='potential_coefficients_composition_{}'.format(conductor))
 
     def shunt_admittance_earth_return(self):
         self._admittance_subplots(graph_key='earth_return_admittance')

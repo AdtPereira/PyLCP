@@ -554,6 +554,36 @@ class ComsolPostProcessor:
             'Zi_hollow': data['hollow_conductor_coil_voltage'].to_numpy(),
         }
 
+    def get_scc_internal_impedance_matrix(self) -> dict:
+        """
+        Returns the SCC internal impedance matrix [Zi] (core + sheath, 2x2)
+        measured via the Js method (coil voltage under core/sheath excitation),
+        from 'internal_impedance_matrix_core_excitation.txt' and
+        'internal_impedance_matrix_sheath_excitation.txt'.
+        """
+        N = 2
+        general_data = self.get_general_parameters('internal_impedance_matrix_core_excitation')
+        if general_data is None:
+            return None
+        if 'internal_impedance_matrix_sheath_excitation' not in self.cmsl_reader.data:
+            print("  Warning: file 'internal_impedance_matrix_sheath_excitation.txt' not found. COMSOL data ignored.")
+            return None
+
+        core = self.cmsl_reader.data['internal_impedance_matrix_core_excitation']
+        sheath = self.cmsl_reader.data['internal_impedance_matrix_sheath_excitation']
+        freq = general_data['frequencies']
+
+        Zi = np.zeros((len(freq), N, N), dtype=complex)
+        Zi[:, 0, 0] = core['core_voltage']
+        Zi[:, 1, 1] = sheath['sheath_voltage']
+        Zi[:, 0, 1] = core['sheath_voltage']
+        Zi[:, 1, 0] = core['sheath_voltage']
+
+        return {
+            'frequencies': freq,
+            'impedance_matrix': Zi,
+        }
+
     def get_shunt_capacitance_elements(self) -> dict:
         """
         Returns C_11 (core) and C_22 (sheath) self-capacitances per unit length

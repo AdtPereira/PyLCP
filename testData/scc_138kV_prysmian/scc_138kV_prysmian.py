@@ -38,6 +38,7 @@ import matplotlib.pyplot as plt
 os.system('cls' if os.name == 'nt' else 'clear')
 try:
     from utils.case_utils import *
+    from utils.comsol_data import ComsolPostProcessor
     from plotter.scc_models import SingleCoreCableModels
     from models.single_core_cable import SingleCoreCableModelGenerator
     from mtl_main.graphics import GroundReturnMTLRepresentation
@@ -54,8 +55,12 @@ def main():
     model = SingleCoreCableModelGenerator(__file__).underground_model()
     mtl_model = MulticonductorTransmissionLine(model)
 
+    print("Loading COMSOL internal impedance results...")
+    cmsl_processor = ComsolPostProcessor(__file__)
+    scc_internal_cmsl = cmsl_processor.get_scc_internal_impedance_matrix()
+
     pul_data = {
-        'comsol': None, # cmsl_reader.data,
+        'comsol': scc_internal_cmsl,
         'frequencies': np.logspace(0, 7, num=121),
         'logger_data': {
             'frequencies': [1e2, 1e4, 1e5],

@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 os.system('cls' if os.name == 'nt' else 'clear')
 try:
     from utils.case_utils import *
+    from utils.comsol_data import ComsolPostProcessor
     from plotter.scc_models import SingleCoreCableModels
     from models.single_core_cable import SingleCoreCableModelGenerator
     from mtl_main.graphics import GroundReturnMTLRepresentation
@@ -24,9 +25,13 @@ def main():
     model = SingleCoreCableModelGenerator(__file__).underground_model()
     mtl_model = MulticonductorTransmissionLine(model)
 
+    print("Loading COMSOL internal impedance results...")
+    cmsl_processor = ComsolPostProcessor(__file__)
+    scc_internal_cmsl = cmsl_processor.get_scc_internal_impedance_matrix()
+
     # 1. ESTRUTURA DE DADOS CENTRALIZADA
     pul_data = {
-        'comsol': None, # cmsl_reader.data,
+        'comsol': scc_internal_cmsl,
         'frequencies': np.logspace(0, 7, num=121),
         'scenarios': {
             'p100_xue': {
@@ -64,20 +69,20 @@ def main():
     
     print(f"End of the routine! Time spent on simulation: {(time.time() - st):.1f} seconds.\n")
     plotter = SingleCoreCableModels(__file__, pul_data, autoSave=True)
-    plotter.potential_coefficients_composition(condutor='core_sheath')
-    plotter.potential_coefficients_composition(condutor='core')
-    plotter.potential_coefficients_composition(condutor='sheath')
+    plotter.potential_coefficients_composition(conductor='core_sheath')
+    plotter.potential_coefficients_composition(conductor='core')
+    plotter.potential_coefficients_composition(conductor='sheath')
     plotter.potential_coefficients_earth_return()
     plotter.potential_coefficients_internal()
-    plotter.series_impedance_composition(condutor='core_sheath')
-    plotter.series_impedance_composition(condutor='core')
-    plotter.series_impedance_composition(condutor='sheath')
+    plotter.series_impedance_composition(conductor='core_sheath')
+    plotter.series_impedance_composition(conductor='core')
+    plotter.series_impedance_composition(conductor='sheath')
     plotter.series_impedance_earth_return()
     plotter.series_impedance_internal()
     plotter.series_impedance_matrix()
-    plotter.shunt_admittance_composition(condutor='core_sheath')
-    plotter.shunt_admittance_composition(condutor='core')
-    plotter.shunt_admittance_composition(condutor='sheath')
+    plotter.shunt_admittance_composition(conductor='core_sheath')
+    plotter.shunt_admittance_composition(conductor='core')
+    plotter.shunt_admittance_composition(conductor='sheath')
     plotter.shunt_admittance_earth_return()
     plotter.shunt_admittance_internal()
     plotter.shunt_admittance_matrix()
