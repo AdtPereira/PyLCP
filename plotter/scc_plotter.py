@@ -52,8 +52,26 @@ class SCCPlotter(BasePlotter):
                     except (KeyError, TypeError, IndexError):
                         print(f"Warning: COMSOL data not found for '{key}' with path {comsol_path}.")
 
-        self._format_axis(ax1, self._scc_xlim, left_cfg)
-        self._format_axis(ax2, self._scc_xlim, right_cfg)
+        if self.mtlb:
+            mtlb_freq = self.mtlb.get('frequencies')
+            if mtlb_freq is not None:
+                mtlb_w = 2 * np.pi * mtlb_freq
+                mtlb_key = cfg.get('matlab_matrix_key', path[-1])
+                for series in cfg.get('matlab_series_to_plot', []):
+                    key = series['key']
+                    if key not in self.mtlb.get('scenarios', {}):
+                        continue
+                    try:
+                        matrix = self.mtlb['scenarios'][key][mtlb_key]
+                        style = {k: v for k, v in series.items() if k != 'key'}
+                        ax1.scatter(mtlb_freq, self._calculate_plot_data(matrix[:, p, q], mtlb_w, left_cfg), **style)
+                        ax2.scatter(mtlb_freq, self._calculate_plot_data(matrix[:, p, q], mtlb_w, right_cfg), **style)
+                    except (KeyError, TypeError, IndexError):
+                        print(f"Warning: MATLAB data not found for '{key}' with key '{mtlb_key}'.")
+
+        xlim = cfg.get('xlim', self._scc_xlim)
+        self._format_axis(ax1, xlim, left_cfg)
+        self._format_axis(ax2, xlim, right_cfg)
         plt.tight_layout(rect=[0, 0, 1, 0.96])
         if self.autoSave:
             save_figure(fig, self.results_dir, base_filename=graph_key)
@@ -104,6 +122,51 @@ class SCCPlotter(BasePlotter):
         plt.tight_layout(rect=[0, 0, 1, 0.96])
         if self.autoSave:
             save_figure(fig, self.results_dir, base_filename=graph_key)
+
+    def _plot_scc_internal_vs_matlab(self, graph_key):
+        """Plots the analytical internal-only impedance (Zi) against the MATLAB reference matrix."""
+        cfg = self.plot_config[graph_key]
+        p, q = cfg['p'], cfg['q']
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=self.figsize, sharey=False)
+        fig.suptitle(cfg['suptitle'], fontsize=12, y=0.98)
+        left_cfg, right_cfg = cfg['left_plot'], cfg['right_plot']
+
+        freq = self._scc_freq
+        w = 2 * np.pi * freq
+
+        internal_matrices = self.pul_data.get('internal_matrices')
+        if internal_matrices is not None:
+            Zi = internal_matrices['impedance_matrix']
+            style = cfg['internal_style']
+            ax1.plot(freq, self._calculate_plot_data(Zi[:, p, q], w, left_cfg), **style)
+            ax2.plot(freq, self._calculate_plot_data(Zi[:, p, q], w, right_cfg), **style)
+
+        if self.mtlb:
+            mtlb_freq = self.mtlb.get('frequencies')
+            if mtlb_freq is not None:
+                mtlb_w = 2 * np.pi * mtlb_freq
+                mtlb_key = cfg.get('matlab_matrix_key', 'internal_impedance_matrix')
+                for series in cfg.get('matlab_series_to_plot', []):
+                    key = series['key']
+                    if key not in self.mtlb.get('scenarios', {}):
+                        continue
+                    try:
+                        matrix = self.mtlb['scenarios'][key][mtlb_key]
+                        style = {k: v for k, v in series.items() if k != 'key'}
+                        ax1.scatter(mtlb_freq, self._calculate_plot_data(matrix[:, p, q], mtlb_w, left_cfg), **style)
+                        ax2.scatter(mtlb_freq, self._calculate_plot_data(matrix[:, p, q], mtlb_w, right_cfg), **style)
+                    except (KeyError, TypeError, IndexError):
+                        print(f"Warning: MATLAB data not found for '{key}' with key '{mtlb_key}'.")
+
+        xlim = cfg.get('xlim', self._scc_xlim)
+        self._format_axis(ax1, xlim, left_cfg)
+        self._format_axis(ax2, xlim, right_cfg)
+        plt.tight_layout(rect=[0, 0, 1, 0.96])
+        if self.autoSave:
+            save_figure(fig, self.results_dir, base_filename=graph_key)
+
+    def scc_series_impedance_internal_vs_matlab(self, graph_key):
+        self._plot_scc_internal_vs_matlab(graph_key)
 
     def scc_series_impedance_matrix(self, graph_key_list):
         for key in graph_key_list:

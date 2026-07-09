@@ -23,6 +23,7 @@ class BasePlotter:
         
         self.mom_so = self.pul_data.get('mom_so', None)
         self.cmsl = self.pul_data.get('comsol', None)
+        self.mtlb = self.pul_data.get('matlab', None)
         self.analytical = self.pul_data.get('analytical', None)
 
         # Assumes the script is run from the project's root directory.
@@ -89,6 +90,10 @@ class BasePlotter:
             if self.mom_so and self.mom_so['scenarios'].get(scenario_key):
                 base_obj = self.mom_so['scenarios'][scenario_key]
                 freq = self.mom_so['frequencies']
+        elif source_type == 'matlab':
+            if self.mtlb and self.mtlb['scenarios'].get(scenario_key):
+                base_obj = self.mtlb['scenarios'][scenario_key]
+                freq = self.mtlb['frequencies']
 
         if base_obj is None:
             print(f"Warning: key '{scenario_key}' not found for source '{source_type}'.")

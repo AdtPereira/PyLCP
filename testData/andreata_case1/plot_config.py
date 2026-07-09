@@ -1,6 +1,6 @@
 import numpy as np
 
-comsol_layout_template = [
+COMSOL_TEMPLATE = [
     {
         'key': 'rho_g_100_epsr1_1_mf',
         'label': r'COMSOL ($\rho_e=100, \epsilon_r=1$)',
@@ -18,7 +18,7 @@ comsol_layout_template = [
     }
 ]
 
-XUE_SERIES = [
+XUE_TEMPLATE = [
     {
         'key': 'p100_er1',
         'type': {
@@ -39,7 +39,7 @@ XUE_SERIES = [
     },
 ] 
 
-VANCE_SERIES = [
+VANCE_TEMPLATE = [
     {
         'key': 'p100_er1_vance',
         'type': {
@@ -60,7 +60,15 @@ VANCE_SERIES = [
     },
 ] 
 
-DECONTI_SERIES = [
+MATLAB_TEMPLATE = [
+    {
+        'key': 'measured',
+        'label': 'MATLAB (ref.)',
+        'marker': 'x', 's': 12, 'color': 'blue', 'linewidths': 1.0, 'zorder': 11
+    }
+]
+
+DECONTI_TEMPLATE = [
     {
         'key': 'p100_er1_deconti',
         'type': {
@@ -124,31 +132,134 @@ PLOT_TPL_CAPACITANCE = {
 }
 
 PLOT_CONFIG = {
-    'fig419': {
-        'suptitle': 'Figure 4.19: P.u.l. Self-impedance of phase - a sheath [Xue, 2018]',
+    'z11_internal_vs_matlab': {
+        'suptitle': r'$Z_{11}$: internal-only analytical (Zi) vs. MATLAB reference (Z)',
+        'p': 0, 'q': 0,
+        'internal_style': {'label': r'Analytical, internal only ($Zi_{11}$)', 'color': 'black', 'linestyle': '-', 'linewidth': 1.5},
+        'matlab_series_to_plot': MATLAB_TEMPLATE,
+        'matlab_matrix_key': 'internal_impedance_matrix',
+        'left_plot': {
+            **PLOT_TPL_RESISTANCE,
+            'label': r'$Rs_{11} \, (\Omega/km)$',
+        },
+        'right_plot': {
+            **PLOT_TPL_INDUCTANCE,
+            'label': r'$Ls_{11} \, (mH/km)$',
+        }
+    },
+
+    'z12_internal_vs_matlab': {
+        'suptitle': r'$Z_{12}$: internal-only analytical (Zi) vs. MATLAB reference (Z)',
+        'p': 0, 'q': 1,
+        'internal_style': {'label': r'Analytical, internal only ($Zi_{12}$)', 'color': 'black', 'linestyle': '-', 'linewidth': 1.5},
+        'matlab_series_to_plot': MATLAB_TEMPLATE,
+        'matlab_matrix_key': 'internal_impedance_matrix',
+        'left_plot': {
+            **PLOT_TPL_RESISTANCE,
+            'label': r'$Rs_{12} \, (\Omega/km)$',
+        },
+        'right_plot': {
+            **PLOT_TPL_INDUCTANCE,
+            'label': r'$Ls_{12} \, (mH/km)$',
+        }
+    },
+
+    'z22_internal_vs_matlab': {
+        'suptitle': r'$Z_{22}$: internal-only analytical (Zi) vs. MATLAB reference (Z)',
         'p': 1, 'q': 1,
-        'series_to_plot': XUE_SERIES + DECONTI_SERIES,
-        'path': ['quasi_tem_matrices', 'series_impedance_matrix'],
-        'comsol_series_to_plot': comsol_layout_template,
-        'comsol_matrix_key': 'series_impedance_matrix',
+        'internal_style': {'label': r'Analytical, internal only ($Zi_{22}$)', 'color': 'black', 'linestyle': '-', 'linewidth': 1.5},
+        'matlab_series_to_plot': MATLAB_TEMPLATE,
+        'matlab_matrix_key': 'internal_impedance_matrix',
         'left_plot': {
             **PLOT_TPL_RESISTANCE,
             'label': r'$Rs_{22} \, (\Omega/km)$',
-            'y_lim': (1E1, 1E5),
         },
         'right_plot': {
             **PLOT_TPL_INDUCTANCE,
             'label': r'$Ls_{22} \, (mH/km)$',
-            'y_lim': (0.5, 2.0),
+        }
+    },
+
+    'z22_matlab_only': {
+        'suptitle': 'MATLAB reference only — Z_22 (phase-a sheath self-impedance)',
+        'p': 1, 'q': 1,
+        'series_to_plot': [],
+        'path': ['quasi_tem_matrices', 'series_impedance_matrix'],
+        'matlab_series_to_plot': MATLAB_TEMPLATE,
+        'matlab_matrix_key': 'series_impedance_matrix',
+        'left_plot': {
+            **PLOT_TPL_RESISTANCE,
+            'label': r'$Rs_{22} \, (\Omega/km)$',
+        },
+        'right_plot': {
+            **PLOT_TPL_INDUCTANCE,
+            'label': r'$Ls_{22} \, (mH/km)$',
+        }
+    },
+
+    'z22_full_vs_matlab': {
+        'suptitle': r'$Z_{22}$: full analytical (Zi+Zg, quasi-TEM) vs. MATLAB reference (Z)',
+        'p': 1, 'q': 1,
+        'series_to_plot': XUE_TEMPLATE + DECONTI_TEMPLATE,
+        'path': ['quasi_tem_matrices', 'series_impedance_matrix'],
+        'matlab_series_to_plot': MATLAB_TEMPLATE,
+        'matlab_matrix_key': 'series_impedance_matrix',
+        'left_plot': {
+            **PLOT_TPL_RESISTANCE,
+            'label': r'$Rs_{22} \, (\Omega/km)$',
+        },
+        'right_plot': {
+            **PLOT_TPL_INDUCTANCE,
+            'label': r'$Ls_{22} \, (mH/km)$',
+        }
+    },
+
+    'fig419_internal_vs_matlab': {
+        'suptitle': 'Figure 4.19 (internal-only): $Z_{22}$ analytical (Zi) vs. MATLAB reference',
+        'p': 1, 'q': 1,
+        'xlim': (1E4, 1E7),
+        'internal_style': {'label': r'Analytical, internal only ($Zi_{22}$)', 'color': 'black', 'linestyle': '-', 'linewidth': 1.5},
+        'matlab_series_to_plot': MATLAB_TEMPLATE,
+        'matlab_matrix_key': 'internal_impedance_matrix',
+        'left_plot': {
+            **PLOT_TPL_RESISTANCE,
+            'label': r'$Rs_{22} \, (\Omega/km)$',
+        },
+        'right_plot': {
+            **PLOT_TPL_INDUCTANCE,
+            'label': r'$Ls_{22} \, (mH/km)$',
+        }
+    },
+
+    'fig419': {
+        'suptitle': 'Figure 4.19: P.u.l. Self-impedance of phase - a sheath [Xue, 2018]',
+        'p': 1, 'q': 1,
+        'series_to_plot': XUE_TEMPLATE + DECONTI_TEMPLATE,
+        'path': ['quasi_tem_matrices', 'series_impedance_matrix'],
+        'comsol_series_to_plot': COMSOL_TEMPLATE,
+        'comsol_matrix_key': 'series_impedance_matrix',
+        'matlab_series_to_plot': MATLAB_TEMPLATE,
+        'matlab_matrix_key': 'series_impedance_matrix',
+        'xlim': (1E-2, 1E7),
+        'left_plot': {
+            **PLOT_TPL_RESISTANCE,
+            'label': r'$Rs_{22} \, (\Omega/km)$',
+            # 'y_lim': (1E1, 1E5),
+        },
+        'right_plot': {
+            **PLOT_TPL_INDUCTANCE,
+            'label': r'$Ls_{22} \, (mH/km)$',
+            # 'y_lim': (0.5, 2.0),
         }
     },
     
     'fig421a': {
         'suptitle': 'Figure 4.21a: P.u.l. Mutual-impedance between phase - a and phase - b sheaths [Xue, 2018]',
         'p': 1, 'q': 3,
-        'series_to_plot': XUE_SERIES + DECONTI_SERIES,
+        'xlim': (1E4, 1E7),
+        'series_to_plot': XUE_TEMPLATE + DECONTI_TEMPLATE,
         'path': ['quasi_tem_matrices', 'series_impedance_matrix'],
-        'comsol_series_to_plot': comsol_layout_template,
+        'comsol_series_to_plot': COMSOL_TEMPLATE,
         'comsol_matrix_key': 'series_impedance_matrix',
         'left_plot': {
             **PLOT_TPL_RESISTANCE,
@@ -165,9 +276,10 @@ PLOT_CONFIG = {
     'fig421b': {
         'suptitle': 'Figure 4.21b: P.u.l. Mutual-impedance between phase - a and phase - c sheaths [Xue, 2018]',
         'p': 1, 'q': 5,
-        'series_to_plot': XUE_SERIES + DECONTI_SERIES,
+        'xlim': (1E4, 1E7),
+        'series_to_plot': XUE_TEMPLATE + DECONTI_TEMPLATE,
         'path': ['quasi_tem_matrices', 'series_impedance_matrix'],
-        'comsol_series_to_plot': comsol_layout_template,
+        'comsol_series_to_plot': COMSOL_TEMPLATE,
         'comsol_matrix_key': 'series_impedance_matrix',
         'left_plot': {
             **PLOT_TPL_RESISTANCE,
@@ -184,10 +296,13 @@ PLOT_CONFIG = {
     'fig423': {
         'suptitle': 'Figure 4.23: P.u.l. Self-admittance of phase - a sheath [Xue, 2018]',
         'p': 1, 'q': 1,
-        'series_to_plot': XUE_SERIES + VANCE_SERIES + DECONTI_SERIES,
+        'xlim': (1E4, 1E7),
+        'series_to_plot': XUE_TEMPLATE + VANCE_TEMPLATE + DECONTI_TEMPLATE,
         'path': ['quasi_tem_matrices', 'shunt_admittance_matrix'],
-        'comsol_series_to_plot': comsol_layout_template,
+        'comsol_series_to_plot': COMSOL_TEMPLATE,
         'comsol_matrix_key': 'shunt_admittance_matrix',
+        'matlab_series_to_plot': MATLAB_TEMPLATE,
+        'matlab_matrix_key': 'shunt_admittance_matrix',
         'left_plot': {
             **PLOT_TPL_CONDUCTANCE,
             'label': r'$G_{22} \, (S/km)$',
@@ -203,9 +318,9 @@ PLOT_CONFIG = {
     'fig425a': {
         'suptitle': 'Figure 4.25: P.u.l. Mutual-admittance between phase - a and phase - b sheaths [Xue, 2018]',
         'p': 1, 'q': 3,
-        'series_to_plot': XUE_SERIES + VANCE_SERIES + DECONTI_SERIES,
+        'series_to_plot': XUE_TEMPLATE + VANCE_TEMPLATE + DECONTI_TEMPLATE,
         'path': ['quasi_tem_matrices', 'shunt_admittance_matrix'],
-        'comsol_series_to_plot': comsol_layout_template,
+        'comsol_series_to_plot': COMSOL_TEMPLATE,
         'comsol_matrix_key': 'shunt_admittance_matrix',
         'left_plot': {
             **PLOT_TPL_CONDUCTANCE,
@@ -222,9 +337,9 @@ PLOT_CONFIG = {
     'fig425b': {
         'suptitle': 'Figure 4.25a: P.u.l. Mutual-admittance between phase - a and phase - c sheaths [Xue, 2018]',
         'p': 1, 'q': 5,
-        'series_to_plot': XUE_SERIES + VANCE_SERIES + DECONTI_SERIES,
+        'series_to_plot': XUE_TEMPLATE + VANCE_TEMPLATE + DECONTI_TEMPLATE,
         'path': ['quasi_tem_matrices', 'shunt_admittance_matrix'],
-        'comsol_series_to_plot': comsol_layout_template,
+        'comsol_series_to_plot': COMSOL_TEMPLATE,
         'comsol_matrix_key': 'shunt_admittance_matrix',
         'left_plot': {
             **PLOT_TPL_CONDUCTANCE,
@@ -240,9 +355,9 @@ PLOT_CONFIG = {
 
     'earth_propagation_constant': {
         'suptitle': r'Earth propagation constant, $\gamma_1$',
-        'series_to_plot': XUE_SERIES,
+        'series_to_plot': XUE_TEMPLATE,
         'path': ['earth_return_parameters', 'gamma_earth'],
-        'comsol_series_to_plot': comsol_layout_template,
+        'comsol_series_to_plot': COMSOL_TEMPLATE,
         'comsol_matrix_key': 'gamma_earth',
         'left_plot': {
             **PLOT_TPL_REAL,
@@ -257,9 +372,9 @@ PLOT_CONFIG = {
     'earth_return_impedance_self': {
         'suptitle': 'P.u.l. Self earth-return impedance of phase - a [Xue, 2018]',
         'p': 0, 'q': 0,
-        'series_to_plot': XUE_SERIES,
+        'series_to_plot': XUE_TEMPLATE,
         'path': ['earth_return_parameters', 'impedance_matrix'],
-        'comsol_series_to_plot': comsol_layout_template,
+        'comsol_series_to_plot': COMSOL_TEMPLATE,
         'comsol_matrix_key': 'impedance_matrix',
         'left_plot': {
             **PLOT_TPL_RESISTANCE,
@@ -274,9 +389,9 @@ PLOT_CONFIG = {
     'earth_return_impedance_mutual_ab': {
         'suptitle': 'P.u.l. Mutual earth-return impedance between phase - a and phase - b [Xue, 2018]',
         'p': 0, 'q': 1,
-        'series_to_plot': XUE_SERIES,
+        'series_to_plot': XUE_TEMPLATE,
         'path': ['earth_return_parameters', 'impedance_matrix'],
-        'comsol_series_to_plot': comsol_layout_template,
+        'comsol_series_to_plot': COMSOL_TEMPLATE,
         'comsol_matrix_key': 'impedance_matrix',
         'left_plot': {
             **PLOT_TPL_RESISTANCE,
@@ -291,9 +406,9 @@ PLOT_CONFIG = {
     'earth_return_impedance_mutual_ac': {
         'suptitle': 'P.u.l. Mutual earth-return impedance between phase - a and phase - c [Xue, 2018]',
         'p': 0, 'q': 2,
-        'series_to_plot': XUE_SERIES,
+        'series_to_plot': XUE_TEMPLATE,
         'path': ['earth_return_parameters', 'impedance_matrix'],
-        'comsol_series_to_plot': comsol_layout_template,
+        'comsol_series_to_plot': COMSOL_TEMPLATE,
         'comsol_matrix_key': 'impedance_matrix',
         'left_plot': {
             **PLOT_TPL_RESISTANCE,
@@ -308,9 +423,9 @@ PLOT_CONFIG = {
     'earth_return_impedance_mutual_bc': {
         'suptitle': 'P.u.l. Mutual earth-return impedance between phase - b and phase - c [Xue, 2018]',
         'p': 1, 'q': 2,
-        'series_to_plot': XUE_SERIES,
+        'series_to_plot': XUE_TEMPLATE,
         'path': ['earth_return_parameters', 'impedance_matrix'],
-        'comsol_series_to_plot': comsol_layout_template,
+        'comsol_series_to_plot': COMSOL_TEMPLATE,
         'comsol_matrix_key': 'impedance_matrix',
         'left_plot': {
             **PLOT_TPL_RESISTANCE,
@@ -325,9 +440,9 @@ PLOT_CONFIG = {
     'earth_return_admittance_self': {
         'suptitle': 'P.u.l. Self earth-return admittance of phase - a [Xue, 2018]',
         'p': 0, 'q': 0,
-        'series_to_plot': XUE_SERIES + VANCE_SERIES,
+        'series_to_plot': XUE_TEMPLATE + VANCE_TEMPLATE,
         'path': ['earth_return_parameters', 'admittance_matrix'],
-        'comsol_series_to_plot': comsol_layout_template,
+        'comsol_series_to_plot': COMSOL_TEMPLATE,
         'comsol_matrix_key': 'admittance_matrix',
         'left_plot': {
             **PLOT_TPL_CONDUCTANCE,
@@ -342,9 +457,9 @@ PLOT_CONFIG = {
     'earth_return_admittance_mutual_ab': {
         'suptitle': 'P.u.l. Mutual earth-return admittance between phase - a and phase - b [Xue, 2018]',
         'p': 0, 'q': 1,
-        'series_to_plot': XUE_SERIES + VANCE_SERIES,
+        'series_to_plot': XUE_TEMPLATE + VANCE_TEMPLATE,
         'path': ['earth_return_parameters', 'admittance_matrix'],
-        'comsol_series_to_plot': comsol_layout_template,
+        'comsol_series_to_plot': COMSOL_TEMPLATE,
         'comsol_matrix_key': 'admittance_matrix',
         'left_plot': {
             **PLOT_TPL_CONDUCTANCE,
@@ -359,9 +474,9 @@ PLOT_CONFIG = {
     'earth_return_admittance_mutual_ac': {
         'suptitle': 'P.u.l. Mutual earth-return admittance between phase - a and phase - c [Xue, 2018]',
         'p': 0, 'q': 2,
-        'series_to_plot': XUE_SERIES + VANCE_SERIES,
+        'series_to_plot': XUE_TEMPLATE + VANCE_TEMPLATE,
         'path': ['earth_return_parameters', 'admittance_matrix'],
-        'comsol_series_to_plot': comsol_layout_template,
+        'comsol_series_to_plot': COMSOL_TEMPLATE,
         'comsol_matrix_key': 'admittance_matrix',
         'left_plot': {
             **PLOT_TPL_CONDUCTANCE,

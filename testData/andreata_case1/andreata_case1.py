@@ -10,6 +10,7 @@ os.system('cls' if os.name == 'nt' else 'clear')
 try:
     from utils.case_utils import *
     from utils.comsol_data import ComsolPostProcessor
+    from utils.matlab_data import MatlabDataReader
     from plotter.scc_plotter import SCCPlotter
     from models.single_core_cable import SingleCoreCableModelGenerator
     from mtl_main.graphics import GroundReturnMTLRepresentation
@@ -36,7 +37,7 @@ def main():
     mtl_model_c = MulticonductorTransmissionLine(model_c)
 
     pul_data = {
-        'frequencies': np.logspace(4, 7, num=121),
+        'frequencies': np.logspace(-2, 7, num=90),
         'comsol': {
             'scenarios': {
                 'rho_g_100_epsr1_1_mf': {},
@@ -112,10 +113,43 @@ def main():
     else:
         print("  Aviso: Processamento COMSOL ignorado (dados não disponíveis).")
         pul_data['comsol'] = {}
-    
+
+    print("Carregando dados de referência do MATLAB...")
+    matlab_reader = MatlabDataReader(__file__, autoShow=False)
+    matlab_freq = matlab_reader.data.get('andreata_frequency_range')
+
+    # O MATLAB exporta os condutores agrupados por tipo: [core_A, core_B, core_C,
+    # sheath_A, sheath_B, sheath_C]. O pyLCP monta suas matrizes (interna e
+    # quasi-TEM) agrupadas por cabo: [core_A, sheath_A, core_B, sheath_B,
+    # core_C, sheath_C] (ver np.kron(np.identity(N), Zij) em
+    # InternalPerUnitParameters.matrices()). Sem essa reordenação, M[p,q]
+    # (pyLCP) e Z[p,q] (MATLAB) apontam para pares de condutores fisicamente
+    # diferentes para os mesmos índices (p, q).
+    matlab_to_pylcp_order = [0, 3, 1, 4, 2, 5]
+
+    def _reorder_matlab_matrix(matrix):
+        if matrix is None:
+            return None
+        return matrix[:, matlab_to_pylcp_order, :][:, :, matlab_to_pylcp_order]
+
+    matlab_internal_z = _reorder_matlab_matrix(matlab_reader.data.get('andreata_internal_impedance_matrix'))
+    matlab_series_z = _reorder_matlab_matrix(matlab_reader.data.get('andreata_series_impedance_matrix'))
+    matlab_shunt_y = _reorder_matlab_matrix(matlab_reader.data.get('andreata_shunt_admittance_matrix'))
+
+    pul_data['matlab'] = {
+        'frequencies': matlab_freq.flatten() if matlab_freq is not None else pul_data['frequencies'],
+        'scenarios': {
+            'measured': {
+                'internal_impedance_matrix': matlab_internal_z,
+                'series_impedance_matrix': matlab_series_z,
+                'shunt_admittance_matrix': matlab_shunt_y,
+            },
+        },
+    }
+
     print("\nCalculating internal parameters for all frequencies...")
     pul = InternalPerUnitParameters(mtl_model_a, pul_data['frequencies'])
-    internal_matrices = pul.matrices(internal_form='hybrid')
+    internal_matrices = pul.matrices(internal_form='approximation')
     pul_data['internal_matrices'] = internal_matrices
 
     print("\nCalculating per-unit-length parameters and quasi-TEM matrices for all scenarios...")
@@ -126,14 +160,11 @@ def main():
         quasi_tem = pul.quasi_tem_approx_matrices(internal_matrices, earth_return)
         value['earth_return_parameters'] = earth_return
         value['quasi_tem_matrices'] = quasi_tem
-    
+
     print(f"\nEnd of the routine! Time spent on simulation: {(time.time() - st):.1f} seconds.\n")
     plotter = SCCPlotter(__file__, pul_data, PLOT_CONFIG, autoSave=True)
-    plotter.scc_earth_propagation_constant()
-    plotter.scc_earth_return_impedance_matrix()
-    plotter.scc_earth_return_admittance_matrix()
-    plotter.scc_series_impedance_matrix(graph_key_list=['fig419', 'fig421a', 'fig421b'])
-    plotter.scc_shunt_admittance_matrix(graph_key_list=['fig423', 'fig425a', 'fig425b'])
+    plotter.scc_series_impedance_matrix(graph_key_list=['fig419'])
+    plotter.scc_shunt_admittance_matrix(graph_key_list=['fig423'])
     GroundReturnMTLRepresentation(__file__, mtl_model_a, units='centimeter').system_schematic()
     plt.show()
 
