@@ -22,16 +22,61 @@ except ImportError as e:
     print(f"Error importing modules: {e}")
     sys.exit(1)
 
+def apply_semiconducting_layer_correction(model: dict, cable_generator: SingleCoreCableModelGenerator) -> dict:
+    """
+    Corrige a permissividade relativa da isolação do núcleo para levar em conta as
+    duas camadas semicondutoras (blindagem do condutor e blindagem da isolação),
+    conforme Eq. (4.65) do Cigré Working Group C4.502 (2013):
+
+        eps_ins_eq = eps_ins * ln(r2/r1) / ln(rb/ra)
+
+    onde r1/r2 são os raios interno/externo da isolação tal como modelada
+    (núcleo -> blindagem metálica) e ra/rb são os raios internos/externos da
+    camada efetivamente dielétrica, isto é, excluindo as duas camadas
+    semicondutoras (d1, junto ao núcleo, e d2, junto à blindagem). As camadas
+    semicondutoras atuam como isolantes para o cálculo da corrente, mas como
+    parte do condutor/blindagem para o cálculo das capacitâncias -- por isso a
+    geometria original (r1, r2) do modelo é preservada, e só a permissividade
+    efetiva da isolação entre núcleo e blindagem é ajustada.
+
+    Não faz nada (retorna o modelo inalterado) se as chaves 'semiconducting_layer'
+    não estiverem presentes no JSON do caso.
+    """
+    core, sheath = cable_generator.core, cable_generator.sheath
+    d1 = (core or {}).get('semiconducting_layer', {}).get('thickness')
+    d2 = (sheath or {}).get('semiconducting_layer', {}).get('thickness')
+    if d1 is None or d2 is None:
+        return model
+
+    r1 = core['outer_radius']
+    r2 = r1 + core['insulation']['thickness']
+    ra, rb = r1 + d1, r2 - d2
+    eps_ins = core['insulation']['relative_permittivity']
+    eps_ins_eq = eps_ins * np.log(r2 / r1) / np.log(rb / ra)
+
+    print(f"Correção de camadas semicondutoras (Eq. 4.65, Cigré WG C4.502): "
+          f"eps_ins {eps_ins:.4f} -> eps_ins_eq {eps_ins_eq:.4f} "
+          f"(r1={r1*1e3:.3f} mm, ra={ra*1e3:.3f} mm, rb={rb*1e3:.3f} mm, r2={r2*1e3:.3f} mm)")
+
+    for conductor in model.values():
+        if isinstance(conductor, dict) and conductor.get('conductor_name') == 'core':
+            conductor['insulation']['relative_permittivity'] = eps_ins_eq
+
+    return model
+
 def main():
     """ Main function to run the simulation and plotting using vectorized calculations. """
-    st = time.time()    
-    model = SingleCoreCableModelGenerator(__file__).underground_model()
+    st = time.time()
+    cable_generator = SingleCoreCableModelGenerator(__file__)
+    model = cable_generator.underground_model()
+    model = apply_semiconducting_layer_correction(model, cable_generator)
     mtl_model_a = MulticonductorTransmissionLine(model)
     
     # --- MTL setup ---
     model_b = copy.deepcopy(model)
     model_b[0]['relative_permittivity'] = 20
     mtl_model_b = MulticonductorTransmissionLine(model_b)
+    
     model_c = copy.deepcopy(model)
     model_c[0]['conductivity'] = 0.002 # rho = 500 ohm.m
     mtl_model_c = MulticonductorTransmissionLine(model_c)
@@ -51,46 +96,46 @@ def main():
                 'zg_form': 'magalhaes_xue',
                 'yg_form': 'magalhaes_xue',
             },
-            'p100_er20': {
-                'mtl': mtl_model_b,
-                'zg_form': 'magalhaes_xue',
-                'yg_form': 'magalhaes_xue',
-            },
-            'p500_er1': {
-                'mtl': mtl_model_c,
-                'zg_form': 'magalhaes_xue',
-                'yg_form': 'magalhaes_xue',
-            },
-            'p100_er1_vance': {
-                'mtl': mtl_model_a,
-                'zg_form': 'deconti',
-                'yg_form': 'vance',
-            },
-            'p100_er20_vance': {
-                'mtl': mtl_model_b,
-                'zg_form': 'deconti',
-                'yg_form': 'vance'
-            },
-            'p500_er1_vance': {
-                'mtl': mtl_model_c,
-                'zg_form': 'deconti',
-                'yg_form': 'vance'
-            },
-            'p100_er1_deconti': {
-                'mtl': mtl_model_a,
-                'zg_form': 'deconti',
-                'yg_form': 'deconti',
-            },
-            'p100_er20_deconti': {
-                'mtl': mtl_model_b,
-                'zg_form': 'deconti',
-                'yg_form': 'deconti'
-            },
-            'p500_er1_deconti': {
-                'mtl': mtl_model_c,
-                'zg_form': 'deconti',
-                'yg_form': 'deconti'
-            },
+            # 'p100_er20': {
+            #     'mtl': mtl_model_b,
+            #     'zg_form': 'magalhaes_xue',
+            #     'yg_form': 'magalhaes_xue',
+            # },
+            # 'p500_er1': {
+            #     'mtl': mtl_model_c,
+            #     'zg_form': 'magalhaes_xue',
+            #     'yg_form': 'magalhaes_xue',
+            # },
+            # 'p100_er1_vance': {
+            #     'mtl': mtl_model_a,
+            #     'zg_form': 'deconti',
+            #     'yg_form': 'vance',
+            # },
+            # 'p100_er20_vance': {
+            #     'mtl': mtl_model_b,
+            #     'zg_form': 'deconti',
+            #     'yg_form': 'vance'
+            # },
+            # 'p500_er1_vance': {
+            #     'mtl': mtl_model_c,
+            #     'zg_form': 'deconti',
+            #     'yg_form': 'vance'
+            # },
+            # 'p100_er1_deconti': {
+            #     'mtl': mtl_model_a,
+            #     'zg_form': 'deconti',
+            #     'yg_form': 'deconti',
+            # },
+            # 'p100_er20_deconti': {
+            #     'mtl': mtl_model_b,
+            #     'zg_form': 'deconti',
+            #     'yg_form': 'deconti'
+            # },
+            # 'p500_er1_deconti': {
+            #     'mtl': mtl_model_c,
+            #     'zg_form': 'deconti',
+            #     'yg_form': 'deconti'
+            # },
         }
     }
 
@@ -135,6 +180,20 @@ def main():
     matlab_internal_z = _reorder_matlab_matrix(matlab_reader.data.get('andreata_internal_impedance_matrix'))
     matlab_series_z = _reorder_matlab_matrix(matlab_reader.data.get('andreata_series_impedance_matrix'))
     matlab_shunt_y = _reorder_matlab_matrix(matlab_reader.data.get('andreata_shunt_admittance_matrix'))
+    matlab_internal_y = _reorder_matlab_matrix(matlab_reader.data.get('andreata_internal_admittance_matrix'))
+
+    # A matriz de coeficiente de potencial de retorno à terra (Pg) só existe a nível de
+    # cabo/fase (3x3: A, B, C) -- ela não distingue núcleo de bainha, já que apenas o
+    # condutor mais externo de cada cabo "enxerga" o retorno pela terra. O MATLAB a
+    # exporta como um 6x6 redundante (bloco 2x2 de Pg repetido), por isso basta extrair
+    # o bloco 3x3 superior-esquerdo -- sem necessidade da permutação núcleo/bainha.
+    matlab_earth_return_pg_full = matlab_reader.data.get('andreata_earth_return_potential_coefficient_matrix')
+    matlab_earth_return_pg = matlab_earth_return_pg_full[:, :3, :3] if matlab_earth_return_pg_full is not None else None
+
+    # Mesmo raciocínio para a impedância de retorno à terra (Zg): 3x3 por fase,
+    # exportada pelo MATLAB como 6x6 redundante -- basta o bloco 3x3 superior-esquerdo.
+    matlab_earth_return_zg_full = matlab_reader.data.get('andreata_earth_return_impedance_matrix')
+    matlab_earth_return_zg = matlab_earth_return_zg_full[:, :3, :3] if matlab_earth_return_zg_full is not None else None
 
     pul_data['matlab'] = {
         'frequencies': matlab_freq.flatten() if matlab_freq is not None else pul_data['frequencies'],
@@ -143,6 +202,9 @@ def main():
                 'internal_impedance_matrix': matlab_internal_z,
                 'series_impedance_matrix': matlab_series_z,
                 'shunt_admittance_matrix': matlab_shunt_y,
+                'internal_admittance_matrix': matlab_internal_y,
+                'earth_return_potential_coefficient_matrix': matlab_earth_return_pg,
+                'earth_return_impedance_matrix': matlab_earth_return_zg,
             },
         },
     }
@@ -163,8 +225,12 @@ def main():
 
     print(f"\nEnd of the routine! Time spent on simulation: {(time.time() - st):.1f} seconds.\n")
     plotter = SCCPlotter(__file__, pul_data, PLOT_CONFIG, autoSave=True)
-    plotter.scc_series_impedance_matrix(graph_key_list=['fig419'])
-    plotter.scc_shunt_admittance_matrix(graph_key_list=['fig423'])
+    plotter.scc_series_impedance_matrix(graph_key_list=['series_impedance_all_scenarios'])
+    plotter.scc_shunt_admittance_matrix(graph_key_list=['shunt_admittance_all_scenarios'])
+    plotter.scc_series_impedance_internal_vs_matlab('internal_impedance_core_sheath')
+    plotter.scc_shunt_admittance_internal_vs_matlab('internal_admittance_core_sheath')
+    plotter.scc_earth_return_potential_coefficient_matrix()
+    plotter.scc_earth_return_impedance_matrix()
     GroundReturnMTLRepresentation(__file__, mtl_model_a, units='centimeter').system_schematic()
     plt.show()
 

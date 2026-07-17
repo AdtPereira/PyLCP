@@ -124,9 +124,14 @@ class SCCPlotter(BasePlotter):
             save_figure(fig, self.results_dir, base_filename=graph_key)
 
     def _plot_scc_internal_vs_matlab(self, graph_key):
-        """Plots the analytical internal-only impedance (Zi) against the MATLAB reference matrix."""
+        """Plots an analytical internal-only matrix (Zi or Yi) against the MATLAB reference matrix.
+
+        Accepts either a single (p, q) pair via the 'p'/'q'/'internal_style' keys, or several
+        overlaid on the same axes via a 'components' list of such dicts (each with its own 'p',
+        'q', 'internal_style' and 'matlab_series_to_plot'). The internal matrix to plot is picked
+        via 'internal_matrix_key' (defaults to 'impedance_matrix', i.e. Zi).
+        """
         cfg = self.plot_config[graph_key]
-        p, q = cfg['p'], cfg['q']
         fig, (ax1, ax2) = plt.subplots(1, 2, figsize=self.figsize, sharey=False)
         fig.suptitle(cfg['suptitle'], fontsize=12, y=0.98)
         left_cfg, right_cfg = cfg['left_plot'], cfg['right_plot']
@@ -134,19 +139,28 @@ class SCCPlotter(BasePlotter):
         freq = self._scc_freq
         w = 2 * np.pi * freq
 
-        internal_matrices = self.pul_data.get('internal_matrices')
-        if internal_matrices is not None:
-            Zi = internal_matrices['impedance_matrix']
-            style = cfg['internal_style']
-            ax1.plot(freq, self._calculate_plot_data(Zi[:, p, q], w, left_cfg), **style)
-            ax2.plot(freq, self._calculate_plot_data(Zi[:, p, q], w, right_cfg), **style)
+        components = cfg.get('components') or [{
+            'p': cfg['p'], 'q': cfg['q'],
+            'internal_style': cfg['internal_style'],
+            'matlab_series_to_plot': cfg.get('matlab_series_to_plot', []),
+        }]
 
-        if self.mtlb:
-            mtlb_freq = self.mtlb.get('frequencies')
-            if mtlb_freq is not None:
-                mtlb_w = 2 * np.pi * mtlb_freq
-                mtlb_key = cfg.get('matlab_matrix_key', 'internal_impedance_matrix')
-                for series in cfg.get('matlab_series_to_plot', []):
+        internal_matrices = self.pul_data.get('internal_matrices')
+        internal_matrix_key = cfg.get('internal_matrix_key', 'impedance_matrix')
+        mtlb_freq = self.mtlb.get('frequencies') if self.mtlb else None
+        mtlb_w = 2 * np.pi * mtlb_freq if mtlb_freq is not None else None
+        mtlb_key = cfg.get('matlab_matrix_key', 'internal_impedance_matrix')
+
+        for comp in components:
+            p, q = comp['p'], comp['q']
+            if internal_matrices is not None:
+                Mi = internal_matrices[internal_matrix_key]
+                style = comp['internal_style']
+                ax1.plot(freq, self._calculate_plot_data(Mi[:, p, q], w, left_cfg), **style)
+                ax2.plot(freq, self._calculate_plot_data(Mi[:, p, q], w, right_cfg), **style)
+
+            if self.mtlb and mtlb_freq is not None:
+                for series in comp.get('matlab_series_to_plot', []):
                     key = series['key']
                     if key not in self.mtlb.get('scenarios', {}):
                         continue
@@ -168,6 +182,9 @@ class SCCPlotter(BasePlotter):
     def scc_series_impedance_internal_vs_matlab(self, graph_key):
         self._plot_scc_internal_vs_matlab(graph_key)
 
+    def scc_shunt_admittance_internal_vs_matlab(self, graph_key):
+        self._plot_scc_internal_vs_matlab(graph_key)
+
     def scc_series_impedance_matrix(self, graph_key_list):
         for key in graph_key_list:
             self._plot_scc_matrix(key)
@@ -182,6 +199,10 @@ class SCCPlotter(BasePlotter):
 
     def scc_earth_return_admittance_matrix(self):
         for key in ['earth_return_admittance_self', 'earth_return_admittance_mutual_ab', 'earth_return_admittance_mutual_ac']:
+            self._plot_scc_matrix(key)
+
+    def scc_earth_return_potential_coefficient_matrix(self):
+        for key in ['earth_return_potential_coefficient_self', 'earth_return_potential_coefficient_mutual_ab', 'earth_return_potential_coefficient_mutual_ac']:
             self._plot_scc_matrix(key)
 
     def scc_earth_propagation_constant(self):

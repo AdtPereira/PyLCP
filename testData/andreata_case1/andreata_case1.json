@@ -21,6 +21,9 @@
         "type": "XLPE",
         "thickness": 0.010675,
         "relative_permittivity": 2.2
+      },
+      "semiconducting_layer": {
+        "thickness": 0.001125
       }
     },
     "sheath": {
@@ -31,6 +34,9 @@
         "type": "PVC",
         "thickness": 0.0022,
         "relative_permittivity": 2.8
+      },
+      "semiconducting_layer": {
+        "thickness": 0.00075
       }
     }
   }
