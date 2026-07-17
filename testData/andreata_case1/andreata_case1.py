@@ -15,61 +15,21 @@ try:
     from models.single_core_cable import SingleCoreCableModelGenerator
     from mtl_main.graphics import GroundReturnMTLRepresentation
     from mtl_main.source import MulticonductorTransmissionLine
-    from analytical_forms.single_core_cable import InternalPerUnitParameters, PerUnitParameters
+    from analytical_forms.single_core_cable import (
+        InternalPerUnitParameters, PerUnitParameters, apply_semiconducting_layer_correction,
+    )
     from .plot_config import PLOT_CONFIG
     print("Modules imported successfully.")
 except ImportError as e:
     print(f"Error importing modules: {e}")
     sys.exit(1)
 
-def apply_semiconducting_layer_correction(model: dict, cable_generator: SingleCoreCableModelGenerator) -> dict:
-    """
-    Corrige a permissividade relativa da isolação do núcleo para levar em conta as
-    duas camadas semicondutoras (blindagem do condutor e blindagem da isolação),
-    conforme Eq. (4.65) do Cigré Working Group C4.502 (2013):
-
-        eps_ins_eq = eps_ins * ln(r2/r1) / ln(rb/ra)
-
-    onde r1/r2 são os raios interno/externo da isolação tal como modelada
-    (núcleo -> blindagem metálica) e ra/rb são os raios internos/externos da
-    camada efetivamente dielétrica, isto é, excluindo as duas camadas
-    semicondutoras (d1, junto ao núcleo, e d2, junto à blindagem). As camadas
-    semicondutoras atuam como isolantes para o cálculo da corrente, mas como
-    parte do condutor/blindagem para o cálculo das capacitâncias -- por isso a
-    geometria original (r1, r2) do modelo é preservada, e só a permissividade
-    efetiva da isolação entre núcleo e blindagem é ajustada.
-
-    Não faz nada (retorna o modelo inalterado) se as chaves 'semiconducting_layer'
-    não estiverem presentes no JSON do caso.
-    """
-    core, sheath = cable_generator.core, cable_generator.sheath
-    d1 = (core or {}).get('semiconducting_layer', {}).get('thickness')
-    d2 = (sheath or {}).get('semiconducting_layer', {}).get('thickness')
-    if d1 is None or d2 is None:
-        return model
-
-    r1 = core['outer_radius']
-    r2 = r1 + core['insulation']['thickness']
-    ra, rb = r1 + d1, r2 - d2
-    eps_ins = core['insulation']['relative_permittivity']
-    eps_ins_eq = eps_ins * np.log(r2 / r1) / np.log(rb / ra)
-
-    print(f"Correção de camadas semicondutoras (Eq. 4.65, Cigré WG C4.502): "
-          f"eps_ins {eps_ins:.4f} -> eps_ins_eq {eps_ins_eq:.4f} "
-          f"(r1={r1*1e3:.3f} mm, ra={ra*1e3:.3f} mm, rb={rb*1e3:.3f} mm, r2={r2*1e3:.3f} mm)")
-
-    for conductor in model.values():
-        if isinstance(conductor, dict) and conductor.get('conductor_name') == 'core':
-            conductor['insulation']['relative_permittivity'] = eps_ins_eq
-
-    return model
-
 def main():
     """ Main function to run the simulation and plotting using vectorized calculations. """
     st = time.time()
     cable_generator = SingleCoreCableModelGenerator(__file__)
     model = cable_generator.underground_model()
-    model = apply_semiconducting_layer_correction(model, cable_generator)
+    model = apply_semiconducting_layer_correction(model, cable_generator.core, cable_generator.sheath)
     mtl_model_a = MulticonductorTransmissionLine(model)
     
     # --- MTL setup ---

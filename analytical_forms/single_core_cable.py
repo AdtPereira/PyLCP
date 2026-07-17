@@ -193,7 +193,61 @@ def capacitance_matrix_from_energy_method(energy_vector: np.ndarray, v0: float =
 
     # Assemble the final 2x2 symmetric capacitance matrix.
     # The off-diagonal mutual capacitance terms are negative.
-    return np.array([[C11, C12], [C12, C22]])   
+    return np.array([[C11, C12], [C12, C22]])
+
+def apply_semiconducting_layer_correction(model: dict, core: dict, sheath: dict) -> dict:
+    """
+    Corrects the relative permittivity of a single-core cable's core insulation
+    to account for the two semiconducting layers (conductor screen + insulation
+    screen) bonded to its inner/outer surfaces, per Eq. (4.65) of Cigré Working
+    Group C4.502 (2013):
+
+        eps_ins_eq = eps_ins * ln(r2/r1) / ln(rb/ra)
+
+    The semiconducting layers behave as insulators for current (impedance)
+    calculations, but as an extension of the conductor/sheath for capacitance
+    (admittance) calculations. So the original geometry (r1, r2) used elsewhere
+    in the model is preserved, and only the insulation's effective permittivity
+    is corrected to match the reduced dielectric span (ra, rb) that remains
+    once both semiconducting layers are excluded.
+
+    Args:
+        model: the model dict produced by a SingleCoreCableModelGenerator
+            (e.g. via .underground_model()), mutated in place for every
+            conductor named 'core'.
+        core: the case's 'cable_definition.core' dict, as loaded from JSON.
+            Must contain 'outer_radius' and 'insulation' ('thickness',
+            'relative_permittivity'); 'semiconducting_layer' ('thickness') is
+            optional.
+        sheath: the case's 'cable_definition.sheath' dict, as loaded from JSON.
+            'semiconducting_layer' ('thickness') is optional.
+
+    Returns:
+        dict: the same `model`, with 'insulation.relative_permittivity'
+        corrected on every 'core' conductor. Returned unchanged if either
+        layer lacks a 'semiconducting_layer' definition.
+    """
+    d1 = (core or {}).get('semiconducting_layer', {}).get('thickness')
+    d2 = (sheath or {}).get('semiconducting_layer', {}).get('thickness')
+    if d1 is None or d2 is None:
+        return model
+
+    r1 = core['outer_radius']
+    r2 = r1 + core['insulation']['thickness']
+    ra, rb = r1 + d1, r2 - d2
+    eps_ins = core['insulation']['relative_permittivity']
+    eps_ins_eq = eps_ins * np.log(r2 / r1) / np.log(rb / ra)
+
+    print("\n======== Semiconducting Layer Correction (Cigré WG C4.502, Eq. 4.65) ========")
+    print(f"r1={r1*1e3:.3f} mm, ra={ra*1e3:.3f} mm, rb={rb*1e3:.3f} mm, r2={r2*1e3:.3f} mm")
+    print(f"eps_ins: {eps_ins:.4f} -> eps_ins_eq: {eps_ins_eq:.4f}")
+    print("===================================================================\n")
+
+    for conductor in model.values():
+        if isinstance(conductor, dict) and conductor.get('conductor_name') == 'core':
+            conductor['insulation']['relative_permittivity'] = eps_ins_eq
+
+    return model
 
 class EquivalentRadiiSystems:
     def __init__(self, model: MulticonductorTransmissionLine):
