@@ -54,7 +54,7 @@ def main():
     st = time.time()    
     model_generator = SingleCoreCableModelGenerator(__file__)    
     model_0 = model_generator.eccentric_hdpe_enclosed_model()
-    model_1 = model_generator.underground_model()
+    model_1 = model_generator.underground_flat_model()
     mtl_0 = MulticonductorTransmissionLine(model_0)
     mtl_1 = MulticonductorTransmissionLine(model_1)
 

@@ -44,7 +44,9 @@ try:
     from models.single_core_cable import SingleCoreCableModelGenerator
     from mtl_main.graphics import GroundReturnMTLRepresentation
     from mtl_main.source import MulticonductorTransmissionLine
-    from analytical_forms.single_core_cable import InternalPerUnitParameters, PerUnitParameters
+    from analytical_forms.single_core_cable import (
+        InternalPerUnitParameters, PerUnitParameters, apply_semiconducting_layer_correction,
+    )
     print("Core modules imported successfully.")
 except ImportError as e:
     print(f"Error importing modules: {e}")
@@ -53,7 +55,9 @@ except ImportError as e:
 def main():
     """ Main function to run the simulation and plotting using vectorized calculations. """
     st = time.time()    
-    model = SingleCoreCableModelGenerator(__file__).underground_model()
+    cable_generator = SingleCoreCableModelGenerator(__file__)
+    model = cable_generator.underground_flat_model()
+    model = apply_semiconducting_layer_correction(model, cable_generator.core, cable_generator.sheath)
     mtl_model = MulticonductorTransmissionLine(model)
 
     print("Loading COMSOL internal impedance results...")

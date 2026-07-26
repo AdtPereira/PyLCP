@@ -20,7 +20,10 @@
       "insulation": {
         "type": "XLPE",
         "thickness": 0.019340,
-        "relative_permittivity": 2.963538
+        "relative_permittivity": 2.3
+      },
+      "semiconducting_layer": {
+        "thickness": 0.00189
       }
     },
     "sheath": {
@@ -31,6 +34,9 @@
         "type": "HDPE",
         "thickness": 0.004,
         "relative_permittivity": 2.3
+      },
+      "semiconducting_layer": {
+        "thickness": 0.00214
       }
     }
   }

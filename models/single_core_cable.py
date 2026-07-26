@@ -433,7 +433,95 @@ class SingleCoreCableModelGenerator:
 
         return model
 
-    def underground_model(self) -> Dict[str, Any]:
+    def flat_scc_with_ecc_cable_model(self, host_conductor: str = 'sheath') -> Dict[str, Any]:
+        """
+        Gera um modelo para a Configuração 3 (Figura 5.3): três cabos SCC de potência
+        em arranjo plano (flat), diretamente enterrados no solo (sem duto HDPE), mais
+        um cabo de aterramento (ECC) próximo ao cabo mais à direita, sem encostar
+        nele.
+
+        A posição do ECC é controlada por dois parâmetros de 'arrangement':
+          - 'ecc_alignment': 'center' (padrão) posiciona o centro do ECC no mesmo
+            eixo horizontal dos centros dos cabos SCC (todos a '-burial_depth');
+            'bottom_tangent' posiciona o ECC apoiado na mesma linha horizontal
+            tangente à superfície inferior dos cabos SCC (situação em que todos
+            repousam no fundo de uma vala comum).
+          - 'ecc_horizontal_gap': folga horizontal (em metros) entre a superfície externa do
+            último cabo SCC e a superfície externa do ECC (cabos "próximos", não
+            encostados).
+        """
+
+        # --- 1. Dados do SCC ---
+        host_conductor_data = getattr(self, host_conductor)
+        host_insulation = host_conductor_data.get('insulation')
+        cable_outer_radius = host_conductor_data['outer_radius'] + (host_insulation['thickness'] if host_insulation else 0)
+
+        # --- 2. Dados do ECC ---
+        assert self.ecc is not None, "ECC conductor data must be provided for the flat SCC + ECC model."
+        ecc_insulation = self.ecc.get('insulation')
+        ecc_outer_radius = self.ecc['outer_radius'] + (ecc_insulation['thickness'] if ecc_insulation else 0)
+
+        # --- 3. Posição dos Cabos SCC (arranjo plano, diretamente enterrados) ---
+        # Configuração 3 é sempre trifásica (3 cabos SCC); a cardinalidade não
+        # vem do JSON, análogo a conventional_three_phase_flat.
+        depth = self.arrangement['burial_depth']
+        spacing = self.arrangement['spacing']
+        num_scc_conductors = 3
+        cable_centers = [(i * spacing, -depth) for i in range(num_scc_conductors)]
+
+        # --- 4. Posição do ECC (próximo ao último cabo SCC, sem encostar) ---
+        ecc_alignment = self.arrangement.get('ecc_alignment', 'center')
+        ecc_horizontal_gap = self.arrangement.get('ecc_horizontal_gap', 0.0)
+        last_cable_center = cable_centers[-1]
+        horizontal_offset = cable_outer_radius + ecc_horizontal_gap + ecc_outer_radius
+
+        if ecc_alignment == 'center':
+            # ECC no mesmo eixo horizontal dos centros dos cabos SCC.
+            ecc_center = (last_cable_center[0] + horizontal_offset, -depth)
+        elif ecc_alignment == 'bottom_tangent':
+            # ECC apoiado na linha tangente à superfície inferior dos cabos SCC
+            # (todos os cabos repousando no fundo de uma vala comum).
+            trench_floor_y = -depth - cable_outer_radius
+            ecc_center = (last_cable_center[0] + horizontal_offset, trench_floor_y + ecc_outer_radius)
+        else:
+            raise ValueError(
+                f"Unknown 'ecc_alignment' value: '{ecc_alignment}'. Expected 'center' or 'bottom_tangent'."
+            )
+
+        # --- 5. Geração do Modelo ---
+        model = {
+            'name': self.input_data.get('name', 'generic flat ECC system'),
+            'type': self.input_data.get('type', 'scc-flat-ecc'),
+            'note': self.input_data.get('note', 'NA'),
+            'idx_ref_conductor': 0,
+            0: {
+                'line_id': 0,
+                'conductor_name': 'soil',
+                'line_type': 'return',
+                'line_return': None,
+                'conductivity': self.soil['conductivity_S_per_m'],
+                'relative_permeability': 1.0,
+                'relative_permittivity': self.soil['relative_permittivity'],
+                'relative_permittivity_out': 1.0,
+            },
+        }
+
+        # --- 6. Adicionar Condutores ---
+        conductor_id = 1
+
+        # Adiciona os três cabos SCC no arranjo plano.
+        for cp in cable_centers:
+            conductor_id = self._add_cable_conductors(model, conductor_id, cp)
+
+        # Adiciona o ECC em 'ecc_center' (próximo ao último cabo, sem encostar).
+        conductor_id = self._add_ecc_conductor(model, conductor_id, ecc_center)
+
+        if not self.silent_mode:
+            self._show_model(model)
+
+        return model
+
+    def underground_flat_model(self) -> Dict[str, Any]:
         """
         Generates a parametric model for underground cables in a flat arrangement.
         The number of cables and their spacing is determined by the 'arrangement'

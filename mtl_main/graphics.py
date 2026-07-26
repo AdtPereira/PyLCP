@@ -102,6 +102,9 @@ class BaseMTLRepresentation:
         elif self.model.mtl_type == 'shared-hdpe':
             title = 'Single-Core Cable Buried in HDPE-Air Gap Enclosure'
             h_factor = -2
+        elif self.model.mtl_type == 'scc-flat-ecc':
+            title = 'Flat-Buried SCC Cables with ECC'
+            h_factor = -2.5
         elif self.model.mtl_type == 'pipe':
             title = 'Pipe-Type Cable'
             h_factor = 1
@@ -329,11 +332,17 @@ class GroundReturnMTLRepresentation(BaseMTLRepresentation):
         deepest_cond = params['depth_ref_conductor']
         deepest_cond_x = deepest_cond['center_point'][0]
 
-        # Calculate the schematic y-position of the depth-reference conductor centre
+        # Calculate the schematic y-position of the depth-reference conductor centre.
+        # This MUST mirror the bypass in _plot_conductor_graphic: when h_factor == 1
+        # the conductors are drawn at their real (unscaled) y, so the annotation has
+        # to reference that same real y instead of the rescaled one.
         y_real_deepest = params['y_depth_ref']
-        y_avg = params['y_avg']
-        schematic_y_avg = params['h_factor'] * params['max_radius']
-        schematic_y_deepest = schematic_y_avg + (y_real_deepest - y_avg)
+        if params['h_factor'] != 1:
+            y_avg = params['y_avg']
+            schematic_y_avg = params['h_factor'] * params['max_radius']
+            schematic_y_deepest = schematic_y_avg + (y_real_deepest - y_avg)
+        else:
+            schematic_y_deepest = y_real_deepest
 
         schematic_y_scaled = schematic_y_deepest * self.unit_factor
 

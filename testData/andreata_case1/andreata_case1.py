@@ -28,7 +28,7 @@ def main():
     """ Main function to run the simulation and plotting using vectorized calculations. """
     st = time.time()
     cable_generator = SingleCoreCableModelGenerator(__file__)
-    model = cable_generator.underground_model()
+    model = cable_generator.underground_flat_model()
     model = apply_semiconducting_layer_correction(model, cable_generator.core, cable_generator.sheath)
     mtl_model_a = MulticonductorTransmissionLine(model)
     
@@ -53,19 +53,19 @@ def main():
         'scenarios': {
             'p100_er1': {
                 'mtl': mtl_model_a,
-                'zg_form': 'magalhaes_xue',
-                'yg_form': 'magalhaes_xue',
+                'zg_form': 'deconti',
+                'yg_form': 'deconti',
             },
-            # 'p100_er20': {
-            #     'mtl': mtl_model_b,
-            #     'zg_form': 'magalhaes_xue',
-            #     'yg_form': 'magalhaes_xue',
-            # },
-            # 'p500_er1': {
-            #     'mtl': mtl_model_c,
-            #     'zg_form': 'magalhaes_xue',
-            #     'yg_form': 'magalhaes_xue',
-            # },
+            'p100_er20': {
+                'mtl': mtl_model_b,
+                'zg_form': 'deconti',
+                'yg_form': 'deconti',
+            },
+            'p500_er1': {
+                'mtl': mtl_model_c,
+                'zg_form': 'deconti',
+                'yg_form': 'deconti',
+            },
             # 'p100_er1_vance': {
             #     'mtl': mtl_model_a,
             #     'zg_form': 'deconti',
@@ -104,8 +104,7 @@ def main():
     cmsl_params = cmsl_processor.get_general_parameters('cmsl_ground_return_impedance')
     if cmsl_params is not None:
         pul = InternalPerUnitParameters(mtl_model_a, cmsl_params['frequencies'])
-        internal_matrices = pul.matrices(internal_form='hybrid')
-
+        internal_matrices = pul.matrices(internal_form='approximation')
         pul_data['comsol'].update(cmsl_params)
         pul_data['comsol']['internal_matrices'] = internal_matrices
 
@@ -184,7 +183,7 @@ def main():
         value['quasi_tem_matrices'] = quasi_tem
 
     print(f"\nEnd of the routine! Time spent on simulation: {(time.time() - st):.1f} seconds.\n")
-    plotter = SCCPlotter(__file__, pul_data, PLOT_CONFIG, autoSave=True)
+    plotter = SCCPlotter(__file__, pul_data, PLOT_CONFIG, autoSave=False)
     plotter.scc_series_impedance_matrix(graph_key_list=['series_impedance_all_scenarios'])
     plotter.scc_shunt_admittance_matrix(graph_key_list=['shunt_admittance_all_scenarios'])
     plotter.scc_series_impedance_internal_vs_matlab('internal_impedance_core_sheath')

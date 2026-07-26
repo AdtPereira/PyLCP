@@ -23,7 +23,7 @@ except ImportError as e:
 def main():
     """ Main function to run the simulation and plotting using vectorized calculations. """
     st = time.time()    
-    model = SingleCoreCableModelGenerator(__file__).underground_model()
+    model = SingleCoreCableModelGenerator(__file__).underground_flat_model()
     mtl_model = MulticonductorTransmissionLine(model)
 
     print("Loading COMSOL internal impedance results...")
