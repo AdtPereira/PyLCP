@@ -128,8 +128,8 @@ def main():
     plotter.scc_earth_propagation_constant()
     plotter.scc_earth_return_impedance_matrix()
     plotter.scc_earth_return_admittance_matrix()
-    plotter.scc_series_impedance_matrix(graph_key_list=['fig419', 'fig421a', 'fig421b'])
-    plotter.scc_shunt_admittance_matrix(graph_key_list=['fig423', 'fig425a', 'fig425b'])
+    plotter.compare_complete_matrices(key_list=['fig419', 'fig421a', 'fig421b'])
+    plotter.shunt_admittance_matrix(graph_key_list=['fig423', 'fig425a', 'fig425b'])
     GroundReturnMTLRepresentation(__file__, mtl_model_a, units='centimeter').system_schematic()
     plt.show()
 

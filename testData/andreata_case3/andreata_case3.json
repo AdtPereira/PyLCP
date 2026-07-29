@@ -7,7 +7,7 @@
     "fourier_order": 10,
     "idx_ref_conductor": 0,
     "ecc_alignment": "center",
-    "ecc_horizontal_gap": 0.01
+    "ecc_horizontal_gap": 0.02802
   },
   "soil": {
     "conductivity_S_per_m": 0.01,
@@ -43,11 +43,11 @@
     "ecc": {
       "inner_radius": 0.0,
       "outer_radius": 0.0033,
-      "conductivity_S_per_m": 6E7,
+      "conductivity_S_per_m": 3.8E7,
       "insulation": {
         "type": "XLPE",
-        "thickness": 0.001,
-        "relative_permittivity": 2.2
+        "thickness": 0.002,
+        "relative_permittivity": 2.8
       }
     }
   }

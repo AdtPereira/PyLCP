@@ -89,7 +89,7 @@ def main():
     print(f"End of the routine! Time spent on simulation: {(time.time() - st):.1f} seconds.\n")
     GroundReturnMTLRepresentation(__file__, mtl_model_a, units='centimeter').system_schematic()
     plotter = SCCPlotter(__file__, pul_data, PLOT_CONFIG, autoSave=False)
-    plotter.scc_series_impedance_matrix(graph_key_list=['fig419'])
+    plotter.compare_complete_matrices(key_list=['fig419'])
     plt.show()    
 
 if __name__ == "__main__":

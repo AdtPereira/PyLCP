@@ -2,6 +2,7 @@ import sys
 import os
 import numpy as np
 from pathlib import Path
+from typing import Sequence
 
 import scipy.io as sio
 
@@ -123,3 +124,61 @@ class MatlabDataReader:
                 shape = getattr(arr, 'shape', None)
                 dtype = getattr(arr, 'dtype', type(arr))
                 print(f"  {var_name}: shape={shape}, dtype={dtype}")
+
+    @staticmethod
+    def _reorder_conductor_matrix(matrix, conductor_order: Sequence[int]):
+        """
+        O MATLAB exporta os condutores agrupados por tipo: [core_A, core_B, core_C,
+        sheath_A, sheath_B, sheath_C]. O pyLCP monta suas matrizes (interna e
+        quasi-TEM) agrupadas por cabo: [core_A, sheath_A, core_B, sheath_B,
+        core_C, sheath_C] (ver np.kron(np.identity(N), Zij) em
+        InternalPerUnitParameters.matrices()). Sem essa reordenação, M[p,q]
+        (pyLCP) e Z[p,q] (MATLAB) apontam para pares de condutores fisicamente
+        diferentes para os mesmos índices (p, q).
+        """
+        if matrix is None:
+            return None
+        return matrix[:, conductor_order, :][:, :, conductor_order]
+
+    def get_scc_scenario_data(self, prefix: str, conductor_order: Sequence[int]) -> dict:
+        """
+        Monta o dicionário de dados de referência do MATLAB (no formato usado por
+        pul_data['matlab']) para um caso SCC (núcleo + bainha), a partir dos
+        arquivos exportados com o prefixo `prefix` (ex.: 'andreata' ->
+        'andreata_frequency_range', 'andreata_series_impedance_matrix', ...).
+
+        `conductor_order` reordena os condutores da convenção MATLAB (agrupada
+        por tipo) para a convenção pyLCP (agrupada por cabo); ver
+        `_reorder_conductor_matrix`. As duas matrizes de retorno pelo solo (Zg,
+        Pg) seguem o mesmo layout tipo-agrupado das demais -- núcleo e bainha
+        do mesmo cabo têm entradas redundantes (idênticas), já que o retorno
+        pelo solo só depende da posição do cabo, não de qual condutor dentro
+        dele -- por isso usam a mesma `_reorder_conductor_matrix`, sem recorte
+        especial.
+
+        Retorna 'frequencies' como None se o arquivo correspondente não for
+        encontrado -- o fallback (ex.: para pul_data['frequencies']) fica a
+        cargo do chamador.
+        """
+        frequencies = self.data.get(f'{prefix}_frequency_range')
+
+        internal_z = self._reorder_conductor_matrix(self.data.get(f'{prefix}_internal_impedance_matrix'), conductor_order)
+        series_z = self._reorder_conductor_matrix(self.data.get(f'{prefix}_series_impedance_matrix'), conductor_order)
+        shunt_y = self._reorder_conductor_matrix(self.data.get(f'{prefix}_shunt_admittance_matrix'), conductor_order)
+        internal_y = self._reorder_conductor_matrix(self.data.get(f'{prefix}_internal_admittance_matrix'), conductor_order)
+        earth_return_pg = self._reorder_conductor_matrix(self.data.get(f'{prefix}_earth_return_potential_coefficient_matrix'), conductor_order)
+        earth_return_zg = self._reorder_conductor_matrix(self.data.get(f'{prefix}_earth_return_impedance_matrix'), conductor_order)
+
+        return {
+            'frequencies': frequencies.flatten() if frequencies is not None else None,
+            'scenarios': {
+                'measured': {
+                    'internal_impedance_matrix': internal_z,
+                    'series_impedance_matrix': series_z,
+                    'shunt_admittance_matrix': shunt_y,
+                    'internal_admittance_matrix': internal_y,
+                    'earth_return_potential_coefficient_matrix': earth_return_pg,
+                    'earth_return_impedance_matrix': earth_return_zg,
+                },
+            },
+        }

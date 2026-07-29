@@ -7,14 +7,17 @@ mais à direita, sem encostar nele. É o primeiro caso do repositório com uma m
 heterogênea de cabos (3 SCC de 2 condutores cada + 1 ECC de 1 condutor), o que expôs
 uma série de suposições de "N cabos idênticos" implícitas em várias partes do pipeline.
 
-Este documento registra, em ordem cronológica de descoberta, os 5 itens tratados:
+Este documento registra, em ordem cronológica de descoberta, os 8 itens tratados:
 1. reformulação do gerador de modelo para refletir a Figura 5.3;
 2. bug no esquema gráfico (`system_schematic.png`);
 3. decisão de design sobre `num_conductors`;
 4. bug dimensional na matriz de impedância interna;
-5. bug dimensional na matriz de retorno pelo solo (quasi-TEM).
+5. bug dimensional na matriz de retorno pelo solo (quasi-TEM);
+6. `conductor_order` do MATLAB sem o ECC (dados descartados silenciosamente);
+7. índices de ECC errados no `PLOT_CONFIG` para as matrizes de retorno pelo solo;
+8. matrizes de retorno pelo solo do MATLAB recortadas em vez de reordenadas.
 
-Mais uma pendência conhecida e não corrigida (item 6).
+Mais uma pendência conhecida e não corrigida (item 9, `utils/comsol_data.py`).
 
 ---
 
@@ -196,7 +199,117 @@ até o fim sem erro. Regressão limpa nos mesmos 7 casos homogêneos do Item 4.
 
 ---
 
-## Item 6 (pendente) — Mesmo padrão de bug em `utils/comsol_data.py`
+## Item 6 — `conductor_order` do MATLAB sem o ECC (dados descartados silenciosamente)
+
+**Onde:** `testData/andreata_case3/andreata_case3.py` (chamada a `MatlabDataReader.get_scc_scenario_data`)
+
+**Sintoma original:** três warnings ao rodar, sem crash:
+```
+Warning: MATLAB data not found for 'measured' with key 'series_impedance_matrix'.
+Warning: MATLAB data not found for 'measured' with key 'internal_impedance_matrix'.
+Warning: MATLAB data not found for 'measured' with key 'internal_admittance_matrix'.
+```
+
+**Causa raiz:** os arquivos `.mat` de referência já vinham no formato cheio 7×7 (confirmado
+via `scipy.io.loadmat`: shape `(7, 7, 90)`), mas `conductor_order=[0, 3, 1, 4, 2, 5]`
+— herdado do `andreata_case1`, que não tem ECC — só listava 6 índices.
+`MatlabDataReader._reorder_conductor_matrix` (`utils/matlab_data.py`) faz
+`matrix[:, conductor_order, :][:, :, conductor_order]`: com apenas 6 índices, a
+linha/coluna do ECC (índice 6) era silenciosamente descartada, produzindo uma matriz
+`'measured'` 6×6. Os componentes de plotagem que pedem `p=6, q=6` (termo próprio do ECC)
+então não encontravam esse índice (`IndexError`, capturado pelo `except` genérico do
+plotter — `scc_plotter.py:69` — e impresso apenas como "not found").
+
+**Correção:** `conductor_order=[0, 3, 1, 4, 2, 5, 6]` — o ECC não tem par núcleo/bainha
+para trocar de posição, então permanece no fim (índice 6) tanto na convenção MATLAB
+(tipo-agrupada) quanto na convenção pyLCP (cabo-agrupada).
+
+**Validado:** os três warnings desaparecem; `andreata_case3.py` roda sem alterar as
+demais curvas (índices 0-5 inalterados pela mudança).
+
+---
+
+## Item 7 — Índices de ECC errados no `PLOT_CONFIG` para as matrizes de retorno pelo solo
+
+**Onde:** `testData/andreata_case3/plot_config.py`
+
+**Sintoma original:**
+```
+IndexError: index 6 is out of bounds for axis 1 with size 4
+```
+em `scc_plotter.py:32` (`_plot_scc_matrix`), ao plotar `earth_return_impedance_ecc`.
+
+**Causa raiz:** as configs `earth_return_impedance_ecc`, `earth_return_admittance_ecc` e
+`earth_return_potential_coeff_ecc` usavam `path: ['earth_return_parameters', ...]` com
+`p=6, q=6` — mas `PerUnitParameters.earth_return_parameters()`
+(`analytical_forms/single_core_cable.py:1081`) retorna matrizes indexadas **por cabo
+físico** (`N = num_sc_cables = 4`: fase A, fase B, fase C, ECC — ver Item 5), não por
+condutor. Nesse espaço o ECC é o índice 3, não 6. Já as configs
+`mutual_impedance_phase_a_sheath_ecc`, `self_impedance_ecc` e `self_admittance_ecc`, que
+usam `path: ['quasi_tem_matrices', ...]`, já estavam corretas com `p=6, q=6`, pois essas
+matrizes foram expandidas para o espaço por-condutor (N=7) via `_expand_by_block_sizes`
+(Item 5).
+
+**Correção:**
+- `earth_return_admittance_ecc`: mantido em `path: ['earth_return_parameters',
+  'admittance_matrix']`, com `p=3, q=3` (índice do ECC no espaço por-cabo). Não há
+  equivalente por-condutor válido para essa matriz — ver observação abaixo.
+- `earth_return_impedance_ecc` / `earth_return_potential_coeff_ecc`: migrados para
+  `path: ['quasi_tem_matrices', 'earth_return_impedance_matrix']` /
+  `['quasi_tem_matrices', 'earth_return_potential_coefficient']`, com `p=6, q=6` — essas
+  chaves já existem em `quasi_tem_approx_matrices` (linha 1219-1226), expandidas para
+  N=7, e batem índice-a-índice com o MATLAB reordenado (ver Item 8).
+
+**Observação (não corrigida):** `quasi_tem_approx_matrices` retorna
+`'earth_return_admittance_matrix': Yg`, mas `Yg` nunca é preenchido (fica
+`np.zeros_like(Zi, dtype=complex)`, dead code pré-existente) — por isso
+`earth_return_admittance_ecc` não pôde ser migrado como as outras duas. Como essa config
+não tem `matlab_series_to_plot`, isso não gera warning nem crash hoje; fica registrado
+para quando alguém for calcular `Yg` de fato.
+
+**Validado:** `andreata_case3.py` roda até o fim sem `IndexError`.
+
+---
+
+## Item 8 — Matrizes de retorno pelo solo do MATLAB recortadas em vez de reordenadas (ECC descartado)
+
+**Onde:** `utils/matlab_data.py` (`MatlabDataReader.get_scc_scenario_data`)
+
+**Sintoma original (após o Item 7):**
+```
+Warning: MATLAB data not found for 'measured' with key 'earth_return_impedance_matrix'.
+Warning: MATLAB data not found for 'measured' with key 'earth_return_potential_coefficient_matrix'.
+```
+
+**Causa raiz:** `earth_return_impedance_matrix` e `earth_return_potential_coefficient_matrix`
+recebiam um tratamento diferente das outras 4 matrizes: em vez de
+`_reorder_conductor_matrix(..., conductor_order)`, o código recortava apenas o bloco
+superior-esquerdo `[:num_phases, :num_phases]` (3×3), sob a suposição — correta para
+`andreata_case1` (sem ECC), mas desatualizada para `andreata_case3` — de que essas
+matrizes só existem "a nível de cabo/fase". Confirmado via `scipy.io.loadmat` que os
+`.mat` de retorno pelo solo já vêm no mesmo formato cheio 7×7, tipo-agrupado-com-redundância,
+das demais 4 matrizes: `M[0,0]==M[3,3]` (core_A==sheath_A), `M[1,1]==M[4,4]`,
+`M[2,2]==M[5,5]`, e `M[6,6]` é o valor próprio do ECC. O recorte a 3×3 descartava esse
+índice 6 por completo, então `'measured'` nunca tinha dado para o ECC.
+
+**Correção:** as duas matrizes passaram a usar `_reorder_conductor_matrix(matrix,
+conductor_order)`, igual às outras 4 — sem recorte especial. O parâmetro `num_phases`
+(que só servia a esse recorte) foi removido de `get_scc_scenario_data`, e as chamadas em
+`andreata_case1.py`/`andreata_case3.py` atualizadas.
+
+**Validado:**
+- Os dois warnings desaparecem; nenhum warning novo surge em `andreata_case1` (os índices
+  `p=0, q=0` de fase-A apontam para o mesmo valor de `core_A` tanto no formato recortado
+  quanto no formato cheio reordenado — confirmado numericamente).
+- Checagem numérica pontual (índice de frequência 45, ≈2,15 kHz): `Zg` pyLCP
+  `[:,6,6] = 3,532e-4 + j4,951e-3` vs. MATLAB `3,531e-4 + j4,952e-3`; `Pg` pyLCP
+  `= 5,580e4 + j5,357e5` vs. MATLAB `5,580e4 + j5,354e5` — mesma ordem de grandeza,
+  consistente com dado medido vs. formulação analítica (mesmo padrão de `Zi_77`/`Yi_77`,
+  Item 4).
+
+---
+
+## Item 9 (pendente) — Mesmo padrão de bug em `utils/comsol_data.py`
 
 **Onde:** `utils/comsol_data.py:731` (`ComsolPostProcessor.get_quasi_tem_approx_matrices`)
 

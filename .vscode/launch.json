@@ -5,6 +5,7 @@
             "name": "Debug: Arquivo Atual como Módulo",
             "type": "debugpy",
             "request": "launch",
+            "python": "C:\\Users\\adilt\\miniconda3\\envs\\pylcp\\python.exe",
             "console": "integratedTerminal",
             // Executa o nosso script runner
             "program": "${workspaceFolder}/debug_runner.py",

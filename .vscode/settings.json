@@ -1,4 +1,5 @@
 {
+    "python.defaultInterpreterPath": "C:\\Users\\adilt\\miniconda3\\envs\\pylcp\\python.exe",
     "cSpell.words": [
         "ACSR",
         "agrupadas",
@@ -149,5 +150,7 @@
         "yref",
         "yscale",
         "zorder"
-    ]
+    ],
+    "python-envs.defaultEnvManager": "ms-python.python:conda",
+    "python-envs.defaultPackageManager": "ms-python.python:conda"
 }

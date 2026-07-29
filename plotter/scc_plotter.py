@@ -3,7 +3,6 @@ import matplotlib.pyplot as plt
 from utils.case_utils import save_figure
 from .models_base import BasePlotter
 
-
 class SCCPlotter(BasePlotter):
     def __init__(self, file_path: str, pul_data: dict, plot_config: dict, autoSave: bool = True):
         super().__init__(file_path, pul_data, plot_config, autoSave=autoSave)
@@ -123,7 +122,7 @@ class SCCPlotter(BasePlotter):
         if self.autoSave:
             save_figure(fig, self.results_dir, base_filename=graph_key)
 
-    def _plot_scc_internal_vs_matlab(self, graph_key):
+    def _plot_scc_internal_matrix(self, graph_key):
         """Plots an analytical internal-only matrix (Zi or Yi) against the MATLAB reference matrix.
 
         Accepts either a single (p, q) pair via the 'p'/'q'/'internal_style' keys, or several
@@ -179,35 +178,16 @@ class SCCPlotter(BasePlotter):
         if self.autoSave:
             save_figure(fig, self.results_dir, base_filename=graph_key)
 
-    def scc_series_impedance_internal_vs_matlab(self, graph_key):
-        self._plot_scc_internal_vs_matlab(graph_key)
-
-    def scc_shunt_admittance_internal_vs_matlab(self, graph_key):
-        self._plot_scc_internal_vs_matlab(graph_key)
-
-    def scc_series_impedance_matrix(self, graph_key_list):
-        for key in graph_key_list:
+    def compare_complete_matrices(self, key_list):
+        for key in key_list:
             self._plot_scc_matrix(key)
 
-    def scc_shunt_admittance_matrix(self, graph_key_list):
-        for key in graph_key_list:
-            self._plot_scc_matrix(key)
-
-    def scc_earth_return_impedance_matrix(self):
-        for key in ['earth_return_impedance_self', 'earth_return_impedance_mutual_ab', 'earth_return_impedance_mutual_ac']:
-            self._plot_scc_matrix(key)
-
-    def scc_earth_return_admittance_matrix(self):
-        for key in ['earth_return_admittance_self', 'earth_return_admittance_mutual_ab', 'earth_return_admittance_mutual_ac']:
-            self._plot_scc_matrix(key)
-
-    def scc_earth_return_potential_coefficient_matrix(self):
-        for key in ['earth_return_potential_coefficient_self', 'earth_return_potential_coefficient_mutual_ab', 'earth_return_potential_coefficient_mutual_ac']:
-            self._plot_scc_matrix(key)
+    def compare_internal_matrices(self, key_list):
+        for key in key_list:
+            self._plot_scc_internal_matrix(key)
 
     def scc_earth_propagation_constant(self):
         self._plot_scc_scalar('earth_propagation_constant')
-
 
 class HDPEPlotter(BasePlotter):
     def __init__(self, file_path: str, pul_data: dict, plot_config: dict, autoSave: bool = True):
@@ -220,7 +200,6 @@ class HDPEPlotter(BasePlotter):
     def hdpe_internal_impedance_elements(self):
         for key in ['coaxial_cable', 'internal_impedance_elements']:
             self._plot_non_matrix_parameters(key)
-
 
 class CoaxialCablePlotter(BasePlotter):
     def __init__(self, file_path: str, pul_data: dict, plot_config: dict, autoSave: bool = True):
