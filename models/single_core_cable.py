@@ -440,7 +440,19 @@ class SingleCoreCableModelGenerator:
         um cabo de aterramento (ECC) próximo ao cabo mais à direita, sem encostar
         nele.
 
-        A posição do ECC é controlada por dois parâmetros de 'arrangement':
+        A posição do ECC é controlada por parâmetros de 'arrangement', em um de
+        dois modos mutuamente exclusivos:
+
+        Modo preciso (usado quando 'ecc_vertical_gap' está presente no JSON):
+          - 'ecc_horizontal_gap' / 'ecc_vertical_gap': distâncias (em metros,
+            podem ser negativas) entre o centro do ECC e o centro do terceiro
+            cabo SCC (o mais à direita), tomadas centro-a-centro (não folga
+            entre superfícies). 'ecc_vertical_gap' positivo posiciona o ECC
+            mais fundo que o cabo (mesma convenção de sinal de
+            'burial_depth'); 'ecc_horizontal_gap' positivo o afasta
+            horizontalmente do cabo.
+
+        Modo legado (usado quando 'ecc_vertical_gap' está ausente):
           - 'ecc_alignment': 'center' (padrão) posiciona o centro do ECC no mesmo
             eixo horizontal dos centros dos cabos SCC (todos a '-burial_depth');
             'bottom_tangent' posiciona o ECC apoiado na mesma linha horizontal
@@ -470,23 +482,37 @@ class SingleCoreCableModelGenerator:
         cable_centers = [(i * spacing, -depth) for i in range(num_scc_conductors)]
 
         # --- 4. Posição do ECC (próximo ao último cabo SCC, sem encostar) ---
-        ecc_alignment = self.arrangement.get('ecc_alignment', 'center')
-        ecc_horizontal_gap = self.arrangement.get('ecc_horizontal_gap', 0.0)
         last_cable_center = cable_centers[-1]
-        horizontal_offset = cable_outer_radius + ecc_horizontal_gap + ecc_outer_radius
+        ecc_vertical_gap = self.arrangement.get('ecc_vertical_gap')
 
-        if ecc_alignment == 'center':
-            # ECC no mesmo eixo horizontal dos centros dos cabos SCC.
-            ecc_center = (last_cable_center[0] + horizontal_offset, -depth)
-        elif ecc_alignment == 'bottom_tangent':
-            # ECC apoiado na linha tangente à superfície inferior dos cabos SCC
-            # (todos os cabos repousando no fundo de uma vala comum).
-            trench_floor_y = -depth - cable_outer_radius
-            ecc_center = (last_cable_center[0] + horizontal_offset, trench_floor_y + ecc_outer_radius)
-        else:
-            raise ValueError(
-                f"Unknown 'ecc_alignment' value: '{ecc_alignment}'. Expected 'center' or 'bottom_tangent'."
+        if ecc_vertical_gap is not None:
+            # Modo preciso: 'ecc_horizontal_gap'/'ecc_vertical_gap' são distâncias
+            # centro-a-centro entre o ECC e o terceiro cabo SCC (não folgas entre
+            # superfícies externas).
+            ecc_horizontal_gap = self.arrangement.get('ecc_horizontal_gap', 0.0)
+            ecc_center = (
+                last_cable_center[0] + ecc_horizontal_gap,
+                last_cable_center[1] - ecc_vertical_gap,
             )
+        else:
+            # Modo legado: 'ecc_alignment' + 'ecc_horizontal_gap' como folga entre
+            # as superfícies externas do cabo e do ECC.
+            ecc_alignment = self.arrangement.get('ecc_alignment', 'center')
+            ecc_horizontal_gap = self.arrangement.get('ecc_horizontal_gap', 0.0)
+            horizontal_offset = cable_outer_radius + ecc_horizontal_gap + ecc_outer_radius
+
+            if ecc_alignment == 'center':
+                # ECC no mesmo eixo horizontal dos centros dos cabos SCC.
+                ecc_center = (last_cable_center[0] + horizontal_offset, -depth)
+            elif ecc_alignment == 'bottom_tangent':
+                # ECC apoiado na linha tangente à superfície inferior dos cabos SCC
+                # (todos os cabos repousando no fundo de uma vala comum).
+                trench_floor_y = -depth - cable_outer_radius
+                ecc_center = (last_cable_center[0] + horizontal_offset, trench_floor_y + ecc_outer_radius)
+            else:
+                raise ValueError(
+                    f"Unknown 'ecc_alignment' value: '{ecc_alignment}'. Expected 'center' or 'bottom_tangent'."
+                )
 
         # --- 5. Geração do Modelo ---
         model = {

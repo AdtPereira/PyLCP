@@ -244,7 +244,7 @@ PLOT_CONFIG = {
         'right_plot': {
             **PLOT_TPL_CAPACITANCE,
             'label': r'$C_{22} \, (nF/km)$',
-            'y_lim': (0.0, 3.0),
+            'y_lim': (0.0, 2.0),
         }
     },
 

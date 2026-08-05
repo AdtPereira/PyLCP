@@ -7,7 +7,7 @@ mais à direita, sem encostar nele. É o primeiro caso do repositório com uma m
 heterogênea de cabos (3 SCC de 2 condutores cada + 1 ECC de 1 condutor), o que expôs
 uma série de suposições de "N cabos idênticos" implícitas em várias partes do pipeline.
 
-Este documento registra, em ordem cronológica de descoberta, os 8 itens tratados:
+Este documento registra, em ordem cronológica de descoberta, os itens tratados:
 1. reformulação do gerador de modelo para refletir a Figura 5.3;
 2. bug no esquema gráfico (`system_schematic.png`);
 3. decisão de design sobre `num_conductors`;
@@ -15,9 +15,11 @@ Este documento registra, em ordem cronológica de descoberta, os 8 itens tratado
 5. bug dimensional na matriz de retorno pelo solo (quasi-TEM);
 6. `conductor_order` do MATLAB sem o ECC (dados descartados silenciosamente);
 7. índices de ECC errados no `PLOT_CONFIG` para as matrizes de retorno pelo solo;
-8. matrizes de retorno pelo solo do MATLAB recortadas em vez de reordenadas.
-
-Mais uma pendência conhecida e não corrigida (item 9, `utils/comsol_data.py`).
+8. matrizes de retorno pelo solo do MATLAB recortadas em vez de reordenadas;
+9. *(pendente)* mesmo padrão de bug em `utils/comsol_data.py`;
+10. diagnóstico de instabilidade numérica na matriz de admitância shunt `Y`;
+11. reparametrização da posição do ECC para distâncias centro-a-centro precisas;
+12. cota de profundidade do esquemático presa ao ECC em vez de a um cabo SCC.
 
 ---
 
@@ -331,3 +333,143 @@ com a `Zi` 7×7.
 função (em vez de derivá-lo de `self.model.num_conductors_per_scc` como hoje), reusando
 a mesma `_expand_by_block_sizes` do Item 5. Fica registrado aqui para quando houver dado
 COMSOL disponível para este caso.
+
+---
+
+## Item 10 — Diagnóstico de instabilidade numérica na matriz de admitância shunt `Y`
+
+**Onde:** `analytical_forms/single_core_cable.py` (`PerUnitParameters.quasi_tem_approx_matrices`,
+`sommerfeld_quasi_tem_approx_admittance`).
+
+**Pedido:** investigar se há problema/instabilidade numérica na matriz de admitância `Y`
+de `andreata_case3`.
+
+**O que foi checado (sem problema encontrado):**
+- Nenhum `NaN`/`Inf` em `Ysh`, `Yg` (retorno pelo solo) ou `Yi` (interna), em nenhum
+  cenário (`magalhaes_xue`/`deconti`, 3 solos).
+- Número de condição de `Psh` (a matriz invertida para obter `Ysh`) fica baixo
+  (< 55) em toda a varredura de 90 frequências — sem mal-condicionamento explosivo.
+- Não é sub-convergência de quadratura: aumentar os pontos de Gauss-Legendre de
+  `sommerfeld_quasi_tem_approx_admittance` de 150 para 2400 muda o resultado da
+  integral em menos de 0,5%.
+
+**Problema real encontrado (divergência de exatidão, não instabilidade em si):**
+comparando `Ysh` calculado contra `andreata_shunt_admittance_matrix.mat` (MATLAB,
+reordenado corretamente para a convenção pyLCP — Item 6/8), há um desvio que cresce
+suavemente com a frequência e fica concentrado quase exclusivamente nos condutores
+ligados ao ECC (índice 6) e ao cabo SCC mais próximo dele (bainha C, índice 5):
+
+| condutor (índice) | erro relativo máx. (em f = 10 MHz) |
+|---|---|
+| núcleos A/B/C (0, 2, 4) | ~2×10⁻⁹ (ruído de ponto flutuante) |
+| bainhas A/B (1, 3) | 0,26% – 0,42% |
+| **bainha C (5)** | **15,9%** |
+| **ECC (6)** | **23,1%** |
+
+O padrão é idêntico nas duas formulações testadas (`magalhaes_xue` e `deconti`), o que
+descarta bug específico de uma fórmula — a causa está na parte compartilhada (termo
+geométrico `K0(γ_terra·d)` do retorno pelo solo). O par ECC↔bainha-C é o único com
+espaçamento centro-a-centro pequeno (poucos cm, ver Item 11) frente aos 0,2–0,4 m entre
+os cabos SCC; nessa distância o argumento de `K0` fica perto do regime log-singular
+(derivada `-1/x` grande quando `x→0`), o que torna esse termo específico muito mais
+sensível a erro/aproximação em alta frequência do que os pares mais espaçados —
+hipótese consistente com o padrão observado, mas não uma prova formal.
+
+**Sem correção aplicada** — é um limite de exatidão da aproximação quasi-TEM para
+condutores muito próximos em alta frequência, não um bug de implementação. Registrado
+para referência caso o desvio volte a incomodar após o ajuste de geometria do Item 11
+(que muda a distância ECC↔cabo-C).
+
+**Nota lateral (resolvida):** a config `self_admittance_ecc` do `plot_config.py` chegou
+a ficar temporariamente com `p=0, q=0` (índice do núcleo A) durante essa investigação,
+destoando do rótulo `G_77`/`C_77` (ECC = índice 6, ver Item 7). Já foi corrigida de volta
+para `p=6, q=6`.
+
+---
+
+## Item 11 — Reparametrização da posição do ECC para distâncias centro-a-centro precisas
+
+**Onde:** `models/single_core_cable.py:436` (`flat_scc_with_ecc_cable_model`),
+`testData/andreata_case3/andreata_case3.json`.
+
+**O quê:** a posição do ECC era controlada por `ecc_alignment` (`'center'` ou
+`'bottom_tangent'`) + `ecc_horizontal_gap`, este último medido como folga entre as
+**superfícies externas** do cabo C e do ECC — não permitia posicionar o ECC com um
+deslocamento vertical arbitrário em relação ao cabo, só as duas opções fixas do
+`ecc_alignment`.
+
+**Correção:** adicionado um modo de posicionamento preciso, ativado quando
+`ecc_vertical_gap` está presente em `arrangement`:
+- `ecc_horizontal_gap` / `ecc_vertical_gap` passam a ser distâncias **centro-a-centro**
+  (não mais folga de superfície) entre o centro do ECC e o centro do terceiro cabo SCC:
+  `ecc_center = (last_cable_center_x + ecc_horizontal_gap, last_cable_center_y -
+  ecc_vertical_gap)`. `ecc_vertical_gap` positivo posiciona o ECC mais fundo que o cabo
+  (mesma convenção de sinal de `burial_depth`).
+- O modo legado (`ecc_alignment` + `ecc_horizontal_gap` como folga de superfície) foi
+  mantido como *fallback* para quando `ecc_vertical_gap` não é fornecido — sem impacto
+  em nenhum outro caso do repositório (`flat_scc_with_ecc_cable_model` só é usado por
+  `andreata_case3`).
+- `andreata_case3.json`: `ecc_alignment` removido; `ecc_horizontal_gap` recalculado de
+  `0,001` (folga de superfície, valor que estava em uso no momento da migração) para os
+  valores de referência definitivos `ecc_horizontal_gap = 0,02802` m e
+  `ecc_vertical_gap = 0,00886` m (centro-a-centro).
+
+**Validado:** com `ecc_horizontal_gap`/`ecc_vertical_gap` calculados para reproduzir
+exatamente a posição antiga (`0,0303`/`0,0`), o centro resultante do ECC bateu
+numericamente com o modo legado (`(0,4303, -1,2)` nos dois modos). Com os valores de
+referência finais (`0,02802`/`0,00886`), o ECC fica em `(0,42802, -1,20886)` — mais
+fundo que os cabos SCC, o que expôs o Item 12.
+
+---
+
+## Item 12 — Cota de profundidade do esquemático presa ao ECC em vez de a um cabo SCC
+
+**Onde:** `mtl_main/graphics.py:71` (`BaseMTLRepresentation._calculate_schematic_parameters`).
+
+**Sintoma:** depois do Item 11, com `ecc_vertical_gap = 0,00886` (ECC mais fundo que os
+cabos SCC), a cota de profundidade (`h = ...`) e a cruz de referência em
+`system_schematic.png` passaram a apontar para o ECC (`(0,42802, -1,20886)`) em vez de
+para um dos cabos de potência.
+
+**Causa raiz:** `_calculate_schematic_parameters` escolhe `depth_ref_conductor` como o
+condutor fisicamente mais fundo (`deepest_conductor`, por `y_min`) para o tipo
+`'scc-flat-ecc'` — exceto para `'hdpe'`/`'shared-hdpe'`, que já tinham uma exceção
+dedicada (fixando a referência no `core` do SCC, não no condutor mais fundo). Antes do
+Item 11 o ECC estava sempre à mesma profundidade dos cabos SCC (`ecc_alignment='center'`
+implícito), então a escolha por "mais fundo" coincidia por acaso com um cabo SCC; ao
+tornar a profundidade do ECC ajustável, essa coincidência deixou de valer.
+
+**Correção:** estendida a mesma exceção de `'hdpe'`/`'shared-hdpe'` para
+`'scc-flat-ecc'` — a cota de profundidade sempre referencia o centro de um `core` de
+cabo SCC (primeiro encontrado, cabo A), independente de onde o ECC estiver posicionado
+verticalmente.
+
+**Validado:** com `ecc_vertical_gap = 0,00886`, `depth_ref_conductor` passou a apontar
+para o núcleo do cabo A (`(0,0, -1,2)`, `conductor_name='core'`) em vez do ECC
+(confirmado que `deepest_conductor` — não usado mais para a cota — de fato ainda é o
+ECC, como esperado). `system_schematic.png` regenerado sem erro.
+
+---
+
+## Item 13 (nota, não é bug) — Contagem de pontos em `Y` — pyLCP vs. MATLAB
+
+**Onde:** `plotter/scc_plotter.py:32` (linha, pyLCP) vs. `plotter/scc_plotter.py:66`
+(scatter, MATLAB).
+
+**Percepção reportada:** visualmente, a curva "MATLAB" no gráfico `self_admittance_ecc`
+parecia ter menos pontos que as curvas analíticas.
+
+**Verificado:** as duas matrizes têm exatamente o mesmo número de elementos —
+`Ysh` (pyLCP) e a `shunt_admittance_matrix` medida (MATLAB) são ambas `(90, 7, 7)` =
+4410 elementos, sobre o mesmo array de 90 frequências (`np.allclose` entre os dois
+arrays de frequência = `True`). Dentro do `xlim=(1E4, 1E7)` do gráfico, exatamente 30
+dos 90 pontos caem na janela visível — o mesmo número para as duas fontes.
+
+**Causa da percepção:** diferença de estilo de desenho, não de dado. As séries pyLCP
+usam `ax.plot(...)` (linha contínua interpolando os 30 pontos, sem marcas individuais
+visíveis); a série MATLAB usa `ax.scatter(...)` (marcador `'x'` discreto em cada um dos
+30 pontos). Uma linha contínua "esconde" a discretização subjacente; um scatter a
+escancara.
+
+**Sem correção necessária** — comportamento esperado, registrado só para referência
+futura.

@@ -66,9 +66,11 @@ class BaseMTLRepresentation:
             y_min = min(y_coords)
             deepest_conductor = next((c for c in active_conductors if c['center_point'][1] == y_min), core_conductor)
 
-        # For HDPE types the burial depth is referenced to the SCC core centre,
-        # not to whichever conductor happens to sit deepest (e.g. the ECC).
-        if self.model.mtl_type in ('hdpe', 'shared-hdpe'):
+        # For HDPE and flat-SCC+ECC types the burial depth is referenced to an
+        # isolated SCC core centre, not to whichever conductor happens to sit
+        # deepest (e.g. the ECC, which 'ecc_vertical_gap' may place below the
+        # SCC cables).
+        if self.model.mtl_type in ('hdpe', 'shared-hdpe', 'scc-flat-ecc'):
             scc_core = next(
                 (c for c in active_conductors if c.get('conductor_name') == 'core'),
                 deepest_conductor,

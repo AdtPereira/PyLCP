@@ -268,17 +268,17 @@ PLOT_CONFIG = {
         'comsol_matrix_key': 'shunt_admittance_matrix',
         'matlab_series_to_plot': MATLAB_TEMPLATE,
         'matlab_matrix_key': 'shunt_admittance_matrix',
-        'p': 3, 'q': 3,
+        'p': 6, 'q': 6,
         'xlim': (1E4, 1E7),
         'left_plot': {
             **PLOT_TPL_CONDUCTANCE,
             'label': r'$G_{77} \, (S/km)$',
-            # 'y_lim': (0.0, 20),
+            # 'y_lim': (0.0, 25),
         },
         'right_plot': {
             **PLOT_TPL_CAPACITANCE,
             'label': r'$C_{77} \, (nF/km)$',
-            # 'y_lim': (0.0, 3.0),
+            # 'y_lim': (0.0, 2.0),
         }
     },
 

@@ -129,6 +129,8 @@ def main():
 
     print(f"\nEnd of the routine! Time spent on simulation: {(time.time() - st):.1f} seconds.\n")
     plotter = SCCPlotter(__file__, pul_data, PLOT_CONFIG, autoSave=False)
+    # plotter.compare_complete_matrices(
+    #     key_list=['self_admittance_phase_a_sheath'])
     plotter.compare_complete_matrices(
         key_list=['self_impedance_phase_a_sheath',
                   'self_admittance_phase_a_sheath',
@@ -138,7 +140,7 @@ def main():
     plotter.compare_internal_matrices(
         key_list=['internal_impedance_matrix',
                   'internal_admittance_matrix'])
-    # GroundReturnMTLRepresentation(__file__, mtl_model_a, units='centimeter').system_schematic()
+    GroundReturnMTLRepresentation(__file__, mtl_model_a, units='centimeter').system_schematic()
     plt.show()
 
 if __name__ == "__main__":
