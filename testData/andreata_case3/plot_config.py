@@ -268,7 +268,7 @@ PLOT_CONFIG = {
         'comsol_matrix_key': 'shunt_admittance_matrix',
         'matlab_series_to_plot': MATLAB_TEMPLATE,
         'matlab_matrix_key': 'shunt_admittance_matrix',
-        'p': 6, 'q': 6,
+        'p': 3, 'q': 3,
         'xlim': (1E4, 1E7),
         'left_plot': {
             **PLOT_TPL_CONDUCTANCE,
