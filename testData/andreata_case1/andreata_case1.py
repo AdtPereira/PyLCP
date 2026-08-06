@@ -129,8 +129,6 @@ def main():
 
     print(f"\nEnd of the routine! Time spent on simulation: {(time.time() - st):.1f} seconds.\n")
     plotter = SCCPlotter(__file__, pul_data, PLOT_CONFIG, autoSave=False)
-    # plotter.compare_complete_matrices(
-    #     key_list=['self_admittance_phase_a_sheath'])
     plotter.compare_complete_matrices(
         key_list=['self_impedance_phase_a_sheath',
                   'self_admittance_phase_a_sheath',

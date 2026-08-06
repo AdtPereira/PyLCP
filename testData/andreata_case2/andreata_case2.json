@@ -1,0 +1,62 @@
+{
+  "type": "HDPE",
+  "name": "34.5 kV XLPE underground three-phase flat single-core cables, each in its own HDPE tube",
+  "note": "Configuração 2 (Figura 5.2): três cabos SCC núcleo+blindagem em arranjo plano, cada um dentro de seu próprio duto de HDPE. Andreata, Luis Eduardo Batista. Análise das Características de Propagação e de Transitórios Eletromagnéticos em Cabos Subterrâneos Instalados em Tubos Não Metálicos no Contexto de Parques Eólicos. Programa de Pós-Graduação em Engenharia Elétrica, Universidade Federal do Minas Gerais, 2025. https://hdl.handle.net/1843/2086",
+  "arrangement": {
+    "unit": "meter",
+    "type": "flat",
+    "num_conductors": 3,
+    "burial_depth": 1.2,
+    "spacing": 0.2,
+    "fourier_order": 10,
+    "idx_ref_conductor": 0
+  },
+  "soil": {
+    "conductivity_S_per_m": 0.01,
+    "relative_permittivity": 1.0
+  },
+  "cable_definition": {
+    "core": {
+      "inner_radius": 0.0,
+      "outer_radius": 0.010325,
+      "conductivity_S_per_m": 3.8E7,
+      "insulation": {
+        "type": "XLPE",
+        "thickness": 0.010675,
+        "relative_permittivity": 2.2,
+        "delta_tangent": 0.0008
+      },
+      "semiconducting_layer": {
+        "thickness": 0.001125
+      },
+      "enclosure": null
+    },
+    "sheath": {
+      "inner_radius": 0.0210,
+      "outer_radius": 0.0218,
+      "conductivity_S_per_m": 6E7,
+      "insulation": {
+        "type": "PVC",
+        "thickness": 0.0022,
+        "relative_permittivity": 2.8,
+        "delta_tangent": 0.001
+      },
+      "semiconducting_layer": {
+      "thickness": 0.00075
+      },
+      "enclosure": {
+        "type": "HDPE",
+        "inner_radius": 0.0508,
+        "outer_radius": 0.0578,
+        "relative_permittivity": 2.35,
+        "delta_tangent": 0.001,
+        "insulation": {
+          "type": "air",
+          "thickness": null,
+          "relative_permittivity": 1.0
+        }
+      }
+    }
+  }
+}
+

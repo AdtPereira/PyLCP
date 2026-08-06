@@ -1,0 +1,3 @@
+D1 "101.6 [mm]" "HDPE inner diameter"
+D2 "115.6 [mm]" "HDPE outer diameter"
+epsr3 2.35 "HPDE insulator relative permittivity"

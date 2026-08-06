@@ -10,6 +10,7 @@ cable layers.
 """
 
 import json
+import copy
 from pathlib import Path
 import numpy as np
 from typing import Dict, Any, Tuple
@@ -336,6 +337,86 @@ class SingleCoreCableModelGenerator:
                     v['enclosure']['center_point'] = enclosure_center
                 else:
                     v['enclosure'] = None
+
+        if not self.silent_mode:
+            self._show_model(model)
+
+        return model
+
+    def flat_hdpe_enclosed_model(self, host_conductor: str = 'sheath') -> Dict[str, Any]:
+        """
+        Gera um modelo para a Configuração 2 (Figura 5.2): três cabos SCC de
+        potência em arranjo plano (flat), cada um instalado dentro de seu
+        próprio duto de HDPE enterrado no solo. A geometria é excêntrica: o
+        cabo repousa no fundo do seu duto (mesma convenção de
+        `eccentric_hdpe_enclosed_model`, ver também `schematic_original_hdpe.png`
+        do caso `hdpe_300mm2`), não concêntrica. Como 'burial_depth' se refere
+        ao centro do cabo (não ao do duto), o centro do duto fica deslocado
+        para cima em relação ao centro do cabo.
+
+        Generaliza `eccentric_hdpe_enclosed_model` (1 cabo) para N cabos, do
+        mesmo modo que `underground_flat_model` generaliza
+        `conventional_single_phase`: mesmos 'burial_depth'/'spacing' do
+        'arrangement', um duto idêntico (mesmo deslocamento vertical)
+        injetado em cada cabo.
+        """
+        # --- Dados do cabo e do duto (definido no condutor host, ex.: 'sheath') ---
+        host_conductor_data = getattr(self, host_conductor)
+        host_insulation = host_conductor_data.get('insulation')
+        enclosure_data = host_conductor_data.get('enclosure')
+
+        if not enclosure_data:
+            raise ValueError(f"Enclosure definition not found within conductor '{host_conductor}'.")
+
+        # --- Deslocamento vertical cabo -> duto (mesma lógica excêntrica de
+        # `eccentric_hdpe_enclosed_model`, aplicada identicamente a cada fase) ---
+        cable_outer_radius = host_conductor_data['outer_radius'] + (host_insulation['thickness'] if host_insulation else 0)
+        enclosure_inner_radius = enclosure_data['inner_radius']
+
+        if cable_outer_radius > enclosure_inner_radius:
+            raise ValueError("Cable does not fit inside the enclosure based on JSON dimensions.")
+
+        vertical_offset = enclosure_inner_radius - cable_outer_radius
+
+        # --- Posição dos cabos SCC (arranjo plano); 'burial_depth' é o centro do cabo ---
+        depth = self.arrangement['burial_depth']
+        spacing = self.arrangement.get('spacing', 0)
+        num_conductors = self.arrangement.get('num_conductors', 3)
+        cable_centers = [(i * spacing, -depth) for i in range(num_conductors)]
+
+        # --- Geração do Modelo ---
+        model = {
+            'name': self.input_data.get('name', 'FLAT_HDPE_Enclosed_SCC_System'),
+            'type': 'hdpe',
+            'note': self.input_data.get(
+                'note', 'A parametric flat arrangement of SCC cables, each individually enclosed in an HDPE duct.'),
+            'idx_ref_conductor': 0,
+            0: {
+                'line_id': 0,
+                'conductor_name': 'soil',
+                'line_type': 'return',
+                'line_return': None,
+                'conductivity': self.soil['conductivity_S_per_m'],
+                'relative_permeability': 1.0,
+                'relative_permittivity': self.soil['relative_permittivity'],
+                'relative_permittivity_out': 1.0,
+            },
+        }
+
+        conductor_id = 1
+        for cp in cable_centers:
+            conductor_id = self._add_cable_conductors(model, conductor_id, cp)
+
+        # --- Injetar um duto excêntrico (deslocado para cima) por fase ---
+        # Cada conductor recebe sua própria cópia de 'enclosure_data' -- um
+        # dict compartilhado (por referência) faria o 'center_point' do
+        # último cabo processado sobrescrever os das fases anteriores.
+        for v in model.values():
+            if isinstance(v, dict) and v.get('conductor_name') == host_conductor:
+                cable_center = v['center_point']
+                enclosure_center = (cable_center[0], cable_center[1] + vertical_offset)
+                v['enclosure'] = copy.deepcopy(enclosure_data)
+                v['enclosure']['center_point'] = enclosure_center
 
         if not self.silent_mode:
             self._show_model(model)

@@ -1,0 +1,7 @@
+exp_max 6 ""
+freq_coax 10^exp_max[Hz] ""
+delta_coax sqrt(2/(w_coax*mu_coax*sigma1)) ""
+mu_coax mu0_const "permeability of dielectric"
+w_coax 2*pi*freq_coax ""
+V0 1[V] ""
+I0 1[A] ""

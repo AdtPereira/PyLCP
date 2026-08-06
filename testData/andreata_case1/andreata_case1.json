@@ -20,11 +20,13 @@
       "insulation": {
         "type": "XLPE",
         "thickness": 0.010675,
-        "relative_permittivity": 2.2
+        "relative_permittivity": 2.2,
+        "delta_tangent": 0.0008
       },
       "semiconducting_layer": {
         "thickness": 0.001125
-      }
+      },
+      "enclosure": null
     },
     "sheath": {
       "inner_radius": 0.0210,
@@ -33,11 +35,13 @@
       "insulation": {
         "type": "PVC",
         "thickness": 0.0022,
-        "relative_permittivity": 2.8
+        "relative_permittivity": 2.8,
+        "delta_tangent": 0.001
       },
       "semiconducting_layer": {
         "thickness": 0.00075
-      }
+      },
+      "enclosure": null
     }
   }
 }
