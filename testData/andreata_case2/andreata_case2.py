@@ -156,7 +156,7 @@ def main():
     print("Carregando dados de referência do MATLAB...")
     matlab_reader = MatlabDataReader(__file__, autoShow=False)
     matlab_data = matlab_reader.get_scc_scenario_data(
-        prefix='andreata_hdpe',
+        prefix='andreata_case2',
         conductor_order=[0, 3, 1, 4, 2, 5],
     )
 
@@ -169,7 +169,7 @@ def main():
     case1_script_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'andreata_case1', 'andreata_case1.py')
     case1_matlab_reader = MatlabDataReader(case1_script_path, autoShow=False)
     case1_matlab_data = case1_matlab_reader.get_scc_scenario_data(
-        prefix='andreata',
+        prefix='andreata_case1',
         conductor_order=[0, 3, 1, 4, 2, 5],
     )
     matlab_data['scenarios']['case1_no_duct'] = case1_matlab_data['scenarios']['measured']
@@ -180,27 +180,18 @@ def main():
         pul_data['frequencies'])
     pul_data['matlab'] = matlab_data
 
-    print("Construindo matrizes COMSOL...")
+    # Os parâmetros internos usados para compor a matriz quasi-TEM do COMSOL
+    # vêm do modelo GMD case 3.1 (a variante mais completa das três) -- só o
+    # retorno à terra é, de fato, medido no COMSOL. A impedância interna
+    # combinada (segundo bloco de load_scc_earth_return_and_internal_scenarios)
+    # é a mesma medição legada de cabo único reaproveitada do estudo
+    # monofásico anterior hdpe_300mm2 -- válida aqui porque a seção
+    # transversal núcleo+blindagem+duto é idêntica em cada fase; só o retorno
+    # à terra muda com o número de fases. Fornece a referência 'measured' de
+    # 'internal_impedance_matrix' (ver plot_config.py).
     cmsl_processor = ComsolPostProcessor(__file__)
-    cmsl_params = cmsl_processor.get_general_parameters('cmsl_ground_return_impedance')
-    if cmsl_params is not None:
-        # Os parâmetros internos usados para compor a matriz quasi-TEM do
-        # COMSOL vêm do modelo GMD case 3.1 (a variante mais completa das
-        # três) -- só o retorno à terra é, de fato, medido no COMSOL.
-        pul = InternalPerUnitParameters(mtl_3, cmsl_params['frequencies'])
-        internal_matrices = pul.matrices(internal_form='approximation')
-        pul_data['comsol'].update(cmsl_params)
-        pul_data['comsol']['internal_matrices'] = internal_matrices
-
-        for key, value in pul_data['comsol']['scenarios'].items():
-            print(f"  -> Processando COMSOL para: {key}")
-            earth_return = cmsl_processor.get_earth_return_parameters(key)
-            quasi_tem = cmsl_processor.get_quasi_tem_approx_matrices(internal_matrices, earth_return)
-            value['earth_return_parameters'] = earth_return
-            value['quasi_tem_matrices'] = quasi_tem
-    else:
-        print("  Aviso: Processamento COMSOL ignorado (dados não disponíveis).")
-        pul_data['comsol'] = {}
+    cmsl_processor.load_scc_earth_return_and_internal_scenarios(
+        pul_data, internal_mtl_model=mtl_3, internal_form='approximation')
 
     print("\nCalculating per-unit-length parameters and quasi-TEM matrices for all scenarios...")
     for key, value in pul_data['scenarios'].items():
@@ -228,6 +219,12 @@ def main():
         value['earth_return_parameters'] = earth_return
         value['quasi_tem_matrices'] = quasi_tem
 
+    # Matriz interna canônica para 'internal_impedance_matrix' (ver
+    # plot_config.py): usa o cenário '3' (GMD case 3.1), o mais completo dos
+    # três modelos de duto -- mesma escolha já feita para os parâmetros
+    # internos do COMSOL de retorno à terra acima.
+    pul_data['internal_matrices'] = pul_data['scenarios']['3']['internal_matrices']
+
     c_comsol = None
     if 'cmsl_shunt_params' in cmsl_processor.cmsl_reader.data:
         c_comsol = cmsl_processor.get_shunt_capacitance_elements()
@@ -236,16 +233,13 @@ def main():
 
     print(f"\nEnd of the routine! Time spent on simulation: {(time.time() - st):.1f} seconds.\n")
     plotter = SCCPlotter(__file__, pul_data, PLOT_CONFIG, autoSave=False)
-    plotter.compare_complete_matrices(
-        key_list=['core_self_impedance',
-                  'mutual_impedance_core_sheath',
-                  'sheath_self_impedance',
-                  'core_self_admittance',
-                  'mutual_admittance_core_sheath',
-                  'sheath_self_admittance',
-                  'earth_return_impedance_phase_a',
-                  'earth_return_admittance_phase_a',
-                  'earth_return_potential_coeff_phase_a'])
+    # plotter.compare_complete_matrices(
+    #     key_list=['core_self_impedance',
+    #               'mutual_impedance_core_sheath',
+    #               'sheath_self_impedance',
+    #               'earth_return_impedance_phase_a'])
+    plotter.compare_internal_matrices(
+        key_list=['internal_impedance_matrix'])
     GroundReturnMTLRepresentation(__file__, mtl_0, units='centimeter').system_schematic()
     plt.show()
 

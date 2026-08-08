@@ -14,7 +14,9 @@ try:
     from models.single_core_cable import SingleCoreCableModelGenerator
     from mtl_main.graphics import GroundReturnMTLRepresentation
     from mtl_main.source import MulticonductorTransmissionLine
-    from analytical_forms.single_core_cable import InternalPerUnitParameters, PerUnitParameters
+    from analytical_forms.single_core_cable import (
+            InternalPerUnitParameters, PerUnitParameters, apply_semiconducting_layer_correction,
+    )
     print("Modules imported successfully.")
 except ImportError as e:
     print(f"Error importing modules: {e}")
@@ -22,8 +24,10 @@ except ImportError as e:
 
 def main():
     """ Main function to run the simulation and plotting using vectorized calculations. """
-    st = time.time()    
-    model = SingleCoreCableModelGenerator(__file__).underground_flat_model()
+    st = time.time()
+    cable_generator = SingleCoreCableModelGenerator(__file__)
+    model = cable_generator.underground_flat_model()
+    model = apply_semiconducting_layer_correction(model, cable_generator.core, cable_generator.sheath)
     mtl_model = MulticonductorTransmissionLine(model)
 
     print("Loading COMSOL internal impedance results...")
@@ -80,7 +84,7 @@ def main():
     }
 
     print(f"End of the routine! Time spent on simulation: {(time.time() - st):.1f} seconds.\n")
-    plotter = SingleCoreCableModels(__file__, pul_data, PLOT_CONFIG, autoSave=True)
+    plotter = SingleCoreCableModels(__file__, pul_data, PLOT_CONFIG, autoSave=False)
     # plotter.potential_coefficients_composition(conductor='core_sheath')
     # plotter.potential_coefficients_composition(conductor='core')
     # plotter.potential_coefficients_composition(conductor='sheath')
@@ -90,7 +94,7 @@ def main():
     # plotter.series_impedance_composition(conductor='core')
     # plotter.series_impedance_composition(conductor='sheath')
     # plotter.series_impedance_earth_return()
-    plotter.series_impedance_internal()
+    plotter.internal_impedance_matrix()
     # plotter.series_impedance_matrix()
     # plotter.shunt_admittance_composition(conductor='core_sheath')
     # plotter.shunt_admittance_composition(conductor='core')

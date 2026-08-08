@@ -123,12 +123,14 @@ class SCCPlotter(BasePlotter):
             save_figure(fig, self.results_dir, base_filename=graph_key)
 
     def _plot_scc_internal_matrix(self, graph_key):
-        """Plots an analytical internal-only matrix (Zi or Yi) against the MATLAB reference matrix.
+        """Plots an analytical internal-only matrix (Zi or Yi) against COMSOL/MATLAB reference matrices.
 
         Accepts either a single (p, q) pair via the 'p'/'q'/'internal_style' keys, or several
         overlaid on the same axes via a 'components' list of such dicts (each with its own 'p',
-        'q', 'internal_style' and 'matlab_series_to_plot'). The internal matrix to plot is picked
-        via 'internal_matrix_key' (defaults to 'impedance_matrix', i.e. Zi).
+        'q', 'internal_style', 'comsol_series_to_plot' and 'matlab_series_to_plot'). The internal
+        matrix to plot is picked via 'internal_matrix_key' (defaults to 'impedance_matrix', i.e. Zi).
+        COMSOL/MATLAB reference matrices are looked up via 'comsol_matrix_key'/'matlab_matrix_key'
+        (each a flat key into the respective scenario dict, holding a (freq, N, N) matrix).
         """
         cfg = self.plot_config[graph_key]
         fig, (ax1, ax2) = plt.subplots(1, 2, figsize=self.figsize, sharey=False)
@@ -141,11 +143,15 @@ class SCCPlotter(BasePlotter):
         components = cfg.get('components') or [{
             'p': cfg['p'], 'q': cfg['q'],
             'internal_style': cfg['internal_style'],
+            'comsol_series_to_plot': cfg.get('comsol_series_to_plot', []),
             'matlab_series_to_plot': cfg.get('matlab_series_to_plot', []),
         }]
 
         internal_matrices = self.pul_data.get('internal_matrices')
         internal_matrix_key = cfg.get('internal_matrix_key', 'impedance_matrix')
+        cmsl_freq = self.cmsl.get('frequencies') if self.cmsl else None
+        cmsl_w = 2 * np.pi * cmsl_freq if cmsl_freq is not None else None
+        cmsl_key = cfg.get('comsol_matrix_key', 'impedance_matrix')
         mtlb_freq = self.mtlb.get('frequencies') if self.mtlb else None
         mtlb_w = 2 * np.pi * mtlb_freq if mtlb_freq is not None else None
         mtlb_key = cfg.get('matlab_matrix_key', 'internal_impedance_matrix')
@@ -157,6 +163,19 @@ class SCCPlotter(BasePlotter):
                 style = comp['internal_style']
                 ax1.plot(freq, self._calculate_plot_data(Mi[:, p, q], w, left_cfg), **style)
                 ax2.plot(freq, self._calculate_plot_data(Mi[:, p, q], w, right_cfg), **style)
+
+            if self.cmsl and cmsl_freq is not None:
+                for series in comp.get('comsol_series_to_plot', []):
+                    key = series['key']
+                    if key not in self.cmsl.get('scenarios', {}):
+                        continue
+                    try:
+                        matrix = self.cmsl['scenarios'][key][cmsl_key]
+                        style = {k: v for k, v in series.items() if k != 'key'}
+                        ax1.scatter(cmsl_freq, self._calculate_plot_data(matrix[:, p, q], cmsl_w, left_cfg), **style)
+                        ax2.scatter(cmsl_freq, self._calculate_plot_data(matrix[:, p, q], cmsl_w, right_cfg), **style)
+                    except (KeyError, TypeError, IndexError):
+                        print(f"Warning: COMSOL data not found for '{key}' with key '{cmsl_key}'.")
 
             if self.mtlb and mtlb_freq is not None:
                 for series in comp.get('matlab_series_to_plot', []):

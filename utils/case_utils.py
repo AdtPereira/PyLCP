@@ -105,17 +105,9 @@ def matrix_viewer(matrix: np.ndarray, title: str, columns_name: Optional[list] =
     else:
         print(df)
 
-def matrix_to_string(matrix: np.ndarray) -> str:
-    # ... (função auxiliar sem alteração)
-    lines = []
-    s_rows = [[f"{val:11.4e}" for val in row] for row in matrix]
-    for row in s_rows:
-        lines.append("  ".join(row))
-    return "\n".join(lines)
-
 def print_real_matrix(name: str, matrix_data: np.ndarray, unit: str):
     # ... (função auxiliar sem alteração)
-    lines = _matrix_to_string(matrix_data).split('\n')
+    lines = matrix_to_string(matrix_data).split('\n')
     num_rows = len(lines)
     middle_row_idx = num_rows // 2
     

@@ -9,6 +9,7 @@ from pathlib import Path
 import scipy.constants as sc
 from scipy.linalg import lu_factor, lu_solve
 from utils.case_utils import *
+from analytical_forms.single_core_cable import InternalPerUnitParameters, _expand_by_block_sizes
 
 class MergedComsolDataReader:
     """
@@ -323,6 +324,59 @@ class ComsolPostProcessor:
             'frequencies': freq,
             'angular_frequencies': 2 * np.pi * freq,
         }
+
+    def load_scc_earth_return_and_internal_scenarios(
+        self, pul_data: dict, internal_mtl_model, internal_form: str = 'approximation',
+        earth_return_key: str = 'cmsl_ground_return_impedance',
+    ) -> None:
+        """
+        Popula pul_data['comsol'] in-place com os dois blocos de dados COMSOL
+        que os casos SCC (andreata_case1/2/3) sempre carregam juntos:
+
+        1. Retorno à terra por cenário (chaves já presentes em
+           pul_data['comsol']['scenarios'], ex. 'rho_g_100_epsr1_1_mf'): para
+           cada uma, monta earth_return_parameters + quasi_tem_matrices a
+           partir de internal_mtl_model (usado só para os parâmetros
+           internos -- o retorno à terra em si vem do COMSOL).
+        2. Impedância interna combinada (núcleo + blindagem), lida de
+           'cmsl_internal_impedance_matrix.txt': data1() = excitação pelo
+           núcleo (self do núcleo + mútua), data2() = excitação pela
+           blindagem (self da blindagem) -- ver
+           get_scc_internal_impedance_matrix_combined(). Não depende do
+           solo/retorno à terra, por isso é carregada incondicionalmente,
+           mesmo que o bloco 1 acima não tenha dados.
+
+        NOTA: os dois blocos compartilham pul_data['comsol']['frequencies']
+        -- hoje inofensivo nos três casos porque só um dos dois arquivos
+        costuma existir por vez; se algum caso vier a ter os dois
+        simultaneamente, vão precisar da mesma grade de frequência.
+        """
+        print("Construindo matrizes COMSOL...")
+        cmsl_params = self.get_general_parameters(earth_return_key)
+        if cmsl_params is not None:
+            pul = InternalPerUnitParameters(internal_mtl_model, cmsl_params['frequencies'])
+            internal_matrices = pul.matrices(internal_form=internal_form)
+            pul_data['comsol'].update(cmsl_params)
+            pul_data['comsol']['internal_matrices'] = internal_matrices
+
+            for key, value in pul_data['comsol']['scenarios'].items():
+                print(f"  -> Processando COMSOL para: {key}")
+                earth_return = self.get_earth_return_parameters(key)
+                quasi_tem = self.get_quasi_tem_approx_matrices(internal_matrices, earth_return)
+                value['earth_return_parameters'] = earth_return
+                value['quasi_tem_matrices'] = quasi_tem
+        else:
+            print("  Aviso: Processamento COMSOL ignorado (dados não disponíveis).")
+            pul_data['comsol'] = {}
+
+        print("Carregando dados COMSOL de impedância interna...")
+        scc_internal_cmsl = self.get_scc_internal_impedance_matrix_combined()
+        if scc_internal_cmsl is not None:
+            pul_data['comsol'].setdefault('scenarios', {})
+            pul_data['comsol']['frequencies'] = scc_internal_cmsl['frequencies']
+            pul_data['comsol']['scenarios'].update(scc_internal_cmsl['scenarios'])
+        else:
+            print("  Aviso: dados COMSOL de impedância interna não disponíveis.")
 
     def get_bifilar_data(self, excitation_type: str = 'average'):
         N = 2
@@ -735,23 +789,27 @@ class ComsolPostProcessor:
         general_data = self.get_general_parameters('cmsl_ground_return_impedance')
         freq = general_data['frequencies']
         jw = 1j * general_data['angular_frequencies']
-        M = 2
+
+        # Conductors per cable, in the same order as the ground-return (N x N)
+        # matrices below. Uniform ([M]*N) for homogeneous MTL types; for
+        # 'scc-flat-ecc' the SCC and ECC cables have different M, so the
+        # ground-return coupling (which only depends on cable position, not on
+        # which/how many conductors that cable has) must be tiled block-by-block
+        # with each cable's own size rather than a single uniform M. Mirrors
+        # PerUnitParameters.quasi_tem_approx_matrices (analytical_forms/single_core_cable.py).
+        block_sizes = internal_matrices['block_sizes']
 
         z0_jk = earth_return_params['impedance_matrix']         # Shape (num_freq, N, N)
         pg_jk = earth_return_params['potential_coefficient']    # Shape (num_freq, N, N)
         yg_jk = earth_return_params['admittance_matrix']        # Shape (num_freq, N, N)
 
-        Zi = internal_matrices['impedance_matrix']              # Shape (num_freq, N*M, N*M)
-        Pi = internal_matrices['potential_coefficient_matrix']  # Shape (N*M, N*M)
-        Yi = internal_matrices['shunt_admittance_matrix']       # Shape (num_freq, N*M, N*M)
+        Zi = internal_matrices['impedance_matrix']              # Shape (num_freq, sum(M), sum(M))
+        Pi = internal_matrices['potential_coefficient_matrix']  # Shape (sum(M), sum(M))
+        Yi = internal_matrices['shunt_admittance_matrix']       # Shape (num_freq, sum(M), sum(M))
 
-        # Loop to build the block matrix for each frequency
-        Zg = np.zeros_like(Zi, dtype=complex)
-        Pg = np.zeros_like(Zi, dtype=complex)
+        Zg = _expand_by_block_sizes(z0_jk, block_sizes)
+        Pg = _expand_by_block_sizes(pg_jk, block_sizes)
         Yg = np.zeros_like(Zi, dtype=complex)
-        for i in range(len(freq)):
-            Zg[i, :, :] = np.kron(z0_jk[i, :, :], np.ones((M, M)))
-            Pg[i, :, :] = np.kron(pg_jk[i, :, :], np.ones((M, M)))
 
         # Series impedance is a simple element-wise addition
         Zs = Zi + Zg

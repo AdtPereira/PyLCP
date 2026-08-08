@@ -1,17 +1,15 @@
+from ..andreata_common.plot_templates import (
+    MATLAB_TEMPLATE,
+    PLOT_TPL_REAL, PLOT_TPL_IMAG, PLOT_TPL_RESISTANCE, PLOT_TPL_INDUCTANCE,
+    PLOT_TPL_CONDUCTANCE, PLOT_TPL_CAPACITANCE,
+)
+
 COMSOL_TEMPLATE = [
     {
         'key': 'rho_g_100_epsr1_1_mf',
         'label': r'COMSOL ($\rho_e=100, \epsilon_r=1$)',
         'marker': 'o', 's': 20, 'facecolors': 'none', 'edgecolors': 'black', 'zorder': 10
     },
-]
-
-MATLAB_TEMPLATE = [
-    {
-        'key': 'measured',
-        'label': 'MATLAB',
-        'marker': 'x', 's': 12, 'color': 'blue', 'linewidths': 1.0, 'zorder': 11
-    }
 ]
 
 # Referência de validação cruzada (não é dado do duto): MATLAB do
@@ -50,49 +48,73 @@ DUCT_MODEL_TEMPLATE = [
     },
 ]
 
-PLOT_TPL_REAL = {
-    'component': 'real',
-    'scale': 1e0,
-    'xscale': 'log',
-    'yscale': 'linear',
-}
-
-PLOT_TPL_IMAG = {
-    'component': 'imag',
-    'scale': 1e0,
-    'xscale': 'log',
-    'yscale': 'linear',
-}
-
-PLOT_TPL_RESISTANCE = {
-    'component': 'real',
-    'scale': 1e3,
-    'xscale': 'log',
-    'yscale': 'log',
-}
-
-PLOT_TPL_INDUCTANCE = {
-    'component': 'imag_div_w',
-    'scale': 1e6,
-    'xscale': 'log',
-    'yscale': 'linear',
-}
-
-PLOT_TPL_CONDUCTANCE = {
-    'component': 'real',
-    'scale': 1e3,
-    'xscale': 'log',
-    'yscale': 'linear',
-}
-
-PLOT_TPL_CAPACITANCE = {
-    'component': 'imag_div_w',
-    'scale': 1e9,
-    'xscale': 'log',
-    'yscale': 'linear',
+# COMSOL de impedância interna (medição legada, cabo único, método Js) --
+# reaproveitado do estudo monofásico anterior (hdpe_300mm2): a seção
+# transversal núcleo+blindagem+duto é idêntica em cada fase, só o retorno à
+# terra muda com o número de fases (ver andreata_case2.py). Uma cor por
+# componente (cc/cs/ss) para diferenciá-los visualmente -- ao contrário do
+# hdpe_300mm2 original, que usa o mesmo marcador preto para os três.
+INTERNAL_COMSOL_TEMPLATE = {
+    'cc': {'key': 'measured', 'marker': 'o', 's': 20, 'facecolors': 'none', 'edgecolors': 'black',
+           'zorder': 10, 'label': r'COMSOL ($J_s$ method)'},
+    'cs': {'key': 'measured', 'marker': 'o', 's': 20, 'facecolors': 'none', 'edgecolors': 'tab:red',
+           'zorder': 10, 'label': ''},
+    'ss': {'key': 'measured', 'marker': 'o', 's': 20, 'facecolors': 'none', 'edgecolors': 'tab:blue',
+           'zorder': 10, 'label': ''},
 }
 
 PLOT_CONFIG = {
+
+    # --- Parâmetros internos combinados (núcleo + blindagem, fase A), um só
+    # modelo de duto (GMD case 3.1, o mais completo dos três) contra as
+    # referências COMSOL/MATLAB -- mesmo gráfico já existente no caso
+    # monofásico hdpe_300mm2 (internal_impedance_matrix.png), com a leitura
+    # MATLAB ('measured', prefixo 'andreata_hdpe') já preparada para quando
+    # os dados próprios do duto chegarem (ver andreata_case2.py, Item 9 de
+    # BUGS_AND_FIXES.md). Para a comparação por modelo de duto
+    # (Underground/ERS/GMD), ver 'core_self_impedance' etc. abaixo. ---
+
+    'internal_impedance_matrix': {
+        'suptitle': r'P.u.l. Internal Impedance Matrix, phase A — GMD case 3.1 [Lafaia, 2015] vs. COMSOL ($J_s$) [Yin, 1990]',
+        'components': [
+            {
+                'p': 0, 'q': 0,
+                'internal_style': {'label': r'$Zi_{cc}$ GMD case 3.1', 'color': 'black', 'linestyle': '-', 'linewidth': 1.5},
+                'comsol_series_to_plot': [INTERNAL_COMSOL_TEMPLATE['cc']],
+                'matlab_series_to_plot': [
+                    {'key': 'measured', 'label': 'MATLAB', 'marker': 'x', 's': 8, 'color': 'black', 'linewidths': 1.0, 'zorder': 11},
+                ],
+            },
+            {
+                'p': 0, 'q': 1,
+                'internal_style': {'label': r'$Zi_{cs}$ GMD case 3.1', 'color': 'tab:red', 'linestyle': '--', 'linewidth': 1.5},
+                'comsol_series_to_plot': [INTERNAL_COMSOL_TEMPLATE['cs']],
+                'matlab_series_to_plot': [
+                    {'key': 'measured', 'marker': 'x', 's': 8, 'color': 'tab:red', 'linewidths': 1.0, 'zorder': 11},
+                ],
+            },
+            {
+                'p': 1, 'q': 1,
+                'internal_style': {'label': r'$Zi_{ss}$ GMD case 3.1', 'color': 'tab:blue', 'linestyle': '-.', 'linewidth': 1.5},
+                'comsol_series_to_plot': [INTERNAL_COMSOL_TEMPLATE['ss']],
+                'matlab_series_to_plot': [
+                    {'key': 'measured', 'marker': 'x', 's': 8, 'color': 'tab:blue', 'linewidths': 1.0, 'zorder': 11},
+                ],
+            },
+        ],
+        'comsol_matrix_key': 'impedance_matrix',
+        'matlab_matrix_key': 'internal_impedance_matrix',
+        'xlim': (1E-2, 1E7),
+        'left_plot': {
+            **PLOT_TPL_RESISTANCE,
+            'label': r'$Rs \, (\Omega/km)$',
+            'y_lim': (1E-4, 1E2),
+        },
+        'right_plot': {
+            **PLOT_TPL_INDUCTANCE,
+            'label': r'$Ls \, (mH/km)$',
+        }
+    },
 
     # --- Parâmetros internos (núcleo + blindagem, fase A): sensíveis ao
     # modelo de duto (bare/ERS/GMD) porque ERS/GMD alteram a espessura e/ou

@@ -90,7 +90,7 @@ def main():
     plotter.series_impedance_composition(conductor='core')
     plotter.series_impedance_composition(conductor='sheath')
     plotter.series_impedance_earth_return()
-    plotter.series_impedance_internal()
+    plotter.internal_impedance_matrix()
     plotter.series_impedance_matrix()
     plotter.shunt_admittance_composition(conductor='core_sheath')
     plotter.shunt_admittance_composition(conductor='core')

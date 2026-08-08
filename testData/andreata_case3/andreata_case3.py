@@ -84,10 +84,14 @@ def main():
         }
     }
 
+    cmsl_processor = ComsolPostProcessor(__file__)
+    cmsl_processor.load_scc_earth_return_and_internal_scenarios(
+        pul_data, internal_mtl_model=mtl_model_a, internal_form='approximation')
+
     print("Carregando dados de referência do MATLAB...")
     matlab_reader = MatlabDataReader(__file__, autoShow=False)
     matlab_data = matlab_reader.get_scc_scenario_data(
-        prefix='andreata',
+        prefix='andreata_case3',
         conductor_order=[0, 3, 1, 4, 2, 5, 6],
     )
     matlab_data['frequencies'] = (
@@ -110,16 +114,15 @@ def main():
 
     print(f"\nEnd of the routine! Time spent on simulation: {(time.time() - st):.1f} seconds.\n")
     plotter = SCCPlotter(__file__, pul_data, PLOT_CONFIG, autoSave=False)
-    plotter.compare_complete_matrices(
-        key_list=['mutual_impedance_phase_a_sheath_ecc',
-                  'self_impedance_ecc',
-                  'self_admittance_ecc',
-                  'earth_return_impedance_ecc',
-                  'earth_return_admittance_ecc',
-                  'earth_return_potential_coeff_ecc'])
+    # plotter.compare_complete_matrices(
+    #     key_list=['mutual_impedance_phase_a_sheath_ecc',
+    #               'self_impedance_ecc',
+    #               'self_admittance_ecc',
+    #               'earth_return_impedance_ecc',
+    #               'earth_return_admittance_ecc',
+    #               'earth_return_potential_coeff_ecc'])
     plotter.compare_internal_matrices(
-        key_list=['internal_impedance_matrix',
-                  'internal_admittance_matrix'])
+        key_list=['internal_impedance_matrix', 'internal_admittance_matrix'])
     GroundReturnMTLRepresentation(__file__, mtl_model_a, units='centimeter').system_schematic()
     plt.show()
 

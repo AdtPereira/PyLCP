@@ -1,160 +1,45 @@
-COMSOL_TEMPLATE = [
-    {
-        'key': 'rho_g_100_epsr1_1_mf',
-        'label': r'COMSOL ($\rho_e=100, \epsilon_r=1$)',
-        'marker': 'o', 's': 35, 'facecolors': 'none', 'edgecolors': 'black', 'zorder': 10
-    },
-    {
-        'key': 'rho_g_100_epsr1_20_mf',
-        'label': r'COMSOL ($\rho_e=100, \epsilon_r=20$)',
-        'marker': 'o', 's': 15, 'facecolors': 'black', 'edgecolors': 'none', 'zorder': 10
-    },
-    {
-        'key': 'rho_g_500_epsr1_1_mf',
-        'label': r'COMSOL ($\rho_e=500, \epsilon_r=1$)',
-        'marker': 's', 's': 15, 'color': 'black', 'zorder': 10
-    }
-]
-
-XUE_TEMPLATE = [
-    {
-        'key': 'p100_er1',
-        'type': {
-            'main': {'label': r'$\rho_e=100 \;\Omega m, \epsilon_r=1$', 'color': 'black', 'linestyle': '-', 'linewidth': 1.5},
-        }
-    },
-    {
-        'key': 'p100_er20',
-        'type': {
-            'main': {'label': r'$\rho_e=100 \;\Omega m, \epsilon_r=20$', 'color': 'black', 'linestyle': '--', 'linewidth': 1.5},
-        }
-    },
-    {
-        'key': 'p500_er1',
-        'type': {
-            'main': {'label': r'$\rho_e=500 \;\Omega m, \epsilon_r=1$', 'color': 'black', 'linestyle': '-.', 'linewidth': 1.5},
-        }
-    },
-] 
-
-VANCE_TEMPLATE = [
-    {
-        'key': 'p100_er1_vance',
-        'type': {
-            'main': {'label': 'Vance Form. (1978)', 'color': 'darkgreen', 'linestyle': '--', 'linewidth': 1.0},
-        }
-    },
-    {
-        'key': 'p100_er20_vance',
-        'type': {
-            'main': {'label': '', 'color': 'darkgreen', 'linestyle': '--', 'linewidth': 1.0},
-        }
-    },
-    {
-        'key': 'p500_er1_vance',
-        'type': {
-            'main': {'label': '', 'color': 'darkgreen', 'linestyle': '--', 'linewidth': 1.0},
-        }
-    },
-] 
-
-MATLAB_TEMPLATE = [
-    {
-        'key': 'measured',
-        'label': 'MATLAB',
-        'marker': 'x', 's': 12, 'color': 'blue', 'linewidths': 1.0, 'zorder': 11
-    }
-]
-
-DECONTI_TEMPLATE = [
-    {
-        'key': 'p100_er1_deconti',
-        'type': {
-            'main': {'label': 'De Conti et al. Form. (2023)', 'color': 'red', 'linestyle': ':', 'linewidth': 1.0},
-        }
-    },
-    {
-        'key': 'p100_er20_deconti',
-        'type': {
-            'main': {'label': '', 'color': 'red', 'linestyle': ':', 'linewidth': 1.0},
-        }
-    },
-    {
-        'key': 'p500_er1_deconti',
-        'type': {
-            'main': {'label': '', 'color': 'red', 'linestyle': ':', 'linewidth': 1.0},
-        }
-    },
-] 
-
-PLOT_TPL_REAL = {
-    'component': 'real',
-    'scale': 1e0,
-    'xscale': 'log',
-    'yscale': 'linear',
-}
-
-PLOT_TPL_IMAG = {
-    'component': 'imag',
-    'scale': 1e0,
-    'xscale': 'log',
-    'yscale': 'linear',
-}
-
-PLOT_TPL_RESISTANCE = {
-    'component': 'real',
-    'scale': 1e3,
-    'xscale': 'log',
-    'yscale': 'log',
-}
-
-PLOT_TPL_INDUCTANCE = {
-    'component': 'imag_div_w',
-    'scale': 1e6,
-    'xscale': 'log',
-    'yscale': 'linear',
-}
-
-PLOT_TPL_CONDUCTANCE = {
-    'component': 'real',
-    'scale': 1e3,
-    'xscale': 'log',
-    'yscale': 'linear',
-}
-
-PLOT_TPL_CAPACITANCE = {
-    'component': 'imag_div_w',
-    'scale': 1e9,
-    'xscale': 'log',
-    'yscale': 'linear',
-}
+from ..andreata_common.plot_templates import (
+    COMSOL_TEMPLATE, XUE_TEMPLATE, MATLAB_TEMPLATE, DECONTI_TEMPLATE,
+    PLOT_TPL_REAL, PLOT_TPL_IMAG, PLOT_TPL_RESISTANCE, PLOT_TPL_INDUCTANCE,
+    PLOT_TPL_CONDUCTANCE, PLOT_TPL_CAPACITANCE,
+)
 
 PLOT_CONFIG = {
     'internal_impedance_matrix': {
-        'suptitle': 'P.u.l. Internal Impedance Matrix [Ametani, 2015]',
+        'suptitle': 'P.u.l. Internal Impedance Matrix [Ametani, 2015] vs. COMSOL ($J_s$) [Yin, 1990]',
         'components': [
             {
                 'p': 0, 'q': 0,
-                'internal_style': {'label': r'$Zi_{11}$', 'color': 'black', 'linestyle': '-', 'linewidth': 1.5},
+                'internal_style': {'label': r'$Zi_{cc}$', 'color': 'black', 'linestyle': '-', 'linewidth': 1.5},
+                'comsol_series_to_plot': [
+                    {'key': 'measured', 'marker': 'o', 's': 25, 'facecolors': 'none', 'edgecolors': 'black', 'zorder': 10},
+                ],
                 'matlab_series_to_plot': [
-                    {'key': 'measured', 'marker': 'x', 's': 8, 'color': 'black', 'linewidths': 1.0, 'zorder': 11},
+                    {'key': 'measured', 'marker': 'o', 's': 4, 'color': 'black', 'linewidths': 1.0, 'zorder': 11},
                 ],
             },
             {
                 'p': 0, 'q': 1,
-                'internal_style': {'label': r'$Zi_{12}$', 'color': 'tab:red', 'linestyle': '--', 'linewidth': 1.5},
+                'internal_style': {'label': r'$Zi_{cs}$', 'color': 'tab:red', 'linestyle': '--', 'linewidth': 1.5},
+                'comsol_series_to_plot': [
+                    {'key': 'measured', 'marker': 'o', 's': 25, 'facecolors': 'none', 'edgecolors': 'tab:red', 'zorder': 10},
+                ],
                 'matlab_series_to_plot': [
-                    {'key': 'measured', 'marker': 'x', 's': 8, 'color': 'black', 'linewidths': 1.0, 'zorder': 11},
+                    {'key': 'measured', 'marker': 'o', 's': 4, 'color': 'black', 'linewidths': 1.0, 'zorder': 11},
                 ],
             },
             {
                 'p': 1, 'q': 1,
-                'internal_style': {'label': r'$Zi_{22}$', 'color': 'tab:blue', 'linestyle': '-.', 'linewidth': 1.5},
+                'internal_style': {'label': r'$Zi_{ss}$', 'color': 'tab:blue', 'linestyle': '-.', 'linewidth': 1.5},
+                'comsol_series_to_plot': [
+                    {'key': 'measured', 'label': 'COMSOL', 'marker': 'o', 's': 25, 'facecolors': 'none', 'edgecolors': 'tab:blue', 'zorder': 10},
+                ],
                 'matlab_series_to_plot': [
-                    {'key': 'measured', 'label': 'MATLAB', 'marker': 'x', 's': 8, 'color': 'black', 'linewidths': 1.0, 'zorder': 11},
+                    {'key': 'measured', 'label': 'MATLAB', 'marker': 'o', 's': 4, 'color': 'black', 'linewidths': 1.0, 'zorder': 11},
                 ],
             },
         ],
+        'comsol_matrix_key': 'impedance_matrix',
         'matlab_matrix_key': 'internal_impedance_matrix',
         'xlim': (1E-2, 1E7),
         'left_plot': {
@@ -176,21 +61,21 @@ PLOT_CONFIG = {
                 'p': 0, 'q': 0,
                 'internal_style': {'label': r'$Yi_{11}$', 'color': 'black', 'linestyle': '-', 'linewidth': 1.5},
                 'matlab_series_to_plot': [
-                    {'key': 'measured', 'marker': 'x', 's': 8, 'color': 'black', 'linewidths': 1.0, 'zorder': 11},
+                    {'key': 'measured', 'marker': 'o', 's': 4, 'color': 'black', 'linewidths': 1.0, 'zorder': 11},
                 ],
             },
             {
                 'p': 0, 'q': 1,
                 'internal_style': {'label': r'$Yi_{12}$', 'color': 'tab:red', 'linestyle': '--', 'linewidth': 1.5},
                 'matlab_series_to_plot': [
-                    {'key': 'measured', 'marker': 'x', 's': 8, 'color': 'black', 'linewidths': 1.0, 'zorder': 11},
+                    {'key': 'measured', 'marker': 'o', 's': 4, 'color': 'black', 'linewidths': 1.0, 'zorder': 11},
                 ],
             },
             {
                 'p': 1, 'q': 1,
                 'internal_style': {'label': r'$Yi_{22}$', 'color': 'tab:blue', 'linestyle': '-.', 'linewidth': 1.5},
                 'matlab_series_to_plot': [
-                    {'key': 'measured', 'label': 'MATLAB', 'marker': 'x', 's': 8, 'color': 'black', 'linewidths': 1.0, 'zorder': 11},
+                    {'key': 'measured', 'label': 'MATLAB', 'marker': 'o', 's': 4, 'color': 'black', 'linewidths': 1.0, 'zorder': 11},
                 ],
             },
         ],

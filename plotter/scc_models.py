@@ -86,7 +86,7 @@ class SingleCoreCableModels(BasePlotter):
     def potential_coefficients_earth_return(self):
         self._plot_matrix_parameters('earth_return_potential')
 
-    def series_impedance_internal(self):
+    def internal_impedance_matrix(self):
         self._plot_matrix_parameters('internal_impedance')
 
     def shunt_admittance_internal(self):
