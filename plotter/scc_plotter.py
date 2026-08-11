@@ -127,8 +127,12 @@ class SCCPlotter(BasePlotter):
 
         Accepts either a single (p, q) pair via the 'p'/'q'/'internal_style' keys, or several
         overlaid on the same axes via a 'components' list of such dicts (each with its own 'p',
-        'q', 'internal_style', 'comsol_series_to_plot' and 'matlab_series_to_plot'). The internal
-        matrix to plot is picked via 'internal_matrix_key' (defaults to 'impedance_matrix', i.e. Zi).
+        'q', 'internal_style', 'comsol_series_to_plot' and 'matlab_series_to_plot'). Within a
+        'components' entry, 'internal_style' is optional -- omitting it (or setting it to None)
+        skips the analytical curve for that component while still plotting its COMSOL/MATLAB
+        reference series, e.g. to hide one duct model from an overlay without losing its
+        reference points. The internal matrix to plot is picked via 'internal_matrix_key'
+        (defaults to 'impedance_matrix', i.e. Zi).
         COMSOL/MATLAB reference matrices are looked up via 'comsol_matrix_key'/'matlab_matrix_key'
         (each a flat key into the respective scenario dict, holding a (freq, N, N) matrix).
         """
@@ -149,18 +153,25 @@ class SCCPlotter(BasePlotter):
 
         internal_matrices = self.pul_data.get('internal_matrices')
         internal_matrix_key = cfg.get('internal_matrix_key', 'impedance_matrix')
-        cmsl_freq = self.cmsl.get('frequencies') if self.cmsl else None
-        cmsl_w = 2 * np.pi * cmsl_freq if cmsl_freq is not None else None
         cmsl_key = cfg.get('comsol_matrix_key', 'impedance_matrix')
+        # Each internal matrix (impedance/admittance) comes from its own
+        # independent COMSOL .txt file and may have its own frequency grid
+        # (different point count) -- look it up per-key rather than assuming
+        # a single shared self.cmsl['frequencies'] (that key represents only
+        # the earth-return grid, used by the 'path'-based _plot_scc_matrix).
+        cmsl_freq = self.cmsl.get('frequencies_by_key', {}).get(cmsl_key) if self.cmsl else None
+        if cmsl_freq is None and self.cmsl:
+            cmsl_freq = self.cmsl.get('frequencies')
+        cmsl_w = 2 * np.pi * cmsl_freq if cmsl_freq is not None else None
         mtlb_freq = self.mtlb.get('frequencies') if self.mtlb else None
         mtlb_w = 2 * np.pi * mtlb_freq if mtlb_freq is not None else None
         mtlb_key = cfg.get('matlab_matrix_key', 'internal_impedance_matrix')
 
         for comp in components:
             p, q = comp['p'], comp['q']
-            if internal_matrices is not None:
+            style = comp.get('internal_style')
+            if internal_matrices is not None and style is not None:
                 Mi = internal_matrices[internal_matrix_key]
-                style = comp['internal_style']
                 ax1.plot(freq, self._calculate_plot_data(Mi[:, p, q], w, left_cfg), **style)
                 ax2.plot(freq, self._calculate_plot_data(Mi[:, p, q], w, right_cfg), **style)
 

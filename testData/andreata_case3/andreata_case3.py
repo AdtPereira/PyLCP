@@ -113,7 +113,7 @@ def main():
         value['quasi_tem_matrices'] = quasi_tem
 
     print(f"\nEnd of the routine! Time spent on simulation: {(time.time() - st):.1f} seconds.\n")
-    plotter = SCCPlotter(__file__, pul_data, PLOT_CONFIG, autoSave=False)
+    plotter = SCCPlotter(__file__, pul_data, PLOT_CONFIG, autoSave=True)
     # plotter.compare_complete_matrices(
     #     key_list=['mutual_impedance_phase_a_sheath_ecc',
     #               'self_impedance_ecc',

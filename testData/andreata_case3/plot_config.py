@@ -12,28 +12,28 @@ PLOT_CONFIG = {
                 'p': 0, 'q': 0,
                 'internal_style': {'label': r'$Zi_{11}$', 'color': 'black', 'linestyle': '-', 'linewidth': 1.5},
                 'matlab_series_to_plot': [
-                    {'key': 'measured', 'marker': 'x', 's': 8, 'color': 'black', 'linewidths': 1.0, 'zorder': 11},
+                    {'key': 'measured', 'marker': '.', 's': 8, 'color': 'black', 'linewidths': 1.0, 'zorder': 11},
                 ],
             },
             {
                 'p': 0, 'q': 1,
                 'internal_style': {'label': r'$Zi_{12}$', 'color': 'tab:red', 'linestyle': '--', 'linewidth': 1.5},
                 'matlab_series_to_plot': [
-                    {'key': 'measured', 'marker': 'x', 's': 8, 'color': 'black', 'linewidths': 1.0, 'zorder': 11},
+                    {'key': 'measured', 'marker': '.', 's': 8, 'color': 'black', 'linewidths': 1.0, 'zorder': 11},
                 ],
             },
             {
                 'p': 1, 'q': 1,
                 'internal_style': {'label': r'$Zi_{22}$', 'color': 'tab:blue', 'linestyle': '-.', 'linewidth': 1.5},
                 'matlab_series_to_plot': [
-                    {'key': 'measured', 'marker': 'x', 's': 8, 'color': 'black', 'linewidths': 1.0, 'zorder': 11},
+                    {'key': 'measured', 'marker': '.', 's': 8, 'color': 'black', 'linewidths': 1.0, 'zorder': 11},
                 ],
             },
             {
                 'p': 6, 'q': 6,
                 'internal_style': {'label': r'$Zi_{77}$', 'color': 'tab:green', 'linestyle': ':', 'linewidth': 1.5},
                 'matlab_series_to_plot': [
-                    {'key': 'measured', 'label': 'MATLAB', 'marker': 'x', 's': 8, 'color': 'black', 'linewidths': 1.0, 'zorder': 11},
+                    {'key': 'measured', 'label': 'MATLAB', 'marker': '.', 's': 8, 'color': 'black', 'linewidths': 1.0, 'zorder': 11},
                 ],
             },
         ],
@@ -58,28 +58,28 @@ PLOT_CONFIG = {
                 'p': 0, 'q': 0,
                 'internal_style': {'label': r'$Yi_{11}$', 'color': 'black', 'linestyle': '-', 'linewidth': 1.5},
                 'matlab_series_to_plot': [
-                    {'key': 'measured', 'marker': 'x', 's': 8, 'color': 'black', 'linewidths': 1.0, 'zorder': 11},
+                    {'key': 'measured', 'marker': '.', 's': 8, 'color': 'black', 'linewidths': 1.0, 'zorder': 11},
                 ],
             },
             {
                 'p': 0, 'q': 1,
                 'internal_style': {'label': r'$Yi_{12}$', 'color': 'tab:red', 'linestyle': '--', 'linewidth': 1.5},
                 'matlab_series_to_plot': [
-                    {'key': 'measured', 'marker': 'x', 's': 8, 'color': 'black', 'linewidths': 1.0, 'zorder': 11},
+                    {'key': 'measured', 'marker': '.', 's': 8, 'color': 'black', 'linewidths': 1.0, 'zorder': 11},
                 ],
             },
             {
                 'p': 1, 'q': 1,
                 'internal_style': {'label': r'$Yi_{22}$', 'color': 'tab:blue', 'linestyle': '-.', 'linewidth': 1.5},
                 'matlab_series_to_plot': [
-                    {'key': 'measured', 'marker': 'x', 's': 8, 'color': 'black', 'linewidths': 1.0, 'zorder': 11},
+                    {'key': 'measured', 'marker': '.', 's': 8, 'color': 'black', 'linewidths': 1.0, 'zorder': 11},
                 ],
             },
             {
                 'p': 6, 'q': 6,
                 'internal_style': {'label': r'$Yi_{77}$', 'color': 'tab:green', 'linestyle': ':', 'linewidth': 1.5},
                 'matlab_series_to_plot': [
-                    {'key': 'measured', 'label': 'MATLAB', 'marker': 'x', 's': 8, 'color': 'black', 'linewidths': 1.0, 'zorder': 11},
+                    {'key': 'measured', 'label': 'MATLAB', 'marker': '.', 's': 8, 'color': 'black', 'linewidths': 1.0, 'zorder': 11},
                 ],
             },
         ],

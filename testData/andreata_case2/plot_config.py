@@ -79,26 +79,26 @@ PLOT_CONFIG = {
         'components': [
             {
                 'p': 0, 'q': 0,
-                'internal_style': {'label': r'$Zi_{cc}$ GMD case 3.1', 'color': 'black', 'linestyle': '-', 'linewidth': 1.5},
+                # 'internal_style': {'label': r'$Zi_{cc}$ GMD case 3.1', 'color': 'black', 'linestyle': '-', 'linewidth': 1.5},
                 'comsol_series_to_plot': [INTERNAL_COMSOL_TEMPLATE['cc']],
                 'matlab_series_to_plot': [
-                    {'key': 'measured', 'label': 'MATLAB', 'marker': 'x', 's': 8, 'color': 'black', 'linewidths': 1.0, 'zorder': 11},
+                    {'key': 'measured', 'label': 'MATLAB', 'marker': '.', 's': 8, 'color': 'black', 'linewidths': 1.0, 'zorder': 11},
                 ],
             },
             {
                 'p': 0, 'q': 1,
-                'internal_style': {'label': r'$Zi_{cs}$ GMD case 3.1', 'color': 'tab:red', 'linestyle': '--', 'linewidth': 1.5},
+                # 'internal_style': {'label': r'$Zi_{cs}$ GMD case 3.1', 'color': 'tab:red', 'linestyle': '--', 'linewidth': 1.5},
                 'comsol_series_to_plot': [INTERNAL_COMSOL_TEMPLATE['cs']],
                 'matlab_series_to_plot': [
-                    {'key': 'measured', 'marker': 'x', 's': 8, 'color': 'tab:red', 'linewidths': 1.0, 'zorder': 11},
+                    {'key': 'measured', 'marker': '.', 's': 8, 'color': 'tab:red', 'linewidths': 1.0, 'zorder': 11},
                 ],
             },
             {
                 'p': 1, 'q': 1,
-                'internal_style': {'label': r'$Zi_{ss}$ GMD case 3.1', 'color': 'tab:blue', 'linestyle': '-.', 'linewidth': 1.5},
+                # 'internal_style': {'label': r'$Zi_{ss}$ GMD case 3.1', 'color': 'tab:blue', 'linestyle': '-.', 'linewidth': 1.5},
                 'comsol_series_to_plot': [INTERNAL_COMSOL_TEMPLATE['ss']],
                 'matlab_series_to_plot': [
-                    {'key': 'measured', 'marker': 'x', 's': 8, 'color': 'tab:blue', 'linewidths': 1.0, 'zorder': 11},
+                    {'key': 'measured', 'marker': '.', 's': 8, 'color': 'tab:blue', 'linewidths': 1.0, 'zorder': 11},
                 ],
             },
         ],
@@ -113,6 +113,48 @@ PLOT_CONFIG = {
         'right_plot': {
             **PLOT_TPL_INDUCTANCE,
             'label': r'$Ls \, (mH/km)$',
+        }
+    },
+
+    'internal_admittance_matrix': {
+        'suptitle': r'P.u.l. Internal Admittance Matrix, phase A — GMD case 3.1 [Lafaia, 2015] vs. COMSOL',
+        'internal_matrix_key': 'shunt_admittance_matrix',
+        'components': [
+            {
+                'p': 0, 'q': 0,
+                # 'internal_style': {'label': r'$Yi_{cc}$ GMD case 3.1', 'color': 'black', 'linestyle': '-', 'linewidth': 1.5},
+                'comsol_series_to_plot': [INTERNAL_COMSOL_TEMPLATE['cc']],
+                'matlab_series_to_plot': [
+                    {'key': 'measured', 'label': 'MATLAB', 'marker': '.', 's': 8, 'color': 'black', 'linewidths': 1.0, 'zorder': 11},
+                ],
+            },
+            {
+                'p': 0, 'q': 1,
+                # 'internal_style': {'label': r'$Yi_{cs}$ GMD case 3.1', 'color': 'tab:red', 'linestyle': '--', 'linewidth': 1.5},
+                'comsol_series_to_plot': [INTERNAL_COMSOL_TEMPLATE['cs']],
+                'matlab_series_to_plot': [
+                    {'key': 'measured', 'marker': '.', 's': 8, 'color': 'tab:red', 'linewidths': 1.0, 'zorder': 11},
+                ],
+            },
+            {
+                'p': 1, 'q': 1,
+                # 'internal_style': {'label': r'$Yi_{ss}$ GMD case 3.1', 'color': 'tab:blue', 'linestyle': '-.', 'linewidth': 1.5},
+                'comsol_series_to_plot': [INTERNAL_COMSOL_TEMPLATE['ss']],
+                'matlab_series_to_plot': [
+                    {'key': 'measured', 'marker': '.', 's': 8, 'color': 'tab:blue', 'linewidths': 1.0, 'zorder': 11},
+                ],
+            },
+        ],
+        'comsol_matrix_key': 'admittance_matrix',
+        'matlab_matrix_key': 'internal_admittance_matrix',
+        'xlim': (1E-2, 1E7),
+        'left_plot': {
+            **PLOT_TPL_CONDUCTANCE,
+            'label': r'$G \, (S/km)$',
+        },
+        'right_plot': {
+            **PLOT_TPL_CAPACITANCE,
+            'label': r'$C \, (nF/km)$',
         }
     },
 

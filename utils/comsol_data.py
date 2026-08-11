@@ -345,11 +345,28 @@ class ComsolPostProcessor:
            get_scc_internal_impedance_matrix_combined(). Não depende do
            solo/retorno à terra, por isso é carregada incondicionalmente,
            mesmo que o bloco 1 acima não tenha dados.
+        3. Admitância interna combinada (núcleo + blindagem), lida de
+           'cmsl_internal_admittance_matrix.txt' pelo método direto (carga),
+           mesma convenção do bloco 2 -- ver
+           get_scc_internal_admittance_matrix_combined(). Também carregada
+           incondicionalmente.
 
-        NOTA: os dois blocos compartilham pul_data['comsol']['frequencies']
-        -- hoje inofensivo nos três casos porque só um dos dois arquivos
-        costuma existir por vez; se algum caso vier a ter os dois
-        simultaneamente, vão precisar da mesma grade de frequência.
+        Os blocos 2 e 3 são mesclados no mesmo cenário 'measured' (cada um
+        contribuindo sua própria chave de matriz -- 'impedance_matrix' e
+        'admittance_matrix' -- sem se sobrescreverem).
+
+        Os três blocos NÃO compartilham uma única grade de frequência: cada
+        um vem de um arquivo .txt do COMSOL independente (retorno à terra,
+        impedância interna, admitância interna), com sua própria varredura
+        paramétrica -- não há garantia de que tenham o mesmo número de
+        pontos (ex.: andreata_case2 tem 46 pontos no arquivo de impedância
+        e 91 no de admitância). Por isso cada matriz interna guarda sua
+        própria frequência em pul_data['comsol']['frequencies_by_key'][chave]
+        (chave = 'impedance_matrix'/'admittance_matrix'), consultada por
+        SCCPlotter._plot_scc_internal_matrix() em vez do
+        pul_data['comsol']['frequencies'] compartilhado (que continua
+        representando só a grade do retorno à terra, usada pelos gráficos
+        baseados em 'path'/_plot_scc_matrix).
         """
         print("Construindo matrizes COMSOL...")
         cmsl_params = self.get_general_parameters(earth_return_key)
@@ -369,14 +386,27 @@ class ComsolPostProcessor:
             print("  Aviso: Processamento COMSOL ignorado (dados não disponíveis).")
             pul_data['comsol'] = {}
 
+        pul_data['comsol'].setdefault('frequencies_by_key', {})
+
         print("Carregando dados COMSOL de impedância interna...")
-        scc_internal_cmsl = self.get_scc_internal_impedance_matrix_combined()
-        if scc_internal_cmsl is not None:
+        scc_internal_z_cmsl = self.get_scc_internal_impedance_matrix_combined()
+        if scc_internal_z_cmsl is not None:
             pul_data['comsol'].setdefault('scenarios', {})
-            pul_data['comsol']['frequencies'] = scc_internal_cmsl['frequencies']
-            pul_data['comsol']['scenarios'].update(scc_internal_cmsl['scenarios'])
+            pul_data['comsol']['frequencies_by_key']['impedance_matrix'] = scc_internal_z_cmsl['frequencies']
+            for key, value in scc_internal_z_cmsl['scenarios'].items():
+                pul_data['comsol']['scenarios'].setdefault(key, {}).update(value)
         else:
             print("  Aviso: dados COMSOL de impedância interna não disponíveis.")
+
+        print("Carregando dados COMSOL de admitância interna...")
+        scc_internal_y_cmsl = self.get_scc_internal_admittance_matrix_combined()
+        if scc_internal_y_cmsl is not None:
+            pul_data['comsol'].setdefault('scenarios', {})
+            pul_data['comsol']['frequencies_by_key']['admittance_matrix'] = scc_internal_y_cmsl['frequencies']
+            for key, value in scc_internal_y_cmsl['scenarios'].items():
+                pul_data['comsol']['scenarios'].setdefault(key, {}).update(value)
+        else:
+            print("  Aviso: dados COMSOL de admitância interna não disponíveis.")
 
     def get_bifilar_data(self, excitation_type: str = 'average'):
         N = 2
@@ -685,6 +715,65 @@ class ComsolPostProcessor:
             'frequencies': freq,
             'scenarios': {
                 'measured': {'impedance_matrix': Zi},
+            },
+        }
+
+    def get_scc_internal_admittance_matrix_combined(self) -> dict:
+        """
+        Returns the SCC internal admittance matrix [Yi] (core + sheath, 2x2)
+        from a single combined file 'cmsl_internal_admittance_matrix.txt'
+        holding both excitations in one table: a core-excitation block (Ccc,
+        Csic, Csoc, Ccc_energy, Wcc) and a sheath-excitation block (Ccs,
+        Csis, Csos, Css_energy, Wss, Wcs), all direct charge/V readings
+        except the *_energy/W* columns.
+
+        C_cc (core self) = Ccc: direct core-charge reading under core
+        excitation. C_cs (core-sheath mutual) = Csic: direct induced
+        sheath-charge reading, same core-excitation block (sheath held at
+        zero voltage) -- matches the convention used by
+        get_scc_internal_impedance_matrix_combined() for the impedance file.
+
+        C_ss (sheath self) = Csis + Csos: under sheath excitation the sheath
+        sits between two dielectrics -- the core insulation (XLPE) inward
+        and its own outer jacket (PVC) outward -- so its total charge is the
+        sum of both surfaces' direct readings (Csis: inner/core-facing,
+        Csos: outer/jacket-facing). Summing them reproduces the analytical
+        Yi_22 = jw*(Cc+Cs) to ~3e-4 % (verified against
+        InternalPerUnitParameters.matrices()['shunt_admittance_matrix']),
+        confirming the jacket capacitance is fully captured by the direct
+        method here -- the *_energy/W* columns are not needed.
+
+        Returned in the standard 'scenarios' shape expected by
+        BasePlotter._get_data_from_source(source='comsol').
+        """
+        N = 2
+        general_data = self.get_general_parameters('cmsl_internal_admittance_matrix')
+        if general_data is None:
+            return None
+
+        data = self.cmsl_reader.data['cmsl_internal_admittance_matrix']
+        freq = general_data['frequencies']
+        jw = 1j * general_data['angular_frequencies']
+
+        def _real(col):
+            return np.real(np.asarray(data[col], dtype=complex))
+
+        c_cc = _real('ccc')                     # core self, direct (core excitation)
+        c_cs = _real('csic')                     # core-sheath mutual, direct (core excitation)
+        c_ss = _real('csis') + _real('csos')     # sheath self, direct (sheath excitation, inner+outer)
+
+        C = np.zeros((len(freq), N, N))
+        C[:, 0, 0] = c_cc
+        C[:, 0, 1] = c_cs
+        C[:, 1, 0] = c_cs
+        C[:, 1, 1] = c_ss
+
+        Yi = jw[:, np.newaxis, np.newaxis] * C
+
+        return {
+            'frequencies': freq,
+            'scenarios': {
+                'measured': {'admittance_matrix': Yi},
             },
         }
 

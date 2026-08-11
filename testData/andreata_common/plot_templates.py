@@ -16,7 +16,7 @@ MATLAB_TEMPLATE = [
     {
         'key': 'measured',
         'label': 'MATLAB',
-        'marker': 'x', 's': 12, 'color': 'blue', 'linewidths': 1.0, 'zorder': 11
+        'marker': '.', 's': 12, 'color': 'blue', 'linewidths': 1.0, 'zorder': 11
     }
 ]
 

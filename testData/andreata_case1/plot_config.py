@@ -10,7 +10,7 @@ PLOT_CONFIG = {
         'components': [
             {
                 'p': 0, 'q': 0,
-                'internal_style': {'label': r'$Zi_{cc}$', 'color': 'black', 'linestyle': '-', 'linewidth': 1.5},
+                'internal_style': {'label': r'$Zi_{cc}$', 'color': 'black', 'linestyle': '-', 'linewidth': 1.5, 'zorder': 12},
                 'comsol_series_to_plot': [
                     {'key': 'measured', 'marker': 'o', 's': 25, 'facecolors': 'none', 'edgecolors': 'black', 'zorder': 10},
                 ],
@@ -20,7 +20,7 @@ PLOT_CONFIG = {
             },
             {
                 'p': 0, 'q': 1,
-                'internal_style': {'label': r'$Zi_{cs}$', 'color': 'tab:red', 'linestyle': '--', 'linewidth': 1.5},
+                'internal_style': {'label': r'$Zi_{cs}$', 'color': 'tab:red', 'linestyle': '--', 'linewidth': 1.5, 'zorder': 12},
                 'comsol_series_to_plot': [
                     {'key': 'measured', 'marker': 'o', 's': 25, 'facecolors': 'none', 'edgecolors': 'tab:red', 'zorder': 10},
                 ],
@@ -30,7 +30,7 @@ PLOT_CONFIG = {
             },
             {
                 'p': 1, 'q': 1,
-                'internal_style': {'label': r'$Zi_{ss}$', 'color': 'tab:blue', 'linestyle': '-.', 'linewidth': 1.5},
+                'internal_style': {'label': r'$Zi_{ss}$', 'color': 'tab:blue', 'linestyle': '-.', 'linewidth': 1.5, 'zorder': 12},
                 'comsol_series_to_plot': [
                     {'key': 'measured', 'label': 'COMSOL', 'marker': 'o', 's': 25, 'facecolors': 'none', 'edgecolors': 'tab:blue', 'zorder': 10},
                 ],
@@ -59,27 +59,37 @@ PLOT_CONFIG = {
         'components': [
             {
                 'p': 0, 'q': 0,
-                'internal_style': {'label': r'$Yi_{11}$', 'color': 'black', 'linestyle': '-', 'linewidth': 1.5},
+                'internal_style': {'label': r'$Yi_{11}$', 'color': 'black', 'linestyle': '-', 'linewidth': 1.5, 'zorder': 12},
+                'comsol_series_to_plot': [
+                    {'key': 'measured', 'marker': 'o', 's': 25, 'facecolors': 'white', 'edgecolors': 'black', 'zorder': 10},
+                ],
                 'matlab_series_to_plot': [
                     {'key': 'measured', 'marker': 'o', 's': 4, 'color': 'black', 'linewidths': 1.0, 'zorder': 11},
                 ],
             },
             {
                 'p': 0, 'q': 1,
-                'internal_style': {'label': r'$Yi_{12}$', 'color': 'tab:red', 'linestyle': '--', 'linewidth': 1.5},
+                'internal_style': {'label': r'$Yi_{12}$', 'color': 'tab:red', 'linestyle': '--', 'linewidth': 1.5, 'zorder': 12},
+                'comsol_series_to_plot': [
+                    {'key': 'measured', 'marker': 'o', 's': 25, 'facecolors': 'none', 'edgecolors': 'black', 'zorder': 10},
+                ],
                 'matlab_series_to_plot': [
                     {'key': 'measured', 'marker': 'o', 's': 4, 'color': 'black', 'linewidths': 1.0, 'zorder': 11},
                 ],
             },
             {
                 'p': 1, 'q': 1,
-                'internal_style': {'label': r'$Yi_{22}$', 'color': 'tab:blue', 'linestyle': '-.', 'linewidth': 1.5},
+                'internal_style': {'label': r'$Yi_{22}$', 'color': 'tab:blue', 'linestyle': '-.', 'linewidth': 1.5, 'zorder': 12},
+                'comsol_series_to_plot': [
+                    {'key': 'measured', 'label': 'COMSOL', 'marker': 'o', 's': 25, 'facecolors': 'none', 'edgecolors': 'black', 'zorder': 10},
+                ],
                 'matlab_series_to_plot': [
                     {'key': 'measured', 'label': 'MATLAB', 'marker': 'o', 's': 4, 'color': 'black', 'linewidths': 1.0, 'zorder': 11},
                 ],
             },
         ],
         'matlab_matrix_key': 'internal_admittance_matrix',
+        'comsol_matrix_key': 'admittance_matrix',
         'xlim': (1E-2, 1E7),
         'left_plot': {
             **PLOT_TPL_CONDUCTANCE,

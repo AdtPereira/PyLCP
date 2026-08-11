@@ -232,14 +232,14 @@ def main():
     validate_against_case1_reference(pul_data)
 
     print(f"\nEnd of the routine! Time spent on simulation: {(time.time() - st):.1f} seconds.\n")
-    plotter = SCCPlotter(__file__, pul_data, PLOT_CONFIG, autoSave=False)
+    plotter = SCCPlotter(__file__, pul_data, PLOT_CONFIG, autoSave=True)
     # plotter.compare_complete_matrices(
     #     key_list=['core_self_impedance',
     #               'mutual_impedance_core_sheath',
     #               'sheath_self_impedance',
     #               'earth_return_impedance_phase_a'])
     plotter.compare_internal_matrices(
-        key_list=['internal_impedance_matrix'])
+            key_list=['internal_impedance_matrix', 'internal_admittance_matrix'])
     GroundReturnMTLRepresentation(__file__, mtl_0, units='centimeter').system_schematic()
     plt.show()
 
