@@ -41,7 +41,7 @@ PLOT_CONFIG = {
         ],
         'comsol_matrix_key': 'impedance_matrix',
         'matlab_matrix_key': 'internal_impedance_matrix',
-        'xlim': (1E-2, 1E7),
+        'xlim': (1E1, 1E7),
         'left_plot': {
             **PLOT_TPL_RESISTANCE,
             'label': r'$Rs \, (\Omega/km)$',
@@ -90,7 +90,7 @@ PLOT_CONFIG = {
         ],
         'matlab_matrix_key': 'internal_admittance_matrix',
         'comsol_matrix_key': 'admittance_matrix',
-        'xlim': (1E-2, 1E7),
+        'xlim': (1E3, 1E6),
         'left_plot': {
             **PLOT_TPL_CONDUCTANCE,
             'label': r'$G \, (S/km)$',
@@ -202,6 +202,7 @@ PLOT_CONFIG = {
         'path': ['earth_return_parameters', 'potential_coefficient'],
         'matlab_series_to_plot': MATLAB_TEMPLATE,
         'matlab_matrix_key': 'earth_return_potential_coefficient_matrix',
+        'xlim': (1E4, 1E7),
         'left_plot': {
             **PLOT_TPL_REAL,
             'label': r'$Re\{Pg_{11}\} \, (m/F)$',

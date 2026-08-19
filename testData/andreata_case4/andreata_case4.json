@@ -1,14 +1,16 @@
 {
-  "type": "scc-flat-hdpe",
-  "name": "34.5 kV XLPE underground three-phase flat single-core cables, each in its own HDPE tube",
-  "note": "Figura 5.2 - Configuração 2: Cabos dentro de tubos enterrados. Andreata, Luis Eduardo Batista. Análise das Características de Propagação e de Transitórios Eletromagnéticos em Cabos Subterrâneos Instalados em Tubos Não Metálicos no Contexto de Parques Eólicos. Programa de Pós-Graduação em Engenharia Elétrica, Universidade Federal do Minas Gerais, 2025. https://hdl.handle.net/1843/2086",
+  "type": "scc-flat-hdpe-ecc",
+  "name": "34.5 kV XLPE underground three-phase flat single-core cables",
+  "note": "Figura 5.4 - Configuração 4: Cabos dentro de tubos enterrados e um condutor adicional. Andreata, Luis Eduardo Batista. Análise das Características de Propagação e de Transitórios Eletromagnéticos em Cabos Subterrâneos Instalados em Tubos Não Metálicos no Contexto de Parques Eólicos. Programa de Pós-Graduação em Engenharia Elétrica, Universidade Federal do Minas Gerais, 2025. https://hdl.handle.net/1843/2086",
   "arrangement": {
     "unit": "meter",
     "num_conductors": 3,
     "burial_depth": 1.2,
     "spacing": 0.2,
     "fourier_order": 10,
-    "idx_ref_conductor": 0
+    "idx_ref_conductor": 0,
+    "ecc_horizontal_gap": 0.0295,
+    "ecc_vertical_gap": 0.006
   },
   "soil": {
     "conductivity_S_per_m": 0.01,
@@ -54,6 +56,16 @@
           "thickness": null,
           "relative_permittivity": 1.0
         }
+      }
+    },
+    "ecc": {
+      "inner_radius": 0.0,
+      "outer_radius": 0.0033,
+      "conductivity_S_per_m": 3.8E7,
+      "insulation": {
+        "type": "XLPE",
+        "thickness": 0.002,
+        "relative_permittivity": 2.8
       }
     }
   }

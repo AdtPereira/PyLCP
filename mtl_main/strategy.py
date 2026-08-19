@@ -1565,10 +1565,14 @@ def mtl_strategy_factory(mtl_type: str) -> MTLStrategy:
         'coaxial': CableStrategy,
         'overhead': OverheadLineStrategy,
         'scc': SingleCoreCableStrategy,
+        'scc-flat': SingleCoreCableStrategy,
         'pipe': CableStrategy,
         'hdpe': SingleCoreCableInHDPEStrategy,
+        'HDPE': SingleCoreCableInHDPEStrategy,
+        'scc-flat-hdpe': SingleCoreCableInHDPEStrategy,
         'shared-hdpe': SingleCoreCableWithECCInHDPEStrategy,
         'scc-flat-ecc': SingleCoreCableWithECCStrategy,
+        'scc-flat-hdpe-ecc': SingleCoreCableWithECCStrategy,
     }
     
     strategy_class = strategies.get(mtl_type)

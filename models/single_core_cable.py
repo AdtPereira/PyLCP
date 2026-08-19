@@ -387,7 +387,7 @@ class SingleCoreCableModelGenerator:
         # --- Geração do Modelo ---
         model = {
             'name': self.input_data.get('name', 'FLAT_HDPE_Enclosed_SCC_System'),
-            'type': 'hdpe',
+            'type': self.input_data.get('type', 'hdpe'),
             'note': self.input_data.get(
                 'note', 'A parametric flat arrangement of SCC cables, each individually enclosed in an HDPE duct.'),
             'idx_ref_conductor': 0,
@@ -411,6 +411,106 @@ class SingleCoreCableModelGenerator:
         # Cada conductor recebe sua própria cópia de 'enclosure_data' -- um
         # dict compartilhado (por referência) faria o 'center_point' do
         # último cabo processado sobrescrever os das fases anteriores.
+        for v in model.values():
+            if isinstance(v, dict) and v.get('conductor_name') == host_conductor:
+                cable_center = v['center_point']
+                enclosure_center = (cable_center[0], cable_center[1] + vertical_offset)
+                v['enclosure'] = copy.deepcopy(enclosure_data)
+                v['enclosure']['center_point'] = enclosure_center
+
+        if not self.silent_mode:
+            self._show_model(model)
+
+        return model
+
+    def flat_hdpe_enclosed_with_shared_ecc_model(self, host_conductor: str = 'sheath') -> Dict[str, Any]:
+        """
+        Gera um modelo para a Configuração 4 (Figura 5.4): três cabos SCC de
+        potência em arranjo plano (flat), cada um instalado dentro de seu
+        próprio duto de HDPE enterrado no solo -- igual a
+        `flat_hdpe_enclosed_model` --, mais um cabo de aterramento (ECC)
+        compartilhando o duto do terceiro cabo (mesmo cabo próximo ao ECC em
+        `flat_scc_with_ecc_cable_model`, Configuração 3).
+
+        A posição do ECC em relação ao terceiro cabo SCC é a mesma da
+        Configuração 3 -- a única diferença física entre as duas
+        configurações é a adição do duto HDPE. Por isso este método
+        reaproveita, sem alteração, a fórmula de posicionamento
+        centro-a-centro (modo "preciso") de `flat_scc_with_ecc_cable_model`:
+        `ecc_center = (last_cable_center + ecc_horizontal_gap,
+        last_cable_center - ecc_vertical_gap)`, lendo os mesmos
+        `arrangement.ecc_horizontal_gap`/`ecc_vertical_gap` do JSON (iguais
+        aos de `andreata_case3.json`). Não há cálculo de encaixe geométrico
+        no duto: essa geometria (SCC + ECC compartilhando um duto) é
+        não-canônica e não tem formulação analítica no pyLCP -- este modelo
+        serve só para o esquemático (ver `andreata_case4/README.md`).
+        """
+        # --- Dados do cabo e do duto (definido no condutor host, ex.: 'sheath') ---
+        host_conductor_data = getattr(self, host_conductor)
+        host_insulation = host_conductor_data.get('insulation')
+        enclosure_data = host_conductor_data.get('enclosure')
+
+        if not enclosure_data:
+            raise ValueError(f"Enclosure definition not found within conductor '{host_conductor}'.")
+
+        assert self.ecc is not None, "ECC conductor data must be provided for the shared-duct model."
+
+        # --- Deslocamento vertical cabo -> duto (mesma lógica excêntrica de
+        # `flat_hdpe_enclosed_model`, aplicada identicamente a cada fase) ---
+        cable_outer_radius = host_conductor_data['outer_radius'] + (host_insulation['thickness'] if host_insulation else 0)
+        enclosure_inner_radius = enclosure_data['inner_radius']
+
+        if cable_outer_radius > enclosure_inner_radius:
+            raise ValueError("Cable does not fit inside the enclosure based on JSON dimensions.")
+
+        vertical_offset = enclosure_inner_radius - cable_outer_radius
+
+        # --- Posição dos cabos SCC (arranjo plano); 'burial_depth' é o centro do cabo ---
+        depth = self.arrangement['burial_depth']
+        spacing = self.arrangement.get('spacing', 0)
+        num_conductors = self.arrangement.get('num_conductors', 3)
+        cable_centers = [(i * spacing, -depth) for i in range(num_conductors)]
+
+        # --- Posição do ECC (modo "preciso" de `flat_scc_with_ecc_cable_model`,
+        # centro-a-centro em relação ao último cabo SCC) ---
+        last_cable_center = cable_centers[-1]
+        ecc_horizontal_gap = self.arrangement.get('ecc_horizontal_gap', 0.0)
+        ecc_vertical_gap = self.arrangement['ecc_vertical_gap']
+        ecc_center = (
+            last_cable_center[0] + ecc_horizontal_gap,
+            last_cable_center[1] - ecc_vertical_gap,
+        )
+
+        # --- Geração do Modelo ---
+        model = {
+            'name': self.input_data.get('name', 'FLAT_HDPE_Enclosed_SCC_System_with_shared_ECC'),
+            'type': self.input_data.get('type', 'scc-flat-hdpe-ecc'),
+            'note': self.input_data.get(
+                'note', 'A parametric flat arrangement of SCC cables, each individually enclosed in an '
+                        'HDPE duct, with an ECC sharing the third duct.'),
+            'idx_ref_conductor': 0,
+            0: {
+                'line_id': 0,
+                'conductor_name': 'soil',
+                'line_type': 'return',
+                'line_return': None,
+                'conductivity': self.soil['conductivity_S_per_m'],
+                'relative_permeability': 1.0,
+                'relative_permittivity': self.soil['relative_permittivity'],
+                'relative_permittivity_out': 1.0,
+            },
+        }
+
+        # --- Adicionar Condutores: 3 cabos SCC (1..6), depois o ECC (7) ---
+        conductor_id = 1
+        for cp in cable_centers:
+            conductor_id = self._add_cable_conductors(model, conductor_id, cp)
+        conductor_id = self._add_ecc_conductor(model, conductor_id, ecc_center)
+
+        # --- Injetar um duto excêntrico (deslocado para cima) por fase --
+        # Cada conductor recebe sua própria cópia de 'enclosure_data', igual
+        # a `flat_hdpe_enclosed_model`. O ECC não recebe duto próprio (não
+        # tem campo 'enclosure'), mesma convenção de `flat_scc_with_ecc_cable_model`.
         for v in model.values():
             if isinstance(v, dict) and v.get('conductor_name') == host_conductor:
                 cable_center = v['center_point']
@@ -645,7 +745,7 @@ class SingleCoreCableModelGenerator:
         
         model = {
             'name': self.input_data.get('name', 'Underground_SCC_System'),
-            'type': 'scc',
+            'type': self.input_data.get('type', 'scc'),
             'note': self.input_data.get('note', 'A parametric underground SCC model.'),
             'idx_ref_conductor': 0,
             0: {

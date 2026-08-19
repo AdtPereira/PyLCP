@@ -941,7 +941,7 @@ class InternalPerUnitParameters:
                   'impedance_matrix' (Zi) and 'shunt_admittance_matrix' (Ye) are
                   3D NumPy arrays with shape (num_frequencies, num_total_conductors, num_total_conductors).
         """
-        if self.model.mtl_type == 'scc-flat-ecc':
+        if self.model.mtl_type in ('scc-flat-ecc', 'scc-flat-hdpe-ecc'):
             return self._matrices_heterogeneous(internal_form)
 
         N, M = self.model.num_sc_cables, self.model.num_conductors_per_scc
@@ -989,8 +989,8 @@ class InternalPerUnitParameters:
     def _matrices_heterogeneous(self, internal_form):
         """
         Assembles the internal impedance/admittance matrices for MTL types with
-        non-identical cables (currently 'scc-flat-ecc': N-1 identical SCC cables
-        plus one bare/insulated ECC conductor).
+        non-identical cables (currently 'scc-flat-ecc'/'scc-flat-hdpe-ecc':
+        N-1 identical SCC cables plus one bare/insulated ECC conductor).
 
         self.model.scc is, for these types, a dict keyed by cable center_point
         (see SingleCoreCableWithECCStrategy._extract_scc_parameters), one flat

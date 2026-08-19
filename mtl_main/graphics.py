@@ -70,7 +70,7 @@ class BaseMTLRepresentation:
         # isolated SCC core centre, not to whichever conductor happens to sit
         # deepest (e.g. the ECC, which 'ecc_vertical_gap' may place below the
         # SCC cables).
-        if self.model.mtl_type in ('hdpe', 'shared-hdpe', 'scc-flat-ecc'):
+        if self.model.mtl_type in ('hdpe', 'HDPE', 'shared-hdpe', 'scc-flat-ecc', 'scc-flat-hdpe', 'scc-flat-hdpe-ecc'):
             scc_core = next(
                 (c for c in active_conductors if c.get('conductor_name') == 'core'),
                 deepest_conductor,
@@ -98,7 +98,16 @@ class BaseMTLRepresentation:
         elif self.model.mtl_type == 'scc':
             title = 'Buried Single-Core Cable'
             h_factor = -2.5
+        elif self.model.mtl_type == 'scc-flat':
+            title = 'Buried Single-Core Cable'
+            h_factor = -2.5
         elif self.model.mtl_type == 'hdpe':
+            title = 'Single-Core Cable Buried in HDPE-Air Gap Enclosure'
+            h_factor = -2
+        elif self.model.mtl_type == 'HDPE':
+            title = 'Single-Core Cable Buried in HDPE-Air Gap Enclosure'
+            h_factor = -2
+        elif self.model.mtl_type == 'scc-flat-hdpe':
             title = 'Single-Core Cable Buried in HDPE-Air Gap Enclosure'
             h_factor = -2
         elif self.model.mtl_type == 'shared-hdpe':
@@ -106,6 +115,9 @@ class BaseMTLRepresentation:
             h_factor = -2
         elif self.model.mtl_type == 'scc-flat-ecc':
             title = 'Flat-Buried SCC Cables with ECC'
+            h_factor = -2.5
+        elif self.model.mtl_type == 'scc-flat-hdpe-ecc':
+            title = 'Flat-Buried SCC Cables in HDPE Ducts with Shared ECC'
             h_factor = -2.5
         elif self.model.mtl_type == 'pipe':
             title = 'Pipe-Type Cable'

@@ -5,6 +5,7 @@ SCRIPTS_TO_RUN = [
     "testData.andreata_case1.andreata_case1",
     "testData.andreata_case2.andreata_case2",
     "testData.andreata_case3.andreata_case3",
+    "testData.andreata_case4.andreata_case4",
 ]
 
 def main():
