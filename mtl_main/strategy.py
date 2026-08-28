@@ -3,6 +3,26 @@ import numpy as np
 import scipy.constants as sc
 from collections import defaultdict
 
+
+def _cable_external_geometry(conductor_data: dict):
+    """(center_point, external_radius) that the earth-return formulation must
+    'see' for a physical cable.
+
+    When the cable rests inside a non-metallic duct ('enclosure', e.g. an HDPE
+    tube), the relevant outermost dimension for Zg/Yg is the **duct outer
+    surface** (De Conti/Duarte/Alipio 2023: ``x_jk`` = outer radius of the
+    cables *or tubes*), centred at the duct axis. Otherwise it is the
+    outermost conductor + its insulation.
+    """
+    enclosure = conductor_data.get('enclosure')
+    if enclosure and enclosure.get('outer_radius'):
+        cx = conductor_data['center_point'][0]
+        cy = (enclosure.get('center_point') or conductor_data['center_point'])[1]
+        return (cx, cy), float(enclosure['outer_radius'])
+    insul = (conductor_data.get('insulation') or {}).get('thickness', 0) or 0.0
+    return tuple(conductor_data['center_point']), conductor_data['radius'][1] + insul
+
+
 class MTLStrategy(ABC):
     """ Abstract Base Class defining the interface for MTL type-specific logic."""
 
@@ -398,32 +418,37 @@ class SingleCoreCableStrategy(MTLStrategy):
 
         # 3. Ordenar a lista final pela chave original (0, 1, 2...) para garantir consistência
         cables = sorted(selected_cables, key=lambda item: item[0])
-        
-        N = len(cables)        
+
+        # 4. Geometria que o retorno pela terra 'enxerga' por cabo: quando há
+        # duto ('enclosure'), é a superfície externa do tubo, centrada no eixo
+        # do tubo -- ver _cable_external_geometry.
+        cable_pos = []   # (x, y)
+        cable_rext = []  # raio externo representativo
+        for _tag, data in cables:
+            pos, rext = _cable_external_geometry(data)
+            cable_pos.append(pos)
+            cable_rext.append(rext)
+
+        N = len(cables)
         d_matrix = np.zeros((N, N))
         D_matrix = np.zeros((N, N))
         images_vertical_distance_matrix = np.zeros((N, N))
         horizontal_separation_matrix = np.zeros((N, N))
 
-        for n_idx, (n_tag, n_cable) in enumerate(cables):
-            for m_idx, (m_tag, m_cable) in enumerate(cables):
-                cn, cm = n_cable['center_point'], m_cable['center_point']
+        for n_idx in range(N):
+            xn, yn = cable_pos[n_idx]
+            for m_idx in range(N):
+                xm, ym = cable_pos[m_idx]
 
                 # Horizontal spacing, s = dnm
-                if n_tag == m_tag:
-                    # Self Parameters
-                    s = n_cable['radius'][1] + (n_cable.get('insulation') or {}).get('thickness', 0)
+                if n_idx == m_idx:
+                    s = cable_rext[n_idx]          # termo próprio: raio externo (tubo, se houver)
                 else:
-                    s = cn[0] - cm[0] 
+                    s = xn - xm
 
-                # Physical Distance (d)
-                d_matrix[n_idx, m_idx] = np.sqrt(s ** 2 + (cn[1] - cm[1]) ** 2)
-
-                # Distance to Image (D)
-                D_matrix[n_idx, m_idx] = np.sqrt(s ** 2 + (cn[1] + cm[1]) ** 2)
-
-                # Physical Distances
-                images_vertical_distance_matrix[n_idx, m_idx] = cn[1] + cm[1]
+                d_matrix[n_idx, m_idx] = np.sqrt(s ** 2 + (yn - ym) ** 2)
+                D_matrix[n_idx, m_idx] = np.sqrt(s ** 2 + (yn + ym) ** 2)
+                images_vertical_distance_matrix[n_idx, m_idx] = yn + ym
                 horizontal_separation_matrix[n_idx, m_idx] = s
 
         return {
@@ -624,32 +649,37 @@ class SingleCoreCableInHDPEStrategy(MTLStrategy):
 
         # 3. Ordenar a lista final pela chave original (0, 1, 2...) para garantir consistência
         cables = sorted(selected_cables, key=lambda item: item[0])
-        
-        N = len(cables)        
+
+        # 4. Geometria que o retorno pela terra 'enxerga' por cabo: quando há
+        # duto ('enclosure'), é a superfície externa do tubo, centrada no eixo
+        # do tubo -- ver _cable_external_geometry.
+        cable_pos = []   # (x, y)
+        cable_rext = []  # raio externo representativo
+        for _tag, data in cables:
+            pos, rext = _cable_external_geometry(data)
+            cable_pos.append(pos)
+            cable_rext.append(rext)
+
+        N = len(cables)
         d_matrix = np.zeros((N, N))
         D_matrix = np.zeros((N, N))
         images_vertical_distance_matrix = np.zeros((N, N))
         horizontal_separation_matrix = np.zeros((N, N))
 
-        for n_idx, (n_tag, n_cable) in enumerate(cables):
-            for m_idx, (m_tag, m_cable) in enumerate(cables):
-                cn, cm = n_cable['center_point'], m_cable['center_point']
+        for n_idx in range(N):
+            xn, yn = cable_pos[n_idx]
+            for m_idx in range(N):
+                xm, ym = cable_pos[m_idx]
 
                 # Horizontal spacing, s = dnm
-                if n_tag == m_tag:
-                    # Self Parameters
-                    s = n_cable['radius'][1] + (n_cable.get('insulation') or {}).get('thickness', 0)
+                if n_idx == m_idx:
+                    s = cable_rext[n_idx]          # termo próprio: raio externo (tubo, se houver)
                 else:
-                    s = cn[0] - cm[0] 
+                    s = xn - xm
 
-                # Physical Distance (d)
-                d_matrix[n_idx, m_idx] = np.sqrt(s ** 2 + (cn[1] - cm[1]) ** 2)
-
-                # Distance to Image (D)
-                D_matrix[n_idx, m_idx] = np.sqrt(s ** 2 + (cn[1] + cm[1]) ** 2)
-
-                # Physical Distances
-                images_vertical_distance_matrix[n_idx, m_idx] = cn[1] + cm[1]
+                d_matrix[n_idx, m_idx] = np.sqrt(s ** 2 + (yn - ym) ** 2)
+                D_matrix[n_idx, m_idx] = np.sqrt(s ** 2 + (yn + ym) ** 2)
+                images_vertical_distance_matrix[n_idx, m_idx] = yn + ym
                 horizontal_separation_matrix[n_idx, m_idx] = s
 
         return {
@@ -922,32 +952,37 @@ class SingleCoreCableWithECCInHDPEStrategy(MTLStrategy):
 
         # 3. Ordenar a lista final pela chave original (0, 1, 2...) para garantir consistência
         cables = sorted(selected_cables, key=lambda item: item[0])
-        
-        N = len(cables)        
+
+        # 4. Geometria que o retorno pela terra 'enxerga' por cabo: quando há
+        # duto ('enclosure'), é a superfície externa do tubo, centrada no eixo
+        # do tubo -- ver _cable_external_geometry.
+        cable_pos = []   # (x, y)
+        cable_rext = []  # raio externo representativo
+        for _tag, data in cables:
+            pos, rext = _cable_external_geometry(data)
+            cable_pos.append(pos)
+            cable_rext.append(rext)
+
+        N = len(cables)
         d_matrix = np.zeros((N, N))
         D_matrix = np.zeros((N, N))
         images_vertical_distance_matrix = np.zeros((N, N))
         horizontal_separation_matrix = np.zeros((N, N))
 
-        for n_idx, (n_tag, n_cable) in enumerate(cables):
-            for m_idx, (m_tag, m_cable) in enumerate(cables):
-                cn, cm = n_cable['center_point'], m_cable['center_point']
+        for n_idx in range(N):
+            xn, yn = cable_pos[n_idx]
+            for m_idx in range(N):
+                xm, ym = cable_pos[m_idx]
 
                 # Horizontal spacing, s = dnm
-                if n_tag == m_tag:
-                    # Self Parameters
-                    s = n_cable['radius'][1] + (n_cable.get('insulation') or {}).get('thickness', 0)
+                if n_idx == m_idx:
+                    s = cable_rext[n_idx]          # termo próprio: raio externo (tubo, se houver)
                 else:
-                    s = cn[0] - cm[0] 
+                    s = xn - xm
 
-                # Physical Distance (d)
-                d_matrix[n_idx, m_idx] = np.sqrt(s ** 2 + (cn[1] - cm[1]) ** 2)
-
-                # Distance to Image (D)
-                D_matrix[n_idx, m_idx] = np.sqrt(s ** 2 + (cn[1] + cm[1]) ** 2)
-
-                # Physical Distances
-                images_vertical_distance_matrix[n_idx, m_idx] = cn[1] + cm[1]
+                d_matrix[n_idx, m_idx] = np.sqrt(s ** 2 + (yn - ym) ** 2)
+                D_matrix[n_idx, m_idx] = np.sqrt(s ** 2 + (yn + ym) ** 2)
+                images_vertical_distance_matrix[n_idx, m_idx] = yn + ym
                 horizontal_separation_matrix[n_idx, m_idx] = s
 
         return {
@@ -1228,32 +1263,37 @@ class SingleCoreCableWithECCStrategy(MTLStrategy):
 
         # 3. Ordenar a lista final pela chave original (0, 1, 2...) para garantir consistência
         cables = sorted(selected_cables, key=lambda item: item[0])
-        
-        N = len(cables)        
+
+        # 4. Geometria que o retorno pela terra 'enxerga' por cabo: quando há
+        # duto ('enclosure'), é a superfície externa do tubo, centrada no eixo
+        # do tubo -- ver _cable_external_geometry.
+        cable_pos = []   # (x, y)
+        cable_rext = []  # raio externo representativo
+        for _tag, data in cables:
+            pos, rext = _cable_external_geometry(data)
+            cable_pos.append(pos)
+            cable_rext.append(rext)
+
+        N = len(cables)
         d_matrix = np.zeros((N, N))
         D_matrix = np.zeros((N, N))
         images_vertical_distance_matrix = np.zeros((N, N))
         horizontal_separation_matrix = np.zeros((N, N))
 
-        for n_idx, (n_tag, n_cable) in enumerate(cables):
-            for m_idx, (m_tag, m_cable) in enumerate(cables):
-                cn, cm = n_cable['center_point'], m_cable['center_point']
+        for n_idx in range(N):
+            xn, yn = cable_pos[n_idx]
+            for m_idx in range(N):
+                xm, ym = cable_pos[m_idx]
 
                 # Horizontal spacing, s = dnm
-                if n_tag == m_tag:
-                    # Self Parameters
-                    s = n_cable['radius'][1] + (n_cable.get('insulation') or {}).get('thickness', 0)
+                if n_idx == m_idx:
+                    s = cable_rext[n_idx]          # termo próprio: raio externo (tubo, se houver)
                 else:
-                    s = cn[0] - cm[0] 
+                    s = xn - xm
 
-                # Physical Distance (d)
-                d_matrix[n_idx, m_idx] = np.sqrt(s ** 2 + (cn[1] - cm[1]) ** 2)
-
-                # Distance to Image (D)
-                D_matrix[n_idx, m_idx] = np.sqrt(s ** 2 + (cn[1] + cm[1]) ** 2)
-
-                # Physical Distances
-                images_vertical_distance_matrix[n_idx, m_idx] = cn[1] + cm[1]
+                d_matrix[n_idx, m_idx] = np.sqrt(s ** 2 + (yn - ym) ** 2)
+                D_matrix[n_idx, m_idx] = np.sqrt(s ** 2 + (yn + ym) ** 2)
+                images_vertical_distance_matrix[n_idx, m_idx] = yn + ym
                 horizontal_separation_matrix[n_idx, m_idx] = s
 
         return {

@@ -824,6 +824,40 @@ class ComsolPostProcessor:
         Returned in the standard 'scenarios' shape expected by
         BasePlotter._get_data_from_source(source='comsol').
         """
+        built = self._scc_internal_nodal_capacitance()
+        if built is None:
+            return None
+        freq, C, jw = built['frequencies'], built['C'], 1j * built['angular_frequencies']
+        Yi = jw[:, np.newaxis, np.newaxis] * C
+        return {
+            'frequencies': freq,
+            'scenarios': {'measured': {'admittance_matrix': Yi}},
+        }
+
+    def get_scc_internal_capacitance_matrix_combined(self) -> dict:
+        """SCC internal **nodal capacitance** matrix ``C`` (F/m), from the same
+        charge-method file as :meth:`get_scc_internal_admittance_matrix_combined`
+        but **without** the ``jw`` factor.
+
+        This is exactly the ``capacitance_matrix`` produced by the analytical
+        path (``InternalPerUnitParameters.matrices()``): ``C = Pi^-1``, nodal
+        convention (``C[0,0] = Cc``, ``C[0,1] = -Cc``, ``C[1,1] = Cc + Cs``).
+        The FEM model already carries the eccentric geometry with air + HDPE
+        duct, so ``Cs`` here is the sheath-to-duct-surface capacitance through
+        PVC + air + HDPE (used by the FEM-hybrid pipeline).
+        """
+        built = self._scc_internal_nodal_capacitance()
+        if built is None:
+            return None
+        return {
+            'frequencies': built['frequencies'],
+            'scenarios': {'measured': {'capacitance_matrix': built['C']}},
+        }
+
+    def _scc_internal_nodal_capacitance(self):
+        """Shared parser for the SCC internal capacitance (charge method).
+        Returns ``{'frequencies', 'angular_frequencies', 'C'}`` with
+        ``C`` of shape ``(Nf, N, N)`` (N = 2, or 7 with ECC), or ``None``."""
         general_data = self.get_general_parameters('cmsl_internal_admittance_charge_method')
         is_legacy = general_data is None
         if is_legacy:
@@ -900,13 +934,10 @@ class ComsolPostProcessor:
             C[:, ECC_GLOBAL_INDEX, 1] = c_se
             C[:, ECC_GLOBAL_INDEX, ECC_GLOBAL_INDEX] = c_ee
 
-        Yi = jw[:, np.newaxis, np.newaxis] * C
-
         return {
             'frequencies': freq,
-            'scenarios': {
-                'measured': {'admittance_matrix': Yi},
-            },
+            'angular_frequencies': general_data['angular_frequencies'],
+            'C': C,
         }
 
     def get_shunt_capacitance_elements(self) -> dict:

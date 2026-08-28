@@ -4,6 +4,19 @@ from ..andreata_common.plot_templates import (
     PLOT_TPL_CONDUCTANCE, PLOT_TPL_CAPACITANCE,
 )
 
+# Caminho FEM-híbrido do pyLCP: Zi/Yi do COMSOL (geometria excêntrica exata,
+# ar + tubo HDPE) + retorno pela terra analítico (Magalhães/Xue) com o raio
+# externo do tubo. É a linha comparada contra o MATLAB (FEM de Andreata).
+FEM_HYBRID_TEMPLATE = [
+    {
+        'key': 'fem',
+        'type': {
+            'main': {'label': 'pyLCP (FEM-híbrido)', 'color': 'black',
+                     'linestyle': '-', 'linewidth': 1.5},
+        }
+    }
+]
+
 COMSOL_TEMPLATE = [
     {
         'key': 'rho_g_100_epsr1_1_mf',
@@ -279,19 +292,41 @@ PLOT_CONFIG = {
         }
     },
 
-    # --- Retorno à terra (acoplamento entre fases), fase A: aproximação em
-    # todos os três cenários -- a formulação de Zg/Yg não enxerga o duto,
-    # apenas a posição/raio externo de cada cabo. A comparação contra
-    # COMSOL/MATLAB é a única validação de fato disponível aqui. ---
+    # --- FEM-híbrido (pyLCP) vs. MATLAB (FEM de Andreata) -------------------
+    # Agora o duto HDPE É modelado: Zi/Yi vêm do COMSOL (geometria excêntrica
+    # exata) e o retorno pela terra é analítico com o raio externo do tubo
+    # (Parte A). Equivalente aos gráficos self_*/earth_return_* do case1. ---
+
+    'self_impedance_phase_a_sheath': {
+        'suptitle': 'P.u.l. self-impedance of phase-a sheath — pyLCP (FEM-híbrido) vs. MATLAB',
+        'series_to_plot': FEM_HYBRID_TEMPLATE,
+        'path': ['quasi_tem_matrices', 'series_impedance_matrix'],
+        'matlab_series_to_plot': MATLAB_TEMPLATE,
+        'matlab_matrix_key': 'series_impedance_matrix',
+        'p': 1, 'q': 1,
+        'xlim': (1E-2, 1E7),
+        'left_plot': {**PLOT_TPL_RESISTANCE, 'label': r'$Rs_{22} \, (\Omega/km)$'},
+        'right_plot': {**PLOT_TPL_INDUCTANCE, 'label': r'$Ls_{22} \, (mH/km)$'},
+    },
+
+    'self_admittance_phase_a_sheath': {
+        'suptitle': 'P.u.l. self-admittance of phase-a sheath — pyLCP (FEM-híbrido) vs. MATLAB',
+        'series_to_plot': FEM_HYBRID_TEMPLATE,
+        'path': ['quasi_tem_matrices', 'shunt_admittance_matrix'],
+        'matlab_series_to_plot': MATLAB_TEMPLATE,
+        'matlab_matrix_key': 'shunt_admittance_matrix',
+        'p': 1, 'q': 1,
+        'xlim': (1E-2, 1E7),
+        'left_plot': {**PLOT_TPL_CONDUCTANCE, 'label': r'$G_{22} \, (S/km)$'},
+        'right_plot': {**PLOT_TPL_CAPACITANCE, 'label': r'$C_{22} \, (nF/km)$'},
+    },
 
     'earth_return_impedance_phase_a': {
-        'suptitle': 'P.u.l. Self earth-return impedance of phase-a [Xue, 2018] — duct ignored by the formulation',
+        'suptitle': 'P.u.l. self earth-return impedance of phase-a — pyLCP (FEM-híbrido, raio do tubo) vs. MATLAB',
         'p': 0, 'q': 0,
-        # 'series_to_plot': DUCT_MODEL_TEMPLATE,
+        'series_to_plot': FEM_HYBRID_TEMPLATE,
         'path': ['earth_return_parameters', 'impedance_matrix'],
-        'comsol_series_to_plot': COMSOL_TEMPLATE,
-        'comsol_matrix_key': 'impedance_matrix',
-        'matlab_series_to_plot': MATLAB_TEMPLATE + MATLAB_CASE1_NO_DUCT_TEMPLATE,
+        'matlab_series_to_plot': MATLAB_TEMPLATE,
         'matlab_matrix_key': 'earth_return_impedance_matrix',
         'xlim': (1E-2, 1E7),
         'left_plot': {
@@ -322,11 +357,11 @@ PLOT_CONFIG = {
     },
 
     'earth_return_potential_coeff_phase_a': {
-        'suptitle': 'P.u.l. Self earth-return potential coefficient of phase-a [Xue, 2018]',
+        'suptitle': 'P.u.l. self earth-return potential coefficient of phase-a — pyLCP (FEM-híbrido) vs. MATLAB',
         'p': 0, 'q': 0,
-        # 'series_to_plot': DUCT_MODEL_TEMPLATE,
+        'series_to_plot': FEM_HYBRID_TEMPLATE,
         'path': ['earth_return_parameters', 'potential_coefficient'],
-        'matlab_series_to_plot': MATLAB_TEMPLATE + MATLAB_CASE1_NO_DUCT_TEMPLATE,
+        'matlab_series_to_plot': MATLAB_TEMPLATE,
         'matlab_matrix_key': 'earth_return_potential_coefficient_matrix',
         'left_plot': {
             **PLOT_TPL_REAL,

@@ -1038,6 +1038,97 @@ class InternalPerUnitParameters:
             'block_sizes': [Zij.shape[1] for Zij, _ in blocks],  # conductors per cable, in ground-return matrix order
         }
 
+
+class InternalParametersFromFEM:
+    """Internal PUL parameters (``Zi``, ``Pi``) assembled from FEM/COMSOL
+    per-cable matrices, in the **same dict shape** as
+    :meth:`InternalPerUnitParameters.matrices`.
+
+    For geometries without a closed-form internal solution (SCC resting
+    eccentrically inside a non-metallic HDPE duct -- Config. 2 of Andreata,
+    and the shared-duct Configs 4-5), the magnetodynamic FEM already yields
+    ``Zi`` **including** the external inductance of the air + duct annulus up
+    to the duct outer surface (Ametani's 2-term split: everything that is not
+    earth return). The electrostatic FEM yields the nodal capacitance ``C``
+    (``= Pi^-1``) with the real air/HDPE permittivities. Composed downstream
+    with the analytical earth return (whose self-term radius is the **duct**
+    outer radius, see ``mtl_main/strategy._cable_external_geometry``).
+
+    Parameters
+    ----------
+    frequencies : (Nf,) array
+        Target analytical frequency grid.
+    zi : (Nf_fem, M, M) complex
+        Per-cable internal impedance from FEM, on ``zi_frequencies``.
+    zi_frequencies : (Nf_fem,) array
+    capacitance : (M, M) or (Nf_fem, M, M) real
+        Per-cable nodal capacitance (frequency-independent; a 3-D array is
+        collapsed to its first slice).
+    num_cables : int
+        Number of identical cables (tiled via ``kron(I_N, .)``).
+    """
+
+    def __init__(self, frequencies, *, zi, zi_frequencies, capacitance, num_cables):
+        self.f = np.asarray(frequencies, dtype=float)
+        self.w = 2.0 * np.pi * self.f
+        self.zi_fem = np.asarray(zi, dtype=complex)
+        self.zi_f = np.asarray(zi_frequencies, dtype=float)
+        cap = np.asarray(capacitance, dtype=float)
+        self.C_cable = cap[0] if cap.ndim == 3 else cap
+        self.N = int(num_cables)
+        self.M = self.C_cable.shape[0]
+        if self.zi_fem.shape[1:] != (self.M, self.M):
+            raise ValueError(
+                f"zi block {self.zi_fem.shape[1:]} inconsistent with capacitance {self.C_cable.shape}"
+            )
+
+    def _interp_zi(self):
+        """Interpolate each ``Zi`` element onto ``self.f`` in log-frequency,
+        real and imaginary parts separately. Uses shape-preserving monotone
+        cubic (PCHIP) -- no overshoot, and smoother than piecewise-linear on
+        the coarse FEM grid (~5 pts/decade). Held constant outside the FEM
+        range."""
+        from scipy.interpolate import PchipInterpolator
+
+        log_target = np.log(self.f)
+        log_fem = np.log(self.zi_f)
+        order = np.argsort(log_fem)
+        log_fem = log_fem[order]
+        out = np.zeros((self.f.size, self.M, self.M), dtype=complex)
+        for i in range(self.M):
+            for j in range(self.M):
+                col = self.zi_fem[order, i, j]
+                re = PchipInterpolator(log_fem, col.real, extrapolate=False)(log_target)
+                im = PchipInterpolator(log_fem, col.imag, extrapolate=False)(log_target)
+                re = np.where(np.isnan(re), np.interp(log_target, log_fem, col.real), re)
+                im = np.where(np.isnan(im), np.interp(log_target, log_fem, col.imag), im)
+                out[:, i, j] = re + 1j * im
+        return out
+
+    def matrices(self):
+        eye = np.identity(self.N)
+        zi_cable = self._interp_zi()                       # (Nf, M, M)
+        Zi = np.stack([np.kron(eye, zi_cable[k]) for k in range(self.f.size)])
+
+        Pi_cable = np.linalg.inv(self.C_cable)
+        Pi = np.kron(eye, Pi_cable)
+        Ci = np.kron(eye, self.C_cable)
+        Ye = 1j * self.w[:, np.newaxis, np.newaxis] * np.linalg.inv(Pi)[np.newaxis, :, :]
+
+        with np.errstate(divide='ignore', invalid='ignore'):
+            Li = Zi.imag / self.w[:, np.newaxis, np.newaxis]
+
+        return {
+            'impedance_matrix': Zi,
+            'resistance_matrix': Zi.real,
+            'inductance_matrix': Li,
+            'shunt_admittance_matrix': Ye,
+            'potential_coefficient_matrix': Pi,
+            'capacitance_matrix': Ci,
+            'block_sizes': [self.M] * self.N,
+        }
+
+
 class PerUnitParameters:
     """
     This class calculates vector-frequency PUL parameters using an MTL geometry model,
@@ -1252,3 +1343,45 @@ class PerUnitParameters:
             quasi_tem_matrices['shunt_admittance_matrix'],
         )
         return {**quasi_tem_matrices, **propagation}
+
+
+def build_pul_matrices(mtl, frequencies, *, internal_source='analytical',
+                       fem_internal=None, zg_form='magalhaes_xue',
+                       yg_form='magalhaes_xue', internal_form='hybrid'):
+    """Hybrid PUL assembler: internal parameters (analytical **or** FEM) +
+    analytical earth return + quasi-TEM composition + phase-domain propagation.
+
+    Parameters
+    ----------
+    mtl : MulticonductorTransmissionLine
+        Geometry model. For ``internal_source='fem'`` it must be the real
+        duct model (``flat_hdpe_enclosed_model``) so the earth-return self-term
+        radius is the HDPE duct outer surface.
+    internal_source : {'analytical', 'fem'}
+    fem_internal : InternalParametersFromFEM, required when ``internal_source='fem'``.
+
+    Returns
+    -------
+    dict
+        ``{'internal_matrices', 'earth_return_parameters', 'quasi_tem_matrices'}``
+        -- ``quasi_tem_matrices`` already carries the phase-domain propagation
+        keys (``propagation_voltage_matrix``, ``characteristic_impedance_matrix``, ...).
+    """
+    if internal_source == 'analytical':
+        internal = InternalPerUnitParameters(mtl, frequencies).matrices(internal_form)
+    elif internal_source == 'fem':
+        if fem_internal is None:
+            raise ValueError("internal_source='fem' requires fem_internal=InternalParametersFromFEM(...)")
+        internal = fem_internal.matrices()
+    else:
+        raise ValueError(f"unknown internal_source: {internal_source!r}")
+
+    pul = PerUnitParameters(mtl, frequencies)
+    earth = pul.earth_return_parameters(zg_form, yg_form)
+    quasi_tem = pul.propagation_matrices(pul.quasi_tem_approx_matrices(internal, earth))
+
+    return {
+        'internal_matrices': internal,
+        'earth_return_parameters': earth,
+        'quasi_tem_matrices': quasi_tem,
+    }

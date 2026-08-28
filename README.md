@@ -24,7 +24,7 @@ PyLCP/
 │   └── graphics.py             # Esquemáticos de seção transversal
 │
 ├── analytical_forms/           # Formulações analíticas
-│   ├── single_core_cable.py    # Cabos monopolares (SCC)
+│   ├── single_core_cable.py    # Cabos monopolares (SCC); InternalParametersFromFEM, build_pul_matrices
 │   ├── overhead_lines.py       # Linhas aéreas (OHTL)
 │   ├── modal_analysis.py       # Decomposição modal (Cap. 5 Andreata): α_m, v_m, Z_cm
 │   └── isolated_wires.py       # Fios em meio homogêneo
@@ -327,7 +327,24 @@ sem duto HDPE) os modos são rotulados automaticamente em 2 estágios
 | Caso | Figuras de Andreata |
 |---|---|
 | `andreata_case1` — 3 SCC diretamente enterrados (Config. 1) | 5.5 / 5.6 / 5.7 |
-| `andreata_case2` — 3 SCC em dutos HDPE individuais (Config. 2) | 5.8 / 5.9 / 5.10 |
+| `andreata_case2` — 3 SCC em dutos HDPE individuais (Config. 2), pipeline **FEM-híbrido** | 5.8 / 5.9 / 5.10 |
+
+---
+
+## Pipeline híbrido (interno FEM/COMSOL + retorno pelo solo analítico)
+
+Para geometrias sem solução analítica interna (SCC dentro de tubo HDPE —
+Config. 2), `analytical_forms/single_core_cable.py::build_pul_matrices(...,
+internal_source='fem', fem_internal=InternalParametersFromFEM(...))` compõe:
+
+- **`Zi` / `Yi`** — do COMSOL (geometria excêntrica exata, ar + tubo HDPE);
+- **`Zg` / `Yg`** — analítico (`magalhaes_xue`/`deconti`), com o termo próprio
+  usando o **raio externo do tubo** (`mtl_main/strategy._cable_external_geometry`
+  reconhece o campo `enclosure` do modelo).
+
+Reproduz `Z'`/`Y'` da referência FEM de Andreata a **< 2 %**, sem o método GMD
+de permissividade equivalente de Lafaia. Detalhes:
+[`testData/andreata_common/PLANO_PIPELINE_HIBRIDO.md`](testData/andreata_common/PLANO_PIPELINE_HIBRIDO.md).
 
 Detalhes de projeto, validação e limitações:
 [`testData/andreata_common/DESENVOLVIMENTO_MODAL_CAP5.md`](testData/andreata_common/DESENVOLVIMENTO_MODAL_CAP5.md).

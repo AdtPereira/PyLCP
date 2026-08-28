@@ -32,7 +32,7 @@ frequência) está em [`PLANO_CAP5_PROPAGACAO.md`](PLANO_CAP5_PROPAGACAO.md).
 | `analytical_forms/overhead_lines.py` | `PerUnitParameters.pul_matrices` passou a chamar `phase_domain_propagation` (resultado idêntico; regressão conferida em `ohtl_deConti_ex51`). |
 | `analytical_forms/single_core_cable.py` | Novo `PerUnitParameters.propagation_matrices(quasi_tem_matrices)` — anexa `propagation_voltage_matrix`, `propagation_current_matrix`, `characteristic_impedance_matrix`, `characteristic_admittance_matrix` ao dict de `quasi_tem_approx_matrices` (retrocompatível). |
 | `testData/andreata_case1/andreata_case1.py` | Chama `propagation_matrices`, roda `check_pul_passivity` + relatório, `ModalDecomposition` no cenário `p100_er1`, e `ModalPropagationPlotter.plot_all()` — Figs 5.5 / 5.6 / 5.7. |
-| `testData/andreata_case2/andreata_case2.py` | Idem no cenário `3` (GMD case 3.1, duto HDPE dobrado via ERS/GMD) — Figs 5.8 / 5.9 / 5.10. |
+| `testData/andreata_case2/andreata_case2.py` | Idem no cenário **`fem`** (pipeline FEM-híbrido — ver [`PLANO_PIPELINE_HIBRIDO.md`](PLANO_PIPELINE_HIBRIDO.md); `Zi`/`Yi` do COMSOL + retorno pela terra analítico com o raio do tubo, **sem** o GMD de Lafaia). Figs 5.8 / 5.9 / 5.10 + 4 gráficos de comparação vs. MATLAB (`self_impedance_phase_a_sheath`, `self_admittance_phase_a_sheath`, `earth_return_impedance_phase_a`, `earth_return_potential_coeff_phase_a`). |
 
 ---
 
@@ -165,19 +165,24 @@ Nova rotulagem, robusta para as duas configs (similaridade = 1,000):
 
 Diagnósticos extras: `classification_ref_freq_hz`, `classification_core_fraction`.
 
-### 3.9 Configuração 2 — duto HDPE
+### 3.9 Configuração 2 — duto HDPE (pipeline FEM-híbrido)
 
-A estrutura de 6 modos é idêntica (Andreata eqs. 5.37–5.39 ≡ 5.34–5.36). O
-duto **não** entra em `Zg`/`Yg` (que só enxergam posição e raio externo do
-cabo); entra como **isolação externa equivalente** na blindagem, dobrada por
-`EquivalentRadiiSystems` — mecanismo já existente em
-`andreata_case2`/`andreata_case4` para os parâmetros shunt. A decomposição
-modal roda sobre o **cenário `3`** do `andreata_case2` (GMD case 3.1), o mais
-completo dos três modelos de duto. Efeito físico: a corrente de retorno das
-blindagens vê agora ar + tubo HDPE (dielétrico grande, `εr` baixo) em vez de
-só solo ⟹ `Z_cm` e `v_m` dos modos terra/entre-blindagens **bem maiores** que
-na Config. 1 (Andreata §5.4.1, Figs 5.8–5.10). O `andreata_case2` usa FEM para
-isso na dissertação; aqui a aproximação ERS/GMD reproduz a tendência.
+A estrutura de 6 modos é idêntica (Andreata eqs. 5.37–5.39 ≡ 5.34–5.36).
+A decomposição modal roda sobre o **cenário `fem`** do `andreata_case2`
+(ver [`PLANO_PIPELINE_HIBRIDO.md`](PLANO_PIPELINE_HIBRIDO.md)):
+
+- **interno** (`Zi`, `Yi`): do COMSOL, geometria excêntrica exata com ar + tubo
+  HDPE (`InternalParametersFromFEM`). Sem o truque GMD de permissividade
+  equivalente de Lafaia.
+- **retorno pela terra** (`Zg`, `Yg`): analítico (`magalhaes_xue`), com o termo
+  próprio usando o **raio externo do tubo** (`D2/2`), não o do SCC
+  (`_cable_external_geometry` em `mtl_main/strategy.py`).
+
+Efeito físico: a corrente de retorno das blindagens vê ar + tubo HDPE
+(dielétrico grande, `εr` baixo) ⟹ `Z_cm` e `v_m` dos modos terra/entre-blindagens
+**bem maiores** que na Config. 1 (Andreata §5.4.1, Figs 5.8–5.10). O caminho
+FEM-híbrido reproduz `Z'/Y'` da referência FEM de Andreata (`.mat`) a **< 2 %**
+(vs. ~10–20 % do GMD), e a oscilação de AF dos modos coaxiais some.
 
 ### 3.10 Diagnóstico de passividade (`utils/passivity_check.py`)
 
@@ -252,28 +257,35 @@ passividade (Z', Y', Yc)     PASSIVE                        PASSIVE
 
 A assinatura da Config. 2 (Andreata §5.4.1) — `Z_cm` e `v_m` dos modos
 terra/entre-blindagens **bem maiores** que na Config. 1 por causa da isolação
-ar + tubo HDPE vista pela corrente de retorno das blindagens — é reproduzida.
+ar + tubo HDPE — é reproduzida.
 
-Desvio de ~10–20 % em alta frequência nos modos terra/entre-blindagens —
-**esperado**: Andreata usa solo com parâmetros dependentes da frequência
-(Salvador et al. 2020), aqui o solo é constante. Fase 3 do plano.
+**Validação `Z'`/`Y'`/`Zg`/`Pg` vs. MATLAB** (referência FEM de Andreata, cenário
+`fem` do `andreata_case2` — 4 gráficos de comparação em `Results/`):
+
+| grandeza | erro rel. máx. |
+|---|---|
+| `Z'` série completa | 0,40 % |
+| `Y'` shunt completa | 1,85 % |
+| `Zg` retorno pela terra | 0,07 % |
+| `Pg` coef. de potencial | 0,81 % |
 
 ---
 
 ## 6. Limitações conhecidas
 
 1. **Solo constante** (ρ = 100 Ω·m) em vez do modelo FD de Salvador (2020) —
-   desvio de ~10–20 % em AF. Fase 3.
-2. **Oscilação cosmética** dos 3 modos coaxiais (quase coincidentes) na última
-   meia-década por degenerescência genuína — o refino de cluster (§3.6) mitiga
-   mas não elimina; mais visível na Config. 2 (grade até 10 MHz, além dos
-   10⁶ Hz do PDF). Próximo passo: ancorar o rastreamento nas **matrizes-limite
-   assintóticas reais** de Wedepohl (1996) §7 (BF: `eig(Re{C·R_dc})`;
-   AF: `eig(Re{P⁻¹ Z'_ce})`).
-3. **Config. 2 via aproximação ERS/GMD** do duto (não FEM como Andreata) —
-   reproduz a tendência de `Z_cm`/`v_m`, magnitude dentro de ~10–20 %.
+   afeta os modos terra/entre-blindagens em alta f. Fase 3 (a comparação
+   `Z'/Y'` vs. MATLAB acima, < 2 %, sugere que o efeito é menor do que o
+   estimado antes).
+2. **Oscilação cosmética** dos 3 modos coaxiais na Config. 1 (grade até 10 MHz):
+   degenerescência genuína — o refino de cluster (§3.6) mitiga. **Na Config. 2
+   com o `Zi` FEM a oscilação some** (o `Zi` FEM tem a indutância externa real,
+   suave). Próximo passo p/ a Config. 1: ancorar o rastreamento nas
+   matrizes-limite assintóticas de Wedepohl (1996) §7.
+3. **Offset de ~2 % em `C₂₂`** da Config. 2: diferença entre o FEM do COMSOL
+   (usado pelo pyLCP) e o FEM próprio de Andreata — não é erro do pipeline.
 4. **Configs 3–5 não implementadas** (ECC, 7º modo, duto compartilhado, família
-   §5.4.2). No plano.
+   §5.4.2). No plano; a Parte A do pipeline híbrido já cobre a geometria de 4–5.
 5. `ModalPropagationPlotter` é autônomo (não usa `PLOT_CONFIG`); overlay de
    referência MATLAB modal ainda não implementado.
 

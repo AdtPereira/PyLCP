@@ -35,6 +35,7 @@ bem maiores que na Config. 1 — vem da isolação equivalente do duto (ar + tub
 HDPE) aplicada à blindagem via ERS/GMD (`EquivalentRadiiSystems`).
 
 **Pendências / próximos passos**
+- **Pipeline híbrido** ([`PLANO_PIPELINE_HIBRIDO.md`](PLANO_PIPELINE_HIBRIDO.md)): substituir o truque GMD Case 3.1 de Lafaia na Config. 2 por (A) retorno pelo solo analítico com o raio externo **do tubo HDPE** + (B) `Zi`/`Yi` do COMSOL. Arquitetura de fonte interna pluggável, serve também Configs 4–5.
 - Configs 3–5: ECC + 7º modo (blindagem↔condutor adicional), duto compartilhado (FEM), família §5.4.2 "por modo entre configurações" (Figs 5.20–5.31).
 - Fase 3 (opcional): solo dependente da frequência — fecha o gap de ~10–20 % em alta f.
 - Cosmético: oscilação dos 3 modos coaxiais (quase coincidentes) na última meia-década por degenerescência — mais visível na Config. 2 (grade até 10 MHz).
