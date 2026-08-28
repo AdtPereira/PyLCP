@@ -19,6 +19,9 @@ try:
         InternalPerUnitParameters, PerUnitParameters, EquivalentRadiiSystems,
         apply_semiconducting_layer_correction,
     )
+    from analytical_forms.modal_analysis import ModalDecomposition, default_scc_roles
+    from plotter.modal_plotter import ModalPropagationPlotter
+    from utils.passivity_check import check_pul_passivity, print_passivity_report
     from .plot_config import PLOT_CONFIG
     print("Modules imported successfully.")
 except ImportError as e:
@@ -216,8 +219,37 @@ def main():
         pul = PerUnitParameters(value['mtl'], pul_data['frequencies'])
         earth_return = pul.earth_return_parameters(value['zg_form'], value['yg_form'])
         quasi_tem = pul.quasi_tem_approx_matrices(internal_matrices, earth_return)
+        quasi_tem = pul.propagation_matrices(quasi_tem)  # phase-domain gamma_v, gamma_i, Zc, Yc
         value['earth_return_parameters'] = earth_return
         value['quasi_tem_matrices'] = quasi_tem
+
+    # ------------------------------------------------------------------ #
+    # Modal-domain propagation characteristics -- Chapter 5 of Andreata  #
+    # (Config. 2: 3 SCC em dutos HDPE individuais -> 6 condutores -> 6   #
+    # modos). Usa o cenario '3' (GMD case 3.1), a variante mais completa #
+    # dos tres modelos de duto -- mesma escolha da matriz interna        #
+    # canonica abaixo e de andreata_case4. Figs. 5.8 / 5.9 / 5.10.       #
+    # ------------------------------------------------------------------ #
+    base = pul_data['scenarios']['3']
+    passivity = check_pul_passivity(pul_data['frequencies'], base['quasi_tem_matrices'])
+    print_passivity_report(passivity, title="Config. 2 -- cenario GMD case 3.1")
+
+    print("Modal decomposition (Config. 2)...")
+    modal = ModalDecomposition(
+        pul_data['frequencies'],
+        base['quasi_tem_matrices']['series_impedance_matrix'],
+        base['quasi_tem_matrices']['shunt_admittance_matrix'],
+        conductor_roles=default_scc_roles(mtl_3.num_sc_cables, mtl_3.num_conductors_per_scc),
+    )
+    modal_data = modal.modal_parameters()
+    pul_data['modal'] = modal_data
+    _diag = modal_data['diagnostics']
+    print(f"  mode labels: {modal_data['mode_labels']}")
+    print(f"  max off-diag ratio Zm      : {_diag['max_offdiag_ratio_Zm']:.2e}")
+    print(f"  max scalar-relation error  : {_diag['max_scalar_relation_error']:.2e}")
+    print(f"  classification similarity  : "
+          f"{min(_diag['classification_similarity'].values()):.3f} (min over modes)")
+    print(f"  passive (Z', Y')           : {_diag['passivity']['passive']}")
 
     # Matriz interna canônica para 'internal_impedance_matrix' (ver
     # plot_config.py): usa o cenário '3' (GMD case 3.1), o mais completo dos
@@ -240,6 +272,11 @@ def main():
     #               'earth_return_impedance_phase_a'])
     plotter.compare_internal_matrices(
             key_list=['internal_impedance_matrix', 'internal_admittance_matrix'])
+
+    # Figs. 5.8 / 5.9 / 5.10 -- modal attenuation, phase velocity, |Z_cm|
+    ModalPropagationPlotter(__file__, pul_data['modal'],
+                            config_name='Configuracao 2', autoSave=True).plot_all()
+
     GroundReturnMTLRepresentation(__file__, mtl_0, units='centimeter').system_schematic()
     plt.show()
 

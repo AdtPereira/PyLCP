@@ -426,25 +426,57 @@ class ModalDecomposition:
             )
             return None
 
-        # reference frequency: lowest, where coaxial modes are distinguishable
-        k_ref = int(np.argmin(self.f))
+        names_sheath = ["ground", "inter_sheath_1", "inter_sheath_2"]
+        names_core = ["coaxial_1", "coaxial_2", "coaxial_3"]
+
+        # --- stage 1: split sheath modes from coaxial modes -----------------
+        # The ground / inter-sheath modes carry ~no core current at any
+        # frequency (Andreata sec. 5.3, frequency-invariant); the coaxial
+        # modes always involve the cores. Use the core-row energy fraction of
+        # each T_I column, averaged over a mid band where every configuration
+        # is decoupled (for duct configs the modes only separate above ~100 Hz).
+        lo, hi = float(self.f.min()), float(self.f.max())
+        band = (self.f >= max(lo, 1e2)) & (self.f <= min(hi, 1e5))
+        if band.sum() < 3:
+            band = np.ones_like(self.f, dtype=bool)
+        kk = np.where(band)[0]
+
+        core_frac = np.zeros(self.n)
+        for k in kk:
+            e = np.abs(TI[k]) ** 2
+            core_frac += e[:3].sum(axis=0) / (e.sum(axis=0) + 1e-300)
+        core_frac /= len(kk)
+
+        order = np.argsort(core_frac)
+        sheath_modes = sorted(order[:3].tolist())
+        core_modes = sorted(order[3:].tolist())
+
+        # --- stage 2: sub-label within each group --------------------------
+        k_ref = int(kk[len(kk) // 2])
         cols = np.real(_normalise_columns(TI[k_ref]))     # (6, 6)
-
-        names = list(REFERENCE_PATTERNS_6C)
-        ref = np.stack([REFERENCE_PATTERNS_6C[nm] for nm in names], axis=1)  # (6, 6)
-        ref = ref / np.linalg.norm(ref, axis=0, keepdims=True)
-        cn = cols / (np.linalg.norm(cols, axis=0, keepdims=True) + 1e-30)
-
-        # cosine similarity, sign-agnostic
-        sim = np.abs(ref.T @ cn)                          # (n_patterns, n_modes)
-        pat_idx, mode_idx = linear_sum_assignment(-sim)
 
         labels = [None] * self.n
         quality = {}
-        for p, m in zip(pat_idx, mode_idx):
-            labels[m] = names[p]
-            quality[names[p]] = float(sim[p, m])
+
+        def _sublabel(modes, subnames, rows):
+            ref = np.stack([REFERENCE_PATTERNS_6C[nm][rows] for nm in subnames], axis=1)
+            ref = ref / np.linalg.norm(ref, axis=0, keepdims=True)
+            block = cols[rows][:, modes]
+            block = block / (np.linalg.norm(block, axis=0, keepdims=True) + 1e-30)
+            sim = np.abs(ref.T @ block)                   # (3, 3)
+            r_idx, c_idx = linear_sum_assignment(-sim)
+            for r, c in zip(r_idx, c_idx):
+                labels[modes[c]] = subnames[r]
+                quality[subnames[r]] = float(sim[r, c])
+
+        _sublabel(sheath_modes, names_sheath, slice(3, 6))
+        _sublabel(core_modes, names_core, slice(0, 3))
+
         self.diagnostics["classification_similarity"] = quality
+        self.diagnostics["classification_ref_freq_hz"] = float(self.f[k_ref])
+        self.diagnostics["classification_core_fraction"] = {
+            int(i): float(core_frac[i]) for i in range(self.n)
+        }
         return tuple(labels)
 
     # ------------------------------------------------------------------ #

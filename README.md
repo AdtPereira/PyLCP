@@ -318,10 +318,16 @@ frequência, rastreia os modos ao longo da frequência (*switching-back
 procedure* — Gustavsen 2008 §IV-A / Wedepohl 1996 §6) e devolve, por modo:
 constante de atenuação `α_m`, constante de fase `β_m`, velocidade de fase
 `v_m`, impedância/admitância características modais `Z_cm`/`Y_cm`, e as matrizes
-de transformação `T_I`/`T_V`. Para a Configuração 1 (3 SCC enterrados, 6 modos)
-os modos são rotulados automaticamente (`ground`, `inter_sheath_1/2`,
-`coaxial_1/2/3`). `plotter/modal_plotter.py::ModalPropagationPlotter` gera as
-Figs 5.5 (`α_m`), 5.6 (`v_m`) e 5.7 (`|Z_cm|`).
+de transformação `T_I`/`T_V`. Para os sistemas de 6 condutores (3 SCC, com ou
+sem duto HDPE) os modos são rotulados automaticamente em 2 estágios
+(`ground`, `inter_sheath_1/2`, `coaxial_1/2/3`).
+`plotter/modal_plotter.py::ModalPropagationPlotter` gera os gráficos de
+`α_m`, `v_m` e `|Z_cm|`:
+
+| Caso | Figuras de Andreata |
+|---|---|
+| `andreata_case1` — 3 SCC diretamente enterrados (Config. 1) | 5.5 / 5.6 / 5.7 |
+| `andreata_case2` — 3 SCC em dutos HDPE individuais (Config. 2) | 5.8 / 5.9 / 5.10 |
 
 Detalhes de projeto, validação e limitações:
 [`testData/andreata_common/DESENVOLVIMENTO_MODAL_CAP5.md`](testData/andreata_common/DESENVOLVIMENTO_MODAL_CAP5.md).

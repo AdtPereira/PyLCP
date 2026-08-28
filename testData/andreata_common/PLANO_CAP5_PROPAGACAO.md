@@ -1,48 +1,80 @@
-# Plano — Características de Propagação no Domínio Modal (Cap. 5 de Andreata) — **somente Configuração 1**
+# Plano — Características de Propagação no Domínio Modal (Cap. 5 de Andreata) — **Configurações 1 e 2**
 
 ---
 
 ## STATUS (atualizado)
 
-**Fases 0–4 do núcleo implementadas e validadas contra as Figs 5.5 / 5.6 / 5.7.**
+**Núcleo implementado; Config. 1 (Figs 5.5–5.7) e Config. 2 (Figs 5.8–5.10) validadas.**
 
 | Entregue | Arquivo |
 |---|---|
 | `phase_domain_propagation(Zs, Ysh)` (γ_v, γ_i, Zc, Yc) — fatorado do OHTL | `mtl_main/propagation.py` |
 | `overhead_lines.py` migrado p/ o módulo compartilhado (regressão OK: `ohtl_deConti_ex51`) | `analytical_forms/overhead_lines.py` |
 | `PerUnitParameters.propagation_matrices()` p/ SCC | `analytical_forms/single_core_cable.py` |
-| `ModalDecomposition` — decompose (com refino de clusters degenerados) → track (âncora no meio da banda, varre p/ os dois lados) → modal_parameters → classify (6 modos, eqs 5.34–5.36) | `analytical_forms/modal_analysis.py` |
-| `ModalPropagationPlotter` — Figs 5.5 (α_m), 5.6 (v_m), 5.7 (\|Z_cm\|) | `plotter/modal_plotter.py` |
-| `andreata_case1.py` chama decomposição modal + gera as 3 figuras em `Results/` | `testData/andreata_case1/andreata_case1.py` |
-| **Diagnóstico de passividade** (só avaliação — Gustavsen 2008 eq. 3): `eig(Re{Z'})`, `eig(Re{Y'})`, `eig(Re{Yc})` ≥ 0 ao longo da varredura | `utils/passivity_check.py` |
-| Rastreamento de modos citado como *switching-back procedure* (Gustavsen 2008 §IV-A; Wedepohl 1996 §6 — sub-rotina `intercheig` que Andreata §5.2 reusou); atribuição ótima via Hungarian em vez do máximo-guloso de Gustavsen | docstrings de `modal_analysis.py` |
+| `ModalDecomposition` — decompose (refino de clusters degenerados) → track (*switching-back*, âncora no meio da banda) → modal_parameters → **classify em 2 estágios** (separa modos de blindagem vs coaxiais pela fração de energia nos núcleos; sub-rotula por padrão — eqs 5.34–5.39) | `analytical_forms/modal_analysis.py` |
+| `ModalPropagationPlotter` — `α_m`, `v_m`, `\|Z_cm\|` | `plotter/modal_plotter.py` |
+| `andreata_case1.py` → Figs 5.5 / 5.6 / 5.7 (Config. 1) | `testData/andreata_case1/andreata_case1.py` |
+| `andreata_case2.py` → Figs 5.8 / 5.9 / 5.10 (Config. 2, cenário `3` = GMD case 3.1) | `testData/andreata_case2/andreata_case2.py` |
+| **Diagnóstico de passividade** (só avaliação — Gustavsen 2008 eq. 3): `eig(Re{Z'})`, `eig(Re{Y'})`, `eig(Re{Yc})` ≥ 0 | `utils/passivity_check.py` |
+| Rastreamento citado como *switching-back procedure* (Gustavsen 2008 §IV-A; Wedepohl 1996 §6 — sub-rotina `intercheig` que Andreata §5.2 reusou); atribuição ótima via Hungarian | docstrings de `modal_analysis.py` |
 
-**Resultados** (cenário `p100_er1`, solo ρ=100 Ωm constante): rótulos limpos
-`(ground, inter_sheath_1, inter_sheath_2, coaxial_1, coaxial_2, coaxial_3)`,
-similaridade de classificação ≥ 0,99; `max_offdiag_ratio_Zm ≈ 0`,
-`max_scalar_relation_error ≈ 1 %`; reconstrução `T_I Λ T_I⁻¹ ≈ Y'Z'` < 1e-16.
-Passividade: `Z'`, `Y'`, `Yc` todos PSD em toda a faixa (`overall: PASSIVE`).
-As 3 figuras batem com o PDF em forma e magnitude (dentro de ~10–20 %, coerente
-com o uso de solo constante em vez do modelo FD de Salvador 2020).
+**Resultados** (solo ρ = 100 Ωm constante): rótulos limpos
+`(ground, inter_sheath_1, inter_sheath_2, coaxial_1, coaxial_2, coaxial_3)` nas
+duas configurações; similaridade de classificação **= 1,000**;
+`max_offdiag_ratio_Zm ≈ 0`; `max_scalar_relation_error ≈ 1 %`;
+reconstrução `T_I Λ T_I⁻¹ ≈ Y'Z'` < 1e-16; `overall: PASSIVE` nas duas.
+
+| | modo terra | entre-blindagens | coaxiais | vs Andreata |
+|---|---|---|---|---|
+| **Config. 1** `\|Z_cm\|` @ 1 MHz | ~60 Ω | ~16–20 Ω | ~13 Ω | Figs 5.5–5.7 ✓ |
+| **Config. 2** `\|Z_cm\|` @ 1 MHz | ~140 Ω | ~55–70 Ω | ~13 Ω | Figs 5.8–5.10 ✓ |
+| **Config. 2** `v_m` @ 1 MHz | ~0,5·10⁸ | ~1,2–1,45·10⁸ | ~1,8·10⁸ | entre-blindagens **muito** mais rápidos que na Config. 1 ✓ |
+
+A assinatura da Config. 2 — `Z_cm` e `v_m` dos modos terra/entre-blindagens
+bem maiores que na Config. 1 — vem da isolação equivalente do duto (ar + tubo
+HDPE) aplicada à blindagem via ERS/GMD (`EquivalentRadiiSystems`).
 
 **Pendências / próximos passos**
-- Fase 3 (opcional): solo dependente da frequência (`models/frequency_dependent_soil.py`) — fecha o gap de ~10–20 % em alta f nos modos terra/entre-blindagens.
-- Cosmético: pequena oscilação/queda dos 3 modos coaxiais (quase coincidentes) na última meia-década (5e5–1e7 Hz) por degenerescência — risco §6.1; mitigável com colapso de `Z_cm` ao valor médio dentro de cluster totalmente degenerado.
-- `plot_config.py`: hoje o `ModalPropagationPlotter` é autônomo (não usa `PLOT_CONFIG`); adicionar entradas se quiser sobrepor referência MATLAB modal.
-- Validação quantitativa figura-a-figura (tabela de erro por modo em f ∈ {1e2, 1e4, 1e6} Hz).
-- `f_c` (eq. 5.33) como anotação nos gráficos.
+- Configs 3–5: ECC + 7º modo (blindagem↔condutor adicional), duto compartilhado (FEM), família §5.4.2 "por modo entre configurações" (Figs 5.20–5.31).
+- Fase 3 (opcional): solo dependente da frequência — fecha o gap de ~10–20 % em alta f.
+- Cosmético: oscilação dos 3 modos coaxiais (quase coincidentes) na última meia-década por degenerescência — mais visível na Config. 2 (grade até 10 MHz).
+- `f_c` (eq. 5.33) como anotação; overlay de referência MATLAB modal.
 
 ---
 
 
-> Escopo restrito: **Configuração 1** (Fig. 5.1) — três cabos monopolares (núcleo + blindagem)
-> **diretamente enterrados** no solo, arranjo plano, 34,5 kV. São **6 condutores → 6 modos**.
-> Objetivo: a partir de `Z'(f)` e `Y'(f)` (já produzidos pelo `andreata_case1`), calcular e plotar
-> **`α_m`, `v_m`, `|Z_Cm|`** por modo, reproduzindo as **Figuras 5.5, 5.6 e 5.7** da dissertação.
+> Escopo atual: **Configurações 1 e 2** (Figs 5.1 e 5.2) — três cabos monopolares
+> (núcleo + blindagem), arranjo plano, 34,5 kV; **diretamente enterrados** (Config. 1)
+> ou **em dutos HDPE individuais** (Config. 2). São **6 condutores → 6 modos** em ambas.
+> Objetivo: a partir de `Z'(f)` e `Y'(f)` (já produzidos por `andreata_case1` /
+> `andreata_case2`), calcular e plotar **`α_m`, `v_m`, `|Z_Cm|`** por modo,
+> reproduzindo as **Figuras 5.5–5.7** (Config. 1) e **5.8–5.10** (Config. 2).
 >
-> Fora de escopo (adiado): Configurações 2–5, condutor de aterramento (ECC) e seu 7º modo,
-> duto HDPE / parâmetros externos por FEM, família de gráficos "por modo entre configurações"
-> (§5.4.2, Figs 5.20–5.31).
+> Fora de escopo (adiado): Configurações 3–5, condutor de aterramento (ECC) e seu
+> 7º modo, duto compartilhado / parâmetros externos por FEM, família §5.4.2
+> "por modo entre configurações" (Figs 5.20–5.31).
+
+---
+
+## 0. Configuração 2 — o que muda em relação à Config. 1
+
+Mesma estrutura de 6 modos (`T_I` de Andreata eqs 5.37–5.39 ≡ 5.34–5.36). O
+duto HDPE **não** entra na formulação de retorno pelo solo (`Zg`/`Yg` só
+enxergam posição e raio externo); entra como **isolação externa equivalente**
+na blindagem, dobrada via `EquivalentRadiiSystems` (mesmo mecanismo já usado
+por `andreata_case2`/`andreata_case4` para os parâmetros shunt). O
+`andreata_case2` já produz 3 cenários — `1` (duto ignorado), `2` (ERS
+ponderado por área), `3` (GMD case 3.1) — e a decomposição modal roda sobre o
+**cenário `3`**, o mais completo (mesma escolha da matriz interna canônica).
+
+**Ajuste necessário no classificador** (feito): a rotulagem antiga projetava
+`T_I` na frequência mínima; na Config. 2 os modos só se separam acima de
+~100 Hz (com o duto, os modos de blindagem carregam corrente de núcleo
+apreciável em BF). A nova rotulagem é em **2 estágios**: (i) separa os 3 modos
+de blindagem dos 3 coaxiais pela fração de energia de `T_I` nas linhas dos
+**núcleos**, média numa banda média (100 Hz – 100 kHz) onde toda config está
+desacoplada; (ii) sub-rotula cada grupo pelo padrão (`[1,1,1]` / `[1,0,-1]` /
+`[-1,2,-1]`). Robusto para as duas configs (similaridade = 1,000).
 
 ---
 
