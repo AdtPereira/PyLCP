@@ -63,6 +63,15 @@ INTERNAL_COMSOL_TEMPLATE = {
            'zorder': 10, 'label': ''},
 }
 
+# Mesmo estilo/cores do INTERNAL_COMSOL_TEMPLATE (impedância, método Js),
+# reaproveitado para a admitância interna -- mas com rótulo de legenda
+# próprio, já que a admitância vem do método direto de carga
+# (cmsl_internal_admittance_charge_method.txt), não do método Js.
+ADMITTANCE_COMSOL_TEMPLATE = {
+    key: {**style, 'label': r'COMSOL (charge method)'} if key == 'cc' else style
+    for key, style in INTERNAL_COMSOL_TEMPLATE.items()
+}
+
 PLOT_CONFIG = {
 
     # --- Parâmetros internos combinados (núcleo + blindagem, fase A), um só
@@ -123,7 +132,7 @@ PLOT_CONFIG = {
             {
                 'p': 0, 'q': 0,
                 # 'internal_style': {'label': r'$Yi_{cc}$ GMD case 3.1', 'color': 'black', 'linestyle': '-', 'linewidth': 1.5},
-                'comsol_series_to_plot': [INTERNAL_COMSOL_TEMPLATE['cc']],
+                'comsol_series_to_plot': [ADMITTANCE_COMSOL_TEMPLATE['cc']],
                 'matlab_series_to_plot': [
                     {'key': 'measured', 'label': 'MATLAB', 'marker': '.', 's': 8, 'color': 'black', 'linewidths': 1.0, 'zorder': 11},
                 ],
@@ -131,7 +140,7 @@ PLOT_CONFIG = {
             {
                 'p': 0, 'q': 1,
                 # 'internal_style': {'label': r'$Yi_{cs}$ GMD case 3.1', 'color': 'tab:red', 'linestyle': '--', 'linewidth': 1.5},
-                'comsol_series_to_plot': [INTERNAL_COMSOL_TEMPLATE['cs']],
+                'comsol_series_to_plot': [ADMITTANCE_COMSOL_TEMPLATE['cs']],
                 'matlab_series_to_plot': [
                     {'key': 'measured', 'marker': '.', 's': 8, 'color': 'tab:red', 'linewidths': 1.0, 'zorder': 11},
                 ],
@@ -139,7 +148,7 @@ PLOT_CONFIG = {
             {
                 'p': 1, 'q': 1,
                 # 'internal_style': {'label': r'$Yi_{ss}$ GMD case 3.1', 'color': 'tab:blue', 'linestyle': '-.', 'linewidth': 1.5},
-                'comsol_series_to_plot': [INTERNAL_COMSOL_TEMPLATE['ss']],
+                'comsol_series_to_plot': [ADMITTANCE_COMSOL_TEMPLATE['ss']],
                 'matlab_series_to_plot': [
                     {'key': 'measured', 'marker': '.', 's': 8, 'color': 'tab:blue', 'linewidths': 1.0, 'zorder': 11},
                 ],

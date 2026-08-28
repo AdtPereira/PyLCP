@@ -4,10 +4,12 @@ from ..andreata_common.plot_templates import (
     PLOT_TPL_CONDUCTANCE, PLOT_TPL_CAPACITANCE,
 )
 
-# Não há dado COMSOL para este caso (nem retorno à terra, nem interno) --
-# nenhum arquivo cmsl_*.txt existe em Results/. Template mantido guardado
-# (mesmo perfil de solo único do andreata_case2), pronto para quando/se o
-# dado chegar; hoje nenhuma config abaixo o referencia ativamente.
+# Não há dado COMSOL de retorno à terra para este caso -- nenhum arquivo
+# 'cmsl_ground_return_impedance.txt' existe em Results/ (impedância e
+# admitância internas, essas sim, já têm dado próprio -- ver
+# INTERNAL_COMSOL_TEMPLATE abaixo). Template mantido guardado (mesmo perfil
+# de solo único do andreata_case2), pronto para quando/se o dado chegar;
+# hoje nenhuma config abaixo o referencia ativamente.
 COMSOL_TEMPLATE = [
     {
         'key': 'rho_g_100_epsr1_1_mf',
@@ -44,12 +46,9 @@ DUCT_MODEL_TEMPLATE = [
 ]
 
 
-# COMSOL de impedância interna (medição legada, cabo único, método Js) --
-# reaproveitado do estudo monofásico anterior (hdpe_300mm2): a seção
-# transversal núcleo+blindagem+duto é idêntica em cada fase, só o retorno à
-# terra muda com o número de fases (ver andreata_case2.py). Uma cor por
-# componente (cc/cs/ss) para diferenciá-los visualmente -- ao contrário do
-# hdpe_300mm2 original, que usa o mesmo marcador preto para os três.
+# COMSOL de impedância interna (3 condutores núcleo/blindagem/ECC, própria do
+# case4, método Js -- ver README.md). Uma cor por componente (cc/cs/ss/ecc)
+# para diferenciá-los visualmente.
 INTERNAL_COMSOL_TEMPLATE = {
     'cc': {'key': 'measured', 'marker': 'o', 's': 20, 'facecolors': 'none', 'edgecolors': 'black',
            'zorder': 10, 'label': r'COMSOL ($J_s$ method)'},
@@ -59,6 +58,15 @@ INTERNAL_COMSOL_TEMPLATE = {
            'zorder': 10, 'label': ''},
     'ecc': {'key': 'measured', 'marker': 'o', 's': 20, 'facecolors': 'none', 'edgecolors': 'tab:green',
            'zorder': 10, 'label': ''},
+}
+
+# Mesmo estilo/cores do INTERNAL_COMSOL_TEMPLATE (impedância, método Js),
+# reaproveitado para a admitância interna -- mas com rótulo de legenda
+# próprio, já que a admitância vem do método direto de carga
+# (cmsl_internal_admittance_charge_method.txt), não do método Js.
+ADMITTANCE_COMSOL_TEMPLATE = {
+    key: {**style, 'label': r'COMSOL (charge method)'} if key == 'cc' else style
+    for key, style in INTERNAL_COMSOL_TEMPLATE.items()
 }
 
 
@@ -127,6 +135,7 @@ PLOT_CONFIG = {
             {
                 'p': 0, 'q': 0,
                 # 'internal_style': {'label': r'$Yi_{cc}$', 'color': 'black', 'linestyle': '-', 'linewidth': 1.5},
+                'comsol_series_to_plot': [ADMITTANCE_COMSOL_TEMPLATE['cc']],
                 'matlab_series_to_plot': [
                     {'key': 'measured', 'label': 'MATLAB', 'marker': '.', 's': 8, 'color': 'black', 'linewidths': 1.0, 'zorder': 11},
                 ],
@@ -134,6 +143,7 @@ PLOT_CONFIG = {
             {
                 'p': 0, 'q': 1,
                 # 'internal_style': {'label': r'$Yi_{cs}$', 'color': 'tab:red', 'linestyle': '--', 'linewidth': 1.5},
+                'comsol_series_to_plot': [ADMITTANCE_COMSOL_TEMPLATE['cs']],
                 'matlab_series_to_plot': [
                     {'key': 'measured', 'marker': '.', 's': 8, 'color': 'tab:red', 'linewidths': 1.0, 'zorder': 11},
                 ],
@@ -141,6 +151,7 @@ PLOT_CONFIG = {
             {
                 'p': 1, 'q': 1,
                 # 'internal_style': {'label': r'$Yi_{ss}$', 'color': 'tab:blue', 'linestyle': '-.', 'linewidth': 1.5},
+                'comsol_series_to_plot': [ADMITTANCE_COMSOL_TEMPLATE['ss']],
                 'matlab_series_to_plot': [
                     {'key': 'measured', 'marker': '.', 's': 8, 'color': 'tab:blue', 'linewidths': 1.0, 'zorder': 11},
                 ],
@@ -148,11 +159,13 @@ PLOT_CONFIG = {
             {
                 'p': 6, 'q': 6,
                 # 'internal_style': {'label': r'$Yi_{77}$ (ECC)', 'color': 'tab:green', 'linestyle': ':', 'linewidth': 1.5},
+                'comsol_series_to_plot': [ADMITTANCE_COMSOL_TEMPLATE['ecc']],
                 'matlab_series_to_plot': [
                     {'key': 'measured', 'marker': '.', 's': 8, 'color': 'tab:green', 'linewidths': 1.0, 'zorder': 11},
                 ],
             },
         ],
+        'comsol_matrix_key': 'admittance_matrix',
         'matlab_matrix_key': 'internal_admittance_matrix',
         'xlim': (1E3, 1E6),
         'left_plot': {

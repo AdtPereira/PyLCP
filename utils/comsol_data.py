@@ -345,9 +345,11 @@ class ComsolPostProcessor:
            get_scc_internal_impedance_matrix_combined(). Não depende do
            solo/retorno à terra, por isso é carregada incondicionalmente,
            mesmo que o bloco 1 acima não tenha dados.
-        3. Admitância interna combinada (núcleo + blindagem), lida de
-           'cmsl_internal_admittance_matrix.txt' pelo método direto (carga),
-           mesma convenção do bloco 2 -- ver
+        3. Admitância interna combinada (núcleo + blindagem), lida pelo
+           método direto (carga) de 'cmsl_internal_admittance_charge_method.txt'
+           (formato novo) ou, na ausência deste, do arquivo legado
+           'cmsl_internal_admittance_matrix.txt' (formato antigo, ainda em uso
+           por casos não reexportados) -- mesma convenção do bloco 2 -- ver
            get_scc_internal_admittance_matrix_combined(). Também carregada
            incondicionalmente.
 
@@ -748,53 +750,155 @@ class ComsolPostProcessor:
 
     def get_scc_internal_admittance_matrix_combined(self) -> dict:
         """
-        Returns the SCC internal admittance matrix [Yi] (core + sheath, 2x2)
-        from a single combined file 'cmsl_internal_admittance_matrix.txt'
-        holding both excitations in one table: a core-excitation block (Ccc,
-        Csic, Csoc, Ccc_energy, Wcc) and a sheath-excitation block (Ccs,
-        Csis, Csos, Css_energy, Wss, Wcs), all direct charge/V readings
-        except the *_energy/W* columns.
+        Returns the SCC internal admittance matrix [Yi] via the direct
+        charge/V method, from 'cmsl_internal_admittance_charge_method.txt'
+        (new format, one file per method -- see
+        'cmsl_internal_admittance_energy_method.txt' for the energy-method
+        columns, not used here). Falls back to the legacy combined file
+        'cmsl_internal_admittance_matrix.txt' (both methods in one table,
+        core+sheath only) for cases not yet reexported in the new format.
 
-        C_cc (core self) = Ccc: direct core-charge reading under core
-        excitation. C_cs (core-sheath mutual) = Csic: direct induced
-        sheath-charge reading, same core-excitation block (sheath held at
-        zero voltage) -- matches the convention used by
+        Column naming (new format): 'C_<measured>_<excitation>', where
+        <measured> in {core, shIn, shOut[, ecc]} identifies where the charge
+        is read (core conductor; sheath inner surface, facing the core
+        insulation; sheath outer surface, facing the outer jacket; ECC
+        conductor) and <excitation> in {coreExc, shExc[, eccExc]} identifies
+        which conductor was excited (the others held at zero voltage).
+        measured == excitation-conductor => self term; otherwise => mutual
+        term. This replaces the old 4-letter names (Ccc/Csic/Csoc/Ccs/Csis/
+        Csos), which mixed the measured/excitation order inconsistently
+        across columns.
+
+        Two layouts are auto-detected by column presence, mirroring
+        get_scc_internal_impedance_matrix_combined():
+
+        - **2-conductor (core + sheath)** -- andreata_case1/case2's file (new
+          format) or andreata_case2's legacy file. Returns a 2x2 matrix
+          (core=0, sheath=1).
+
+        - **3-conductor with ECC** -- andreata_case4's file, detected by the
+          presence of 'C_ecc_coreExc'. Returned in the **global**
+          conductor-index convention used everywhere else for
+          'scc-flat-ecc'/'scc-flat-hdpe-ecc' models (core=0, sheath=1, ECC=6
+          -- same as get_scc_internal_impedance_matrix_combined()), as a 7x7
+          matrix with only indices 0/1/6 populated.
+
+        C_cc (core self) = C_core_coreExc (old: Ccc): direct core-charge
+        reading under core excitation.
+
+        C_cs (core-sheath mutual) = C_shIn_coreExc (old: Csic): direct
+        induced sheath-inner-charge reading, same core-excitation block
+        (sheath held at zero voltage) -- matches the convention used by
         get_scc_internal_impedance_matrix_combined() for the impedance file.
+        C_core_shExc (old: Ccs) is the reciprocal reading (core charge under
+        sheath excitation) and is used only as a sanity cross-check against
+        C_cs, not in the assembled matrix.
 
-        C_ss (sheath self) = Csis + Csos: under sheath excitation the sheath
-        sits between two dielectrics -- the core insulation (XLPE) inward
-        and its own outer jacket (PVC) outward -- so its total charge is the
-        sum of both surfaces' direct readings (Csis: inner/core-facing,
-        Csos: outer/jacket-facing). Summing them reproduces the analytical
-        Yi_22 = jw*(Cc+Cs) to ~3e-4 % (verified against
+        C_ss (sheath self) = C_shIn_shExc + C_shOut_shExc (old: Csis + Csos):
+        under sheath excitation the sheath sits between two dielectrics --
+        the core insulation (XLPE) inward and its own outer jacket (PVC)
+        outward -- so its total charge is the sum of both surfaces' direct
+        readings. Summing them reproduces the analytical Yi_22 = jw*(Cc+Cs)
+        to ~3e-4 % (verified against
         InternalPerUnitParameters.matrices()['shunt_admittance_matrix']),
         confirming the jacket capacitance is fully captured by the direct
-        method here -- the *_energy/W* columns are not needed.
+        method here -- the energy-method file is not needed for this matrix.
+
+        C_shOut_coreExc (old: Csoc) is the sheath-outer charge under core
+        excitation: with the sheath held at zero voltage it acts as a
+        Faraday shield, so this should read ~0. Used only as a shielding
+        sanity check (warned if it isn't negligible), never assembled into
+        the matrix.
+
+        For the ECC block: C_ce (core-ECC mutual) = C_ecc_coreExc, and C_se
+        (sheath-ECC mutual) = C_ecc_shExc -- taken from the excitation of the
+        *lower*-indexed conductor of each pair, same convention as the
+        impedance file. C_ee (ECC self) = C_ecc_eccExc. Physically, the
+        sheath fully shields the core from the ECC (and vice-versa), so
+        C_ce is expected to read ~0 -- this is normal, not a shielding
+        defect (unlike C_shOut_coreExc, which would indicate one if
+        nonzero). C_core_eccExc and C_shIn_eccExc + C_shOut_eccExc are the
+        reciprocal readings for C_ce/C_se respectively, used only as sanity
+        cross-checks.
 
         Returned in the standard 'scenarios' shape expected by
         BasePlotter._get_data_from_source(source='comsol').
         """
-        N = 2
-        general_data = self.get_general_parameters('cmsl_internal_admittance_matrix')
+        general_data = self.get_general_parameters('cmsl_internal_admittance_charge_method')
+        is_legacy = general_data is None
+        if is_legacy:
+            general_data = self.get_general_parameters('cmsl_internal_admittance_matrix')
         if general_data is None:
             return None
 
-        data = self.cmsl_reader.data['cmsl_internal_admittance_matrix']
+        data = self.cmsl_reader.data[
+            'cmsl_internal_admittance_matrix' if is_legacy else 'cmsl_internal_admittance_charge_method'
+        ]
         freq = general_data['frequencies']
         jw = 1j * general_data['angular_frequencies']
 
         def _real(col):
             return np.real(np.asarray(data[col], dtype=complex))
 
-        c_cc = _real('ccc')                     # core self, direct (core excitation)
-        c_cs = _real('csic')                     # core-sheath mutual, direct (core excitation)
-        c_ss = _real('csis') + _real('csos')     # sheath self, direct (sheath excitation, inner+outer)
+        has_ecc = (not is_legacy) and ('c_ecc_coreexc' in data)
 
+        if is_legacy:
+            c_cc = _real('ccc')                     # core self, direct (core excitation)
+            c_cs = _real('csic')                     # core-sheath mutual, direct (core excitation)
+            c_ss = _real('csis') + _real('csos')     # sheath self, direct (sheath excitation, inner+outer)
+            c_cs_reciprocal = _real('ccs')           # core-sheath mutual, direct (sheath excitation) -- reciprocity check
+            c_shield_leak = _real('csoc')            # sheath-outer charge under core excitation -- expected ~0
+        else:
+            c_cc = _real('c_core_coreexc')
+            c_cs = _real('c_shin_coreexc')
+            c_ss = _real('c_shin_shexc') + _real('c_shout_shexc')
+            c_cs_reciprocal = _real('c_core_shexc')
+            c_shield_leak = _real('c_shout_coreexc')
+
+        # Sanity checks (non-fatal): the mutual term should agree regardless
+        # of which conductor was excited (reciprocity), and the shield-leak
+        # reading should be negligible compared to the core self term.
+        reciprocity_err = np.max(np.abs(c_cs - c_cs_reciprocal)) / max(np.max(np.abs(c_cs)), 1e-30)
+        if reciprocity_err > 1e-2:
+            print(f"  Aviso: divergência de reciprocidade na mútua core-sheath (C_cs vs. C_sc) "
+                  f"de {reciprocity_err:.2%} em 'cmsl_internal_admittance_*'.")
+
+        leak_ratio = np.max(np.abs(c_shield_leak)) / max(np.max(np.abs(c_cc)), 1e-30)
+        if leak_ratio > 1e-3:
+            print(f"  Aviso: vazamento de blindagem inesperado (C_shOut_coreExc/Csoc) de "
+                  f"{leak_ratio:.2%} em relação a C_cc em 'cmsl_internal_admittance_*'.")
+
+        ECC_GLOBAL_INDEX = 6
+        N = ECC_GLOBAL_INDEX + 1 if has_ecc else 2
         C = np.zeros((len(freq), N, N))
         C[:, 0, 0] = c_cc
         C[:, 0, 1] = c_cs
         C[:, 1, 0] = c_cs
         C[:, 1, 1] = c_ss
+
+        if has_ecc:
+            c_ce = _real('c_ecc_coreexc')                                    # core-ECC mutual, direct (core excitation)
+            c_se = _real('c_ecc_shexc')                                      # sheath-ECC mutual, direct (sheath excitation)
+            c_ee = _real('c_ecc_eccexc')                                     # ECC self, direct (ECC excitation)
+            c_ce_reciprocal = _real('c_core_eccexc')                         # reciprocity check vs. c_ce
+            c_se_reciprocal = _real('c_shin_eccexc') + _real('c_shout_eccexc')  # reciprocity check vs. c_se
+
+            ce_scale = max(np.max(np.abs(c_ce)), np.max(np.abs(c_ce_reciprocal)), 1e-30)
+            ce_err = np.max(np.abs(c_ce - c_ce_reciprocal)) / ce_scale
+            if ce_err > 1e-2:
+                print(f"  Aviso: divergência de reciprocidade na mútua core-ECC (C_ce vs. C_ec) "
+                      f"de {ce_err:.2%} em 'cmsl_internal_admittance_charge_method'.")
+
+            se_err = np.max(np.abs(c_se - c_se_reciprocal)) / max(np.max(np.abs(c_se)), 1e-30)
+            if se_err > 1e-2:
+                print(f"  Aviso: divergência de reciprocidade na mútua sheath-ECC (C_se vs. C_es) "
+                      f"de {se_err:.2%} em 'cmsl_internal_admittance_charge_method'.")
+
+            C[:, 0, ECC_GLOBAL_INDEX] = c_ce
+            C[:, ECC_GLOBAL_INDEX, 0] = c_ce
+            C[:, 1, ECC_GLOBAL_INDEX] = c_se
+            C[:, ECC_GLOBAL_INDEX, 1] = c_se
+            C[:, ECC_GLOBAL_INDEX, ECC_GLOBAL_INDEX] = c_ee
 
         Yi = jw[:, np.newaxis, np.newaxis] * C
 
