@@ -13,6 +13,7 @@ import scipy.constants as sc
 from scipy.integrate import quad
 from scipy import linalg
 from mtl_main.source import MulticonductorTransmissionLine
+from mtl_main.propagation import phase_domain_propagation
 from numpy.lib import scimath
 
 def sommerfeld(hnm, dnm, ke2, ka2, s_form='s1', pts=300):
@@ -513,48 +514,16 @@ class PerUnitParameters:
 
         zs = zi + ze + zg
 
-        # --- Calculate propagation parameters (requires loops) ---
-        gamma_i = np.zeros((self.num_freq, N, N), dtype=complex)
-        gamma_v = np.zeros((self.num_freq, N, N), dtype=complex)
-        zc = np.zeros((self.num_freq, N, N), dtype=complex)
-        yc = np.zeros((self.num_freq, N, N), dtype=complex)
-        
-        for i in range(self.num_freq):
-            zs_i = zs[i]
-            ysh_i = ysh[i]
-
-            # Inverse of Y using LU decomposition
-            # Solve the system Y * Y_inv = I to find Y_inv
-            lu, piv = linalg.lu_factor(ysh_i)
-            I = np.identity(ysh_i.shape[0])
-            ysh_inv_i = linalg.lu_solve((lu, piv), I)
-
-            # Inverse of Z using LU decomposition
-            # Solve the system Z * Z_inv = I to find Z_inv
-            lu, piv = linalg.lu_factor(zs_i)
-            I = np.identity(zs_i.shape[0])
-            zs_inv_i = linalg.lu_solve((lu, piv), I)
-
-            # Currents and Voltages Propagation Constants Matrix
-            gamma_i[i] = linalg.sqrtm(ysh_i @ zs_i)
-            gamma_v[i] = linalg.sqrtm(zs_i @ ysh_i)
-            
-            # Characteristic impedance Zc = Y_inv * sqrt(Y*Z)
-            zc[i] = ysh_inv_i @ gamma_i[i]
-
-            # Characteristic admittance Yc = Z_inv * sqrt(Z*Y)
-            yc[i] = zs_inv_i @ gamma_v[i]
+        # --- Phase-domain propagation parameters (shared implementation) ---
+        propagation = phase_domain_propagation(zs, ysh)
 
         return {
             'series_impedance_matrix': zs,
-            'shunt_admittance_matrix': ysh, 
+            'shunt_admittance_matrix': ysh,
             'internal_impedance_matrix': zi,
             'free-space_impedance_matrix': ze,
             'earth-return_impedance_matrix': zg,
-            'propagation_voltage_matrix': gamma_v,
-            'propagation_current_matrix': gamma_i,
-            'characteristic_impedance_matrix': zc,
-            'characteristic_admittance_matrix': yc
+            **propagation,
         }
     
     

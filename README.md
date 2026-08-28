@@ -20,11 +20,13 @@ PyLCP/
 ├── mtl_main/                   # Núcleo — modelagem de MTLs
 │   ├── source.py               # MulticonductorTransmissionLine (classe central)
 │   ├── strategy.py             # Padrão Strategy por tipo de MTL
+│   ├── propagation.py          # γ_v, γ_i, Zc, Yc no domínio de fase (compartilhado)
 │   └── graphics.py             # Esquemáticos de seção transversal
 │
 ├── analytical_forms/           # Formulações analíticas
 │   ├── single_core_cable.py    # Cabos monopolares (SCC)
 │   ├── overhead_lines.py       # Linhas aéreas (OHTL)
+│   ├── modal_analysis.py       # Decomposição modal (Cap. 5 Andreata): α_m, v_m, Z_cm
 │   └── isolated_wires.py       # Fios em meio homogêneo
 │
 ├── mom/                        # Método dos Momentos (MoM)
@@ -51,10 +53,12 @@ PyLCP/
 │   ├── ohtl_plotter.py         # OHTLPlotter(BasePlotter)
 │   ├── lima_models.py          # LimaModels — constante de propagação OHTL
 │   ├── deConti_models.py       # DeContiModels — parâmetros matriciais
+│   ├── modal_plotter.py        # ModalPropagationPlotter — Figs 5.5/5.6/5.7 (Andreata)
 │   └── xue_models.py           # XueModels — impedância série Xue
 │
 ├── utils/
 │   ├── case_utils.py           # Utilitários: load_json_parameters, save_figure, ...
+│   ├── passivity_check.py      # Avaliação de passividade de Z'/Y'/Yc (Gustavsen 2008, eq. 3)
 │   └── comsol_data.py          # Leitura e parsing de dados COMSOL
 │
 ├── mtl_paul/                   # Integração Fortran (RIBBON.FOR)
@@ -300,6 +304,27 @@ model = {
 | `propagation_current_matrix` | γ em corrente | 1/m |
 | `characteristic_impedance_matrix` | Impedância característica Zc | Ω |
 | `characteristic_admittance_matrix` | Admitância característica Yc | S |
+
+> Para SCC, essas quatro chaves de propagação são obtidas por
+> `PerUnitParameters.propagation_matrices(quasi_tem_matrices)` (anexadas ao
+> dict de `quasi_tem_approx_matrices`).
+
+---
+
+## Análise Modal (Cap. 5 de Andreata)
+
+`analytical_forms/modal_analysis.py::ModalDecomposition` decompõe `Y'Z'` por
+frequência, rastreia os modos ao longo da frequência (*switching-back
+procedure* — Gustavsen 2008 §IV-A / Wedepohl 1996 §6) e devolve, por modo:
+constante de atenuação `α_m`, constante de fase `β_m`, velocidade de fase
+`v_m`, impedância/admitância características modais `Z_cm`/`Y_cm`, e as matrizes
+de transformação `T_I`/`T_V`. Para a Configuração 1 (3 SCC enterrados, 6 modos)
+os modos são rotulados automaticamente (`ground`, `inter_sheath_1/2`,
+`coaxial_1/2/3`). `plotter/modal_plotter.py::ModalPropagationPlotter` gera as
+Figs 5.5 (`α_m`), 5.6 (`v_m`) e 5.7 (`|Z_cm|`).
+
+Detalhes de projeto, validação e limitações:
+[`testData/andreata_common/DESENVOLVIMENTO_MODAL_CAP5.md`](testData/andreata_common/DESENVOLVIMENTO_MODAL_CAP5.md).
 
 ---
 

@@ -1224,3 +1224,31 @@ class PerUnitParameters:
             'series_impedance_matrix': Zs,
             'shunt_admittance_matrix': Ysh,
         }
+
+    def propagation_matrices(self, quasi_tem_matrices):
+        """
+        Appends the phase-domain propagation parameters (voltage/current
+        propagation-constant matrices and characteristic impedance/admittance)
+        to the dict returned by ``quasi_tem_approx_matrices``.
+
+        Parameters
+        ----------
+        quasi_tem_matrices : dict
+            Output of :meth:`quasi_tem_approx_matrices`; must contain
+            ``series_impedance_matrix`` and ``shunt_admittance_matrix``
+            (each ``(num_freq, N, N)``).
+
+        Returns
+        -------
+        dict
+            A new dict: the input keys plus ``propagation_voltage_matrix``,
+            ``propagation_current_matrix``, ``characteristic_impedance_matrix``
+            and ``characteristic_admittance_matrix``.
+        """
+        from mtl_main.propagation import phase_domain_propagation
+
+        propagation = phase_domain_propagation(
+            quasi_tem_matrices['series_impedance_matrix'],
+            quasi_tem_matrices['shunt_admittance_matrix'],
+        )
+        return {**quasi_tem_matrices, **propagation}
