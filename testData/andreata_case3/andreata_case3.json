@@ -8,8 +8,8 @@
     "spacing": 0.2,
     "fourier_order": 10,
     "idx_ref_conductor": 0,
-    "ecc_horizontal_gap": 0.02802,
-    "ecc_vertical_gap": 0.00886
+    "ecc_horizontal_gap": 0.0295,
+    "ecc_vertical_gap": 0.006
   },
   "soil": {
     "conductivity_S_per_m": 0.01,
