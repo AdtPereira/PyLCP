@@ -1,85 +1,85 @@
-# hdpe_225kV_2000mm2.py — Documentação Completa
+# hdpe_225kV_2000mm2.py — Full Documentation
 
-## Visão Geral
+## Overview
 
-Script de simulação eletromagnética para um cabo de energia de alta tensão (225 kV, 2000 mm²) enterrado e envolto em um tubo de HDPE (High-Density Polyethylene). O objetivo central é calcular os parâmetros por unidade de comprimento (PUL) — impedância interna e admitância de derivação — por meio de formulações analíticas e compará-los com resultados de referência obtidos no COMSOL Multiphysics.
-
----
-
-## Problema Físico
-
-Um cabo monopolar (single-core cable, SCC) é enterrado no solo envolto em um tubo de HDPE. A geometria é excêntrica: o eixo do cabo não coincide com o eixo do tubo. O sistema possui:
-
-- **Condutor de fase (core):** condutor de cobre central (área 2000 mm²).
-- **Isolação principal:** dielétrico entre core e blindagem metálica.
-- **Blindagem metálica (sheath):** condutor tubular externo.
-- **Tubo de HDPE:** envoltório de proteção mecânica com folga de ar entre a blindagem e a parede interna do tubo.
-- **Solo:** meio condutor de retorno (modelado como plano de terra).
-
-A presença do HDPE cria uma região mista (folga de ar + HDPE) que precisa ser reduzida a um dielétrico equivalente para possibilitar o uso das formulações analíticas padrão do tipo MTL (Multiconductor Transmission Line).
+Electromagnetic simulation script for a high-voltage power cable (225 kV, 2000 mm^2) buried and enclosed in an HDPE (High-Density Polyethylene) pipe. The central goal is to compute the per-unit-length (PUL) parameters — internal impedance and shunt admittance — via analytical formulations and compare them against reference results obtained in COMSOL Multiphysics.
 
 ---
 
-## Cenários de Modelagem
+## Physical Problem
 
-O script define quatro modelos MTL (`model_0` a `model_3`) que representam diferentes hipóteses sobre como tratar a região entre a blindagem e o solo:
+A single-core cable (SCC) is buried in the soil, enclosed in an HDPE pipe. The geometry is eccentric: the cable axis does not coincide with the pipe axis. The system has:
 
-| Modelo | Variável | Descrição |
+- **Phase conductor (core):** central copper conductor (area 2000 mm^2).
+- **Main insulation:** dielectric between the core and the metallic sheath.
+- **Metallic sheath:** outer tubular conductor.
+- **HDPE pipe:** mechanical-protection enclosure with an air gap between the sheath and the inner wall of the pipe.
+- **Soil:** conducting return medium (modeled as a ground plane).
+
+The presence of the HDPE creates a mixed region (air gap + HDPE) that must be reduced to an equivalent dielectric to allow the use of the standard analytical MTL (Multiconductor Transmission Line) formulations.
+
+---
+
+## Modeling Scenarios
+
+The script defines four MTL models (`model_0` to `model_3`) representing different hypotheses about how to treat the region between the sheath and the soil:
+
+| Model | Variable | Description |
 |--------|----------|-----------|
-| `model_0` | `mtl_0` | Cabo excêntrico com tubo HDPE — geometria real completa. Usado como referência geométrica para o cálculo dos ERS. |
-| `model_1` | `mtl_1` | Cabo enterrado sem tubo HDPE — ignora a presença do envoltório. Usado como Cenário 1 (underground). |
-| `model_2` | `mtl_2` | Cabo sem enclosure; a região entre blindagem e solo é substituída por um dielétrico equivalente calculado pelo método de **ponderação por área** (area-weighted `epsr`). |
-| `model_3` | `mtl_3` | Cabo sem enclosure; permissividade equivalente calculada pelo método **GMD** (Geometric Mean Distance), caso 3.1. |
+| `model_0` | `mtl_0` | Eccentric cable with HDPE pipe — full real geometry. Used as the geometric reference for the ERS computation. |
+| `model_1` | `mtl_1` | Buried cable without HDPE pipe — ignores the presence of the enclosure. Used as Scenario 1 (underground). |
+| `model_2` | `mtl_2` | Cable without enclosure; the region between sheath and soil is replaced by an equivalent dielectric computed by the **area-weighting** method (area-weighted `epsr`). |
+| `model_3` | `mtl_3` | Cable without enclosure; equivalent permittivity computed by the **GMD** (Geometric Mean Distance) method, case 3.1. |
 
-Os Cenários 1, 2 e 3 correspondem respectivamente a `mtl_1`, `mtl_2` e `mtl_3` na estrutura `pul_data['scenarios']`.
+Scenarios 1, 2 and 3 correspond respectively to `mtl_1`, `mtl_2` and `mtl_3` in the `pul_data['scenarios']` structure.
 
 ---
 
-## Faixa de Frequência
+## Frequency Range
 
 ```python
-frequencies = np.logspace(0, 6, num=31)  # 1 Hz a 1 MHz, 31 pontos em escala logarítmica
+frequencies = np.logspace(0, 6, num=31)  # 1 Hz to 1 MHz, 31 points on a logarithmic scale
 ```
 
 ---
 
-## Dependências
+## Dependencies
 
-### Módulos da Biblioteca Padrão
+### Standard Library Modules
 
-| Módulo | Uso |
+| Module | Use |
 |--------|-----|
-| `sys` | Encerramento em caso de erro de importação |
-| `os` | Limpeza do terminal (`cls`/`clear`) |
-| `copy` | Cópia profunda de dicionários de modelo |
-| `time` | Medição do tempo de execução |
-| `numpy` | Operações numéricas e geração de frequências |
-| `matplotlib.pyplot` | Exibição dos gráficos ao final |
+| `sys` | Exit on an import error |
+| `os` | Terminal clear (`cls`/`clear`) |
+| `copy` | Deep copy of model dictionaries |
+| `time` | Execution-time measurement |
+| `numpy` | Numerical operations and frequency generation |
+| `matplotlib.pyplot` | Display of the plots at the end |
 
-### Módulos PyLCP
+### PyLCP Modules
 
-| Módulo | Classe / Símbolo | Responsabilidade |
+| Module | Class / Symbol | Responsibility |
 |--------|------------------|-----------------|
-| `utils.case_utils` | `*` (wildcard) | Utilitários de formatação, impressão de matrizes e salvamento de figuras |
-| `utils.comsol_data` | `ComsolPostProcessor` | Leitura e processamento dos resultados exportados do COMSOL |
-| `plotter.scc_plotter` | `HDPEPlotter` | Geração dos gráficos de impedância interna |
-| `mtl_main.graphics` | `GroundReturnMTLRepresentation` | Geração dos esquemáticos de seção transversal |
-| `mtl_main.source` | `MulticonductorTransmissionLine` | Construção e validação do modelo MTL |
-| `models.single_core_cable` | `SingleCoreCableModelGenerator` | Geração dos dicionários de modelo a partir do JSON do caso |
-| `analytical_forms.single_core_cable` | `InternalPerUnitParameters` | Cálculo analítico das matrizes PUL (impedância e admitância) |
-| `analytical_forms.single_core_cable` | `EquivalentRadiiSystems` | Cálculo dos raios e permissividades equivalentes |
-| `.plot_config` | `PLOT_CONFIG` | Configuração dos gráficos (séries, estilos, eixos) |
+| `utils.case_utils` | `*` (wildcard) | Formatting, matrix-printing and figure-saving utilities |
+| `utils.comsol_data` | `ComsolPostProcessor` | Reading and processing of the results exported from COMSOL |
+| `plotter.scc_plotter` | `HDPEPlotter` | Generation of the internal-impedance plots |
+| `mtl_main.graphics` | `GroundReturnMTLRepresentation` | Generation of the cross-section schematics |
+| `mtl_main.source` | `MulticonductorTransmissionLine` | Construction and validation of the MTL model |
+| `models.single_core_cable` | `SingleCoreCableModelGenerator` | Generation of the model dictionaries from the case JSON |
+| `analytical_forms.single_core_cable` | `InternalPerUnitParameters` | Analytical computation of the PUL matrices (impedance and admittance) |
+| `analytical_forms.single_core_cable` | `EquivalentRadiiSystems` | Computation of the equivalent radii and permittivities |
+| `.plot_config` | `PLOT_CONFIG` | Plot configuration (series, styles, axes) |
 
 ---
 
-## Estrutura de Dados Principal — `pul_data`
+## Main Data Structure — `pul_data`
 
 ```python
 pul_data = {
-    'frequencies': np.ndarray,          # (31,) — vetor de frequências
+    'frequencies': np.ndarray,          # (31,) — frequency vector
 
     'comsol': {
-        'frequencies': np.ndarray,       # frequências do arquivo COMSOL
+        'frequencies': np.ndarray,       # frequencies from the COMSOL file
         'angular_frequencies': np.ndarray,
         'scenarios': {
             '1': {
@@ -92,26 +92,26 @@ pul_data = {
 
     'scenarios': {
         '1': {
-            'mtl': MulticonductorTransmissionLine,     # modelo underground
-            'internal_parameters': dict,               # saída de parameters_hybrid()
-            'internal_matrices': dict,                 # saída de matrices()
+            'mtl': MulticonductorTransmissionLine,     # underground model
+            'internal_parameters': dict,               # output of parameters_hybrid()
+            'internal_matrices': dict,                 # output of matrices()
         },
-        '2': { ... },   # modelo area-weighted ERS
-        '3': { ... },   # modelo GMD ERS
+        '2': { ... },   # area-weighted ERS model
+        '3': { ... },   # GMD ERS model
     },
 
     'analytical': {
         'frequencies': np.ndarray,
-        'scenarios': { ... }            # referência ao mesmo dict de 'scenarios'
+        'scenarios': { ... }            # reference to the same 'scenarios' dict
     }
 }
 ```
 
 ---
 
-## Fluxo de Execução — `main()`
+## Execution Flow — `main()`
 
-### 1. Geração dos Modelos Geométricos
+### 1. Generation of the Geometric Models
 
 ```python
 model_generator = SingleCoreCableModelGenerator(__file__)
@@ -119,22 +119,22 @@ model_0 = model_generator.eccentric_hdpe_enclosed_model()
 model_1 = model_generator.underground_model()
 ```
 
-- `SingleCoreCableModelGenerator` carrega os parâmetros físicos do arquivo `hdpe_225kV_2000mm2.json` no mesmo diretório.
-- `eccentric_hdpe_enclosed_model()` retorna um dicionário com condutores, isolações e enclosure (tubo HDPE) posicionados excentricamente.
-- `underground_model()` retorna o mesmo cabo sem enclosure, representando o enterramento simples.
+- `SingleCoreCableModelGenerator` loads the physical parameters from the `hdpe_225kV_2000mm2.json` file in the same directory.
+- `eccentric_hdpe_enclosed_model()` returns a dictionary with conductors, insulations and enclosure (HDPE pipe) placed eccentrically.
+- `underground_model()` returns the same cable without an enclosure, representing simple burial.
 
-### 2. Construção dos Objetos MTL
+### 2. Construction of the MTL Objects
 
 ```python
 mtl_0 = MulticonductorTransmissionLine(model_0)
 mtl_1 = MulticonductorTransmissionLine(model_1)
 ```
 
-`MulticonductorTransmissionLine` valida o modelo, extrai superfícies condutoras e calcula propriedades geométricas usadas pelas formulações analíticas.
+`MulticonductorTransmissionLine` validates the model, extracts the conducting surfaces and computes the geometric properties used by the analytical formulations.
 
-### 3. Cálculo dos Sistemas de Raios Equivalentes (ERS)
+### 3. Computation of the Equivalent Radii Systems (ERS)
 
-#### Método Area-Weighted → `model_2`
+#### Area-Weighted Method -> `model_2`
 
 ```python
 ers = EquivalentRadiiSystems(mtl_0)
@@ -149,9 +149,9 @@ model_2[2]['insulation']['relative_permittivity'] = epsr_area['equivalent_relati
 mtl_2 = MulticonductorTransmissionLine(model_2)
 ```
 
-A permissividade equivalente é calculada por média ponderada pela área das regiões dielétrico, folga de ar e HDPE. O enclosure é removido e substituído por uma camada única de isolação equivalente de espessura `r7 - r4`.
+The equivalent permittivity is computed as an area-weighted average of the dielectric, air-gap and HDPE regions. The enclosure is removed and replaced by a single equivalent insulation layer of thickness `r7 - r4`.
 
-#### Método GMD (Caso 3.1) → `model_3`
+#### GMD Method (Case 3.1) -> `model_3`
 
 ```python
 ers = EquivalentRadiiSystems(mtl_0)
@@ -164,9 +164,9 @@ model_3[2]['insulation']['relative_permittivity'] = eps_a
 mtl_3 = MulticonductorTransmissionLine(model_3)
 ```
 
-Baseado na metodologia GMD de Lafaia (2015). No caso 3.1, o raio externo do isolador equivalente é o raio externo do cabo (`r5`), sem modificar a espessura da camada.
+Based on Lafaia's GMD methodology (2015). In case 3.1, the outer radius of the equivalent insulator is the cable outer radius (`r5`), without modifying the layer thickness.
 
-### 4. Leitura dos Dados COMSOL
+### 4. Reading of the COMSOL Data
 
 ```python
 cmsl_processor = ComsolPostProcessor(__file__)
@@ -179,15 +179,15 @@ value['internal_impedance_matrix'] = scc_elements
 value['internal_impedance_elements'] = scc_elements
 ```
 
-`ComsolPostProcessor` localiza automaticamente o diretório `Results/` do caso e lê os arquivos exportados. Os dados obtidos são:
+`ComsolPostProcessor` automatically locates the case's `Results/` directory and reads the exported files. The data obtained is:
 
-| Chave | Conteúdo |
+| Key | Content |
 |-------|----------|
-| `coaxial_cable_impedance` | `z11`, `z12`, `z2i`, `Zcs` — elementos de impedância de cabo coaxial |
-| `internal_impedance_matrix` | Matrizes 2×2 de impedância interna (método JS e método da energia) |
-| `internal_impedance_elements` | Elementos individuais: `self_core`, `self_sheath`, `mutual` |
+| `coaxial_cable_impedance` | `z11`, `z12`, `z2i`, `Zcs` — coaxial-cable impedance elements |
+| `internal_impedance_matrix` | 2x2 internal-impedance matrices (JS method and energy method) |
+| `internal_impedance_elements` | Individual elements: `self_core`, `self_sheath`, `mutual` |
 
-### 5. Cálculo Analítico dos Parâmetros PUL
+### 5. Analytical Computation of the PUL Parameters
 
 ```python
 for key, value in pul_data['scenarios'].items():
@@ -196,12 +196,12 @@ for key, value in pul_data['scenarios'].items():
     value['internal_matrices'] = pul.matrices()
 ```
 
-Para cada cenário analítico (1, 2, 3):
+For each analytical scenario (1, 2, 3):
 
-- `parameters_hybrid()` — abordagem híbrida: funções de Bessel abaixo de 100 kHz, aproximações acima. Retorna os elementos individuais `z11`, `z12`, `z2i`, `Zcs`, etc.
-- `matrices()` — monta as matrizes completas de impedância série e admitância shunt no domínio da frequência.
+- `parameters_hybrid()` — hybrid approach: Bessel functions below 100 kHz, approximations above. Returns the individual elements `z11`, `z12`, `z2i`, `Zcs`, etc.
+- `matrices()` — assembles the full series-impedance and shunt-admittance matrices in the frequency domain.
 
-**Estrutura de retorno de `parameters_hybrid()`:**
+**Return structure of `parameters_hybrid()`:**
 
 ```python
 {
@@ -212,22 +212,22 @@ Para cada cenário analítico (1, 2, 3):
 }
 ```
 
-**Estrutura de retorno de `matrices()`:**
+**Return structure of `matrices()`:**
 
 ```python
 {
-    'impedance_matrix':          np.ndarray,  # (31, N, N) — Ω/m
+    'impedance_matrix':          np.ndarray,  # (31, N, N) — Ohm/m
     'resistance_matrix':         np.ndarray,  # (31, N, N) — Re(Z)
-    'inductance_matrix':         np.ndarray,  # (31, N, N) — Im(Z)/(2πf)
+    'inductance_matrix':         np.ndarray,  # (31, N, N) — Im(Z)/(2*pi*f)
     'shunt_admittance_matrix':   np.ndarray,  # (31, N, N) — S/m
-    'potential_coefficient_matrix': np.ndarray,  # (N, N) — independente da frequência
+    'potential_coefficient_matrix': np.ndarray,  # (N, N) — frequency-independent
     'capacitance_matrix':        np.ndarray,  # (N, N) — F/m
 }
 ```
 
-### 6. Geração dos Gráficos
+### 6. Plot Generation
 
-#### Gráficos de Impedância Interna
+#### Internal-Impedance Plots
 
 ```python
 plotter = HDPEPlotter(__file__, pul_data, PLOT_CONFIG, autoSave=False)
@@ -235,10 +235,10 @@ plotter.hdpe_internal_impedance_matrix()
 plotter.hdpe_internal_impedance_elements()
 ```
 
-- `hdpe_internal_impedance_matrix()` — gráfico duplo (resistência e indutância) comparando os três cenários analíticos com os dados COMSOL para os elementos da matriz PUL (Z_cc, Z_cs, Z_ss).
-- `hdpe_internal_impedance_elements()` — decompõe a impedância em contribuições individuais de cada camada (z11, z12, z2i), comparando método JS com método da energia.
+- `hdpe_internal_impedance_matrix()` — dual plot (resistance and inductance) comparing the three analytical scenarios with the COMSOL data for the PUL matrix elements (Z_cc, Z_cs, Z_ss).
+- `hdpe_internal_impedance_elements()` — decomposes the impedance into individual contributions of each layer (z11, z12, z2i), comparing the JS method with the energy method.
 
-#### Esquemáticos de Seção Transversal
+#### Cross-Section Schematics
 
 ```python
 schematic_configs = [
@@ -252,45 +252,45 @@ for config in schematic_configs:
     schematic.system_schematic(base_filename=config['filename'])
 ```
 
-Gera dois esquemáticos de seção transversal em `Results/`:
-- `schematic_original_hdpe.*` — seção real com o tubo HDPE.
-- `schematic_ignored_hdpe.*` — seção sem o tubo (underground).
+Generates two cross-section schematics in `Results/`:
+- `schematic_original_hdpe.*` — real section with the HDPE pipe.
+- `schematic_ignored_hdpe.*` — section without the pipe (underground).
 
-`autoSave=True` salva os arquivos automaticamente; `autoSave=False` nos plotters de impedância deixa o controle para o `plt.show()` ao final.
+`autoSave=True` saves the files automatically; `autoSave=False` on the impedance plotters leaves control to `plt.show()` at the end.
 
 ---
 
-## Saídas Geradas
+## Generated Outputs
 
-| Arquivo | Diretório | Descrição |
+| File | Directory | Description |
 |---------|-----------|-----------|
-| `schematic_original_hdpe.png/svg` | `Results/` | Seção transversal com tubo HDPE |
-| `schematic_ignored_hdpe.png/svg` | `Results/` | Seção transversal sem tubo |
-| Gráficos de impedância | Janela interativa | Exibidos via `plt.show()` (não salvos automaticamente) |
+| `schematic_original_hdpe.png/svg` | `Results/` | Cross-section with HDPE pipe |
+| `schematic_ignored_hdpe.png/svg` | `Results/` | Cross-section without pipe |
+| Impedance plots | Interactive window | Displayed via `plt.show()` (not saved automatically) |
 
 ---
 
-## Parâmetros Geométricos de Referência
+## Reference Geometric Parameters
 
-Os raios abaixo identificam as superfícies do sistema em ordem crescente a partir do eixo do cabo:
+The radii below identify the system's surfaces in increasing order from the cable axis:
 
-| Símbolo | Superfície |
+| Symbol | Surface |
 |---------|-----------|
-| `r1` | Raio interno do core |
-| `r2` | Raio externo do core |
-| `r3` | Raio externo da isolação do core |
-| `r4` | Raio externo da blindagem metálica (sheath) |
-| `r5` | Raio externo da isolação da blindagem |
-| `r6` | Raio interno do tubo HDPE (início da folga de ar) |
-| `r7` | Raio externo do tubo HDPE |
+| `r1` | Inner radius of the core |
+| `r2` | Outer radius of the core |
+| `r3` | Outer radius of the core insulation |
+| `r4` | Outer radius of the metallic sheath |
+| `r5` | Outer radius of the sheath insulation |
+| `r6` | Inner radius of the HDPE pipe (start of the air gap) |
+| `r7` | Outer radius of the HDPE pipe |
 
 ---
 
-## Execução
+## Running
 
 ```bash
-# A partir do diretório raiz do projeto (c:\git\PyLCP)
+# From the project root directory (c:\git\PyLCP)
 python -m testData.hdpe_225kV_2000mm2.hdpe_225kV_2000mm2
 ```
 
-O terminal é limpo automaticamente no início de cada execução (`main()`). O tempo total é reportado ao final da simulação.
+The terminal is cleared automatically at the start of each run (`main()`). The total time is reported at the end of the simulation.

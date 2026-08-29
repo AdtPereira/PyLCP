@@ -26,14 +26,14 @@ class BifilarPULParameters:
     """
     def __init__(self, project_root: Path, case_name: str, mtl: Dict[str, Any], comsol_data: Dict[str, pd.DataFrame] = {}):
         """
-        Inicializa o analisador de convergência.
+        Initializes the convergence analyzer.
 
         Args:
-            mtl_config (Dict[str, Any]): Dicionário com a configuração do modelo MTL.
-            nf_max (int): Número máximo de coeficientes/ordem harmônica para testar.
+            mtl_config (Dict[str, Any]): Dictionary with the MTL model configuration.
+            nf_max (int): Maximum number of coefficients / harmonic order to test.
         """
 
-        assert len([key for key in mtl.keys() if isinstance(key, int)]) == 2, "A linha bifilar deve conter exatamente dois condutores."
+        assert len([key for key in mtl.keys() if isinstance(key, int)]) == 2, "The bifilar line must contain exactly two conductors."
 
         self.project_root = project_root
         self.case_name = case_name
@@ -44,10 +44,10 @@ class BifilarPULParameters:
         self.N = len([key for key in mtl.keys() if isinstance(key, int)])
         self.results_df = None
 
-        # Extrai parâmetros e prepara o executor do Fortran
+        # Extract parameters and prepare the Fortran runner
         self._analytical_solution()
 
-        # Parâmetros de dados
+        # Data parameters
         self.srw_data = {}
         self.srw_mum_data = {}
         self.analytical_data = {}
@@ -56,7 +56,7 @@ class BifilarPULParameters:
         self.mom_so_data = {}
         self.ribbon_data = {}
 
-        # Parâmetros adicionais
+        # Additional parameters
         self.c_factor = 1e12  # F/m to nF/km
         self.l_factor = 1e6   # H/m to mH/km
         self.r_factor = 1e3   # Ohm/m to Ohm/km
@@ -65,7 +65,7 @@ class BifilarPULParameters:
         self.pt1 = 63
         self.pt2 = 10
 
-        # Parâmetros de plotagem
+        # Plotting parameters
         self.plot_params = {
             'linestyles': [':', '-.', '--', '-', ':', '-.', '--'],
             'markers': ['o', 's', '^', 'd', 'v', '<', '>'],
@@ -77,7 +77,7 @@ class BifilarPULParameters:
         os.makedirs(self.results_dir, exist_ok=True)
 
     def _analytical_solution(self):
-        """Calcula a solução analítica para fios nus como referência."""
+        """Computes the analytical solution for bare wires as a reference."""
         R = self.mtl_copy[0]['radius'][1]
         D = np.linalg.norm(np.array(self.mtl_copy[0]['center_point']) - np.array(self.mtl_copy[1]['center_point']))
         self.DR_ratio = D/R
@@ -86,16 +86,16 @@ class BifilarPULParameters:
 
     def _cfg_plot_appearance(self, ax, ylabel, data_to_plot, yscale='log'):
         """
-        Função auxiliar para configurar um único subplot.
+        Helper function to configure a single subplot.
 
         Args:
-            ax (matplotlib.axes.Axes): O eixo do subplot a ser configurado.
-            title (str): Título do subplot.
-            ylabel (str): Rótulo do eixo Y.
-            data_to_plot (dict): Dados principais para plotagem.
-            ref_data (tuple, optional): Dados de referência para plotagem.
+            ax (matplotlib.axes.Axes): The subplot axis to configure.
+            title (str): Subplot title.
+            ylabel (str): Y-axis label.
+            data_to_plot (dict): Main data for plotting.
+            ref_data (tuple, optional): Reference data for plotting.
         """
-        # Itera sobre os dados para plotagem
+        # Iterate over the data for plotting
         for key, data in data_to_plot.items():
             freq, value = data['data']
             label = data['label']
@@ -127,24 +127,24 @@ class BifilarPULParameters:
 
     def _cfg_plot_matrix_appearance(self, ax, ylabel, data_to_plot, yscale='log', ylim=None):
         """
-        Função auxiliar para configurar um subplot para os elementos da matriz de resistência (R11, R12, R22).
+        Helper function to configure a subplot for the resistance matrix elements (R11, R12, R22).
 
         Args:
-            ax (matplotlib.axes.Axes): O eixo do subplot a ser configurado.
-            ylabel (str): Rótulo do eixo Y.
-            data_to_plot (dict): Dados para plotagem (espera chaves 'r11', 'r12', 'r22').
-            yscale (str, optional): Escala do eixo Y ('log' or 'linear').
+            ax (matplotlib.axes.Axes): The subplot axis to configure.
+            ylabel (str): Y-axis label.
+            data_to_plot (dict): Data for plotting (expects keys 'r11', 'r12', 'r22').
+            yscale (str, optional): Y-axis scale ('log' or 'linear').
         """
-        
-        # Usar os parâmetros de plotagem definidos na classe para consistência
+
+        # Use the plotting parameters defined in the class for consistency
         ls = self.plot_params['linestyles']
         mk = self.plot_params['markers']
         cl = self.plot_params['colors']
 
         styles = {
-            '11': {'color': cl[0], 'linestyle': ls[3], 'marker': mk[0], 'markersize': 6, 'fillstyle': 'none'}, # Preto, Sólido, Círculo
-            '22': {'color': cl[1], 'linestyle': ls[2], 'marker': mk[1], 'markersize': 8, 'fillstyle': 'none'}, # Cinza, Tracejado, Quadrado
-            '12': {'color': cl[2], 'linestyle': ls[0], 'marker': mk[2], 'markersize': 7, 'fillstyle': 'none'}, # Cinza claro, Pontilhado, Triângulo
+            '11': {'color': cl[0], 'linestyle': ls[3], 'marker': mk[0], 'markersize': 6, 'fillstyle': 'none'}, # Black, Solid, Circle
+            '22': {'color': cl[1], 'linestyle': ls[2], 'marker': mk[1], 'markersize': 8, 'fillstyle': 'none'}, # Gray, Dashed, Square
+            '12': {'color': cl[2], 'linestyle': ls[0], 'marker': mk[2], 'markersize': 7, 'fillstyle': 'none'}, # Light gray, Dotted, Triangle
         }
 
         for key, data_dict in data_to_plot.items():
@@ -176,7 +176,7 @@ class BifilarPULParameters:
         ax.grid(True, which='both', linestyle='--', linewidth=0.5)
         
     def show_header(self):
-        """Exibe o cabeçalho do script."""
+        """Displays the script header."""
         print("\n")
         print("="*self.pt2 + " BIFILAR BARE-WIRE RIBBON CABLE SIMULATION " + "="*self.pt2)
         print(f"Project: {self.project_root}")
@@ -189,15 +189,15 @@ class BifilarPULParameters:
 
     def run_analytical(self):
         """
-        Executa a simulação analítica da impedância da linha de transmissão.
+        Runs the analytical simulation of the transmission line impedance.
 
         Args:
-            mtl_config (dict): Dicionário de configuração da linha de transmissão.
-            frequencies (np.ndarray): Array de frequências para a análise.
+            mtl_config (dict): Transmission line configuration dictionary.
+            frequencies (np.ndarray): Array of frequencies for the analysis.
 
         Returns:
-            tuple: Uma tupla contendo três listas: impedâncias série,
-                resistências de alta frequência e indutâncias externas.
+            tuple: A tuple containing three lists: series impedances,
+                high-frequency resistances and external inductances.
         """
         print("\n==============         Analytical Processing       =============")
 
@@ -222,15 +222,15 @@ class BifilarPULParameters:
 
     def run_mom_so(self):
         """
-        Executa a simulação da impedância usando o Método dos Momentos (MoM-SO).
+        Runs the impedance simulation using the Method of Moments (MoM-SO).
 
         Args:
-            mtl_config (dict): Dicionário de configuração da linha de transmissão.
-            frequencies (np.ndarray): Array de frequências para a análise.
-            green_mode (GreenFunctionMode): O modo de cálculo para a função de Green.
+            mtl_config (dict): Transmission line configuration dictionary.
+            frequencies (np.ndarray): Array of frequencies for the analysis.
+            green_mode (GreenFunctionMode): The computation mode for the Green's function.
 
         Returns:
-            list: Uma lista contendo as impedâncias série totais calculadas via MoM.
+            list: A list containing the total series impedances computed via MoM.
         """
         print("\n=============   MoM-SO HomogeneousLosslessMedium   =============")
 
@@ -264,14 +264,14 @@ class BifilarPULParameters:
 
     def plot_impedance_results(self):
         """
-        Gera e exibe os gráficos dos resultados da simulação de forma flexível,
-        organizados em subplots.
+        Generates and displays the simulation result plots in a flexible way,
+        organized in subplots.
 
         Args:
-            mtl (dict): Dicionário de configuração da linha de transmissão.
-            freqs (dict): Dicionário contendo os arrays de frequência para cada simulação.
-            analytical (dict): Dicionário com os resultados da simulação analítica.
-            mom_so (dict): Dicionário com os resultados da simulação MoM-SO.
+            mtl (dict): Transmission line configuration dictionary.
+            freqs (dict): Dictionary containing the frequency arrays for each simulation.
+            analytical (dict): Dictionary with the analytical simulation results.
+            mom_so (dict): Dictionary with the MoM-SO simulation results.
         """
         freq_mom = self.freq_range.get('mom')
         freq_ana = self.freq_range.get('ana')
@@ -302,14 +302,14 @@ class BifilarPULParameters:
 
     def plot_partial_impedance_matrix(self):
         """
-        Gera e exibe os gráficos dos resultados da simulação da matriz de 
-        resistência (R11, R12, R22).
+        Generates and displays the simulation result plots for the
+        resistance matrix (R11, R12, R22).
         """
         freq = self.freq_range.get('mom')
         w = 2 * np.pi * freq
         zp_matrices = [data['zp'] for data in self.mom_so_data.values()]
 
-        # Extrai os componentes da matriz (assumindo matriz 2x2)
+        # Extract the matrix components (assuming a 2x2 matrix)
         r11 = np.array([np.real(zp[0, 0]) * self.r_factor for zp in zp_matrices])
         r12 = np.array([np.real(zp[0, 1]) * self.r_factor for zp in zp_matrices])
         r22 = np.array([np.real(zp[1, 1]) * self.r_factor for zp in zp_matrices])
@@ -371,8 +371,8 @@ class BifilarPULParameters:
 
     def print_impedance_matrix(self):
         """
-        Imprime os resultados da matriz de impedância (Zp) no terminal,
-        frequência a frequência, formatado como no exemplo da figura.
+        Prints the impedance matrix (Zp) results to the terminal,
+        frequency by frequency, formatted as in the figure example.
         """
         print("\n--- Impedance Matrix (Zp) Results ---\n")
         header = f"{'freq (Hz)':<12} {'z11 (Ω/m)':<30} {'z12 (Ω/m)':<30} {'z22 (Ω/m)':<30}"

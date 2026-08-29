@@ -106,13 +106,13 @@ def main():
     if cmsl_params is not None:
         pul_data['comsol'].update(cmsl_params)
         for key, value in pul_data['comsol']['scenarios'].items():
-            print(f"  -> Processando COMSOL para: {key}")
+            print(f"  -> Processing COMSOL for: {key}")
             value['coaxial_cable_impedance'] = cmsl_processor.get_coaxial_cable_parameters()
             scc_elements = cmsl_processor.get_scc_internal_impedance_elements()
             value['internal_impedance_matrix'] = scc_elements
             value['internal_impedance_elements'] = scc_elements
     else:
-        print("  Aviso: Processamento COMSOL ignorado (dados não disponíveis).")
+        print("  Warning: COMSOL processing skipped (data not available).")
         pul_data['comsol'] = {}
 
     pul_data['analytical'] = {
@@ -134,7 +134,7 @@ def main():
     plotter.hdpe_internal_impedance_matrix()
     plotter.hdpe_internal_impedance_elements()
 
-    # 1. Crie uma lista de configurações para cada esquemático
+    # 1. Build a list of configurations for each schematic
     schematic_configs = [
         {'mtl': mtl_0, 'filename': 'schematic_original_hdpe'},
         # {'mtl': mtl_1, 'filename': 'schematic_ignored_hdpe'},

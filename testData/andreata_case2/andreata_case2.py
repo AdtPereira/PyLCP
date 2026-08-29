@@ -75,17 +75,17 @@ def compare_capacitance(pul_data: dict, c_comsol: dict = None) -> None:
 
 def validate_against_case1_reference(pul_data: dict) -> None:
     """
-    Confere que o cenário '1' ("Underground", duto ignorado) concorda com a
-    referência MATLAB do andreata_case1 -- mesma geometria física de 3 cabos
-    SCC em arranjo plano, sem duto. Não valida o efeito do duto em si (que
-    não tem contraparte no case1); serve só como checagem cruzada de código
-    para a parte do pipeline que os dois casos compartilham (geração do
-    modelo 'underground_flat_model', InternalPerUnitParameters,
+    Checks that scenario '1' ("Underground", duct ignored) agrees with the
+    andreata_case1 MATLAB reference -- same physical geometry of 3 SCC cables
+    in a flat arrangement, without a duct. It does not validate the duct effect
+    itself (which has no counterpart in case1); it only serves as a code
+    cross-check for the part of the pipeline the two cases share (generation of
+    the 'underground_flat_model' model, InternalPerUnitParameters,
     PerUnitParameters).
     """
     case1 = pul_data['matlab']['scenarios'].get('case1_no_duct')
     if case1 is None or case1.get('series_impedance_matrix') is None:
-        print("  Aviso: referência MATLAB do andreata_case1 indisponível; validação cruzada ignorada.")
+        print("  Warning: andreata_case1 MATLAB reference unavailable; cross-validation skipped.")
         return
 
     def _max_rel_error(analytical, matlab):
@@ -98,19 +98,19 @@ def validate_against_case1_reference(pul_data: dict) -> None:
     ysh_err = _max_rel_error(quasi_tem['shunt_admittance_matrix'], case1['shunt_admittance_matrix'])
 
     print("\n" + "=" * 70)
-    print("  Validação cruzada: cenário '1' (duto ignorado) vs. MATLAB do andreata_case1")
-    print("  (mesma geometria física -- 3 cabos SCC em arranjo plano, sem duto)")
+    print("  Cross-validation: scenario '1' (duct ignored) vs. andreata_case1 MATLAB")
+    print("  (same physical geometry -- 3 SCC cables in a flat arrangement, no duct)")
     print("=" * 70)
-    print(f"  Zs  (impedância série completa):  erro relativo máx. (norma inf) = {zs_err:.2%}")
-    print(f"  Ysh (admitância shunt completa):  erro relativo máx. (norma inf) = {ysh_err:.2%}")
+    print(f"  Zs  (full series impedance):  max relative error (inf norm) = {zs_err:.2%}")
+    print(f"  Ysh (full shunt admittance):  max relative error (inf norm) = {ysh_err:.2%}")
     print("=" * 70 + "\n")
 
 def _validate_fem_hybrid_vs_matlab(pul_data: dict) -> None:
-    """Confere o cenário 'fem' (FEM-híbrido: Zi/Yi do COMSOL + retorno pela
-    terra analítico com raio do tubo) contra a referência MATLAB do próprio
-    andreata_case2 -- que é a solução FEM de Andreata para a Configuração 2.
-    Esta é a validação de fato do caminho FEM-híbrido (substitui o GMD de
-    Lafaia)."""
+    """Checks the 'fem' scenario (FEM-hybrid: Zi/Yi from COMSOL + analytical
+    earth return with the tube radius) against the MATLAB reference of
+    andreata_case2 itself -- which is Andreata's FEM solution for Configuration 2.
+    This is the actual validation of the FEM-hybrid path (which replaces Lafaia's
+    GMD)."""
     mat = pul_data['matlab']['scenarios'].get('measured', {})
     fem = pul_data['scenarios']['fem']['quasi_tem_matrices']
     er = pul_data['scenarios']['fem']['earth_return_parameters']
@@ -120,23 +120,23 @@ def _validate_fem_hybrid_vs_matlab(pul_data: dict) -> None:
         return float(np.max(np.abs(a - b)) / max(np.max(np.abs(b)), 1e-30))
 
     rows = [
-        ("Z'  (série completa)", fem.get('series_impedance_matrix'), mat.get('series_impedance_matrix')),
-        ("Y'  (shunt completa)", fem.get('shunt_admittance_matrix'), mat.get('shunt_admittance_matrix')),
-        ("Zg  (retorno terra)", er.get('impedance_matrix'), mat.get('earth_return_impedance_matrix')),
-        ("Pg  (coef. potencial)", er.get('potential_coefficient'), mat.get('earth_return_potential_coefficient_matrix')),
+        ("Z'  (full series)", fem.get('series_impedance_matrix'), mat.get('series_impedance_matrix')),
+        ("Y'  (full shunt)", fem.get('shunt_admittance_matrix'), mat.get('shunt_admittance_matrix')),
+        ("Zg  (earth return)", er.get('impedance_matrix'), mat.get('earth_return_impedance_matrix')),
+        ("Pg  (potential coeff.)", er.get('potential_coefficient'), mat.get('earth_return_potential_coefficient_matrix')),
     ]
     print("\n" + "=" * 70)
-    print("  Validação: cenário 'fem' (FEM-híbrido) vs. MATLAB (FEM de Andreata, Config. 2)")
+    print("  Validation: scenario 'fem' (FEM-hybrid) vs. MATLAB (Andreata's FEM, Config. 2)")
     print("=" * 70)
     for label, a, b in rows:
         if a is None or b is None:
-            print(f"  {label:24s}  (referência indisponível)")
+            print(f"  {label:24s}  (reference unavailable)")
             continue
-        # Zg/Pg do pyLCP são (Nf,3,3) por cabo; MATLAB é (Nf,6,6) por condutor.
+        # pyLCP's Zg/Pg are (Nf,3,3) per cable; MATLAB is (Nf,6,6) per conductor.
         if a.shape[1:] != b.shape[1:]:
             a = a[:, :1, :1]
             b = b[:, :1, :1]
-        print(f"  {label:24s}  erro rel. máx. (norma inf) = {_err(a, b):.2%}")
+        print(f"  {label:24s}  max rel. error (inf norm) = {_err(a, b):.2%}")
     print("=" * 70 + "\n")
 
 
@@ -145,32 +145,32 @@ def main():
     st = time.time()
     cable_generator = SingleCoreCableModelGenerator(__file__)
 
-    # --- Modelo 0: geometria física real (Configuração 2 / Figura 5.2) ---
-    # Usado para o esquemático e como base geométrica do ERS/GMD (fornece
-    # r4..r7 via EquivalentRadiiSystems). Seu retorno à terra e seus
-    # parâmetros internos NÃO são usados diretamente nos cenários -- ver
-    # nota de retorno à terra abaixo.
+    # --- Model 0: actual physical geometry (Configuration 2 / Figure 5.2) ---
+    # Used for the schematic and as the geometric basis of the ERS/GMD (provides
+    # r4..r7 via EquivalentRadiiSystems). Its earth return and its internal
+    # parameters are NOT used directly in the scenarios -- see the earth-return
+    # note below.
     model_0 = cable_generator.flat_hdpe_enclosed_model()
     model_0 = apply_semiconducting_layer_correction(model_0, cable_generator.core, cable_generator.sheath)
     mtl_0 = MulticonductorTransmissionLine(model_0)
 
-    # --- Modelo 1: "Underground" -- ignora o duto por completo ---
+    # --- Model 1: "Underground" -- ignores the duct entirely ---
     model_1 = cable_generator.underground_flat_model()
     model_1 = apply_semiconducting_layer_correction(model_1, cable_generator.core, cable_generator.sheath)
     mtl_1 = MulticonductorTransmissionLine(model_1)
 
-    # --- Equivalent Radii Systems (ERS) para os parâmetros shunt ---
+    # --- Equivalent Radii Systems (ERS) for the shunt parameters ---
     print("Calculating equivalent radii systems for shunt parameters...")
     ers = EquivalentRadiiSystems(mtl_0)
     epsr_area = ers.equiv_rel_permittivity_epsr_area_weighted()
     r4, r7 = epsr_area['sheath_outer_radius'], epsr_area['sheath_enclosure_outer_radius']
 
-    # --- Modelo 2: substitui o duto por uma isolação equivalente ponderada por área ---
+    # --- Model 2: replaces the duct with an area-weighted equivalent insulation ---
     model_2 = _override_sheath_insulation(
         copy.deepcopy(model_0), thickness=r7 - r4, relative_permittivity=epsr_area['equivalent_relative_permittivity'])
     mtl_2 = MulticonductorTransmissionLine(model_2)
 
-    # --- Modelo 3: GMD case 3.1 -- r0 do isolante equivalente = r5 (raio externo do cabo) ---
+    # --- Model 3: GMD case 3.1 -- r0 of the equivalent insulator = r5 (cable outer radius) ---
     print("Calculating GMD-based equivalent parameters for shunt parameters...")
     gmp = ers.equivalent_parameters_from_gmd()
     eps_a = gmp['equivalent_relative_permittivity']['case 3.1']
@@ -189,27 +189,30 @@ def main():
             '1': {'mtl': mtl_1, 'zg_form': 'magalhaes_xue', 'yg_form': 'magalhaes_xue'},
             '2': {'mtl': mtl_2, 'zg_form': 'magalhaes_xue', 'yg_form': 'magalhaes_xue'},
             '3': {'mtl': mtl_3, 'zg_form': 'magalhaes_xue', 'yg_form': 'magalhaes_xue'},
-            # FEM-híbrido: Zi/Yi do COMSOL (geometria excêntrica exata, ar +
-            # tubo HDPE) + retorno pela terra analítico com o raio externo do
-            # tubo (mtl_0 -> _cable_external_geometry). Sem o GMD de Lafaia.
+            # FEM-hybrid: Zi/Yi from COMSOL (exact eccentric geometry, air +
+            # HDPE tube) + analytical earth return with the tube outer radius
+            # (mtl_0 -> _cable_external_geometry). Without Lafaia's GMD.
+            # Andreata sec. 5.4 / 6.1: earth return via the CLOSED-FORM
+            # EXPRESSIONS of De Conti/Duarte/Alipio 2023 (eqs. 4.59 and 4.63),
+            # not via the Sommerfeld integrals -> zg_form = yg_form = 'deconti'.
             'fem': {'mtl': mtl_0, 'internal_source': 'fem',
-                    'zg_form': 'magalhaes_xue', 'yg_form': 'magalhaes_xue'},
+                    'zg_form': 'deconti', 'yg_form': 'deconti'},
         }
     }
 
-    print("Carregando dados de referência do MATLAB...")
+    print("Loading MATLAB reference data...")
     matlab_reader = MatlabDataReader(__file__, autoShow=False)
     matlab_data = matlab_reader.get_scc_scenario_data(
         prefix='andreata_case2',
         conductor_order=[0, 3, 1, 4, 2, 5],
     )
 
-    # Referência auxiliar de validação: os dados MATLAB do andreata_case1
-    # descrevem o mesmo sistema de 3 cabos SCC em arranjo plano, sem duto --
-    # devem concordar com o cenário '1' ("Underground", duto ignorado) deste
-    # caso. Aponta o MatlabDataReader para o diretório 'Results' do case1
-    # (mesmo prefixo/ordem de condutores que ele próprio usa).
-    print("Carregando dados de referência do MATLAB do andreata_case1 (validação, duto ignorado)...")
+    # Auxiliary validation reference: the andreata_case1 MATLAB data describes
+    # the same system of 3 SCC cables in a flat arrangement, without a duct --
+    # it must agree with scenario '1' ("Underground", duct ignored) of this
+    # case. Point MatlabDataReader at case1's 'Results' directory (same
+    # prefix / conductor order it uses itself).
+    print("Loading andreata_case1 MATLAB reference data (validation, duct ignored)...")
     case1_script_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'andreata_case1', 'andreata_case1.py')
     case1_matlab_reader = MatlabDataReader(case1_script_path, autoShow=False)
     case1_matlab_data = case1_matlab_reader.get_scc_scenario_data(
@@ -224,23 +227,23 @@ def main():
         pul_data['frequencies'])
     pul_data['matlab'] = matlab_data
 
-    # Os parâmetros internos usados para compor a matriz quasi-TEM do COMSOL
-    # vêm do modelo GMD case 3.1 (a variante mais completa das três) -- só o
-    # retorno à terra é, de fato, medido no COMSOL. A impedância interna
-    # combinada (segundo bloco de load_scc_earth_return_and_internal_scenarios)
-    # é a mesma medição legada de cabo único reaproveitada do estudo
-    # monofásico anterior hdpe_300mm2 -- válida aqui porque a seção
-    # transversal núcleo+blindagem+duto é idêntica em cada fase; só o retorno
-    # à terra muda com o número de fases. Fornece a referência 'measured' de
-    # 'internal_impedance_matrix' (ver plot_config.py).
+    # The internal parameters used to assemble the COMSOL quasi-TEM matrix
+    # come from the GMD case 3.1 model (the most complete of the three) -- only
+    # the earth return is actually measured in COMSOL. The combined internal
+    # impedance (second block of load_scc_earth_return_and_internal_scenarios)
+    # is the same legacy single-cable measurement reused from the previous
+    # single-phase study hdpe_300mm2 -- valid here because the core+sheath+duct
+    # cross-section is identical for each phase; only the earth return changes
+    # with the number of phases. It provides the 'measured' reference for
+    # 'internal_impedance_matrix' (see plot_config.py).
     cmsl_processor = ComsolPostProcessor(__file__)
     cmsl_processor.load_scc_earth_return_and_internal_scenarios(
         pul_data, internal_mtl_model=mtl_3, internal_form='approximation')
 
-    # Bloco interno FEM (por cabo, 2x2) para o cenário 'fem': Zi já com a
-    # indutância externa do ar + tubo (magnetodinâmica), C nodal já com o
-    # dielétrico ar + HDPE (método de carga). Ambos da geometria excêntrica
-    # exata da Config. 2.
+    # FEM internal block (per cable, 2x2) for the 'fem' scenario: Zi already
+    # includes the air + tube external inductance (magnetodynamic), nodal C
+    # already includes the air + HDPE dielectric (charge method). Both from the
+    # exact eccentric geometry of Config. 2.
     _zi_fem = cmsl_processor.get_scc_internal_impedance_matrix_combined()
     _c_fem = cmsl_processor.get_scc_internal_capacitance_matrix_combined()
     fem_internal = InternalParametersFromFEM(
@@ -256,7 +259,7 @@ def main():
         print(f"Calculating scenario: {key}...")
 
         if value.get('internal_source') == 'fem':
-            # Zi/Yi do COMSOL + retorno pela terra analítico (raio do tubo).
+            # Zi/Yi from COMSOL + analytical earth return (tube radius).
             built = build_pul_matrices(
                 value['mtl'], pul_data['frequencies'],
                 internal_source='fem', fem_internal=fem_internal,
@@ -266,7 +269,7 @@ def main():
             value['quasi_tem_matrices'] = built['quasi_tem_matrices']
             continue
 
-        # Cenários 1/2/3: interno analítico (com o modelo de duto bare/ERS/GMD).
+        # Scenarios 1/2/3: analytical internal (with the bare/ERS/GMD duct model).
         pul_internal = InternalPerUnitParameters(value['mtl'], pul_data['frequencies'])
         internal_matrices = pul_internal.matrices(internal_form='hybrid')
         value['internal_matrices'] = internal_matrices
@@ -278,20 +281,20 @@ def main():
         value['earth_return_parameters'] = earth_return
         value['quasi_tem_matrices'] = quasi_tem
 
-    # Validação cruzada Z'/Y' FEM-híbrido vs. MATLAB (referência FEM de Andreata).
+    # Cross-validation Z'/Y' FEM-hybrid vs. MATLAB (Andreata's FEM reference).
     _validate_fem_hybrid_vs_matlab(pul_data)
 
     # ------------------------------------------------------------------ #
     # Modal-domain propagation characteristics -- Chapter 5 of Andreata  #
-    # (Config. 2: 3 SCC em dutos HDPE individuais -> 6 condutores -> 6   #
-    # modos). Roda sobre o cenario 'fem' (FEM-híbrido, sem o GMD de       #
-    # Lafaia). Figs. 5.8 / 5.9 / 5.10.                                    #
+    # (Config. 2: 3 SCC in individual HDPE ducts -> 6 conductors -> 6      #
+    # modes). Runs on the 'fem' scenario (FEM-hybrid, without Lafaia's     #
+    # GMD). Figs. 5.8 / 5.9 / 5.10.                                        #
     # ------------------------------------------------------------------ #
     base = pul_data['scenarios']['fem']
     passivity = check_pul_passivity(pul_data['frequencies'], base['quasi_tem_matrices'])
-    print_passivity_report(passivity, title="Config. 2 -- cenario FEM-hibrido")
+    print_passivity_report(passivity, title="Config. 2 -- FEM-hybrid scenario")
 
-    print("Modal decomposition (Config. 2, FEM-hibrido)...")
+    print("Modal decomposition (Config. 2, FEM-hybrid)...")
     modal = ModalDecomposition(
         pul_data['frequencies'],
         base['quasi_tem_matrices']['series_impedance_matrix'],
@@ -308,8 +311,8 @@ def main():
           f"{min(_diag['classification_similarity'].values()):.3f} (min over modes)")
     print(f"  passive (Z', Y')           : {_diag['passivity']['passive']}")
 
-    # Matriz interna canônica para 'internal_impedance_matrix' (ver
-    # plot_config.py): agora vem do FEM-híbrido.
+    # Canonical internal matrix for 'internal_impedance_matrix' (see
+    # plot_config.py): now comes from the FEM-hybrid.
     pul_data['internal_matrices'] = pul_data['scenarios']['fem']['internal_matrices']
 
     c_comsol = None
@@ -323,8 +326,8 @@ def main():
     plotter.compare_internal_matrices(
             key_list=['internal_impedance_matrix', 'internal_admittance_matrix'])
 
-    # Comparação FEM-híbrido (pyLCP) vs. MATLAB (FEM de Andreata) -- equivalente
-    # aos gráficos do andreata_case1, agora com o duto HDPE modelado de fato.
+    # FEM-hybrid (pyLCP) vs. MATLAB (Andreata's FEM) comparison -- equivalent
+    # to the andreata_case1 plots, now with the HDPE duct actually modeled.
     plotter.compare_complete_matrices(
         key_list=['self_impedance_phase_a_sheath',
                   'self_admittance_phase_a_sheath',
@@ -333,7 +336,7 @@ def main():
 
     # Figs. 5.8 / 5.9 / 5.10 -- modal attenuation, phase velocity, |Z_cm|
     ModalPropagationPlotter(__file__, pul_data['modal'],
-                            config_name='Configuracao 2', autoSave=True).plot_all()
+                            config_name='Configuration 2', autoSave=True).plot_all()
 
     GroundReturnMTLRepresentation(__file__, mtl_0, units='centimeter').system_schematic()
     plt.show()

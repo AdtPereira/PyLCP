@@ -91,7 +91,7 @@ def main():
     cmsl_processor.load_scc_earth_return_and_internal_scenarios(
         pul_data, internal_mtl_model=mtl_model_a, internal_form='approximation')
 
-    print("Carregando dados de referência do MATLAB...")
+    print("Loading MATLAB reference data...")
     matlab_reader = MatlabDataReader(__file__, autoShow=False)
     matlab_data = matlab_reader.get_scc_scenario_data(
         prefix='andreata_case1',
@@ -117,20 +117,22 @@ def main():
         value['earth_return_parameters'] = earth_return
         value['quasi_tem_matrices'] = quasi_tem
 
-    # Passivity sanity check on the reference scenario (assessment only --
-    # Gustavsen 2008, eq. 3). Flags formulation problems (e.g. negative modal
-    # conductance from a bad earth-return admittance).
-    passivity = check_pul_passivity(
-        pul_data['frequencies'], pul_data['scenarios']['p100_er1']['quasi_tem_matrices'])
-    print_passivity_report(passivity, title="Config. 1 -- reference scenario (rho=100)")
-
     # ------------------------------------------------------------------ #
     # Modal-domain propagation characteristics -- Chapter 5 of Andreata  #
-    # (Config. 1: 3 buried SCC -> 6 conductors -> 6 modes). Uses the     #
-    # reference soil scenario (rho = 100 Ohm.m, epsr = 1).               #
+    # (Config. 1: 3 buried SCC -> 6 conductors -> 6 modes).              #
+    #                                                                    #
+    # Andreata secs. 5.4 / 6.1: the earth return uses the CLOSED-FORM     #
+    # EXPRESSIONS of De Conti/Duarte/Alipio (2023) -- eqs. 4.59 (Z'_gjk)  #
+    # and 4.63 (P'_gjk) -- NOT the Sommerfeld integrals (magalhaes_xue).  #
+    # Scenario: rho = 100 Ohm.m, epsr = 1, zg_form = yg_form = 'deconti'. #
     # ------------------------------------------------------------------ #
+    base = pul_data['scenarios']['p100_er1_deconti']
+
+    # Passivity sanity check (assessment only -- Gustavsen 2008, eq. 3).
+    passivity = check_pul_passivity(pul_data['frequencies'], base['quasi_tem_matrices'])
+    print_passivity_report(passivity, title="Config. 1 -- De Conti closed-form (rho=100)")
+
     print("\nModal decomposition (Config. 1)...")
-    base = pul_data['scenarios']['p100_er1']
     modal = ModalDecomposition(
         pul_data['frequencies'],
         base['quasi_tem_matrices']['series_impedance_matrix'],
@@ -150,18 +152,18 @@ def main():
 
     print(f"\nEnd of the routine! Time spent on simulation: {(time.time() - st):.1f} seconds.\n")
     plotter = SCCPlotter(__file__, pul_data, PLOT_CONFIG, autoSave=False)
-    # plotter.compare_complete_matrices(
-    #     key_list=['self_impedance_phase_a_sheath',
-    #               'self_admittance_phase_a_sheath',
-    #               'earth_return_impedance_phase_a',
-    #               'earth_return_admittance_phase_a',
-    #               'earth_return_potential_coeff_phase_a'])
+    plotter.compare_complete_matrices(
+        key_list=['self_impedance_phase_a_sheath',
+                  'self_admittance_phase_a_sheath',
+                  'earth_return_impedance_phase_a',
+                  'earth_return_admittance_phase_a',
+                  'earth_return_potential_coeff_phase_a'])
     plotter.compare_internal_matrices(
         key_list=['internal_impedance_matrix', 'internal_admittance_matrix'])
 
     # Figs. 5.5 / 5.6 / 5.7 -- modal attenuation, phase velocity, |Z_cm|
     ModalPropagationPlotter(__file__, pul_data['modal'],
-                            config_name='Configuracao 1', autoSave=True).plot_all()
+                            config_name='Configuration 1', autoSave=True).plot_all()
 
     GroundReturnMTLRepresentation(__file__, mtl_model_a, units='centimeter').system_schematic()
     plt.show()

@@ -15,19 +15,19 @@ from mom.coated_wire_systems import MulticonductorCoatedWireSystems
 
 class RibbonCoatedCablesPULParameters:
     """
-    Encapsula a lógica para executar e analisar o estudo de convergência
-    de capacitância, comparando MoM Python e Fortran.
+    Encapsulates the logic to run and analyze the capacitance convergence
+    study, comparing Python MoM and Fortran.
     """
     def __init__(self, project_root: Path, case_name: str, mtl: Dict[str, Any], SUM_MAX: int = 10):
         """
-        Inicializa o analisador de convergência.
+        Initializes the convergence analyzer.
 
         Args:
-            mtl_config (Dict[str, Any]): Dicionário com a configuração do modelo MTL.
-            nf_max (int): Número máximo de coeficientes/ordem harmônica para testar.
+            mtl_config (Dict[str, Any]): Dictionary with the MTL model configuration.
+            nf_max (int): Maximum number of coefficients / harmonic order to test.
         """
 
-        assert len([key for key in mtl.keys() if isinstance(key, int)]) > 1, "A linha deve conter mais de um condutor."
+        assert len([key for key in mtl.keys() if isinstance(key, int)]) > 1, "The line must contain more than one conductor."
 
         self.project_root = project_root
         self.case_name = case_name
@@ -36,7 +36,7 @@ class RibbonCoatedCablesPULParameters:
         self.freq_range = {'ana': np.logspace(0, 6, num=200), 'mom': np.logspace(0, 6, num=30)}
         self.srw_ratios = {'ana': np.linspace(4.0, 10.0, num=300), 'mom': np.linspace(4.0, 10.0, num=40)}
 
-        # Parâmetros de dados
+        # Data parameters
         self.srw_data = {}
         self.srw_mum_data = {}
         self.analytical_data = {}
@@ -45,7 +45,7 @@ class RibbonCoatedCablesPULParameters:
         self.ribbon_data = {}
         self.tulip_runner = None
 
-        # Parâmetros adicionais
+        # Additional parameters
         self.c_factor = 1e12  # F/m to nF/km
         self.l_factor = 1e6   # H/m to mH/km
         self.r_factor = 1e3   # Ohm/m to Ohm/km
@@ -57,7 +57,7 @@ class RibbonCoatedCablesPULParameters:
         self.sum_max = SUM_MAX
         self.results_df = None
         
-        # Parâmetros de plotagem
+        # Plotting parameters
         self.plot_params = {
             'linestyles': [':', '-.', '--', '-', ':', '-.', '--'],
             'markers': ['o', 'd', 's', '^', 'v', '<', '>'],
@@ -69,10 +69,10 @@ class RibbonCoatedCablesPULParameters:
         self.swr_ratio = self.D / self.R
 
     def _prepare_fortran_runner(self, mtl):
-        """Prepara os parâmetros e o executor para a simulação Fortran."""
+        """Prepares the parameters and the runner for the Fortran simulation."""
 
-        # Obtenha o dicionário 'insulation' de forma segura.
-        #    Se 'insulation' não existir ou for None, use um dicionário vazio {} como fallback.
+        # Get the 'insulation' dictionary safely.
+        #    If 'insulation' does not exist or is None, use an empty dictionary {} as a fallback.
         refIdx = mtl['idx_ref_conductor']
         insulation_dict = mtl[refIdx].get('insulation') or {}
 
@@ -90,7 +90,7 @@ class RibbonCoatedCablesPULParameters:
         self.runner = FortranRunner(exe_path=str(fortran_exe_path), silent=True)
 
     def _prepare_tulip_runner(self, case_name: str = "three_wires_ribbon"):
-        """Prepara o executor para a simulação Tulip."""
+        """Prepares the runner for the Tulip simulation."""
         EXE_PATH = r"C:\git\tulip\pulmtln-build\rls\bin\Release\pulmtln.exe"
         print(f"--- Preparing to run simulation for case: '{case_name}' ---")
         
@@ -109,13 +109,13 @@ class RibbonCoatedCablesPULParameters:
         
     def _extract_matrix_element(self, column_name: str, row: int, col: int) -> pd.Series:
         """
-        Extrai e processa um elemento específico de uma coluna de matrizes no DataFrame de resultados.
-        O fator de conversão (para indutância ou capacitância) é determinado automaticamente
-        com base no nome da coluna.
+        Extracts and processes a specific element from a matrix column in the results DataFrame.
+        The conversion factor (for inductance or capacitance) is determined automatically
+        based on the column name.
         """
         sign = 1.0
-        
-        # Decide qual fator de conversão usar com base no nome da coluna
+
+        # Decide which conversion factor to use based on the column name
         if column_name.startswith('L'):
             factor = self.l_factor
         elif column_name.startswith('C'):
@@ -123,8 +123,8 @@ class RibbonCoatedCablesPULParameters:
             if row != col:
                 sign = -1.0
         else:
-            # Lança um erro se a coluna não for de Indutância ('L') ou Capacitância ('C')
-            raise ValueError(f"Não foi possível determinar o fator de conversão para a coluna: '{column_name}'")
+            # Raise an error if the column is not Inductance ('L') or Capacitance ('C')
+            raise ValueError(f"Could not determine the conversion factor for the column: '{column_name}'")
         
         extractor = lambda matrix: (
             sign * matrix[row, col] * factor
@@ -135,16 +135,16 @@ class RibbonCoatedCablesPULParameters:
     
     def _configure_plot_appearance(self, ax, ylabel, data_to_plot, yscale='log'):
         """
-        Função auxiliar para configurar um único subplot.
+        Helper function to configure a single subplot.
 
         Args:
-            ax (matplotlib.axes.Axes): O eixo do subplot a ser configurado.
-            title (str): Título do subplot.
-            ylabel (str): Rótulo do eixo Y.
-            data_to_plot (dict): Dados principais para plotagem.
-            ref_data (tuple, optional): Dados de referência para plotagem.
+            ax (matplotlib.axes.Axes): The subplot axis to configure.
+            title (str): Subplot title.
+            ylabel (str): Y-axis label.
+            data_to_plot (dict): Main data for plotting.
+            ref_data (tuple, optional): Reference data for plotting.
         """
-        # Itera sobre os dados para plotagem
+        # Iterate over the data for plotting
         for key, data in data_to_plot.items():
             freq, value = data['data']
             label = data['label']
@@ -175,7 +175,7 @@ class RibbonCoatedCablesPULParameters:
         ax.grid(False)
 
     def show_header(self):
-        """Exibe o cabeçalho do script."""
+        """Displays the script header."""
         print("\n")
         print("="*self.pt2 + " BIFILAR COATED-WIRE RIBBON CABLE SIMULATION " + "="*self.pt2)
         print(f"Project: {self.project_root}")
@@ -186,7 +186,7 @@ class RibbonCoatedCablesPULParameters:
         print("="*self.pt1)
 
     def run_single_fortran(self, mtl: dict = None, displayTerminal: bool = True):
-        """Executa uma simulação única para um valor específico de k."""
+        """Runs a single simulation for a specific value of k."""
 
         if mtl is None:
             self._prepare_fortran_runner(self.mtl_copy)
@@ -216,7 +216,7 @@ class RibbonCoatedCablesPULParameters:
             print("\nNo results found.")
 
     def run_fortran(self, mtl: dict = None, displayTerminal: bool = True):
-        """Executa uma simulação única para um valor específico de k."""
+        """Runs a single simulation for a specific value of k."""
 
         if mtl is None:
             self._prepare_fortran_runner(self.mtl_copy)
@@ -232,14 +232,14 @@ class RibbonCoatedCablesPULParameters:
 
     def run_single_tulip(self):
         """
-        Executa a simulação usando o PyTulip e processa os resultados.
+        Runs the simulation using PyTulip and processes the results.
         """
         print("\n============  pyTulip Simulation  ===========")
         if self.tulip_runner is None:
             self._prepare_tulip_runner()
 
         if self.tulip_runner is None:
-            print("Aviso: PyTulip não disponível (executável não encontrado). Etapa ignorada.")
+            print("Warning: PyTulip not available (executable not found). Step skipped.")
             return
 
         self.tulip_runner.run()
@@ -257,10 +257,10 @@ class RibbonCoatedCablesPULParameters:
 
     def run_mom_methods(self):
         """
-        Executa a simulação clássica do Método dos Momentos (MoM) para a linha de transmissão bifilar.
+        Runs the classical Method of Moments (MoM) simulation for the bifilar transmission line.
 
         Returns:
-            BifilarMoM: Instância do objeto BifilarMoM configurado.
+            BifilarMoM: Instance of the configured BifilarMoM object.
         """
         print("\n============  pyMoM TwoCoatedWireSystem (Bare-Wire)  ===========")
         bare_wire_mtl = copy.deepcopy(self.mtl_copy)
@@ -288,19 +288,19 @@ class RibbonCoatedCablesPULParameters:
 
     def srw_rates(self):
         """
-        Executa a simulação analítica da impedância da linha de transmissão.
+        Runs the analytical simulation of the transmission line impedance.
 
         Args:
-            mtl_config (dict): Dicionário de configuração da linha de transmissão.
-            frequencies (np.ndarray): Array de frequências para a análise.
+            mtl_config (dict): Transmission line configuration dictionary.
+            frequencies (np.ndarray): Array of frequencies for the analysis.
 
         Returns:
-            tuple: Uma tupla contendo três listas: impedâncias série,
-                resistências de alta frequência e indutâncias externas.
+            tuple: A tuple containing three lists: series impedances,
+                high-frequency resistances and external inductances.
         """
         print("\n==============         SRW RATES EVALUATION        =============")
 
-        # Cria a configuração da linha bifilar dinamicamente para cada razão.
+        # Build the bifilar line configuration dynamically for each ratio.
         for ratio in self.srw_ratios['ana']:
             temp_mtl = copy.deepcopy(self.mtl_copy)
             separation = ratio * temp_mtl[0]['radius'][1]
@@ -350,14 +350,14 @@ class RibbonCoatedCablesPULParameters:
             }
 
     def run_convergence(self):
-        """Executa o laço de convergência para ambas as simulações e armazena os resultados."""
+        """Runs the convergence loop for both simulations and stores the results."""
         print(f"\nRunning Convergence Rate until k = {self.sum_max}!")
 
         if self.tulip_runner is None:
             self._prepare_tulip_runner()
 
         if self.tulip_runner is None:
-            print("Aviso: PyTulip não disponível. Resultados Tulip serão omitidos.")
+            print("Warning: PyTulip not available. Tulip results will be omitted.")
         else:
             self.tulip_runner.run()
 
@@ -394,14 +394,14 @@ class RibbonCoatedCablesPULParameters:
 
     def plot_inductance_data(self):
         """
-        Gera e exibe os gráficos dos resultados da simulação de forma flexível,
-        organizados em subplots.
+        Generates and displays the simulation result plots in a flexible way,
+        organized in subplots.
 
         Args:
-            mtl (dict): Dicionário de configuração da linha de transmissão.
-            freqs (dict): Dicionário contendo os arrays de frequência para cada simulação.
-            analytical (dict): Dicionário com os resultados da simulação analítica.
-            mom_so (dict): Dicionário com os resultados da simulação MoM-SO.
+            mtl (dict): Transmission line configuration dictionary.
+            freqs (dict): Dictionary containing the frequency arrays for each simulation.
+            analytical (dict): Dictionary with the analytical simulation results.
+            mom_so (dict): Dictionary with the MoM-SO simulation results.
         """
         inductance_data = {
             'ribbon':       {'data': (self.freq_range.get('mom'), [data['le']           for data in self.ribbon_data.values()]),     'label': r'$\ell_{e,RIBBON.FOR}$'},
@@ -418,14 +418,14 @@ class RibbonCoatedCablesPULParameters:
 
     def plot_capacitance_data(self):
         """
-        Gera e exibe os gráficos dos resultados da simulação de forma flexível,
-        organizados em subplots.
+        Generates and displays the simulation result plots in a flexible way,
+        organized in subplots.
 
         Args:
-            mtl (dict): Dicionário de configuração da linha de transmissão.
-            freqs (dict): Dicionário contendo os arrays de frequência para cada simulação.
-            analytical (dict): Dicionário com os resultados da simulação analítica.
-            mom_so (dict): Dicionário com os resultados da simulação MoM-SO.
+            mtl (dict): Transmission line configuration dictionary.
+            freqs (dict): Dictionary containing the frequency arrays for each simulation.
+            analytical (dict): Dictionary with the analytical simulation results.
+            mom_so (dict): Dictionary with the MoM-SO simulation results.
         """
         capacitante_data = {
             'mom':      {'data': (self.freq_range.get('mom'), [data['c']        for data in self.mom_data.values()]),        'label': 'MoM'},
@@ -442,14 +442,14 @@ class RibbonCoatedCablesPULParameters:
 
     def plot_srw_rates(self):
         """
-        Gera e exibe os gráficos dos resultados da simulação de forma flexível,
-        organizados em subplots.
+        Generates and displays the simulation result plots in a flexible way,
+        organized in subplots.
 
         Args:
-            mtl (dict): Dicionário de configuração da linha de transmissão.
-            freqs (dict): Dicionário contendo os arrays de frequência para cada simulação.
-            analytical (dict): Dicionário com os resultados da simulação analítica.
-            mom_so (dict): Dicionário com os resultados da simulação MoM-SO.
+            mtl (dict): Transmission line configuration dictionary.
+            freqs (dict): Dictionary containing the frequency arrays for each simulation.
+            analytical (dict): Dictionary with the analytical simulation results.
+            mom_so (dict): Dictionary with the MoM-SO simulation results.
         """
 
         capacitante_data = {
@@ -488,20 +488,20 @@ class RibbonCoatedCablesPULParameters:
         
     def plot_paul_fig514a(self):
         """
-        Gera o gráfico de convergência da indutância a partir dos resultados armazenados,
-        replicando a figura de referência.
+        Generates the inductance convergence plot from the stored results,
+        replicating the reference figure.
         """
         if self.results_df is None:
-            print("Execute as simulações primeiro com 'run_convergence()'.")
+            print("Run the simulations first with 'run_convergence()'.")
             return
 
-        # Garante que a simulação foi executada completamente
+        # Ensure the simulation ran to completion
         assert self.results_df.index.max() == self.sum_max - 1, \
-            f"A simulação não rodou até o valor máximo esperado de k={self.sum_max - 1}"
+            f"The simulation did not run up to the expected maximum value of k={self.sum_max - 1}"
 
-        # Extrai os componentes da matriz de indutância 'L' e converte para µH/m.
+        # Extract the components of the 'L' inductance matrix and convert to uH/m.
         try:
-            # Passa o fator de conversão correto (self.l_factor)
+            # Pass the correct conversion factor (self.l_factor)
             l11_ribbon = self._extract_matrix_element('L (RIBBON.FOR)', row=0, col=0)
             l22_ribbon = self._extract_matrix_element('L (RIBBON.FOR)', row=1, col=1)
             l12_ribbon = self._extract_matrix_element('L (RIBBON.FOR)', row=0, col=1)
@@ -509,9 +509,9 @@ class RibbonCoatedCablesPULParameters:
             l22_tulip  = self._extract_matrix_element('L (SEMBA-TULIP)', row=1, col=1)
             l12_tulip  = self._extract_matrix_element('L (SEMBA-TULIP)', row=0, col=1)
         except (TypeError, IndexError) as e:
-            # Corrige as mensagens de erro para o contexto de indutância
-            print(f"Erro ao extrair elementos da matriz de indutância: {e}")
-            print("Verifique se as simulações foram executadas e se a matriz 'L (RIBBON.FOR)' foi populada.")
+            # Adjust the error messages for the inductance context
+            print(f"Error while extracting elements of the inductance matrix: {e}")
+            print("Check that the simulations have been run and that the 'L (RIBBON.FOR)' matrix was populated.")
             return
 
         plt.style.use('default')
@@ -537,20 +537,20 @@ class RibbonCoatedCablesPULParameters:
 
     def plot_paul_fig514b(self):
         """
-        Gera o gráfico de convergência a partir dos resultados armazenados,
-        replicando a figura de referência.
+        Generates the convergence plot from the stored results,
+        replicating the reference figure.
         """
         if self.results_df is None:
-            print("Execute as simulações primeiro com 'run_convergence()'.")
+            print("Run the simulations first with 'run_convergence()'.")
             return
 
-        # Garante que a simulação foi executada completamente
+        # Ensure the simulation ran to completion
         assert self.results_df.index.max() == self.sum_max - 1, \
-            f"A simulação não rodou até o valor máximo esperado de k={self.sum_max - 1}"
+            f"The simulation did not run up to the expected maximum value of k={self.sum_max - 1}"
 
-        # Extrai os componentes da matriz de indutância 'L' e converte para µH/m.
+        # Extract the components of the 'L' inductance matrix and convert to uH/m.
         try:
-            # Passa o fator de conversão correto (self.l_factor)
+            # Pass the correct conversion factor (self.l_factor)
             c11_ribbon = self._extract_matrix_element('C (RIBBON.FOR)', row=0, col=0)
             c22_ribbon = self._extract_matrix_element('C (RIBBON.FOR)', row=1, col=1)
             c12_ribbon = self._extract_matrix_element('C (RIBBON.FOR)', row=0, col=1)
@@ -558,9 +558,9 @@ class RibbonCoatedCablesPULParameters:
             c22_tulip  = self._extract_matrix_element('C (SEMBA-TULIP)', row=1, col=1)
             c12_tulip  = self._extract_matrix_element('C (SEMBA-TULIP)', row=0, col=1)
         except (TypeError, IndexError) as e:
-            # Corrige as mensagens de erro para o contexto de indutância
-            print(f"Erro ao extrair elementos da matriz de indutância: {e}")
-            print("Verifique se as simulações foram executadas e se a matriz 'L (RIBBON.FOR)' foi populada.")
+            # Adjust the error messages for the inductance context
+            print(f"Error while extracting elements of the inductance matrix: {e}")
+            print("Check that the simulations have been run and that the 'L (RIBBON.FOR)' matrix was populated.")
             return
 
         plt.style.use('default')
@@ -586,39 +586,39 @@ class RibbonCoatedCablesPULParameters:
 
     def plot_paul_fig514c(self):
         """
-        Gera o gráfico de convergência a partir dos resultados armazenados,
-        replicando a figura de referência.
+        Generates the convergence plot from the stored results,
+        replicating the reference figure.
         """
         if self.results_df is None:
-            print("Execute as simulações primeiro com 'run_convergence()'.")
+            print("Run the simulations first with 'run_convergence()'.")
             return
 
-        # Garante que a simulação foi executada completamente
+        # Ensure the simulation ran to completion
         assert self.results_df.index.max() == self.sum_max - 1, \
-            f"A simulação não rodou até o valor máximo esperado de k={self.sum_max - 1}"
+            f"The simulation did not run up to the expected maximum value of k={self.sum_max - 1}"
 
-        # Extrai os componentes da matriz de indutância 'L' e converte para µH/m.
+        # Extract the components of the 'L' inductance matrix and convert to uH/m.
         try:
-            # Passa o fator de conversão correto (self.l_factor)
+            # Pass the correct conversion factor (self.l_factor)
             c0_11 = self._extract_matrix_element('C0 (RIBBON.FOR)', row=0, col=0)
             c0_22 = self._extract_matrix_element('C0 (RIBBON.FOR)', row=1, col=1)
             c0_12 = self._extract_matrix_element('C0 (RIBBON.FOR)', row=0, col=1)
         except (TypeError, IndexError) as e:
-            # Corrige as mensagens de erro para o contexto de indutância
-            print(f"Erro ao extrair elementos da matriz de indutância: {e}")
-            print("Verifique se as simulações foram executadas e se a matriz 'L (RIBBON.FOR)' foi populada.")
+            # Adjust the error messages for the inductance context
+            print(f"Error while extracting elements of the inductance matrix: {e}")
+            print("Check that the simulations have been run and that the 'L (RIBBON.FOR)' matrix was populated.")
             return
 
         plt.style.use('default')
         fig, ax = plt.subplots(figsize=self.figsize)
 
-        # Plotagem dos dados com o estilo da figura de referência
+        # Plot the data with the reference figure style
         fortran_nf_axis = self.results_df.index + 1
         ax.plot(fortran_nf_axis, c0_11, color='k', marker='o', linestyle='-',  label='$C0_{11}$')
         ax.plot(fortran_nf_axis, c0_22, color='k', marker='o', linestyle=':',  label='$C0_{22}$', markerfacecolor='white', markeredgecolor='k')
         ax.plot(fortran_nf_axis, c0_12, color='k', marker='s', linestyle='-.', label='$C0_{12}$')
 
-        # Configuração dos eixos para corresponder à imagem de referência
+        # Axis configuration to match the reference image
         ax.set_xlabel('Number of Fourier Coefficients', fontsize=12)
         ax.set_ylabel('Bare-Wire Capacitance (pF/m)', fontsize=12)
         ax.set_xticks(np.arange(1, self.sum_max + 1, 1))
@@ -629,18 +629,18 @@ class RibbonCoatedCablesPULParameters:
         plt.tight_layout()
 
     def plot_paul_fig514d(self):
-        """ Gera o gráfico de convergência a partir dos resultados armazenados, replicando a figura de referência. """
+        """ Generates the convergence plot from the stored results, replicating the reference figure. """
         if self.results_df is None:
-            print("Execute as simulações primeiro com 'run_convergence()'.")
+            print("Run the simulations first with 'run_convergence()'.")
             return
 
-        # Garante que a simulação foi executada completamente
+        # Ensure the simulation ran to completion
         assert self.results_df.index.max() == self.sum_max - 1, \
-            f"A simulação não rodou até o valor máximo esperado de k={self.sum_max - 1}"
+            f"The simulation did not run up to the expected maximum value of k={self.sum_max - 1}"
 
-        # Extrai os componentes da matriz de indutância 'L' e converte para µH/m.
+        # Extract the components of the 'L' inductance matrix and convert to uH/m.
         try:
-            # Passa o fator de conversão correto (self.l_factor)
+            # Pass the correct conversion factor (self.l_factor)
             cgen_00 = self._extract_matrix_element('CGEN (RIBBON.FOR)', row=0, col=0)
             cgen_11 = self._extract_matrix_element('CGEN (RIBBON.FOR)', row=1, col=1)
             cgen_22 = self._extract_matrix_element('CGEN (RIBBON.FOR)', row=2, col=2)
@@ -649,15 +649,15 @@ class RibbonCoatedCablesPULParameters:
             cgen_12 = self._extract_matrix_element('CGEN (RIBBON.FOR)', row=1, col=2)
 
         except (TypeError, IndexError) as e:
-            # Corrige as mensagens de erro para o contexto de indutância
-            print(f"Erro ao extrair elementos da matriz de indutância: {e}")
-            print("Verifique se as simulações foram executadas e se a matriz 'L (RIBBON.FOR)' foi populada.")
+            # Adjust the error messages for the inductance context
+            print(f"Error while extracting elements of the inductance matrix: {e}")
+            print("Check that the simulations have been run and that the 'L (RIBBON.FOR)' matrix was populated.")
             return
 
         plt.style.use('default')
         fig, ax = plt.subplots(figsize=self.figsize)
 
-        # Plotagem dos dados com o estilo da figura de referência
+        # Plot the data with the reference figure style
         fortran_nf_axis = self.results_df.index + 1
         ax.plot(fortran_nf_axis, cgen_00, color='k', marker='o', label='$CGEN_{00}$', linewidth=1.0, zorder=0, markersize=3, linestyle=':')
         ax.plot(fortran_nf_axis, cgen_11, color='k', marker='o', label='$CGEN_{11}$', linewidth=1.0, zorder=1, markersize=3, linestyle='-')
@@ -666,7 +666,7 @@ class RibbonCoatedCablesPULParameters:
         ax.plot(fortran_nf_axis, cgen_12, color='k', marker='s', label='$CGEN_{12}$', linewidth=1.0, zorder=1, markersize=8, linestyle='--', fillstyle='none')
         ax.plot(fortran_nf_axis, cgen_02, color='k', marker='d', label='$CGEN_{02}$', linewidth=1.0, zorder=0, markersize=6, linestyle='-.')
 
-        # Configuração dos eixos para corresponder à imagem de referência
+        # Axis configuration to match the reference image
         ax.set_xlabel('Number of Fourier Coefficients', fontsize=12)
         ax.set_ylabel('Generalized Capacitance (pF/m)', fontsize=12)
         ax.set_xticks(np.arange(1, self.sum_max + 1, 1))
@@ -678,31 +678,31 @@ class RibbonCoatedCablesPULParameters:
 
     def plot_generalized_capacitance_convergence(self):
         """
-        Gera o gráfico de convergência da capacitância generalizada, com subplots
-        separados para os termos CGEN_00 e CGEN_01.
+        Generates the convergence plot of the generalized capacitance, with subplots
+        separated for the CGEN_00 and CGEN_01 terms.
         """
         if self.results_df is None:
-            print("Execute as simulações primeiro com 'run_convergence()'.")
+            print("Run the simulations first with 'run_convergence()'.")
             return
 
         assert self.results_df.index.max() == self.sum_max - 1, \
-            f"A simulação não rodou até o valor máximo esperado de k={self.sum_max - 1}"
+            f"The simulation did not run up to the expected maximum value of k={self.sum_max - 1}"
 
-        # Extração de dados de forma programática.
-        # Esta parte permanece flexível para extrair todos os elementos,
-        # mesmo que apenas alguns sejam plotados.
+        # Programmatic data extraction.
+        # This part stays flexible to extract every element,
+        # even if only some are plotted.
         ribbon, mom, mom_so = {}, {}, {}
         try:
             for i in range(self.N):
                 for j in range(self.N):
                     ribbon[f'c_{i}{j}'] =   self._extract_matrix_element('CGEN (RIBBON.FOR)', row=i, col=j)
         except (TypeError, IndexError, ValueError, KeyError) as e:
-            print(f"Erro ao extrair elementos da matriz de capacitância: {e}")
-            print("Verifique se as simulações foram executadas e se as matrizes 'CGEN' foram populadas com as dimensões corretas.")
+            print(f"Error while extracting elements of the capacitance matrix: {e}")
+            print("Check that the simulations have been run and that the 'CGEN' matrices were populated with the correct dimensions.")
             return
 
         plt.style.use('default')
-        # Cria uma figura com dois subplots (1 linha, 2 colunas)
+        # Create a figure with two subplots (1 row, 2 columns)
         fig, (ax1, ax2) = plt.subplots(1, 2, figsize=self.figsize, sharey=True)
         # fig.suptitle('')
 
@@ -719,7 +719,7 @@ class RibbonCoatedCablesPULParameters:
         ax2.plot(fortran_nf_axis, ribbon['c_01'], label='RIBBON.FOR',
                 color=self.plot_params['colors'][0], marker=self.plot_params['markers'][0], linestyle=self.plot_params['linestyles'][0])
 
-        # Configuração dos eixos para ambos os subplots
+        # Axis configuration for both subplots
         for ax in [ax1, ax2]:
             ax.set_xlabel('Number of Fourier Coefficients (NF)', fontsize=11)
             ax.set_xlim(0.8, max_nf_fortran + 0.2)
@@ -728,22 +728,22 @@ class RibbonCoatedCablesPULParameters:
             ax.legend(loc='lower right', fontsize=10)
             ax.grid(False)
 
-        # Configurações específicas por subplot
+        # Subplot-specific settings
         ax1.set_ylabel('Generalized Capacitance Matrix, $CGEN$ (pF/m)', fontsize=11)
         ax1.set_title('Auto-Capacitance Term $CGEN_{00}$')
         ax2.set_title('Mutual Capacitance Term $CGEN_{01}$')
         plt.tight_layout(rect=[0, 0, 1, 0.96])
 
     def plot_dielectric_coated_capacitance_convergence(self):
-        """ Gera o gráfico de convergência da capacitância do espaço livro, adaptando-se ao número de condutores do sistema. """
+        """ Generates the free-space capacitance convergence plot, adapting to the number of conductors in the system. """
         if self.results_df is None:
-            print("Execute as simulações primeiro com 'run_study()'.")
+            print("Run the simulations first with 'run_study()'.")
             return
 
         assert self.results_df.index.max() == self.sum_max - 1, \
-            f"A simulação não rodou até o valor máximo esperado de k={self.sum_max - 1}"
+            f"The simulation did not run up to the expected maximum value of k={self.sum_max - 1}"
 
-        # Extração de dados de forma programática
+        # Programmatic data extraction
         ribbon, mom =  {}, {}
 
         try:
@@ -753,8 +753,8 @@ class RibbonCoatedCablesPULParameters:
                     mom[f'c_{i}{j}'] = self._extract_matrix_element('C (MoM.PY)', row=i, col=j)
 
         except (TypeError, IndexError, ValueError) as e:
-            print(f"Erro ao extrair elementos da matriz de capacitância: {e}")
-            print("Verifique se as simulações foram executadas e se a matriz 'C' foi populada.")
+            print(f"Error while extracting elements of the capacitance matrix: {e}")
+            print("Check that the simulations have been run and that the 'C' matrix was populated.")
             return
 
         plt.style.use('default')

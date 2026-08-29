@@ -1,16 +1,16 @@
-""" Templates de série/eixo de PLOT_CONFIG compartilhados pelos casos andreata_case1/2/3.
+""" PLOT_CONFIG series/axis templates shared by the andreata_case1/2/3 cases.
 
-Camada base (MATLAB_TEMPLATE, PLOT_TPL_*): idêntica nos três plot_config.py.
-Camada de comparação de formulação de solo (COMSOL_TEMPLATE, XUE_TEMPLATE,
-DECONTI_TEMPLATE): usada por case1 e case3, que comparam formulações de
-retorno à terra (magalhaes_xue / deconti) contra 3 perfis de solo. case2 não
-importa essa segunda camada -- seu eixo de comparação é o modelo de duto
-(bare/ERS/GMD), não a formulação de solo, e define seus próprios templates
-locais (COMSOL_TEMPLATE de 1 perfil, DUCT_MODEL_TEMPLATE etc.) em
+Base layer (MATLAB_TEMPLATE, PLOT_TPL_*): identical across the three plot_config.py.
+Soil-formulation comparison layer (COMSOL_TEMPLATE, XUE_TEMPLATE,
+DECONTI_TEMPLATE): used by case1 and case3, which compare earth-return
+formulations (magalhaes_xue / deconti) against 3 soil profiles. case2 does not
+import this second layer -- its comparison axis is the duct model
+(bare/ERS/GMD), not the soil formulation, and it defines its own local
+templates (a 1-profile COMSOL_TEMPLATE, DUCT_MODEL_TEMPLATE, etc.) in
 testData/andreata_case2/plot_config.py.
 """
 
-# --- Camada base: usada pelos três casos ---
+# --- Base layer: used by the three cases ---
 
 MATLAB_TEMPLATE = [
     {
@@ -62,7 +62,7 @@ PLOT_TPL_CAPACITANCE = {
     'yscale': 'linear',
 }
 
-# --- Camada de comparação de formulação de solo: usada por case1 e case3 ---
+# --- Soil-formulation comparison layer: used by case1 and case3 ---
 
 COMSOL_TEMPLATE = [
     {

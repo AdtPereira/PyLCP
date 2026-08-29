@@ -22,12 +22,12 @@ __all__ = ["ModalPropagationPlotter", "MODE_STYLE"]
 
 # Fixed colour / dash per mode label, kept consistent across the three figures.
 MODE_STYLE = {
-    "ground":         {"color": "black",      "linestyle": "-",  "label": "Modo terra"},
-    "inter_sheath_1": {"color": "tab:blue",   "linestyle": "--", "label": "Modo entre blindagens 1"},
-    "inter_sheath_2": {"color": "tab:blue",   "linestyle": "-.", "label": "Modo entre blindagens 2"},
-    "coaxial_1":      {"color": "tab:red",    "linestyle": "--", "label": "Modo coaxial 1"},
-    "coaxial_2":      {"color": "tab:green",  "linestyle": "-",  "label": "Modo coaxial 2"},
-    "coaxial_3":      {"color": "tab:orange", "linestyle": "-.", "label": "Modo coaxial 3"},
+    "ground":         {"color": "black",      "linestyle": "-",  "label": "Ground mode"},
+    "inter_sheath_1": {"color": "tab:blue",   "linestyle": "--", "label": "Inter-sheath mode 1"},
+    "inter_sheath_2": {"color": "tab:blue",   "linestyle": "-.", "label": "Inter-sheath mode 2"},
+    "coaxial_1":      {"color": "tab:red",    "linestyle": "--", "label": "Coaxial mode 1"},
+    "coaxial_2":      {"color": "tab:green",  "linestyle": "-",  "label": "Coaxial mode 2"},
+    "coaxial_3":      {"color": "tab:orange", "linestyle": "-.", "label": "Coaxial mode 3"},
 }
 
 
@@ -47,7 +47,7 @@ class ModalPropagationPlotter:
     autoSave : bool
     """
 
-    def __init__(self, file_path, modal, config_name="Configuracao 1",
+    def __init__(self, file_path, modal, config_name="Configuration 1",
                  alpha_unit="Np/m", autoSave=True):
         self.script_path = Path(file_path)
         self.modal = modal
@@ -78,7 +78,7 @@ class ModalPropagationPlotter:
         fig.suptitle(f"{title}\n{self.config_name}", fontsize=11)
         ax.set_xscale("log")
         ax.set_xlim(self.xlim)
-        ax.set_xlabel("Frequencia (Hz)")
+        ax.set_xlabel("Frequency (Hz)")
         ax.grid(True, which="both", linestyle="--", linewidth=0.5)
         return fig, ax
 
@@ -95,7 +95,7 @@ class ModalPropagationPlotter:
         alpha = np.asarray(self.modal["alpha"], dtype=float).copy()
         if self.alpha_unit == "Np/km":
             alpha *= 1e3
-        fig, ax = self._new_axis(r"Constante de atenuacao modal $\alpha_m$")
+        fig, ax = self._new_axis(r"Modal attenuation constant $\alpha_m$")
         for j in range(self.n):
             ax.plot(self.f, alpha[:, j], **self._style(self.labels[j], j))
         ax.set_yscale("log")
@@ -105,7 +105,7 @@ class ModalPropagationPlotter:
     def modal_phase_velocity(self):
         """Fig. 5.6 -- v_m(f)."""
         v = np.abs(np.asarray(self.modal["vphase"], dtype=float))
-        fig, ax = self._new_axis(r"Velocidade de fase modal $v_m$")
+        fig, ax = self._new_axis(r"Modal phase velocity $v_m$")
         for j in range(self.n):
             ax.plot(self.f, v[:, j], **self._style(self.labels[j], j))
         ax.set_ylabel(r"$v_m$ (m/s)")
@@ -115,7 +115,7 @@ class ModalPropagationPlotter:
     def modal_char_impedance(self):
         """Fig. 5.7 -- |Z_cm(f)|."""
         zc = np.abs(np.asarray(self.modal["Zcm"], dtype=complex))
-        fig, ax = self._new_axis(r"Impedancia caracteristica modal $|Z_{cm}|$")
+        fig, ax = self._new_axis(r"Modal characteristic impedance $|Z_{cm}|$")
         for j in range(self.n):
             ax.plot(self.f, zc[:, j], **self._style(self.labels[j], j))
         ax.set_yscale("log")

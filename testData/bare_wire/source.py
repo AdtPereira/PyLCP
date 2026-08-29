@@ -26,14 +26,14 @@ class BifilarBareWirePULParameters:
     """
     def __init__(self, project_root: Path, case_name: str, mtl: Dict[str, Any], SUM_MAX: int = 10, comsol_data: Dict[str, pd.DataFrame] = {}):
         """
-        Inicializa o analisador de convergência.
+        Initializes the convergence analyzer.
 
         Args:
-            mtl_config (Dict[str, Any]): Dicionário com a configuração do modelo MTL.
-            nf_max (int): Número máximo de coeficientes/ordem harmônica para testar.
+            mtl_config (Dict[str, Any]): Dictionary with the MTL model configuration.
+            nf_max (int): Maximum number of coefficients / harmonic order to test.
         """
 
-        assert len([key for key in mtl.keys() if isinstance(key, int)]) == 2, "A linha bifilar deve conter exatamente dois condutores."
+        assert len([key for key in mtl.keys() if isinstance(key, int)]) == 2, "The bifilar line must contain exactly two conductors."
 
         self.project_root = project_root
         self.case_name = case_name
@@ -46,10 +46,10 @@ class BifilarBareWirePULParameters:
         self.sum_max = SUM_MAX
         self.results_df = None
 
-        # Extrai parâmetros e prepara o executor do Fortran
+        # Extract parameters and prepare the Fortran runner
         self._bifilar_analytical_solution()
 
-        # Parâmetros de dados
+        # Data parameters
         self.srw_data = {}
         self.srw_mum_data = {}
         self.analytical_data = {}
@@ -58,7 +58,7 @@ class BifilarBareWirePULParameters:
         self.mom_so_data = {}
         self.ribbon_data = {}
 
-        # Parâmetros adicionais
+        # Additional parameters
         self.c_factor = 1e12  # F/m to nF/km
         self.l_factor = 1e6   # H/m to mH/km
         self.r_factor = 1e3   # Ohm/m to Ohm/km
@@ -66,7 +66,7 @@ class BifilarBareWirePULParameters:
         self.pt1 = 63
         self.pt2 = 10
 
-        # Parâmetros de plotagem
+        # Plotting parameters
         self.plot_params = {
             'linestyles': [':', '-.', '--', '-', ':', '-.', '--'],
             'markers': ['o', 's', '^', 'd', 'v', '<', '>'],
@@ -78,10 +78,10 @@ class BifilarBareWirePULParameters:
         os.makedirs(self.results_dir, exist_ok=True)
         
     def _prepare_fortran_runner(self, mtl):
-        """Prepara os parâmetros e o executor para a simulação Fortran."""
+        """Prepares the parameters and the runner for the Fortran simulation."""
 
-        # Obtenha o dicionário 'sheath' de forma segura.
-        #    Se 'sheath' não existir ou for None, use um dicionário vazio {} como fallback.
+        # Get the 'sheath' dictionary safely.
+        #    If 'sheath' does not exist or is None, use an empty dictionary {} as a fallback.
         refIdx = mtl['idx_ref_conductor']
         sheath_dict = mtl[refIdx].get('sheath') or {}
 
@@ -100,13 +100,13 @@ class BifilarBareWirePULParameters:
 
     def _extract_matrix_element(self, column_name: str, row: int, col: int) -> pd.Series:
         """
-        Extrai e processa um elemento específico de uma coluna de matrizes no DataFrame de resultados.
-        O fator de conversão (para indutância ou capacitância) é determinado automaticamente
-        com base no nome da coluna.
+        Extracts and processes a specific element from a matrix column in the results DataFrame.
+        The conversion factor (for inductance or capacitance) is determined automatically
+        based on the column name.
         """
         sign = 1.0
-        
-        # Decide qual fator de conversão usar com base no nome da coluna
+
+        # Decide which conversion factor to use based on the column name
         if column_name.startswith('L'):
             factor = self.l_factor
         elif column_name.startswith('C'):
@@ -114,8 +114,8 @@ class BifilarBareWirePULParameters:
             if row != col:
                 sign = -1.0
         else:
-            # Lança um erro se a coluna não for de Indutância ('L') ou Capacitância ('C')
-            raise ValueError(f"Não foi possível determinar o fator de conversão para a coluna: '{column_name}'")
+            # Raise an error if the column is not Inductance ('L') or Capacitance ('C')
+            raise ValueError(f"Could not determine the conversion factor for the column: '{column_name}'")
         
         extractor = lambda matrix: (
             sign * matrix[row, col] * factor
@@ -125,7 +125,7 @@ class BifilarBareWirePULParameters:
         return self.results_df[column_name].apply(extractor)
 
     def _bifilar_analytical_solution(self):
-        """Calcula a solução analítica para fios nus como referência."""
+        """Computes the analytical solution for bare wires as a reference."""
         R = self.mtl_copy[0]['radius'][1]
         D = np.linalg.norm(np.array(self.mtl_copy[0]['center_point']) - np.array(self.mtl_copy[1]['center_point']))
         self.DR_ratio = D/R
@@ -134,16 +134,16 @@ class BifilarBareWirePULParameters:
 
     def _configure_plot_appearance(self, ax, ylabel, data_to_plot, yscale='log'):
         """
-        Função auxiliar para configurar um único subplot.
+        Helper function to configure a single subplot.
 
         Args:
-            ax (matplotlib.axes.Axes): O eixo do subplot a ser configurado.
-            title (str): Título do subplot.
-            ylabel (str): Rótulo do eixo Y.
-            data_to_plot (dict): Dados principais para plotagem.
-            ref_data (tuple, optional): Dados de referência para plotagem.
+            ax (matplotlib.axes.Axes): The subplot axis to configure.
+            title (str): Subplot title.
+            ylabel (str): Y-axis label.
+            data_to_plot (dict): Main data for plotting.
+            ref_data (tuple, optional): Reference data for plotting.
         """
-        # Itera sobre os dados para plotagem
+        # Iterate over the data for plotting
         for key, data in data_to_plot.items():
             freq, value = data['data']
             label = data['label']
@@ -174,7 +174,7 @@ class BifilarBareWirePULParameters:
         ax.grid(False)
 
     def show_header(self):
-        """Exibe o cabeçalho do script."""
+        """Displays the script header."""
         print("\n")
         print("="*self.pt2 + " BIFILAR BARE-WIRE RIBBON CABLE SIMULATION " + "="*self.pt2)
         print(f"Project: {self.project_root}")
@@ -186,7 +186,7 @@ class BifilarBareWirePULParameters:
         print("="*self.pt1)
 
     def run_single_fortran(self):
-        """Executa uma simulação única para um valor específico de k."""
+        """Runs a single simulation for a specific value of k."""
         self._prepare_fortran_runner(self.mtl_copy)
         self.runner.run_fortran(self.fortran_base_params)
 
@@ -210,7 +210,7 @@ class BifilarBareWirePULParameters:
             print("\nNo results found.")
 
     def run_fortran(self):
-        """Executa uma simulação única para um valor específico de k."""
+        """Runs a single simulation for a specific value of k."""
         self._prepare_fortran_runner(self.mtl_copy)
         self.runner.run_fortran(self.fortran_base_params)
 
@@ -220,10 +220,10 @@ class BifilarBareWirePULParameters:
 
     def run_mom_methods(self, case_name, autoPlots=False):
         """
-        Executa a simulação clássica do Método dos Momentos (MoM) para a linha de transmissão bifilar.
+        Runs the classical Method of Moments (MoM) simulation for the bifilar transmission line.
 
         Returns:
-            BifilarMoM: Instância do objeto BifilarMoM configurado.
+            BifilarMoM: Instance of the configured BifilarMoM object.
         """
         print("\n============== pyMoM MulticonductorBareWireSystems =============")
 
@@ -249,7 +249,7 @@ class BifilarBareWirePULParameters:
 
     def run_analytical(self):
         """
-        Executa a simulação analítica da impedância da linha de transmissão.
+        Runs the analytical simulation of the transmission line impedance.
         """
         print("\n==============         Analytical Processing       =============")
 
@@ -280,15 +280,15 @@ class BifilarBareWirePULParameters:
 
     def run_mom_so(self):
         """
-        Executa a simulação da impedância usando o Método dos Momentos (MoM-SO).
+        Runs the impedance simulation using the Method of Moments (MoM-SO).
 
         Args:
-            mtl_config (dict): Dicionário de configuração da linha de transmissão.
-            frequencies (np.ndarray): Array de frequências para a análise.
-            green_mode (GreenFunctionMode): O modo de cálculo para a função de Green.
+            mtl_config (dict): Transmission line configuration dictionary.
+            frequencies (np.ndarray): Array of frequencies for the analysis.
+            green_mode (GreenFunctionMode): The computation mode for the Green's function.
 
         Returns:
-            list: Uma lista contendo as impedâncias série totais calculadas via MoM.
+            list: A list containing the total series impedances computed via MoM.
         """
         print("\n=============   MoM-SO HomogeneousLosslessMedium   =============")
 
@@ -333,15 +333,15 @@ class BifilarBareWirePULParameters:
 
     def run_srw_rates(self):
         """
-        Executa a simulação analítica da impedância da linha de transmissão.
+        Runs the analytical simulation of the transmission line impedance.
 
         Args:
-            mtl_config (dict): Dicionário de configuração da linha de transmissão.
-            frequencies (np.ndarray): Array de frequências para a análise.
+            mtl_config (dict): Transmission line configuration dictionary.
+            frequencies (np.ndarray): Array of frequencies for the analysis.
 
         Returns:
-            tuple: Uma tupla contendo três listas: impedâncias série,
-                resistências de alta frequência e indutâncias externas.
+            tuple: A tuple containing three lists: series impedances,
+                high-frequency resistances and external inductances.
         """
         print("\n==============         SRW RATES EVALUATION        =============")
 
@@ -390,7 +390,7 @@ class BifilarBareWirePULParameters:
             }
 
     def run_convergence(self):
-        """Executa o laço de convergência para ambas as simulações e armazena os resultados."""
+        """Runs the convergence loop for both simulations and stores the results."""
         print(f"\nRunning Convergence Rate until k = {self.sum_max}!")
         
         results = []
@@ -423,7 +423,7 @@ class BifilarBareWirePULParameters:
             general_cap = mom_so.generalized_capacitance_matrix(green_matrix)
             maxwell_cap = mom_so.maxwellian_capacitance_matrix(general_cap)
             
-            # Coleta de resultados
+            # Collect results
             results.append({
                 'k': k,
                 'L (RIBBON.FOR)':       self.runner.IND_matrix,
@@ -441,14 +441,14 @@ class BifilarBareWirePULParameters:
 
     def plot_resistance_results(self):
         """
-        Gera e exibe os gráficos dos resultados da simulação de forma flexível,
-        organizados em subplots.
+        Generates and displays the simulation result plots in a flexible way,
+        organized in subplots.
 
         Args:
-            mtl (dict): Dicionário de configuração da linha de transmissão.
-            freqs (dict): Dicionário contendo os arrays de frequência para cada simulação.
-            analytical (dict): Dicionário com os resultados da simulação analítica.
-            mom_so (dict): Dicionário com os resultados da simulação MoM-SO.
+            mtl (dict): Transmission line configuration dictionary.
+            freqs (dict): Dictionary containing the frequency arrays for each simulation.
+            analytical (dict): Dictionary with the analytical simulation results.
+            mom_so (dict): Dictionary with the MoM-SO simulation results.
         """
         resistance_data = {
             'mom-so':       {'data': (self.freq_range.get('mom'), [data['rs']  for data in self.mom_so_data.values()]),     'label': 'MoM-SO'},
@@ -463,14 +463,14 @@ class BifilarBareWirePULParameters:
 
     def plot_inductance_results(self):
         """
-        Gera e exibe os gráficos dos resultados da simulação de forma flexível,
-        organizados em subplots.
+        Generates and displays the simulation result plots in a flexible way,
+        organized in subplots.
 
         Args:
-            mtl (dict): Dicionário de configuração da linha de transmissão.
-            freqs (dict): Dicionário contendo os arrays de frequência para cada simulação.
-            analytical (dict): Dicionário com os resultados da simulação analítica.
-            mom_so (dict): Dicionário com os resultados da simulação MoM-SO.
+            mtl (dict): Transmission line configuration dictionary.
+            freqs (dict): Dictionary containing the frequency arrays for each simulation.
+            analytical (dict): Dictionary with the analytical simulation results.
+            mom_so (dict): Dictionary with the MoM-SO simulation results.
         """
         inductance_data = {
             'ribbon':       {'data': (self.freq_range.get('mom'), [data['le']           for data in self.ribbon_data.values()]),     'label': r'$\ell_{e,RIBBON.FOR}$'},
@@ -488,14 +488,14 @@ class BifilarBareWirePULParameters:
 
     def plot_capacitance_results(self):
         """
-        Gera e exibe os gráficos dos resultados da simulação de forma flexível,
-        organizados em subplots.
+        Generates and displays the simulation result plots in a flexible way,
+        organized in subplots.
 
         Args:
-            mtl (dict): Dicionário de configuração da linha de transmissão.
-            freqs (dict): Dicionário contendo os arrays de frequência para cada simulação.
-            analytical (dict): Dicionário com os resultados da simulação analítica.
-            mom_so (dict): Dicionário com os resultados da simulação MoM-SO.
+            mtl (dict): Transmission line configuration dictionary.
+            freqs (dict): Dictionary containing the frequency arrays for each simulation.
+            analytical (dict): Dictionary with the analytical simulation results.
+            mom_so (dict): Dictionary with the MoM-SO simulation results.
         """
         
         capacitante_data = {
@@ -514,14 +514,14 @@ class BifilarBareWirePULParameters:
 
     def plot_srw_rates(self):
         """
-        Gera e exibe os gráficos dos resultados da simulação de forma flexível,
-        organizados em subplots.
+        Generates and displays the simulation result plots in a flexible way,
+        organized in subplots.
 
         Args:
-            mtl (dict): Dicionário de configuração da linha de transmissão.
-            freqs (dict): Dicionário contendo os arrays de frequência para cada simulação.
-            analytical (dict): Dicionário com os resultados da simulação analítica.
-            mom_so (dict): Dicionário com os resultados da simulação MoM-SO.
+            mtl (dict): Transmission line configuration dictionary.
+            freqs (dict): Dictionary containing the frequency arrays for each simulation.
+            analytical (dict): Dictionary with the analytical simulation results.
+            mom_so (dict): Dictionary with the MoM-SO simulation results.
         """
 
         capacitante_data = {
@@ -559,15 +559,15 @@ class BifilarBareWirePULParameters:
 
     def plot_generalized_capacitance_convergence(self):
         """
-        Gera o gráfico de convergência da capacitância generalizada, com subplots
-        separados para os termos CGEN_00 e CGEN_01.
+        Generates the convergence plot of the generalized capacitance, with separate
+        subplots for the CGEN_00 and CGEN_01 terms.
         """
         if self.results_df is None:
-            print("Execute as simulações primeiro com 'run_convergence()'.")
+            print("Run the simulations first with 'run_convergence()'.")
             return
 
         assert self.results_df.index.max() == self.sum_max - 1, \
-            f"A simulação não rodou até o valor máximo esperado de k={self.sum_max - 1}"
+            f"The simulation did not run up to the expected maximum value of k={self.sum_max - 1}"
 
         ribbon, mom, mom_so = {}, {}, {}
         try:
@@ -577,8 +577,8 @@ class BifilarBareWirePULParameters:
                     mom_so[f'c_{i}{j}'] =   self._extract_matrix_element('CGEN (MOM-SO.PY)', row=i, col=j)
                     mom[f'c_{i}{j}'] =      self._extract_matrix_element('CGEN (BARE-WIRE.PY)', row=i, col=j)
         except (TypeError, IndexError, ValueError, KeyError) as e:
-            print(f"Erro ao extrair elementos da matriz de capacitância: {e}")
-            print("Verifique se as simulações foram executadas e se as matrizes 'CGEN' foram populadas com as dimensões corretas.")
+            print(f"Error while extracting elements of the capacitance matrix: {e}")
+            print("Check that the simulations have been run and that the 'CGEN' matrices were populated with the correct dimensions.")
             return
 
         plt.style.use('default')
@@ -606,7 +606,7 @@ class BifilarBareWirePULParameters:
         ax2.plot(python_nf_axis[mask_py], mom_so['c_01'][mask_py], label='MoM-SO.PY',
                 color=self.plot_params['colors'][2], marker=self.plot_params['markers'][2], linestyle=self.plot_params['linestyles'][2], fillstyle='none')
 
-        # Configuração dos eixos para ambos os subplots
+        # Axis configuration for both subplots
         for ax in [ax1, ax2]:
             ax.set_xlabel('Number of Fourier Coefficients (NF)', fontsize=11)
             ax.set_xlim(0.8, max_nf_fortran + 0.2)
@@ -615,7 +615,7 @@ class BifilarBareWirePULParameters:
             ax.legend(loc='lower right', fontsize=10)
             ax.grid(False)
 
-        # Configurações específicas por subplot
+        # Subplot-specific settings
         ax1.set_ylabel('Generalized Capacitance Matrix, $CGEN$ (pF/m)', fontsize=11)
         ax1.set_title('Auto-Capacitance Term $CGEN_{00}$')
         ax2.set_title('Mutual Capacitance Term $CGEN_{01}$')
@@ -623,15 +623,15 @@ class BifilarBareWirePULParameters:
         plt.tight_layout(rect=[0, 0, 1, 0.96])
 
     def plot_free_space_capacitance_convergence(self):
-        """ Gera o gráfico de convergência da capacitância do espaço livro, adaptando-se ao número de condutores do sistema. """
+        """ Generates the free-space capacitance convergence plot, adapting to the number of conductors in the system. """
         if self.results_df is None:
-            print("Execute as simulações primeiro com 'run_study()'.")
+            print("Run the simulations first with 'run_study()'.")
             return
 
         assert self.results_df.index.max() == self.sum_max - 1, \
-            f"A simulação não rodou até o valor máximo esperado de k={self.sum_max - 1}"
+            f"The simulation did not run up to the expected maximum value of k={self.sum_max - 1}"
 
-        # Extração de dados de forma programática
+        # Programmatic data extraction
         ribbon, mom, mom_so = {}, {}, {}
         try:
             for i in range(self.N-1):
@@ -641,8 +641,8 @@ class BifilarBareWirePULParameters:
                     mom[f'c_{i}{j}'] =      self._extract_matrix_element('C0 (BARE-WIRE.PY)', row=i, col=j)
 
         except (TypeError, IndexError, ValueError) as e:
-            print(f"Erro ao extrair elementos da matriz de capacitância: {e}")
-            print("Verifique se as simulações foram executadas e se a matriz 'C' foi populada.")
+            print(f"Error while extracting elements of the capacitance matrix: {e}")
+            print("Check that the simulations have been run and that the 'C' matrix was populated.")
             return
 
         plt.style.use('default')
@@ -657,7 +657,7 @@ class BifilarBareWirePULParameters:
             legend_items_count += 3
             idx = i % len(self.plot_params['markers'])
             
-            # Plot da diagonal principal
+            # Plot of the main diagonal
             ax.plot(fortran_nf_axis, ribbon[f'c_{i}{i}'], label='RIBBON.FOR',
                     color=self.plot_params['colors'][0], marker=self.plot_params['markers'][idx], linestyle=self.plot_params['linestyles'][0])
 
@@ -667,7 +667,7 @@ class BifilarBareWirePULParameters:
             ax.plot(python_nf_axis[mask_py], mom_so[f'c_{i}{i}'][mask_py], label='MoM-SO.PY',
                     color=self.plot_params['colors'][2], marker=self.plot_params['markers'][idx], linestyle=self.plot_params['linestyles'][2], fillstyle='none')
 
-            # Plot dos elementos fora da diagonal
+            # Plot of the off-diagonal elements
             for j in range(i + 1, self.N-1):
                 legend_items_count += 3
                 ijdx = (i+j) % len(self.plot_params['markers'])

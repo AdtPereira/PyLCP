@@ -32,15 +32,15 @@ except ImportError as e:
 # --- Load COMSOL Data ---
 COMSOL_DATA = {}
 try:
-    print(f"--- Instanciando ComsolDataReader para o caso '{case_name}' ---")
+    print(f"--- Instantiating ComsolDataReader for case '{case_name}' ---")
     reader = ComsolDataReader(project_root, case_name)
     COMSOL_DATA = reader.load_all_results()
     if COMSOL_DATA:
         reader.show_summary()
 except FileNotFoundError as e:
-    print(f"Aviso: Diretório de dados do COMSOL não encontrado. Detalhes: {e}")
+    print(f"Warning: COMSOL data directory not found. Details: {e}")
 except Exception as e:
-    print(f"Ocorreu um erro ao carregar os dados do COMSOL: {e}")
+    print(f"An error occurred while loading the COMSOL data: {e}")
 
 def main():
     """ Main function to run the simulation and plotting using vectorized calculations. """

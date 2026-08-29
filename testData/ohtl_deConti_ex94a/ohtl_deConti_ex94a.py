@@ -40,7 +40,7 @@ def main():
     print("Loading model from JSON...")
     model = overhead_lines.single_phase_model(input_json)
     
-    # Cria os objetos de linha de transmissão para cada modelo
+    # Create the transmission line objects for each model
     mtl_model = MulticonductorTransmissionLine(model)
     discrete_frequencies = np.array([60, 100e3, 1e6])
     

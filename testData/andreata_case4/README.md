@@ -1,154 +1,154 @@
 # andreata_case4
 
-## Propósito
+## Purpose
 
-Script de simulação e validação para a **Configuração 4** (Figura 5.4) da
-referência: três cabos coaxiais de núcleo único (SCC — núcleo + blindagem)
-em arranjo plano, cada um instalado dentro do seu próprio duto de HDPE
-(idêntico ao `andreata_case2`), **mais um cabo de aterramento isolado (ECC)
-compartilhando o duto do terceiro cabo** — a mesma posição relativa ao cabo
-C que o ECC já tem no `andreata_case3` (Configuração 3), só que agora dentro
-de um duto. Calcula os parâmetros por unidade de comprimento (PUL) —
-internos (núcleo/blindagem/ECC) e de retorno à terra — comparando três
-formas analíticas distintas de representar o efeito dielétrico do duto, e
-faz validação cruzada com os dados MATLAB do `andreata_case3`.
+Simulation and validation script for **Configuration 4** (Figure 5.4) of the
+reference: three single-core coaxial cables (SCC — core + sheath) in a flat
+arrangement, each installed inside its own HDPE duct (identical to
+`andreata_case2`), **plus one isolated earth conductor (ECC) sharing the duct of
+the third cable** — the same position relative to cable C that the ECC already
+has in `andreata_case3` (Configuration 3), only now inside a duct. It computes
+the per-unit-length (PUL) parameters — internal (core/sheath/ECC) and ground
+return — comparing three distinct analytical ways of representing the
+dielectric effect of the duct, and cross-validates against the `andreata_case3`
+MATLAB data.
 
-Referência: Andreata, Luis Eduardo Batista. *Análise das Características de
+Reference: Andreata, Luis Eduardo Batista. *Análise das Características de
 Propagação e de Transitórios Eletromagnéticos em Cabos Subterrâneos
-Instalados em Tubos Não Metálicos no Contexto de Parques Eólicos.* Programa
-de Pós-Graduação em Engenharia Elétrica, UFMG, 2025.
+Instalados em Tubos Não Metálicos no Contexto de Parques Eólicos.* Graduate
+Program in Electrical Engineering, UFMG, 2025.
 https://hdl.handle.net/1843/2086
 
 ---
 
-## Configuração do Sistema (JSON)
+## System Configuration (JSON)
 
-Parâmetros carregados de `andreata_case4.json`:
+Parameters loaded from `andreata_case4.json`:
 
-| Parâmetro | Valor |
+| Parameter | Value |
 |---|---|
-| Arranjo | Plano (`flat`), 3 cabos SCC + 1 ECC |
-| Profundidade de enterramento | 1,2 m (centro de cada cabo SCC) |
-| Espaçamento entre cabos SCC | 0,2 m (centro a centro) |
-| Solo — condutividade | 0,01 S/m (ρ = 100 Ω·m) |
-| Solo — permissividade relativa | 1,0 |
-| Núcleo — raio externo | 10,325 mm — condutividade: 38 MS/m |
-| Isolação do núcleo | XLPE, 10,675 mm, εr = 2,2 |
-| Bainha — raios int./ext. | 21,0 / 21,8 mm — condutividade: 60 MS/m |
-| Isolação da bainha | PVC, 2,2 mm, εr = 2,8 |
-| Duto (HDPE) — raios int./ext. | 50,8 / 57,8 mm — εr = 2,35, excêntrico (cabo apoiado no fundo), **idêntico ao `andreata_case2`** |
-| ECC — raio externo | 3,3 mm — condutividade: 38 MS/m, isolação XLPE 2,0 mm |
-| Posição do ECC | `ecc_horizontal_gap = 0,02802` m / `ecc_vertical_gap = 0,00886` m (centro-a-centro em relação ao cabo C) — **os mesmos valores de `andreata_case3.json`**, sem recálculo: a posição do ECC em relação ao cabo C não muda entre a Configuração 3 e a 4, só a presença do duto |
-| Ordem de Fourier | 10 |
+| Arrangement | Flat, 3 SCC cables + 1 ECC |
+| Burial depth | 1.2 m (center of each SCC cable) |
+| Spacing between SCC cables | 0.2 m (center to center) |
+| Soil — conductivity | 0.01 S/m (rho = 100 Ohm.m) |
+| Soil — relative permittivity | 1.0 |
+| Core — outer radius | 10.325 mm — conductivity: 38 MS/m |
+| Core insulation | XLPE, 10.675 mm, eps_r = 2.2 |
+| Sheath — inner/outer radii | 21.0 / 21.8 mm — conductivity: 60 MS/m |
+| Sheath insulation | PVC, 2.2 mm, eps_r = 2.8 |
+| Duct (HDPE) — inner/outer radii | 50.8 / 57.8 mm — eps_r = 2.35, eccentric (cable resting on the bottom), **identical to `andreata_case2`** |
+| ECC — outer radius | 3.3 mm — conductivity: 38 MS/m, XLPE insulation 2.0 mm |
+| ECC position | `ecc_horizontal_gap = 0.02802` m / `ecc_vertical_gap = 0.00886` m (center-to-center relative to cable C) — **the same values as `andreata_case3.json`**, with no recomputation: the position of the ECC relative to cable C does not change between Configuration 3 and 4, only the presence of the duct |
+| Fourier order | 10 |
 
-O modelo heterogêneo (usado nos 3 cenários analíticos) contém **7
-condutores**: 1 retorno de solo (`line_id=0`) + 3 pares núcleo/bainha
-(`line_id=1..6`) + 1 ECC (`line_id=7`) — mesma convenção de IDs do
+The heterogeneous model (used in the 3 analytical scenarios) contains **7
+conductors**: 1 soil return (`line_id=0`) + 3 core/sheath pairs
+(`line_id=1..6`) + 1 ECC (`line_id=7`) — same ID convention as
 `andreata_case3`.
 
 ---
 
-## Decisão de arquitetura: dois modelos físicos separados
+## Architecture decision: two separate physical models
 
-`EquivalentRadiiSystems` (usado para calcular os raios/permissividades
-equivalentes ERS/GMD) exige `self.model.scc` como dict **achatado** (uma
-seção transversal só) — incompatível com o dict **agrupado por cabo** que a
-estratégia heterogênea (`SingleCoreCableWithECCStrategy`, necessária por
-causa do ECC) produz. Por isso este caso usa **dois modelos físicos
-distintos**, cada um só para o que precisa:
+`EquivalentRadiiSystems` (used to compute the ERS/GMD equivalent
+radii/permittivities) requires `self.model.scc` as a **flat** dict (a single
+cross-section) — incompatible with the **per-cable grouped** dict that the
+heterogeneous strategy (`SingleCoreCableWithECCStrategy`, needed because of the
+ECC) produces. For that reason this case uses **two distinct physical models**,
+each only for what it needs:
 
-- **`flat_hdpe_enclosed_model()`** (o mesmo método do `andreata_case2`,
-  homogêneo, sem ECC) — usado **só** para alimentar `EquivalentRadiiSystems`
-  e obter `r4..r7`/permissividades equivalentes. O efeito dielétrico do duto
-  não depende da presença do ECC dentro dele, então esse modelo homogêneo é
-  suficiente para essa finalidade.
-- **`flat_hdpe_enclosed_with_shared_ecc_model()`** (novo método,
-  `models/single_core_cable.py`) — modelo físico completo (duto real nas 3
-  fases + ECC na posição centro-a-centro herdada do `andreata_case3`) usado
-  **só para o esquemático** (`system_schematic.png`). **Nunca** passa por
-  `InternalPerUnitParameters`/`PerUnitParameters` — ver limitação abaixo.
+- **`flat_hdpe_enclosed_model()`** (the same method as `andreata_case2`,
+  homogeneous, without ECC) — used **only** to feed `EquivalentRadiiSystems`
+  and obtain `r4..r7`/equivalent permittivities. The duct's dielectric effect
+  does not depend on the presence of the ECC inside it, so this homogeneous
+  model is sufficient for that purpose.
+- **`flat_hdpe_enclosed_with_shared_ecc_model()`** (new method,
+  `models/single_core_cable.py`) — full physical model (real duct on the 3
+  phases + ECC at the center-to-center position inherited from `andreata_case3`)
+  used **only for the schematic** (`system_schematic.png`). It **never** goes
+  through `InternalPerUnitParameters`/`PerUnitParameters` — see the limitation
+  below.
 
-Os 3 cenários analíticos (Underground/ERS/GMD) partem, em vez disso, de
-`flat_scc_with_ecc_cable_model()` (o mesmo método do `andreata_case3`,
-heterogêneo, sem duto), com o efeito do duto aproximado via substituição de
-isolação equivalente nas 3 bainhas SCC (`_override_sheath_insulation`,
-mesma técnica do `andreata_case2`).
+The 3 analytical scenarios (Underground/ERS/GMD) start instead from
+`flat_scc_with_ecc_cable_model()` (the same method as `andreata_case3`,
+heterogeneous, without a duct), with the duct effect approximated via an
+equivalent-insulation substitution on the 3 SCC sheaths
+(`_override_sheath_insulation`, the same technique as `andreata_case2`).
 
 ---
 
-## Limitações e Dados Pendentes
+## Limitations and Pending Data
 
-- **Não há curva analítica pyLCP para o acoplamento SCC↔ECC dentro do duto
-  compartilhado.** A geometria de dois condutores excêntricos (SCC e ECC)
-  dividindo um duto HDPE é **não-canônica** — não existe formulação
-  analítica fechada para essa configuração específica no método
-  quasi-TEM/GMD do pyLCP. Não é uma lacuna de implementação a ser corrigida:
-  é um limite físico do método. Por isso os casos-irmãos de cabo único
-  `hdpe_ecc_300mm2`/`hdpe_ecc_2000mm2` (que modelam exatamente essa
-  geometria compartilhada, via `hdpe_shared_enclosed_model()`) também nunca
-  chamam `InternalPerUnitParameters`/`PerUnitParameters` sobre esse modelo —
-  só o usam para o esquemático e para comparação direta com dados de
-  elementos finitos (COMSOL). Este caso segue o mesmo padrão: a única
-  referência real para o efeito do duto sobre o ECC é a comparação direta
-  com MATLAB (ver gráficos `*_ecc`).
-- **Os 3 cenários (Underground/ERS/GMD) nunca alteram o ECC em si** — a
-  substituição de isolação equivalente (`_override_sheath_insulation`) só
-  atua nas 3 bainhas SCC. Por isso, nos gráficos `self_impedance_ecc`,
-  `self_admittance_ecc`, `earth_return_impedance_ecc` e
-  `earth_return_potential_coeff_ecc`, as três curvas analíticas tendem a
-  coincidir quase totalmente — comportamento esperado, não um bug.
-- **Retorno à terra nunca modela o duto**, em nenhum dos 3 cenários — mesma
-  limitação já documentada no `andreata_case2`: a formulação de `Zg`/`Yg`
-  enxerga apenas posição/raio externo de cada cabo, nunca a presença do
-  duto. A diferença entre os 3 cenários no retorno à terra das fases SCC
-  está só no raio externo efetivo usado no termo próprio de imagem
-  (estendido até `r7` por ERS/GMD).
-- **Dado COMSOL de impedância interna já disponível**
-  (`Results/cmsl_internal_impedance_matrix.txt`) — simulação própria do
-  case4, 3 condutores (núcleo/blindagem/ECC), incluindo o termo próprio do
-  ECC (`p=6, q=6` no gráfico `internal_impedance_matrix.png`). Lido por
-  `ComsolPostProcessor.get_scc_internal_impedance_matrix_combined()`, que
-  detecta esse formato de 3 condutores (vs. o legado de 2 condutores de
-  `andreata_case2`/`hdpe_300mm2`) pela presença da coluna `data1_2` e monta
-  a matriz já no espaço global de 7 condutores (núcleo=0, blindagem=1,
-  ECC=6) — ver Item 3 de `BUGS_AND_FIXES.md`.
-- **Ainda não há dado COMSOL de retorno à terra nem de admitância interna**
+- **There is no pyLCP analytical curve for the SCC<->ECC coupling inside the
+  shared duct.** The geometry of two eccentric conductors (SCC and ECC)
+  sharing an HDPE duct is **non-canonical** — there is no closed-form
+  analytical formulation for that specific configuration in pyLCP's
+  quasi-TEM/GMD method. It is not an implementation gap to be fixed: it is a
+  physical limit of the method. For that reason the sibling single-cable cases
+  `hdpe_ecc_300mm2`/`hdpe_ecc_2000mm2` (which model exactly this shared
+  geometry, via `hdpe_shared_enclosed_model()`) also never call
+  `InternalPerUnitParameters`/`PerUnitParameters` on that model — they only use
+  it for the schematic and for direct comparison with finite-element data
+  (COMSOL). This case follows the same pattern: the only real reference for
+  the duct's effect on the ECC is the direct comparison with MATLAB (see the
+  `*_ecc` plots).
+- **The 3 scenarios (Underground/ERS/GMD) never change the ECC itself** — the
+  equivalent-insulation substitution (`_override_sheath_insulation`) only acts
+  on the 3 SCC sheaths. For that reason, in the plots `self_impedance_ecc`,
+  `self_admittance_ecc`, `earth_return_impedance_ecc` and
+  `earth_return_potential_coeff_ecc`, the three analytical curves tend to
+  coincide almost completely — expected behavior, not a bug.
+- **The ground return never models the duct**, in any of the 3 scenarios — the
+  same limitation already documented in `andreata_case2`: the `Zg`/`Yg`
+  formulation sees only the position / outer radius of each cable, never the
+  presence of the duct. The difference between the 3 scenarios in the SCC
+  phases' ground return is only in the effective outer radius used in the self
+  image term (extended out to `r7` by ERS/GMD).
+- **COMSOL internal impedance data already available**
+  (`Results/cmsl_internal_impedance_matrix.txt`) — case4's own simulation,
+  3 conductors (core/sheath/ECC), including the ECC self term
+  (`p=6, q=6` in the `internal_impedance_matrix.png` plot). Read by
+  `ComsolPostProcessor.get_scc_internal_impedance_matrix_combined()`, which
+  detects this 3-conductor format (vs. the legacy 2-conductor format of
+  `andreata_case2`/`hdpe_300mm2`) by the presence of the `data1_2` column and
+  assembles the matrix already in the global 7-conductor space (core=0,
+  sheath=1, ECC=6) — see Item 3 of `BUGS_AND_FIXES.md`.
+- **There is still no COMSOL ground-return data or internal admittance data**
   (`cmsl_ground_return_impedance.txt`, `cmsl_internal_admittance_matrix.txt`)
-  — o bloco `ComsolPostProcessor.load_scc_earth_return_and_internal_scenarios(...)`
-  é chamado mesmo assim (padrão "guardado" do `andreata_case3`), só emite
-  avisos de dado ausente para essas duas partes, sem bloquear a execução.
-- **MATLAB do duto já disponível.** `Results/andreata_case4_*.mat` — mesmo
-  formato `(7,7,90)` tipo-agrupado dos outros casos, `conductor_order=[0, 3,
-  1, 4, 2, 5, 6]` (ECC sem par para trocar, fica em último em ambas as
-  convenções — mesma ordem do `andreata_case3`).
+  — the `ComsolPostProcessor.load_scc_earth_return_and_internal_scenarios(...)`
+  block is called anyway ("guarded" pattern from `andreata_case3`), it only
+  emits missing-data warnings for those two parts, without blocking execution.
+- **Duct MATLAB data is already available.** `Results/andreata_case4_*.mat` — same
+  type-grouped `(7,7,90)` format as the other cases, `conductor_order=[0, 3,
+  1, 4, 2, 5, 6]` (the ECC has no pair to swap, it stays last in both
+  conventions — same order as `andreata_case3`).
 
 ---
 
-## Execução
+## Running
 
 ```bash
 python -m testData.andreata_case4.andreata_case4
 ```
 
-**Saída esperada:** validação cruzada contra `andreata_case3` impressa no
-console (erro relativo máx. ~0,05%/0,12% em `Zs`/`Ysh`, cenário Underground),
-`internal_impedance_matrix.png`, `internal_admittance_matrix.png` e
-`system_schematic.png` salvos em `testData/andreata_case4/Results/`. Escopo
-reduzido deliberadamente por ora (`main()` mantém o restante dos gráficos —
-comparação por modelo de duto e retorno à terra — comentado em
-`plotter.compare_complete_matrices(...)`, pronto para reativar); o dado
-COMSOL de impedância interna já entra nos dois gráficos ativos, o resto será
-ligado conforme mais dados COMSOL forem chegando (retorno à terra,
-admitância interna).
+**Expected output:** cross-validation against `andreata_case3` printed to the
+console (max relative error ~0.05%/0.12% in `Zs`/`Ysh`, Underground scenario),
+`internal_impedance_matrix.png`, `internal_admittance_matrix.png` and
+`system_schematic.png` saved to `testData/andreata_case4/Results/`. The scope is
+deliberately reduced for now (`main()` keeps the rest of the plots — per-duct-
+model comparison and ground return — commented out in
+`plotter.compare_complete_matrices(...)`, ready to re-enable); the COMSOL
+internal impedance data already feeds the two active plots, the rest will be
+switched on as more COMSOL data arrives (ground return, internal admittance).
 
 ---
 
-## Referências
+## References
 
 - **Andreata, L. E. B.** (2025). *Análise das Características de Propagação e de
   Transitórios Eletromagnéticos em Cabos Subterrâneos Instalados em Tubos Não Metálicos
   no Contexto de Parques Eólicos.* UFMG. https://hdl.handle.net/1843/2086
 - **Xue, H.** (2018). *General Formulation and Accurate Evaluation of Earth-Return
   Parameters for Overhead/Underground Cables*. PhD thesis, École Polytechnique de
-  Montréal. (formulação `magalhaes_xue` de retorno à terra)
-- **Lafaia, I.** (2015). Método GMD para permissividade equivalente de dutos (caso 3.1).
+  Montréal. (`magalhaes_xue` ground-return formulation)
+- **Lafaia, I.** (2015). GMD method for equivalent duct permittivity (case 3.1).

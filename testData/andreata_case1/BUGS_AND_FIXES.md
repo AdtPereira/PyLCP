@@ -1,68 +1,68 @@
-# Resumo de bugs — importação de dados `.mat` (validação `andreata_case1`)
+# Bug summary — `.mat` data import (`andreata_case1` validation)
 
-**Contexto:** `testData/andreata_case1/andreata_case1.py` compara resultados analíticos do pyLCP (`InternalPerUnitParameters`) com uma referência exportada do MATLAB (`Results/andreata_internal_impedance_matrix.mat`, variável `Z`, shape `(6,6,90)` — impedância interna complexa de um sistema de 3 cabos unipolares, núcleo+blindagem, arranjo plano). Foram encontrados **4 bugs distintos**, todos na camada de importação/alinhamento dos dados do MATLAB — os dados brutos do `.mat` em si estão corretos.
-
----
-
-## Bug 1 — Chaves de arquivo `.mat` inexistentes (`matlab_reader.data.get`)
-
-**Onde:** `andreata_case1.py` (antes da correção)
-
-**O quê:** O código buscava `matlab_reader.data.get('andreata_series_impedance_matrix')` e `matlab_reader.data.get('andreata_shunt_admittance_matrix')`. `MatlabDataReader` (`utils/matlab_data.py:63-75`) indexa os dados pelo **nome do arquivo sem extensão** (glob de `Results/*.mat`). Só existe `andreata_internal_impedance_matrix.mat` no diretório — essas duas chaves nunca existiram (resquício de um esquema de nomenclatura anterior). Como o acesso é via `.get()`, o erro é silencioso: retorna `None` sem exceção.
-
-**Impacto:** `pul_data['matlab']['scenarios']['measured']` ficava com ambos os campos `None`. Nos gráficos `z11/z12/z22_internal_vs_matlab`, o `_plot_scc_internal_vs_matlab` (`plotter/scc_plotter.py:154-159`) tentava indexar `None[:, p, q]`, gerava `TypeError`, capturado silenciosamente — resultado: pontos de referência do MATLAB simplesmente não apareciam no gráfico, só um aviso no console.
-
-**Correção:** usar a chave correta (`andreata_internal_impedance_matrix`) e nomear o campo como o plotter espera por padrão (`internal_impedance_matrix`).
+**Context:** `testData/andreata_case1/andreata_case1.py` compares pyLCP analytical results (`InternalPerUnitParameters`) against a reference exported from MATLAB (`Results/andreata_internal_impedance_matrix.mat`, variable `Z`, shape `(6,6,90)` — complex internal impedance of a 3-cable single-core system, core+sheath, flat arrangement). **4 distinct bugs** were found, all in the MATLAB data import/alignment layer — the raw `.mat` data itself is correct.
 
 ---
 
-## Bug 2 — Eixo de frequência assumido incorretamente
+## Bug 1 — Non-existent `.mat` file keys (`matlab_reader.data.get`)
 
-**Onde:** `andreata_case1.py:40` (antes da correção)
+**Where:** `andreata_case1.py` (before the fix)
 
-**O quê:** O código assumia `np.logspace(0, 7, num=90)` (1 Hz–10 MHz) tanto para o cálculo analítico Python quanto para rotular as 90 amostras do `Z` do MATLAB. A varredura real usada no MATLAB — confirmada pelo arquivo `Results/andreata_frequency_range.mat` (variável `freq1`) fornecido posteriormente — é `np.logspace(-2, 7, num=90)` (**0,01 Hz**–10 MHz): mesmo número de pontos e mesmo teto, mas início 2 décadas mais baixo. Verificação numérica: `freq1` bate com `np.logspace(-2,7,90)` com diferença relativa máxima de 4×10⁻¹⁵.
+**What:** The code looked up `matlab_reader.data.get('andreata_series_impedance_matrix')` and `matlab_reader.data.get('andreata_shunt_admittance_matrix')`. `MatlabDataReader` (`utils/matlab_data.py:63-75`) indexes the data by the **file name without extension** (glob of `Results/*.mat`). Only `andreata_internal_impedance_matrix.mat` exists in the directory — those two keys never existed (leftover from a previous naming scheme). Since access is via `.get()`, the error is silent: it returns `None` without an exception.
 
-**Impacto:** como `L = Im(Z)/(2π·f)`, dividir cada amostra pelo `f` errado distorce sistematicamente a curva de indutância. Com o eixo errado, `L(f)` aparecia **crescendo monotonicamente ~73×** ao longo da varredura (2,2 nH → 162 nH) — fisicamente impossível para uma auto-impedância interna (deveria ser um platô em baixa frequência seguido de queda por efeito pelicular). Com o eixo correto, a curva mostrou exatamente o comportamento esperado: platô constante (~220 nH) enquanto R ainda está em regime DC, depois decaimento suave até ~162 nH em alta frequência. A parte real (resistência) não é sensível a esse erro (não depende de divisão por `ω`), por isso o problema só ficava visível na indutância — e não aparecia ao plotar `Z` bruto diretamente no MATLAB (que usa seu próprio eixo nativo correto).
+**Impact:** `pul_data['matlab']['scenarios']['measured']` had both fields set to `None`. In the `z11/z12/z22_internal_vs_matlab` plots, `_plot_scc_internal_vs_matlab` (`plotter/scc_plotter.py:154-159`) tried to index `None[:, p, q]`, raised a `TypeError` that was caught silently — result: the MATLAB reference points simply did not appear on the plot, only a console warning.
 
-**Observação adicional:** `num=90` era o único caso no repositório inteiro com essa contagem de pontos — todos os casos irmãos (`scc_34kV_andreata`, `scc_132kV_xue`, `scc_138kV_prysmian` etc.) usam `num=121`. Mesma classe de bug de copy-paste já identificada em `ohtl_xue_sec43.py`.
-
-**Correção:** carregar `andreata_frequency_range.mat` e usar esse vetor como `pul_data['matlab']['frequencies']`, em vez de reaproveitar o vetor do lado analítico Python. (Nota: o vetor do lado analítico Python também foi atualizado para `np.logspace(-2, 7, num=90)`, então hoje os dois coincidem — mas o código mantém o carregamento explícito do `.mat` de frequência como fonte de verdade, com fallback.)
+**Fix:** use the correct key (`andreata_internal_impedance_matrix`) and name the field as the plotter expects by default (`internal_impedance_matrix`).
 
 ---
 
-## Bug 3 — `matlab_matrix_key` inconsistente em `plot_config.py`
+## Bug 2 — Frequency axis assumed incorrectly
 
-**Onde:** `testData/andreata_case1/plot_config.py:156` e `:172` (antes da correção)
+**Where:** `andreata_case1.py:40` (before the fix)
 
-**O quê:** Os três gráficos `z11/z12/z22_internal_vs_matlab` têm o suptitle "internal-only analytical (Zi) vs. MATLAB reference (Z)", mas apenas `z11` usava `'matlab_matrix_key': 'internal_impedance_matrix'`. `z12` e `z22` ainda apontavam para `'series_impedance_matrix'` — chave que não existe em `pul_data['matlab']['scenarios']['measured']` (consequência direta do Bug 1).
+**What:** The code assumed `np.logspace(0, 7, num=90)` (1 Hz–10 MHz) both for the Python analytical computation and for labeling the 90 samples of the MATLAB `Z`. The actual sweep used in MATLAB — confirmed by the `Results/andreata_frequency_range.mat` file (variable `freq1`) provided later — is `np.logspace(-2, 7, num=90)` (**0.01 Hz**–10 MHz): same number of points and same ceiling, but starting 2 decades lower. Numerical check: `freq1` matches `np.logspace(-2,7,90)` with a maximum relative difference of 4e-15.
 
-**Impacto:** mesmo depois de corrigir o Bug 1, os gráficos `z12` e `z22` continuariam sem mostrar a referência do MATLAB (mesmo sintoma do Bug 1: `KeyError`/`TypeError` capturado silenciosamente).
+**Impact:** since `L = Im(Z)/(2*pi*f)`, dividing each sample by the wrong `f` systematically distorts the inductance curve. With the wrong axis, `L(f)` appeared to be **monotonically increasing ~73x** over the sweep (2.2 nH -> 162 nH) — physically impossible for an internal self-impedance (it should be a low-frequency plateau followed by a skin-effect drop). With the correct axis, the curve showed exactly the expected behavior: a constant plateau (~220 nH) while R is still in the DC regime, then a smooth decay down to ~162 nH at high frequency. The real part (resistance) is not sensitive to this error (it does not depend on division by `omega`), so the problem was only visible in the inductance — and did not appear when plotting the raw `Z` directly in MATLAB (which uses its own correct native axis).
 
-**Correção:** alinhadas as três entradas para `'matlab_matrix_key': 'internal_impedance_matrix'`.
+**Additional note:** `num=90` was the only case in the entire repository with that point count — every sibling case (`scc_34kV_andreata`, `scc_132kV_xue`, `scc_138kV_prysmian`, etc.) uses `num=121`. Same class of copy-paste bug already identified in `ohtl_xue_sec43.py`.
 
----
-
-## Bug 4 — Convenção de ordenação de condutores incompatível entre pyLCP e MATLAB
-
-**Onde:** estrutural — descoberto ao revisar `z12_internal_vs_matlab` e `z22_internal_vs_matlab` após corrigir os Bugs 1–3.
-
-**O quê:** o MATLAB exporta os 6 condutores **agrupados por tipo**: `[core_A, core_B, core_C, sheath_A, sheath_B, sheath_C]` (índices 0–2 = núcleos, 3–5 = blindagens). O pyLCP monta sua matriz interna **agrupada por cabo**: `[core_A, sheath_A, core_B, sheath_B, core_C, sheath_C]`, via `np.kron(np.identity(N), Zij)` em `InternalPerUnitParameters.matrices()` (`analytical_forms/single_core_cable.py:848`), refletindo a ordem de atribuição de `conductor_id` em `models/single_core_cable.py:127-141` (núcleo, depois blindagem, por cabo).
-
-**Evidência:** os elementos diagonais do `Z` do MATLAB confirmam isso — `Z[0,0]==Z[1,1]==Z[2,2]` (≈7,8536e-5 Ω em DC) e `Z[3,3]==Z[4,4]==Z[5,5]` (≈1,549406e-4 Ω em DC), batendo exatamente com a resistência DC teórica (`1/(σ·A)`) do núcleo e da blindagem, respectivamente, calculada a partir do JSON do caso.
-
-**Impacto:** como o código usava o **mesmo par `(p,q)`** para indexar tanto a matriz interna do Python quanto a matriz do MATLAB:
-- `z11` (p=0,q=0) coincidia por acaso — índice 0 é `core_A` nas duas convenções.
-- `z22` (p=1,q=1): pyLCP pegava a auto-impedância da **blindagem A**; o MATLAB (sem correção) entregava a auto-impedância do **núcleo B** (idêntica ao núcleo A) — grandezas físicas diferentes sendo comparadas lado a lado no mesmo gráfico.
-- `z12` (p=0,q=1): pyLCP pegava o acoplamento mútuo **núcleo A ↔ blindagem A** (mesmo cabo, acoplamento coaxial forte); o MATLAB entregava **núcleo A ↔ núcleo B** (cabos diferentes, acoplamento externo fraco) — ordem de grandeza de L incompatível (chegava a ser ~11× maior no par errado).
-
-Validado que os índices corretos (`Z[3,3]` para blindagem A, `Z[0,3]` para núcleo A↔blindagem A) produzem curvas fisicamente consistentes, inclusive convergindo `L(núcleo↔blindagem) → L(blindagem, auto)` em alta frequência — o limite esperado de acoplamento unitário quando o efeito pelicular concentra a corrente nas superfícies enfrentadas.
-
-**Correção:** em `andreata_case1.py:127-130`, a matriz do MATLAB é reordenada com a permutação `[0,3,1,4,2,5]` (aplicada às duas dimensões de condutor) logo no carregamento, antes de ser armazenada em `pul_data['matlab']`, alinhando-a à convenção do pyLCP de uma vez por todas — sem precisar de índices `(p,q)` diferentes por gráfico.
+**Fix:** load `andreata_frequency_range.mat` and use that vector as `pul_data['matlab']['frequencies']`, instead of reusing the Python analytical-side vector. (Note: the Python analytical-side vector was also updated to `np.logspace(-2, 7, num=90)`, so today they coincide — but the code keeps the explicit loading of the frequency `.mat` as the source of truth, with a fallback.)
 
 ---
 
-## Recomendações para o fluxo de exportação MATLAB → pyLCP
+## Bug 3 — Inconsistent `matlab_matrix_key` in `plot_config.py`
 
-1. **Sempre exportar o vetor de frequência junto com os dados** (como já foi feito para este caso com `andreata_frequency_range.mat`) — evita reincidência do Bug 2 em novos casos de validação.
-2. **Documentar/padronizar a convenção de ordenação de condutores** usada nas exportações do MATLAB (por tipo vs. por cabo), ou já exportar na mesma ordem que o pyLCP usa internamente (agrupado por cabo), eliminando a necessidade da permutação de reindexação.
-3. Os Bugs 1 e 3 (nomes de chave/arquivo) sugerem que pode valer a pena um teste de sanidade automático no `MatlabDataReader` ou em `andreata_case1.py` que avise (ou falhe alto, em vez de retornar `None` silenciosamente) quando uma chave esperada não é encontrada — o uso de `.get()` sem verificação mascarou os 3 primeiros bugs por bastante tempo.
+**Where:** `testData/andreata_case1/plot_config.py:156` and `:172` (before the fix)
+
+**What:** The three `z11/z12/z22_internal_vs_matlab` plots have the suptitle "internal-only analytical (Zi) vs. MATLAB reference (Z)", but only `z11` used `'matlab_matrix_key': 'internal_impedance_matrix'`. `z12` and `z22` still pointed to `'series_impedance_matrix'` — a key that does not exist in `pul_data['matlab']['scenarios']['measured']` (a direct consequence of Bug 1).
+
+**Impact:** even after fixing Bug 1, the `z12` and `z22` plots would still not show the MATLAB reference (same symptom as Bug 1: `KeyError`/`TypeError` caught silently).
+
+**Fix:** aligned the three entries to `'matlab_matrix_key': 'internal_impedance_matrix'`.
+
+---
+
+## Bug 4 — Conductor ordering convention incompatible between pyLCP and MATLAB
+
+**Where:** structural — discovered while reviewing `z12_internal_vs_matlab` and `z22_internal_vs_matlab` after fixing Bugs 1–3.
+
+**What:** MATLAB exports the 6 conductors **grouped by type**: `[core_A, core_B, core_C, sheath_A, sheath_B, sheath_C]` (indices 0–2 = cores, 3–5 = sheaths). pyLCP assembles its internal matrix **grouped by cable**: `[core_A, sheath_A, core_B, sheath_B, core_C, sheath_C]`, via `np.kron(np.identity(N), Zij)` in `InternalPerUnitParameters.matrices()` (`analytical_forms/single_core_cable.py:848`), reflecting the `conductor_id` assignment order in `models/single_core_cable.py:127-141` (core, then sheath, per cable).
+
+**Evidence:** the diagonal elements of the MATLAB `Z` confirm this — `Z[0,0]==Z[1,1]==Z[2,2]` (~7.8536e-5 Ohm at DC) and `Z[3,3]==Z[4,4]==Z[5,5]` (~1.549406e-4 Ohm at DC), matching exactly the theoretical DC resistance (`1/(sigma*A)`) of the core and the sheath, respectively, computed from the case JSON.
+
+**Impact:** since the code used the **same `(p,q)` pair** to index both the Python internal matrix and the MATLAB matrix:
+- `z11` (p=0,q=0) coincided by chance — index 0 is `core_A` in both conventions.
+- `z22` (p=1,q=1): pyLCP took the **sheath A** self-impedance; MATLAB (unfixed) delivered the **core B** self-impedance (identical to core A) — different physical quantities being compared side by side on the same plot.
+- `z12` (p=0,q=1): pyLCP took the **core A <-> sheath A** mutual coupling (same cable, strong coaxial coupling); MATLAB delivered **core A <-> core B** (different cables, weak external coupling) — incompatible order of magnitude for L (as much as ~11x larger in the wrong pair).
+
+It was validated that the correct indices (`Z[3,3]` for sheath A, `Z[0,3]` for core A <-> sheath A) produce physically consistent curves, including `L(core<->sheath) -> L(sheath, self)` converging at high frequency — the expected unit-coupling limit when the skin effect concentrates the current on the facing surfaces.
+
+**Fix:** in `andreata_case1.py:127-130`, the MATLAB matrix is reordered with the permutation `[0,3,1,4,2,5]` (applied to both conductor dimensions) right at load time, before being stored in `pul_data['matlab']`, aligning it to the pyLCP convention once and for all — with no need for different `(p,q)` indices per plot.
+
+---
+
+## Recommendations for the MATLAB -> pyLCP export workflow
+
+1. **Always export the frequency vector together with the data** (as was done for this case with `andreata_frequency_range.mat`) — this avoids recurrence of Bug 2 in new validation cases.
+2. **Document/standardize the conductor ordering convention** used in the MATLAB exports (by type vs. by cable), or export directly in the same order that pyLCP uses internally (grouped by cable), eliminating the need for the reindexing permutation.
+3. Bugs 1 and 3 (key/file names) suggest it may be worth an automatic sanity check in `MatlabDataReader` or in `andreata_case1.py` that warns (or fails loudly, instead of silently returning `None`) when an expected key is not found — the use of `.get()` without a check masked the first 3 bugs for a long time.

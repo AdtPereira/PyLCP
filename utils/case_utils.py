@@ -64,8 +64,8 @@ def format_scientific_notation(value, precision=1):
 
 def format_complex_number(z_complex):
     """
-    Formata um número complexo para exibição em string.
-    Ex: (1.23E+0 + 4.56E-1i)
+    Formats a complex number for string display.
+    e.g. (1.23E+0 + 4.56E-1i)
     """
     if z_complex == 0:
         return "0"
@@ -73,7 +73,7 @@ def format_complex_number(z_complex):
     real_part = f"{np.real(z_complex):.4E}"
     imag_part = f"{np.imag(z_complex):.4E}"
 
-    # Ajuste para garantir que "E+0" seja tratado se for o caso
+    # Adjustment to make sure "E+0" is handled if present
     real_part = real_part.replace('E+00', '').replace('E-00', '').replace('0.0000', '0')
     imag_part = imag_part.replace('E+00', '').replace('E-00', '').replace('0.0000', '0')
 
@@ -84,15 +84,15 @@ def format_complex_number(z_complex):
 
 def matrix_viewer(matrix: np.ndarray, title: str, columns_name: Optional[list] = None) -> pd.DataFrame:
     """
-    Formata e exibe uma matriz NumPy como um DataFrame do pandas com um título.
+    Formats and displays a NumPy matrix as a pandas DataFrame with a title.
 
     Args:
-        matriz_numpy (np.ndarray): A matriz de entrada do NumPy.
-        titulo (str): O título a ser exibido acima da matriz formatada.
-        colunas (Optional[list]): Uma lista opcional de nomes para as colunas.
+        matrix (np.ndarray): The input NumPy matrix.
+        title (str): The title to display above the formatted matrix.
+        columns_name (Optional[list]): An optional list of column names.
 
     Returns:
-        pd.DataFrame: A matriz formatada como um DataFrame do pandas.
+        pd.DataFrame: The matrix formatted as a pandas DataFrame.
     """
     pd.options.display.float_format = '{:.5e}'.format
     df = pd.DataFrame(matrix, columns=columns_name)
@@ -106,7 +106,7 @@ def matrix_viewer(matrix: np.ndarray, title: str, columns_name: Optional[list] =
         print(df)
 
 def print_real_matrix(name: str, matrix_data: np.ndarray, unit: str):
-    # ... (função auxiliar sem alteração)
+    # ... (helper function, unchanged)
     lines = matrix_to_string(matrix_data).split('\n')
     num_rows = len(lines)
     middle_row_idx = num_rows // 2

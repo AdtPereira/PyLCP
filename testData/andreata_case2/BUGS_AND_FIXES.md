@@ -1,295 +1,297 @@
-# Diagnósticos e correções — `andreata_case2` (Configuração 2, Figura 5.2)
+# Diagnostics and fixes — `andreata_case2` (Configuration 2, Figure 5.2)
 
-**Contexto:** `andreata_case2` modela a Configuração 2 da referência (Figura 5.2): três
-cabos SCC de potência (núcleo + blindagem) em arranjo plano, cada um instalado dentro do
-seu próprio duto de HDPE, enterrados no solo. Diferente de `andreata_case1`
-(Configuração 1, cabos diretamente enterrados) e `andreata_case3` (Configuração 3, SCC +
-ECC sem duto), aqui **não existe solução analítica de retorno à terra que modele o
-duto** — a formulação de Zg/Yg do pyLCP enxerga só a posição/raio externo de cada cabo,
-nunca a presença de um duto. A validação do efeito do duto depende inteiramente de
+**Context:** `andreata_case2` models Configuration 2 of the reference (Figure 5.2): three
+power SCC cables (core + sheath) in a flat arrangement, each installed inside its
+own HDPE duct, buried in the soil. Unlike `andreata_case1`
+(Configuration 1, directly buried cables) and `andreata_case3` (Configuration 3, SCC +
+ECC without a duct), here **there is no analytical ground-return solution that models the
+duct** — the pyLCP Zg/Yg formulation sees only the position / outer radius of each cable,
+never the presence of a duct. Validating the duct effect depends entirely on
 COMSOL/MATLAB.
 
-O script encontrado no início desta rodada de trabalho era de uma **origem de
-desenvolvimento mais antiga**: modelava um único cabo dentro de um duto (sem as três
-fases, sem acoplamento entre cabos, sem retorno à terra), usando uma API do COMSOL
-própria de cabo isolado e um plotter (`HDPEPlotter`) e `plot_config.py` num formato
-diferente do adotado por `andreata_case1`/`andreata_case3`. Essa mesma linhagem antiga
-ainda serve os casos `hdpe_2000mm2`, `hdpe_300mm2`, `hdpe_ecc_2000mm2`, `hdpe_ecc_300mm2`
-e não foi alterada.
+The script found at the start of this round of work came from an **older development
+lineage**: it modeled a single cable inside a duct (no three phases, no coupling between
+cables, no ground return), using a COMSOL API specific to an isolated cable and a plotter
+(`HDPEPlotter`) and a `plot_config.py` in a format different from the one adopted by
+`andreata_case1`/`andreata_case3`. That same old lineage still serves the cases
+`hdpe_2000mm2`, `hdpe_300mm2`, `hdpe_ecc_2000mm2`, `hdpe_ecc_300mm2` and was not changed.
 
-Este documento registra, em ordem cronológica, o que foi feito:
-1. generalização do gerador de modelo para 3 fases com duto individual (Figura 5.2);
-2. bug de posicionamento — duto concêntrico em vez de excêntrico;
-3. bug de aliasing entre os dutos das 3 fases;
-4. atualização do JSON para o arranjo trifásico;
-5. reescrita de `andreata_case2.py` no molde de `andreata_case1`/`andreata_case3`;
-6. generalização dos índices fixos de blindagem (`model_2[2]`/`model_3[2]`) para N fases;
-7. reescrita de `plot_config.py` no formato dirigido a config do `SCCPlotter`;
-8. validação cruzada contra o MATLAB do `andreata_case1` (cenário sem duto);
-9. limitações conhecidas e pendências de dados externos.
-
----
-
-## Item 1 — Novo gerador de modelo: `flat_hdpe_enclosed_model`
-
-**Onde:** `models/single_core_cable.py`
-
-**O quê:** não existia nenhum método que gerasse N cabos em arranjo plano, cada um
-dentro do seu próprio duto de HDPE — `eccentric_hdpe_enclosed_model`/
-`concentric_hdpe_enclosed_model` eram hardcoded para 1 cabo só (a origem do script
-antigo). A camada de MTL (`SingleCoreCableInHDPEStrategy` em `mtl_main/strategy.py`), em
-contraste, já era genérica para N cabos — ela é praticamente uma cópia de
-`SingleCoreCableStrategy` (usada pelo `type: "scc"` trifásico do case1), agrupando
-condutores por `center_point`. Ou seja, a limitação estava só na geração de geometria,
-não na infraestrutura de cálculo.
-
-**Correção:** novo método `flat_hdpe_enclosed_model(host_conductor='sheath')`,
-generalizando `eccentric_hdpe_enclosed_model` (1 cabo) para N cabos, do mesmo modo que
-`underground_flat_model` generaliza `conventional_single_phase`: mesmos
-`burial_depth`/`spacing`/`num_conductors` do `arrangement`, um duto idêntico injetado em
-cada cabo.
+This document records, in chronological order, what was done:
+1. generalization of the model generator to 3 phases with an individual duct (Figure 5.2);
+2. positioning bug — concentric instead of eccentric duct;
+3. aliasing bug between the ducts of the 3 phases;
+4. update of the JSON to the three-phase arrangement;
+5. rewrite of `andreata_case2.py` in the mold of `andreata_case1`/`andreata_case3`;
+6. generalization of the fixed sheath indices (`model_2[2]`/`model_3[2]`) to N phases;
+7. rewrite of `plot_config.py` in the `SCCPlotter` config-driven format;
+8. cross-validation against the `andreata_case1` MATLAB (no-duct scenario);
+9. known limitations and pending external data.
 
 ---
 
-## Item 2 — Duto gerado concêntrico; deveria ser excêntrico (cabo no fundo do duto)
+## Item 1 — New model generator: `flat_hdpe_enclosed_model`
 
-**Onde:** `models/single_core_cable.py` (`flat_hdpe_enclosed_model`)
+**Where:** `models/single_core_cable.py`
 
-**O quê:** a primeira versão do método usava geometria **concêntrica** (cabo e duto
-compartilhando o mesmo centro) — por analogia direta com `concentric_hdpe_enclosed_model`
-e com uma leitura inicial da Figura 5.2. O usuário apontou que essa não é a convenção
-usada no restante do repositório: `schematic_original_hdpe.png` (caso `hdpe_300mm2`, já
-existente) mostra o cabo **apoiado na superfície interna inferior do duto** — a mesma
-convenção de `eccentric_hdpe_enclosed_model` —, e não centrado nele.
+**What:** there was no method that generated N cables in a flat arrangement, each
+inside its own HDPE duct — `eccentric_hdpe_enclosed_model`/
+`concentric_hdpe_enclosed_model` were hardcoded for a single cable (the origin of the
+old script). The MTL layer (`SingleCoreCableInHDPEStrategy` in `mtl_main/strategy.py`), by
+contrast, was already generic for N cables — it is essentially a copy of
+`SingleCoreCableStrategy` (used by case1's three-phase `type: "scc"`), grouping
+conductors by `center_point`. In other words, the limitation was only in the geometry
+generation, not in the computation infrastructure.
 
-**Impacto:** com `burial_depth` (`h = 1,20 m`) fixado no centro do **cabo** (não do
-duto), a geometria concêntrica colocava o centro do duto exatamente na mesma cota do
-cabo; a correta exige deslocar o centro do duto **para cima**, preservando `h` no centro
-do cabo.
+**Fix:** new method `flat_hdpe_enclosed_model(host_conductor='sheath')`,
+generalizing `eccentric_hdpe_enclosed_model` (1 cable) to N cables, the same way
+`underground_flat_model` generalizes `conventional_single_phase`: same
+`burial_depth`/`spacing`/`num_conductors` from the `arrangement`, an identical duct
+injected into each cable.
 
-**Correção:** reescrito para excentricidade, replicando a lógica de
+---
+
+## Item 2 — Duct generated concentric; it should be eccentric (cable on the bottom of the duct)
+
+**Where:** `models/single_core_cable.py` (`flat_hdpe_enclosed_model`)
+
+**What:** the first version of the method used **concentric** geometry (cable and duct
+sharing the same center) — by direct analogy with `concentric_hdpe_enclosed_model`
+and an initial reading of Figure 5.2. The user pointed out that this is not the convention
+used in the rest of the repository: `schematic_original_hdpe.png` (case `hdpe_300mm2`,
+already existing) shows the cable **resting on the lower inner surface of the duct** — the
+same convention as `eccentric_hdpe_enclosed_model` — and not centered in it.
+
+**Impact:** with `burial_depth` (`h = 1.20 m`) fixed at the center of the **cable** (not
+the duct), the concentric geometry placed the duct center at exactly the same level as the
+cable; the correct one requires shifting the duct center **upward**, preserving `h` at the
+cable center.
+
+**Fix:** rewritten for eccentricity, replicating the logic of
 `eccentric_hdpe_enclosed_model`: `vertical_offset = enclosure_inner_radius -
-cable_outer_radius`; o centro do duto de cada fase é `(cable_center[0], cable_center[1] +
-vertical_offset)`. Aplicado identicamente às 3 fases (mesmo duto, mesmo deslocamento).
+cable_outer_radius`; each phase's duct center is `(cable_center[0], cable_center[1] +
+vertical_offset)`. Applied identically to the 3 phases (same duct, same offset).
 
-**Validado:** `system_schematic.png` regenerado — os 3 cabos aparecem apoiados no fundo
-de seus respectivos dutos, batendo visualmente com `schematic_original_hdpe.png` e com a
-Figura 5.2 (cabos em x = 0 / 0,2 / 0,4 m, profundidade do centro do cabo h = 1,20 m).
-
----
-
-## Item 3 — Bug de aliasing: os 3 dutos compartilhariam o mesmo `center_point`
-
-**Onde:** `models/single_core_cable.py` (`flat_hdpe_enclosed_model`)
-
-**O quê:** o padrão usado pelos métodos de 1 cabo (`eccentric_/concentric_hdpe_enclosed_model`)
-injeta o `enclosure_data` **por referência** direta no condutor host encontrado (só há
-um). Generalizado ingenuamente para N cabos, o mesmo dict `enclosure_data` (obtido uma
-única vez de `self.sheath['enclosure']`) seria compartilhado pelas 3 blindagens — cada
-atribuição de `v['enclosure']['center_point']` no laço sobrescreveria a mesma instância,
-de forma que **todas as 3 fases acabariam com o `center_point` do duto da última fase
-processada**.
-
-**Correção:** cada condutor recebe sua própria cópia via `copy.deepcopy(enclosure_data)`
-antes de setar seu `center_point` individual. (`import copy` adicionado ao topo do
-arquivo.)
+**Validated:** `system_schematic.png` regenerated — the 3 cables appear resting on the
+bottom of their respective ducts, matching `schematic_original_hdpe.png` visually and
+Figure 5.2 (cables at x = 0 / 0.2 / 0.4 m, cable-center depth h = 1.20 m).
 
 ---
 
-## Item 4 — `andreata_case2.json`: arranjo trifásico
+## Item 3 — Aliasing bug: the 3 ducts would share the same `center_point`
 
-**Onde:** `testData/andreata_case2/andreata_case2.json`
+**Where:** `models/single_core_cable.py` (`flat_hdpe_enclosed_model`)
 
-**O quê:** `arrangement` descrevia 1 cabo (`"type": "single"`, `"num_conductors": 1`,
+**What:** the pattern used by the 1-cable methods (`eccentric_/concentric_hdpe_enclosed_model`)
+injects `enclosure_data` **by direct reference** into the host conductor found (there is
+only one). Naively generalized to N cables, the same `enclosure_data` dict (obtained a
+single time from `self.sheath['enclosure']`) would be shared by the 3 sheaths — each
+assignment of `v['enclosure']['center_point']` in the loop would overwrite the same
+instance, so that **all 3 phases would end up with the `center_point` of the duct of the
+last processed phase**.
+
+**Fix:** each conductor gets its own copy via `copy.deepcopy(enclosure_data)`
+before setting its individual `center_point`. (`import copy` added at the top of the
+file.)
+
+---
+
+## Item 4 — `andreata_case2.json`: three-phase arrangement
+
+**Where:** `testData/andreata_case2/andreata_case2.json`
+
+**What:** `arrangement` described 1 cable (`"type": "single"`, `"num_conductors": 1`,
 `"spacing": null`, `"fourier_order": 4`).
 
-**Correção:** atualizado para `"type": "flat"`, `"num_conductors": 3`, `"spacing": 0.2`
-(m, centro-a-centro, conforme Figura 5.2), `"fourier_order": 10` (alinhado ao
-`andreata_case1`, antes divergente sem motivo aparente). `burial_depth` (1,2 m) e a
-definição de `cable_definition` (cabo + duto) já correspondiam à Figura 5.2 e não foram
-alteradas. `name`/`note` atualizados para descrever a Configuração 2 trifásica.
+**Fix:** updated to `"type": "flat"`, `"num_conductors": 3`, `"spacing": 0.2`
+(m, center-to-center, per Figure 5.2), `"fourier_order": 10` (aligned to
+`andreata_case1`, previously divergent with no apparent reason). `burial_depth` (1.2 m) and
+the `cable_definition` definition (cable + duct) already matched Figure 5.2 and were not
+changed. `name`/`note` updated to describe the three-phase Configuration 2.
 
 ---
 
-## Item 5 — Reescrita de `andreata_case2.py` no molde do case1/case3
+## Item 5 — Rewrite of `andreata_case2.py` in the mold of case1/case3
 
-**Onde:** `testData/andreata_case2/andreata_case2.py`
+**Where:** `testData/andreata_case2/andreata_case2.py`
 
-**O quê:** o script original refletia a linhagem antiga de desenvolvimento (ver seção de
-Contexto) e não podia simplesmente ser "adaptado" — várias peças inteiras estavam
-ausentes porque, com 1 cabo só, não faziam sentido:
-- nunca chamava `apply_semiconducting_layer_correction`, apesar do JSON já definir
-  `semiconducting_layer` para núcleo e blindagem (correção nunca aplicada — inconsistência
-  latente, independente da mudança para 3 fases);
-- não calculava retorno à terra (`PerUnitParameters`) nem matrizes quasi-TEM — sem
-  acoplamento entre fases, isso nunca tinha sido necessário;
-- não usava `MatlabDataReader` (case1/case3 usam);
-- lia dados COMSOL pela API de cabo isolado (`cmsl_coaxial_cable_impedance`/
-  `get_coaxial_cable_parameters`/`get_scc_internal_impedance_elements`), incompatível
-  com a família de retorno à terra trifásica (`cmsl_ground_return_impedance`/
-  `get_earth_return_parameters`) usada por case1/case3;
-- plotava com `HDPEPlotter` (API de "data_series" própria, incompatível com o formato de
-  `plot_config.py` dirigido a config usado por `SCCPlotter`).
+**What:** the original script reflected the old development lineage (see the Context
+section) and could not simply be "adapted" — several whole pieces were missing because,
+with a single cable, they did not make sense:
+- it never called `apply_semiconducting_layer_correction`, even though the JSON already
+  defined `semiconducting_layer` for the core and sheath (correction never applied — a
+  latent inconsistency, independent of the move to 3 phases);
+- it did not compute ground return (`PerUnitParameters`) or quasi-TEM matrices — without
+  coupling between phases, this had never been necessary;
+- it did not use `MatlabDataReader` (case1/case3 do);
+- it read COMSOL data through the isolated-cable API (`cmsl_coaxial_cable_impedance`/
+  `get_coaxial_cable_parameters`/`get_scc_internal_impedance_elements`), incompatible
+  with the three-phase ground-return family (`cmsl_ground_return_impedance`/
+  `get_earth_return_parameters`) used by case1/case3;
+- it plotted with `HDPEPlotter` (its own "data_series" API, incompatible with the
+  config-driven `plot_config.py` format used by `SCCPlotter`).
 
-**Correção:** reescrito seguindo o esqueleto do `andreata_case1.py`/`andreata_case3.py`:
-- `model_0 = flat_hdpe_enclosed_model()` → `apply_semiconducting_layer_correction(...)` →
-  `MulticonductorTransmissionLine(model_0)` — geometria física real, usada para o
-  esquemático e como base do ERS/GMD (via `EquivalentRadiiSystems(mtl_0)`, que fornece
-  `r4`..`r7`);
-- `model_1 = underground_flat_model()` (+ mesma correção semicondutora) — cenário
-  "Underground", ignora o duto por completo; serve de baseline e de contraparte direta
-  do `andreata_case1` (ver Item 8);
-- `model_2`/`model_3` — os dois modelos equivalentes de duto já existentes no script
-  antigo (ERS ponderado por área; GMD caso 3.1) foram preservados como o diferencial
-  físico do caso, agora extraídos para uma função compartilhada `_override_sheath_insulation`
-  (ver Item 6) e alimentando os mesmos 3 cenários (`'1'`, `'2'`, `'3'`) usados no resto do
-  pipeline;
-- bloco de retorno à terra adicionado ao laço de cenários: `PerUnitParameters(...).earth_return_parameters(...)`
-  + `quasi_tem_approx_matrices(...)`, análogo ao case1, mas com uma única formulação de
-  solo (`magalhaes_xue`) — o eixo de comparação relevante aqui é bare/ERS/GMD, não
-  formulações de solo (esse é o assunto do case1);
-- `MatlabDataReader` adicionado (prefixo `andreata_hdpe`, ver Item 9 sobre a suposição de
-  nome de arquivo);
-- COMSOL trocado para a família de retorno à terra (`cmsl_ground_return_impedance` /
-  `get_earth_return_parameters('rho_g_100_epsr1_1_mf')` — chave escolhida por já
-  corresponder ao solo do JSON, ρ=100 Ω·m / εr=1); os parâmetros internos usados para
-  compor a matriz quasi-TEM do COMSOL vêm do modelo GMD caso 3.1 (`mtl_3`), por ser a
-  variante mais completa das três — só o retorno à terra é, de fato, medido no COMSOL;
-- `HDPEPlotter` trocado por `SCCPlotter` (`compare_complete_matrices`), com
-  `plot_config.py` reescrito (ver Item 7);
-- `compare_capacitance()` (tabela impressa de C₁₁/C₂₂ da fase A) preservada quase
-  inalterada — ela já indexava por cenário (`'1'`/`'2'`/`'3'`), então generaliza sem
-  mudanças para N=3 fases (índices `[0,0]`/`[1,1]` da matriz de capacitância continuam
-  sendo núcleo/blindagem da fase A, já que a ordenação por cabo não muda);
-- leitura de `get_shunt_capacitance_elements()` (COMSOL) agora gateada explicitamente por
-  `'cmsl_shunt_params' in cmsl_processor.cmsl_reader.data` — no script antigo, essa
-  chamada (que acessa `self.cmsl_reader.data['cmsl_shunt_params']` diretamente, sem
-  tratamento de ausência) era gateada pela presença de um arquivo COMSOL *diferente*
-  (`cmsl_coaxial_cable_impedance`), o que já era impreciso e teria virado um `KeyError`
-  não tratado assim que a família COMSOL fosse trocada.
-
----
-
-## Item 6 — Índices fixos de blindagem (`model_2[2]`) não generalizavam para N fases
-
-**Onde:** `testData/andreata_case2/andreata_case2.py`
-
-**O quê:** o script antigo (1 cabo) localizava a blindagem para aplicar a permissividade
-equivalente por posição fixa: `model_2[2]['enclosure'] = None`,
-`model_2[2]['insulation']['thickness'] = ...` (índice `2` = única blindagem existente,
-já que a ordem de inserção é `0=solo, 1=núcleo, 2=blindagem`). Com 3 fases, as blindagens
-ficam nos índices `2, 4, 6` — o código antigo, se simplesmente reaproveitado, teria
-alterado só a blindagem da fase A e deixado B/C com o duto físico intacto (inconsistência
-silenciosa, sem erro).
-
-**Correção:** extraído para a função `_override_sheath_insulation(model, thickness,
-relative_permittivity)`, que varre `model.values()` por `conductor_name == 'sheath'` e
-aplica a substituição a todas as blindagens encontradas — correto para qualquer N.
-`model_3` mantém a espessura original da isolação (`model_0[2]['insulation']['thickness']`,
-lida antes da substituição — Caso 3.1 mantém r0 = r5), alterando só a permissividade;
-`model_2` usa a espessura estendida até r7.
+**Fix:** rewritten following the skeleton of `andreata_case1.py`/`andreata_case3.py`:
+- `model_0 = flat_hdpe_enclosed_model()` -> `apply_semiconducting_layer_correction(...)` ->
+  `MulticonductorTransmissionLine(model_0)` — actual physical geometry, used for the
+  schematic and as the basis of the ERS/GMD (via `EquivalentRadiiSystems(mtl_0)`, which
+  provides `r4`..`r7`);
+- `model_1 = underground_flat_model()` (+ same semiconducting correction) — "Underground"
+  scenario, ignores the duct entirely; serves as a baseline and a direct counterpart of
+  `andreata_case1` (see Item 8);
+- `model_2`/`model_3` — the two equivalent duct models already existing in the old
+  script (area-weighted ERS; GMD case 3.1) were preserved as the physical distinctive of
+  the case, now extracted into a shared function `_override_sheath_insulation`
+  (see Item 6) and feeding the same 3 scenarios (`'1'`, `'2'`, `'3'`) used in the rest of
+  the pipeline;
+- ground-return block added to the scenario loop: `PerUnitParameters(...).earth_return_parameters(...)`
+  + `quasi_tem_approx_matrices(...)`, analogous to case1, but with a single soil
+  formulation (`magalhaes_xue`) — the relevant comparison axis here is bare/ERS/GMD, not
+  soil formulations (that is the subject of case1);
+- `MatlabDataReader` added (prefix `andreata_hdpe`, see Item 9 about the file-name
+  assumption);
+- COMSOL switched to the ground-return family (`cmsl_ground_return_impedance` /
+  `get_earth_return_parameters('rho_g_100_epsr1_1_mf')` — key chosen because it already
+  matches the soil of the JSON, rho=100 Ohm.m / eps_r=1); the internal parameters used to
+  assemble the COMSOL quasi-TEM matrix come from the GMD case 3.1 model (`mtl_3`), as it
+  is the most complete of the three variants — only the ground return is actually
+  measured in COMSOL;
+- `HDPEPlotter` replaced by `SCCPlotter` (`compare_complete_matrices`), with
+  `plot_config.py` rewritten (see Item 7);
+- `compare_capacitance()` (printed C_11/C_22 table for phase A) preserved almost
+  unchanged — it already indexed by scenario (`'1'`/`'2'`/`'3'`), so it generalizes with
+  no changes to N=3 phases (the `[0,0]`/`[1,1]` indices of the capacitance matrix remain
+  phase-A core/sheath, since the per-cable ordering does not change);
+- the `get_shunt_capacitance_elements()` (COMSOL) read is now explicitly gated by
+  `'cmsl_shunt_params' in cmsl_processor.cmsl_reader.data` — in the old script, that
+  call (which accesses `self.cmsl_reader.data['cmsl_shunt_params']` directly, without
+  absence handling) was gated by the presence of a *different* COMSOL file
+  (`cmsl_coaxial_cable_impedance`), which was already imprecise and would have become an
+  unhandled `KeyError` as soon as the COMSOL family was switched.
 
 ---
 
-## Item 7 — Reescrita de `plot_config.py` no formato do `SCCPlotter`
+## Item 6 — Fixed sheath indices (`model_2[2]`) did not generalize to N phases
 
-**Onde:** `testData/andreata_case2/plot_config.py`
+**Where:** `testData/andreata_case2/andreata_case2.py`
 
-**O quê:** o arquivo antigo usava um esquema `data_series` (lista de dicts com
-`source`/`scenario_key`/`data_path`/`plot_style`/`series`) próprio do `HDPEPlotter`,
-incompatível com o formato `series_to_plot`/`path`/`p`/`q`/`components` que o `SCCPlotter`
-espera (mesmo usado por `andreata_case1`/`andreata_case3`).
+**What:** the old (1-cable) script located the sheath to apply the equivalent
+permittivity by a fixed position: `model_2[2]['enclosure'] = None`,
+`model_2[2]['insulation']['thickness'] = ...` (index `2` = the only existing sheath,
+since the insertion order is `0=soil, 1=core, 2=sheath`). With 3 phases, the sheaths
+are at indices `2, 4, 6` — the old code, if simply reused, would have changed only the
+phase-A sheath and left B/C with the physical duct intact (a silent inconsistency, no
+error).
 
-**Correção:** reescrito nesse segundo formato. Templates de série:
-`DUCT_MODEL_TEMPLATE` (cenários `'1'`/`'2'`/`'3'` — Underground/ERS/GMD, uma linha cada),
-`COMSOL_TEMPLATE` (`rho_g_100_epsr1_1_mf`), `MATLAB_TEMPLATE` (`'measured'`, dado
-específico do caso, ainda não existente). 9 gráficos via `compare_complete_matrices`:
-6 internos (núcleo/blindagem/mútua × impedância/admitância, todos sensíveis ao modelo de
-duto porque ERS/GMD alteram espessura e/ou permissividade da isolação externa da
-blindagem) + 3 de retorno à terra por fase (impedância, admitância, coeficiente de
-potencial — ver nota no Item 5 sobre a formulação não modelar o duto).
+**Fix:** extracted into the function `_override_sheath_insulation(model, thickness,
+relative_permittivity)`, which scans `model.values()` for `conductor_name == 'sheath'` and
+applies the replacement to every sheath found — correct for any N.
+`model_3` keeps the original insulation thickness (`model_0[2]['insulation']['thickness']`,
+read before the substitution — Case 3.1 keeps r0 = r5), changing only the permittivity;
+`model_2` uses the thickness extended out to r7.
 
 ---
 
-## Item 8 — Validação cruzada com o MATLAB do `andreata_case1`
+## Item 7 — Rewrite of `plot_config.py` in the `SCCPlotter` format
 
-**Onde:** `testData/andreata_case2/andreata_case2.py` (`validate_against_case1_reference`),
+**Where:** `testData/andreata_case2/plot_config.py`
+
+**What:** the old file used a `data_series` scheme (list of dicts with
+`source`/`scenario_key`/`data_path`/`plot_style`/`series`) specific to `HDPEPlotter`,
+incompatible with the `series_to_plot`/`path`/`p`/`q`/`components` format that `SCCPlotter`
+expects (also used by `andreata_case1`/`andreata_case3`).
+
+**Fix:** rewritten in that second format. Series templates:
+`DUCT_MODEL_TEMPLATE` (scenarios `'1'`/`'2'`/`'3'` — Underground/ERS/GMD, one line each),
+`COMSOL_TEMPLATE` (`rho_g_100_epsr1_1_mf`), `MATLAB_TEMPLATE` (`'measured'`, case-specific
+data, not yet existing). 9 plots via `compare_complete_matrices`:
+6 internal (core/sheath/mutual x impedance/admittance, all sensitive to the duct model
+because ERS/GMD change the thickness and/or permittivity of the sheath's outer insulation)
++ 3 ground return per phase (impedance, admittance, potential coefficient — see the note in
+Item 5 about the formulation not modeling the duct).
+
+---
+
+## Item 8 — Cross-validation with the `andreata_case1` MATLAB
+
+**Where:** `testData/andreata_case2/andreata_case2.py` (`validate_against_case1_reference`),
 `testData/andreata_case2/plot_config.py` (`MATLAB_CASE1_NO_DUCT_TEMPLATE`)
 
-**Motivação:** o cenário `'1'` ("Underground", duto ignorado, gerado por
-`underground_flat_model()`) descreve exatamente a mesma geometria física do
-`andreata_case1` (3 cabos SCC em arranjo plano, sem duto). Como o `andreata_case1` já tem
-dados MATLAB de referência validados (ver `andreata_case1/BUGS_MATLAB_IMPORT.md`), eles
-servem de checagem cruzada de código para a parte do pipeline que os dois casos
-compartilham (`InternalPerUnitParameters`, `PerUnitParameters`), sem depender dos dados
-COMSOL/MATLAB específicos do duto (que ainda não existem).
+**Motivation:** scenario `'1'` ("Underground", duct ignored, generated by
+`underground_flat_model()`) describes exactly the same physical geometry as
+`andreata_case1` (3 SCC cables in a flat arrangement, without a duct). Since
+`andreata_case1` already has validated MATLAB reference data (see
+`andreata_case1/BUGS_AND_FIXES.md`), it serves as a code cross-check for the part of
+the pipeline the two cases share (`InternalPerUnitParameters`, `PerUnitParameters`),
+without depending on the duct-specific COMSOL/MATLAB data (which does not yet exist).
 
-**Implementação:** um segundo `MatlabDataReader`, apontado para o caminho de script do
-`andreata_case1` (não o `__file__` do próprio case2) — assim ele lê
-`testData/andreata_case1/Results/*.mat` em vez de `testData/andreata_case2/Results/*.mat`
-— carrega o mesmo prefixo (`'andreata'`) e `conductor_order` (`[0,3,1,4,2,5]`) que o
-`andreata_case1.py` usa para si mesmo. O resultado é armazenado como o cenário
-`'case1_no_duct'` dentro de `pul_data['matlab']['scenarios']`, ao lado do cenário
-`'measured'` (dados próprios do case2, com duto, ainda ausentes) — os dois podem
-coexistir e ser plotados juntos sem conflito, já que o `SCCPlotter` indexa por chave de
-cenário.
+**Implementation:** a second `MatlabDataReader`, pointed at the script path of
+`andreata_case1` (not case2's own `__file__`) — so it reads
+`testData/andreata_case1/Results/*.mat` instead of `testData/andreata_case2/Results/*.mat`
+— loads the same prefix (`'andreata'`) and `conductor_order` (`[0,3,1,4,2,5]`) that
+`andreata_case1.py` uses for itself. The result is stored as the scenario
+`'case1_no_duct'` inside `pul_data['matlab']['scenarios']`, alongside the scenario
+`'measured'` (case2's own data, with duct, still absent) — the two can
+coexist and be plotted together without conflict, since `SCCPlotter` indexes by scenario
+key.
 
-`validate_against_case1_reference()` imprime o erro relativo máximo (norma-∞) entre a
-matriz quasi-TEM completa do cenário `'1'` (`series_impedance_matrix`,
-`shunt_admittance_matrix`) e a referência MATLAB do case1.
+`validate_against_case1_reference()` prints the maximum relative error (inf norm) between
+the full quasi-TEM matrix of scenario `'1'` (`series_impedance_matrix`,
+`shunt_admittance_matrix`) and the case1 MATLAB reference.
 
-**Resultado (com os dados MATLAB do `andreata_case1` já existentes em seu `Results/`):**
+**Result (with the `andreata_case1` MATLAB data already existing in its `Results/`):**
 ```
-Zs  (impedância série completa):  erro relativo máx. (norma inf) = 0.06%
-Ysh (admitância shunt completa):  erro relativo máx. (norma inf) = 0.15%
+Zs  (full series impedance):  max relative error (inf norm) = 0.06%
+Ysh (full shunt admittance):  max relative error (inf norm) = 0.15%
 ```
-Concordância excelente — confirma que a geração do modelo bare trifásico e o cálculo de
-parâmetros internos/retorno à terra estão corretos nesta parte do pipeline. **Não** valida
-o efeito do duto em si (`'2'`/`'3'`), que não tem contraparte no `andreata_case1`.
+Excellent agreement — it confirms that the generation of the bare three-phase model and
+the internal/ground-return parameter computation are correct in this part of the pipeline.
+It does **not** validate the duct effect itself (`'2'`/`'3'`), which has no counterpart in
+`andreata_case1`.
 
-`plot_config.py` ganhou `MATLAB_CASE1_NO_DUCT_TEMPLATE` (marcador `+` laranja, chave
-`'case1_no_duct'`), somado a `MATLAB_TEMPLATE` nos gráficos internos e de retorno à terra,
-para sobrepor essa referência visualmente à linha preta do cenário `'1'`.
+`plot_config.py` gained `MATLAB_CASE1_NO_DUCT_TEMPLATE` (orange `+` marker, key
+`'case1_no_duct'`), added to `MATLAB_TEMPLATE` in the internal and ground-return plots,
+to overlay this reference visually onto the black line of scenario `'1'`.
 
 ---
 
-## Item 9 — Limitações conhecidas e pendências de dados externos
+## Item 9 — Known limitations and pending external data
 
-- **COMSOL do duto ainda não existe.** `cmsl_processor.get_general_parameters('cmsl_ground_return_impedance')`
-  retorna `None` (arquivo ausente em `Results/`) — o bloco inteiro é ignorado
-  graciosamente (`pul_data['comsol'] = {}`), igual ao `andreata_case1`. Quando adicionado,
-  deve seguir o mesmo formato de colunas do `andreata_case1`
-  (`cmsl_ground_return_impedance.txt`, sufixos `_rho_g_100_epsr1_1_mf_vcoil_1/2/3`) — a
-  chave de cenário `'rho_g_100_epsr1_1_mf'` já está fixada no código combinando com o
-  solo do JSON (ρ=100 Ω·m, εr=1); se o arquivo real usar outro `rho_g`/`epsr1`, ajustar a
-  chave em `andreata_case2.py` e `COMSOL_TEMPLATE` (`plot_config.py`).
-- **MATLAB do duto ainda não existe.** `MatlabDataReader(__file__, ...)` procura por
-  `.mat` em `testData/andreata_case2/Results/` com prefixo `'andreata_hdpe'` (ex.:
+- **Duct COMSOL data does not yet exist.** `cmsl_processor.get_general_parameters('cmsl_ground_return_impedance')`
+  returns `None` (file missing in `Results/`) — the whole block is skipped
+  gracefully (`pul_data['comsol'] = {}`), same as `andreata_case1`. When added,
+  it must follow the same column format as `andreata_case1`
+  (`cmsl_ground_return_impedance.txt`, suffixes `_rho_g_100_epsr1_1_mf_vcoil_1/2/3`) — the
+  scenario key `'rho_g_100_epsr1_1_mf'` is already fixed in the code, matching the
+  soil of the JSON (rho=100 Ohm.m, eps_r=1); if the real file uses a different
+  `rho_g`/`epsr1`, adjust the key in `andreata_case2.py` and `COMSOL_TEMPLATE`
+  (`plot_config.py`).
+- **Duct MATLAB data does not yet exist.** `MatlabDataReader(__file__, ...)` looks for
+  `.mat` in `testData/andreata_case2/Results/` with the prefix `'andreata_hdpe'` (e.g.
   `andreata_hdpe_frequency_range.mat`, `andreata_hdpe_series_impedance_matrix.mat`, etc.
-  — mesmo conjunto de variáveis que o `andreata_case1` usa, só com prefixo diferente).
-  Esse prefixo foi escolhido para não colidir com o `'andreata'` puro reservado ao
-  case1 (ver Item 8) — se o prefixo real vier diferente, ajustar a string em
+  — the same set of variables that `andreata_case1` uses, only with a different prefix).
+  This prefix was chosen so as not to collide with the plain `'andreata'` reserved for
+  case1 (see Item 8) — if the real prefix comes different, adjust the string in
   `andreata_case2.py`.
-- **`cmsl_shunt_params.txt` existente em `Results/` é do estudo antigo de cabo único**,
-  reaproveitado apenas para a linha "COMSOL (energy method)" da tabela de capacitância —
-  não é uma referência do sistema trifásico e deve ser substituído quando os dados novos
-  chegarem (mesmo nome de arquivo esperado, `get_shunt_capacitance_elements()` não muda).
-  Os demais arquivos legados em `Results/` (`cmsl_coaxial_cable_impedance.txt`,
+- **The `cmsl_shunt_params.txt` present in `Results/` is from the old single-cable
+  study**, reused only for the "COMSOL (energy method)" line of the capacitance table —
+  it is not a reference for the three-phase system and should be replaced when the new
+  data arrives (same file name expected, `get_shunt_capacitance_elements()` does not
+  change). The other legacy files in `Results/` (`cmsl_coaxial_cable_impedance.txt`,
   `cmsl_series_impedance_core_excitation.txt`, `cmsl_series_impedance_sheath_excitation.txt`)
-  não são mais lidos pelo script atual (API de cabo isolado, abandonada — ver Item 5);
-  ficam como dado morto em `Results/` até uma limpeza futura, sem bloquear a execução.
-- **Retorno à terra nunca modela o duto**, em nenhum dos 3 cenários — ver nota extensa no
-  código (`andreata_case2.py`, dentro do laço de cenários) e no Item de Contexto acima.
-  A única forma de validar o efeito real do duto no retorno à terra é a comparação
-  COMSOL/MATLAB pendente.
+  are no longer read by the current script (isolated-cable API, abandoned — see Item 5);
+  they remain as dead data in `Results/` until a future cleanup, not blocking execution.
+- **The ground return never models the duct**, in any of the 3 scenarios — see the
+  extensive note in the code (`andreata_case2.py`, inside the scenario loop) and in the
+  Context item above. The only way to validate the real effect of the duct on the ground
+  return is the pending COMSOL/MATLAB comparison.
 
 ---
 
-## Módulos legados não alterados
+## Legacy modules not changed
 
-`models/hdpe.py`, `models/model_generator.py`, `models/isolated_conductors.py` e a classe
-`HDPEPlotter` (`plotter/scc_plotter.py`) continuam servindo os casos `hdpe_2000mm2`,
-`hdpe_300mm2`, `hdpe_ecc_2000mm2`, `hdpe_ecc_300mm2` — são a linhagem antiga de fato, e
-`andreata_case2` deixou de depender deles (usa exclusivamente
+`models/hdpe.py`, `models/model_generator.py`, `models/isolated_conductors.py` and the
+`HDPEPlotter` class (`plotter/scc_plotter.py`) still serve the cases `hdpe_2000mm2`,
+`hdpe_300mm2`, `hdpe_ecc_2000mm2`, `hdpe_ecc_300mm2` — they are the old lineage in fact, and
+`andreata_case2` no longer depends on them (it uses exclusively
 `models.single_core_cable.SingleCoreCableModelGenerator`, `analytical_forms.single_core_cable`
-e `plotter.scc_plotter.SCCPlotter`, a mesma base do `andreata_case1`/`andreata_case3`).
+and `plotter.scc_plotter.SCCPlotter`, the same base as `andreata_case1`/`andreata_case3`).

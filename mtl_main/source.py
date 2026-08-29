@@ -75,53 +75,53 @@ class MulticonductorTransmissionLine:
         # Dimension N - Equation (2.36) [1]
         self.N = sum(self.NF_List)
 
-        # Número de coeficientes harmônicos de Fourier por condutor
-        self.NF = self.NF_List[self.mtl_idx_ref]        
+        # Number of Fourier harmonic coefficients per conductor
+        self.NF = self.NF_List[self.mtl_idx_ref]
 
     # Method to generate the PUL data structure
     def get_pul_data_structure(self):
         """
-        Gera a estrutura de dados base para os parâmetros por unidade de comprimento (PUL),
-        usando os dados de frequência do 'frequency_driver' do modelo.
-        
-        A resolução de frequência para o método 'analytical' é definida como 4x
-        a resolução do 'mom_so' (steps_per_decade).
-        
-        Retorna:
-            dict: Um dicionário estruturado para armazenar dados PUL.
+        Generates the base data structure for the per-unit-length (PUL) parameters,
+        using the frequency data from the model's 'frequency_driver'.
+
+        The frequency resolution for the 'analytical' method is set to 4x
+        the 'mom_so' resolution (steps_per_decade).
+
+        Returns:
+            dict: A structured dictionary to store PUL data.
         """
-        
+
         freq = self.mtl_frequency
-        
-        # Tenta gerar frequências dinamicamente a partir do model
+
+        # Try to generate frequencies dynamically from the model
         if freq and freq.get('spacing') == 'log':
             min_hz = freq.get('min_Hz', 1.0)
             max_hz = freq.get('max_Hz', 1e6)
-            
-            # Passos por década para mom_so (numérico)
+
+            # Steps per decade for mom_so (numerical)
             steps_per_decade = freq.get('steps_per_decade', 5) # Default 5
-            
-            # ATUALIZADO: Passos por década para analytical (4x mom_so)
+
+            # UPDATED: steps per decade for analytical (4x mom_so)
             steps_per_decade_analytical = steps_per_decade * 4
 
             start_log = np.log10(min_hz)
             stop_log = np.log10(max_hz)
             num_decades = stop_log - start_log
-            
-            # Calcula num_points para mom_so
+
+            # Compute num_points for mom_so
             num_mom_so = int((num_decades * steps_per_decade) + 1)
-            
-            # Calcula num_points para analytical
+
+            # Compute num_points for analytical
             num_analytical = int((num_decades * steps_per_decade_analytical) + 1)
-            
+
             freq = np.logspace(start_log, stop_log, num=num_mom_so)
             freq_analytical = np.logspace(start_log, stop_log, num=num_analytical)
 
         else:
-            # Fallback para valores estáticos (caso frequency_driver falhe)
-            # (Padrão: 5 steps/decade para mom_so -> 31 pontos)
+            # Fallback to static values (in case frequency_driver fails)
+            # (Default: 5 steps/decade for mom_so -> 31 points)
             freq = np.logspace(0, 6, num=31)
-            # (Padrão: 20 steps/decade para analytical (4*5) -> 121 pontos)
+            # (Default: 20 steps/decade for analytical (4*5) -> 121 points)
             freq_analytical = np.logspace(0, 6, num=121)
 
         pul_data = {
@@ -134,13 +134,13 @@ class MulticonductorTransmissionLine:
             'mom_so': {
                 'frequencies': freq,
                 'scenarios': {
-                    '1': {'mtl': self},  # 'self' é a instância mtl
+                    '1': {'mtl': self},  # 'self' is the mtl instance
                 },
             },
             'analytical': {
                 'frequencies': freq_analytical,
                 'scenarios': {
-                    '1': {'mtl': self},  # 'self' é a instância mtl
+                    '1': {'mtl': self},  # 'self' is the mtl instance
                 },
             },
         }

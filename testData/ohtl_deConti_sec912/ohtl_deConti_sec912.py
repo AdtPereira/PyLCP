@@ -8,7 +8,7 @@ import numpy as np
 from pathlib import Path
 import matplotlib.pyplot as plt
 
-# --- Configure project root for module imports (sem alteração) ---
+# --- Configure project root for module imports (unchanged) ---
 try:
     os.system('cls' if os.name == 'nt' else 'clear')
     project_root = Path(__file__).resolve().parents[2]
@@ -39,32 +39,32 @@ def main():
     st = time.time()    
     input_json = load_json_parameters(__file__, show_content=True)
     
-    # --- 1. CRIAÇÃO DOS DOIS MODELOS (LÓGICA CORRIGIDA) ---
-    
-    # Modelo Sólido (carregado diretamente do JSON original)
+    # --- 1. CREATION OF THE TWO MODELS (CORRECTED LOGIC) ---
+
+    # Solid model (loaded directly from the original JSON)
     print("Loading SOLID model from JSON...")
     solid_model_dict = overhead_lines.single_phase_model(input_json)
-    
-    # Modelo Tubular Equivalente (criado a partir do sólido)
+
+    # Equivalent tubular model (created from the solid one)
     print("Creating equivalent TUBULAR model programmatically...")
     tubular_model_dict = copy.deepcopy(solid_model_dict)
-    
-    # Define o raio interno como 50% do raio externo para criar o tubo
-    # (pode ajustar essa proporção como desejar)
+
+    # Set the inner radius to 50% of the outer radius to create the tube
+    # (this ratio can be adjusted as desired)
     outer_radius = tubular_model_dict[1]['radius'][1]
     tubular_model_dict[1]['radius'][0] = 0.5 * outer_radius
-    
-    # Cria os objetos de linha de transmissão para cada modelo
+
+    # Create the transmission line objects for each model
     mtl_solid = MulticonductorTransmissionLine(solid_model_dict)
     mtl_tubular = MulticonductorTransmissionLine(tubular_model_dict)
     frequencies = np.logspace(0, 8, num=400)
-    
-    # Simulação para o modelo sólido
+
+    # Simulation for the solid model
     print("Running simulation for SOLID model...")
     pul_data = {'frequencies': frequencies}
     pul_data['internal'] = InternalPerUnitParameters(mtl_solid, frequencies).all_terms()
 
-    # Simulação para o modelo tubular
+    # Simulation for the tubular model
     print("\nRunning simulation for TUBULAR model...")
     pul_data_tubular = {'frequencies': frequencies}
     pul_data_tubular['internal'] = InternalPerUnitParameters(mtl_tubular, frequencies).all_terms()

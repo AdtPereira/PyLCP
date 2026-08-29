@@ -4,14 +4,14 @@ from ..andreata_common.plot_templates import (
     PLOT_TPL_CONDUCTANCE, PLOT_TPL_CAPACITANCE,
 )
 
-# Caminho FEM-híbrido do pyLCP: Zi/Yi do COMSOL (geometria excêntrica exata,
-# ar + tubo HDPE) + retorno pela terra analítico (Magalhães/Xue) com o raio
-# externo do tubo. É a linha comparada contra o MATLAB (FEM de Andreata).
+# pyLCP FEM-hybrid path: Zi/Yi from COMSOL (exact eccentric geometry,
+# air + HDPE tube) + analytical earth return (Magalhaes/Xue) with the tube
+# outer radius. This is the line compared against MATLAB (Andreata's FEM).
 FEM_HYBRID_TEMPLATE = [
     {
         'key': 'fem',
         'type': {
-            'main': {'label': 'pyLCP (FEM-híbrido)', 'color': 'black',
+            'main': {'label': 'pyLCP (FEM-hybrid)', 'color': 'black',
                      'linestyle': '-', 'linewidth': 1.5},
         }
     }
@@ -25,21 +25,21 @@ COMSOL_TEMPLATE = [
     },
 ]
 
-# Referência de validação cruzada (não é dado do duto): MATLAB do
-# andreata_case1, mesma geometria de 3 cabos flat sem duto -- deve concordar
-# com o cenário '1' ("Underground", duto ignorado) plotado junto (linha preta
-# sólida do DUCT_MODEL_TEMPLATE abaixo).
+# Cross-validation reference (not duct data): andreata_case1 MATLAB, same
+# geometry of 3 flat cables without a duct -- it must agree with scenario '1'
+# ("Underground", duct ignored) plotted alongside (the solid black line of
+# the DUCT_MODEL_TEMPLATE below).
 MATLAB_CASE1_NO_DUCT_TEMPLATE = [
     {
         'key': 'case1_no_duct',
-        'label': 'MATLAB (andreata_case1, sem duto)',
+        'label': 'MATLAB (andreata_case1, no duct)',
         'marker': '+', 's': 30, 'color': 'darkorange', 'linewidths': 1.2, 'zorder': 12
     }
 ]
 
-# Os três modelos analíticos de duto comparados neste caso (Configuração 2 /
-# Figura 5.2): ignorar o duto por completo, substituí-lo por uma isolação
-# equivalente ponderada por área (ERS), ou pelo método GMD (Lafaia, 2015).
+# The three analytical duct models compared in this case (Configuration 2 /
+# Figure 5.2): ignore the duct entirely, replace it with an area-weighted
+# equivalent insulation (ERS), or with the GMD method (Lafaia, 2015).
 DUCT_MODEL_TEMPLATE = [
     {
         'key': '1',
@@ -61,12 +61,12 @@ DUCT_MODEL_TEMPLATE = [
     },
 ]
 
-# COMSOL de impedância interna (medição legada, cabo único, método Js) --
-# reaproveitado do estudo monofásico anterior (hdpe_300mm2): a seção
-# transversal núcleo+blindagem+duto é idêntica em cada fase, só o retorno à
-# terra muda com o número de fases (ver andreata_case2.py). Uma cor por
-# componente (cc/cs/ss) para diferenciá-los visualmente -- ao contrário do
-# hdpe_300mm2 original, que usa o mesmo marcador preto para os três.
+# COMSOL internal impedance (legacy measurement, single cable, Js method) --
+# reused from the previous single-phase study (hdpe_300mm2): the
+# core+sheath+duct cross-section is identical for each phase, only the earth
+# return changes with the number of phases (see andreata_case2.py). One color
+# per component (cc/cs/ss) to tell them apart visually -- unlike the original
+# hdpe_300mm2, which uses the same black marker for all three.
 INTERNAL_COMSOL_TEMPLATE = {
     'cc': {'key': 'measured', 'marker': 'o', 's': 20, 'facecolors': 'none', 'edgecolors': 'black',
            'zorder': 10, 'label': r'COMSOL ($J_s$ method)'},
@@ -76,10 +76,10 @@ INTERNAL_COMSOL_TEMPLATE = {
            'zorder': 10, 'label': ''},
 }
 
-# Mesmo estilo/cores do INTERNAL_COMSOL_TEMPLATE (impedância, método Js),
-# reaproveitado para a admitância interna -- mas com rótulo de legenda
-# próprio, já que a admitância vem do método direto de carga
-# (cmsl_internal_admittance_charge_method.txt), não do método Js.
+# Same style/colors as INTERNAL_COMSOL_TEMPLATE (impedance, Js method),
+# reused for the internal admittance -- but with its own legend label, since
+# the admittance comes from the direct charge method
+# (cmsl_internal_admittance_charge_method.txt), not the Js method.
 ADMITTANCE_COMSOL_TEMPLATE = {
     key: {**style, 'label': r'COMSOL (charge method)'} if key == 'cc' else style
     for key, style in INTERNAL_COMSOL_TEMPLATE.items()
@@ -87,14 +87,14 @@ ADMITTANCE_COMSOL_TEMPLATE = {
 
 PLOT_CONFIG = {
 
-    # --- Parâmetros internos combinados (núcleo + blindagem, fase A), um só
-    # modelo de duto (GMD case 3.1, o mais completo dos três) contra as
-    # referências COMSOL/MATLAB -- mesmo gráfico já existente no caso
-    # monofásico hdpe_300mm2 (internal_impedance_matrix.png), com a leitura
-    # MATLAB ('measured', prefixo 'andreata_hdpe') já preparada para quando
-    # os dados próprios do duto chegarem (ver andreata_case2.py, Item 9 de
-    # BUGS_AND_FIXES.md). Para a comparação por modelo de duto
-    # (Underground/ERS/GMD), ver 'core_self_impedance' etc. abaixo. ---
+    # --- Combined internal parameters (core + sheath, phase A), a single
+    # duct model (GMD case 3.1, the most complete of the three) against the
+    # COMSOL/MATLAB references -- same plot already present in the single-phase
+    # case hdpe_300mm2 (internal_impedance_matrix.png), with the MATLAB reading
+    # ('measured', prefix 'andreata_hdpe') already prepared for when the duct's
+    # own data arrives (see andreata_case2.py, Item 9 of BUGS_AND_FIXES.md).
+    # For the per-duct-model comparison (Underground/ERS/GMD), see
+    # 'core_self_impedance' etc. below. ---
 
     'internal_impedance_matrix': {
         'suptitle': r'P.u.l. Internal Impedance Matrix, phase A — GMD case 3.1 [Lafaia, 2015] vs. COMSOL ($J_s$) [Yin, 1990]',
@@ -180,9 +180,9 @@ PLOT_CONFIG = {
         }
     },
 
-    # --- Parâmetros internos (núcleo + blindagem, fase A): sensíveis ao
-    # modelo de duto (bare/ERS/GMD) porque ERS/GMD alteram a espessura e/ou
-    # permissividade da isolação externa da blindagem. ---
+    # --- Internal parameters (core + sheath, phase A): sensitive to the duct
+    # model (bare/ERS/GMD) because ERS/GMD change the thickness and/or
+    # permittivity of the sheath's outer insulation. ---
 
     'core_self_impedance': {
         'suptitle': 'P.u.l. Core Self-Impedance, phase A ($Z_{cc}$) — HDPE duct modeling comparison',
@@ -292,13 +292,13 @@ PLOT_CONFIG = {
         }
     },
 
-    # --- FEM-híbrido (pyLCP) vs. MATLAB (FEM de Andreata) -------------------
-    # Agora o duto HDPE É modelado: Zi/Yi vêm do COMSOL (geometria excêntrica
-    # exata) e o retorno pela terra é analítico com o raio externo do tubo
-    # (Parte A). Equivalente aos gráficos self_*/earth_return_* do case1. ---
+    # --- FEM-hybrid (pyLCP) vs. MATLAB (Andreata's FEM) --------------------
+    # Now the HDPE duct IS modeled: Zi/Yi come from COMSOL (exact eccentric
+    # geometry) and the earth return is analytical with the tube outer radius
+    # (Part A). Equivalent to the self_*/earth_return_* plots of case1. ---
 
     'self_impedance_phase_a_sheath': {
-        'suptitle': 'P.u.l. self-impedance of phase-a sheath — pyLCP (FEM-híbrido) vs. MATLAB',
+        'suptitle': 'P.u.l. self-impedance of phase-a sheath — pyLCP (FEM-hybrid) vs. MATLAB',
         'series_to_plot': FEM_HYBRID_TEMPLATE,
         'path': ['quasi_tem_matrices', 'series_impedance_matrix'],
         'matlab_series_to_plot': MATLAB_TEMPLATE,
@@ -310,7 +310,7 @@ PLOT_CONFIG = {
     },
 
     'self_admittance_phase_a_sheath': {
-        'suptitle': 'P.u.l. self-admittance of phase-a sheath — pyLCP (FEM-híbrido) vs. MATLAB',
+        'suptitle': 'P.u.l. self-admittance of phase-a sheath — pyLCP (FEM-hybrid) vs. MATLAB',
         'series_to_plot': FEM_HYBRID_TEMPLATE,
         'path': ['quasi_tem_matrices', 'shunt_admittance_matrix'],
         'matlab_series_to_plot': MATLAB_TEMPLATE,
@@ -322,7 +322,7 @@ PLOT_CONFIG = {
     },
 
     'earth_return_impedance_phase_a': {
-        'suptitle': 'P.u.l. self earth-return impedance of phase-a — pyLCP (FEM-híbrido, raio do tubo) vs. MATLAB',
+        'suptitle': 'P.u.l. self earth-return impedance of phase-a — pyLCP (FEM-hybrid, tube radius) vs. MATLAB',
         'p': 0, 'q': 0,
         'series_to_plot': FEM_HYBRID_TEMPLATE,
         'path': ['earth_return_parameters', 'impedance_matrix'],
@@ -357,7 +357,7 @@ PLOT_CONFIG = {
     },
 
     'earth_return_potential_coeff_phase_a': {
-        'suptitle': 'P.u.l. self earth-return potential coefficient of phase-a — pyLCP (FEM-híbrido) vs. MATLAB',
+        'suptitle': 'P.u.l. self earth-return potential coefficient of phase-a — pyLCP (FEM-hybrid) vs. MATLAB',
         'p': 0, 'q': 0,
         'series_to_plot': FEM_HYBRID_TEMPLATE,
         'path': ['earth_return_parameters', 'potential_coefficient'],

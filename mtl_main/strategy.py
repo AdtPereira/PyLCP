@@ -379,51 +379,51 @@ class SingleCoreCableStrategy(MTLStrategy):
     
     def _cable_distance_matrices(self, mtl: dict) -> dict:
         """
-            Calcula todas as matrizes de distância necessárias para a análise de cabos,
-            incluindo as separações geométricas, de retorno pelo solo, horizontais e verticais.
+            Computes every distance matrix required for the cable analysis,
+            including the geometric, ground-return, horizontal and vertical separations.
 
-            Para cada cabo físico, esta função seleciona o componente com o maior raio externo
-            para representá-lo nos cálculos de distância. O agrupamento dos componentes de um
-            mesmo cabo é feito pela coordenada 'center_point' compartilhada.
+            For each physical cable, this function selects the component with the largest
+            outer radius to represent it in the distance computations. Grouping the
+            components of the same cable is done by the shared 'center_point' coordinate.
         """
-        # 1. Agrupar condutores pela coordenada 'center_point'
+        # 1. Group conductors by the 'center_point' coordinate
         cable_groups = defaultdict(list)
         for key, data in mtl.items():
-            # Ignora o condutor de retorno (solo)
+            # Skip the return conductor (soil)
             if data.get('line_type') == 'return':
                 continue
-            
+
             if data.get('center_point') is None:
                 continue
-            
-            # Armazena a tupla (chave_original, dados) no grupo correspondente à sua posição
+
+            # Store the tuple (original_key, data) in the group matching its position
             cable_groups[tuple(data.get('center_point'))].append((key, data))
 
-        # 2. Para cada grupo (localização), selecionar o condutor com o maior raio externo
+        # 2. For each group (location), select the conductor with the largest outer radius
         selected_cables = []
         for center_point, conductors_in_group in cable_groups.items():
             if not conductors_in_group:
                 continue
 
-            # Função para calcular o raio externo total de um condutor
+            # Function to compute the total outer radius of a conductor
             def get_outer_radius(conductor_tuple):
                 data = conductor_tuple[1]
                 insulation_thickness = (data.get('insulation') or {}).get('thickness', 0)
-                # data['radius'] é uma tupla (raio_interno, raio_externo)
+                # data['radius'] is a tuple (inner_radius, outer_radius)
                 return data['radius'][1] + insulation_thickness
 
-            # Encontra o condutor com o raio externo máximo no grupo
+            # Find the conductor with the maximum outer radius in the group
             representative_conductor = max(conductors_in_group, key=get_outer_radius)
             selected_cables.append(representative_conductor)
 
-        # 3. Ordenar a lista final pela chave original (0, 1, 2...) para garantir consistência
+        # 3. Sort the final list by the original key (0, 1, 2...) to ensure consistency
         cables = sorted(selected_cables, key=lambda item: item[0])
 
-        # 4. Geometria que o retorno pela terra 'enxerga' por cabo: quando há
-        # duto ('enclosure'), é a superfície externa do tubo, centrada no eixo
-        # do tubo -- ver _cable_external_geometry.
+        # 4. Geometry that the earth return 'sees' per cable: when there is a
+        # duct ('enclosure'), it is the outer surface of the tube, centered on the
+        # tube axis -- see _cable_external_geometry.
         cable_pos = []   # (x, y)
-        cable_rext = []  # raio externo representativo
+        cable_rext = []  # representative outer radius
         for _tag, data in cables:
             pos, rext = _cable_external_geometry(data)
             cable_pos.append(pos)
@@ -442,7 +442,7 @@ class SingleCoreCableStrategy(MTLStrategy):
 
                 # Horizontal spacing, s = dnm
                 if n_idx == m_idx:
-                    s = cable_rext[n_idx]          # termo próprio: raio externo (tubo, se houver)
+                    s = cable_rext[n_idx]          # self term: outer radius (tube, if present)
                 else:
                     s = xn - xm
 
@@ -610,51 +610,51 @@ class SingleCoreCableInHDPEStrategy(MTLStrategy):
     
     def _cable_distance_matrices(self, mtl: dict) -> dict:
         """
-            Calcula todas as matrizes de distância necessárias para a análise de cabos,
-            incluindo as separações geométricas, de retorno pelo solo, horizontais e verticais.
+            Computes every distance matrix required for the cable analysis,
+            including the geometric, ground-return, horizontal and vertical separations.
 
-            Para cada cabo físico, esta função seleciona o componente com o maior raio externo
-            para representá-lo nos cálculos de distância. O agrupamento dos componentes de um
-            mesmo cabo é feito pela coordenada 'center_point' compartilhada.
+            For each physical cable, this function selects the component with the largest
+            outer radius to represent it in the distance computations. Grouping the
+            components of the same cable is done by the shared 'center_point' coordinate.
         """
-        # 1. Agrupar condutores pela coordenada 'center_point'
+        # 1. Group conductors by the 'center_point' coordinate
         cable_groups = defaultdict(list)
         for key, data in mtl.items():
-            # Ignora o condutor de retorno (solo)
+            # Skip the return conductor (soil)
             if data.get('line_type') == 'return':
                 continue
-            
+
             if data.get('center_point') is None:
                 continue
-            
-            # Armazena a tupla (chave_original, dados) no grupo correspondente à sua posição
+
+            # Store the tuple (original_key, data) in the group matching its position
             cable_groups[tuple(data.get('center_point'))].append((key, data))
 
-        # 2. Para cada grupo (localização), selecionar o condutor com o maior raio externo
+        # 2. For each group (location), select the conductor with the largest outer radius
         selected_cables = []
         for center_point, conductors_in_group in cable_groups.items():
             if not conductors_in_group:
                 continue
 
-            # Função para calcular o raio externo total de um condutor
+            # Function to compute the total outer radius of a conductor
             def get_outer_radius(conductor_tuple):
                 data = conductor_tuple[1]
                 insulation_thickness = (data.get('insulation') or {}).get('thickness', 0)
-                # data['radius'] é uma tupla (raio_interno, raio_externo)
+                # data['radius'] is a tuple (inner_radius, outer_radius)
                 return data['radius'][1] + insulation_thickness
 
-            # Encontra o condutor com o raio externo máximo no grupo
+            # Find the conductor with the maximum outer radius in the group
             representative_conductor = max(conductors_in_group, key=get_outer_radius)
             selected_cables.append(representative_conductor)
 
-        # 3. Ordenar a lista final pela chave original (0, 1, 2...) para garantir consistência
+        # 3. Sort the final list by the original key (0, 1, 2...) to ensure consistency
         cables = sorted(selected_cables, key=lambda item: item[0])
 
-        # 4. Geometria que o retorno pela terra 'enxerga' por cabo: quando há
-        # duto ('enclosure'), é a superfície externa do tubo, centrada no eixo
-        # do tubo -- ver _cable_external_geometry.
+        # 4. Geometry that the earth return 'sees' per cable: when there is a
+        # duct ('enclosure'), it is the outer surface of the tube, centered on the
+        # tube axis -- see _cable_external_geometry.
         cable_pos = []   # (x, y)
-        cable_rext = []  # raio externo representativo
+        cable_rext = []  # representative outer radius
         for _tag, data in cables:
             pos, rext = _cable_external_geometry(data)
             cable_pos.append(pos)
@@ -673,7 +673,7 @@ class SingleCoreCableInHDPEStrategy(MTLStrategy):
 
                 # Horizontal spacing, s = dnm
                 if n_idx == m_idx:
-                    s = cable_rext[n_idx]          # termo próprio: raio externo (tubo, se houver)
+                    s = cable_rext[n_idx]          # self term: outer radius (tube, if present)
                 else:
                     s = xn - xm
 
@@ -803,29 +803,29 @@ class SingleCoreCableWithECCInHDPEStrategy(MTLStrategy):
                   parameter dictionaries (scc) for each cable.
         """
         
-        # 1. Agrupar condutores (core, sheath, armor) por seu center_point
+        # 1. Group conductors (core, sheath, armor) by their center_point
         cable_systems = defaultdict(lambda: {'core': None, 'sheath': None, 'armor': None})
         for conductor_data in mtl.values():
             name = conductor_data.get('conductor_name')
             center_point = conductor_data.get('center_point')
             
-            # Ignora componentes não relevantes (ex: solo) ou sem posição
+            # Skip non-relevant components (e.g. soil) or those without a position
             if not center_point or name not in ('core', 'sheath', 'armor'):
                 continue
             
-            # Usa a string da tupla como chave do dicionário
+            # Use the tuple's string as the dictionary key
             cp_key = str(center_point)
             
             if cable_systems[cp_key][name] is not None:
-                # Alerta se encontrarmos, por exemplo, dois 'core' no mesmo center_point
+                # Warn if we find, for example, two 'core' entries at the same center_point
                 print(f"Warning: Duplicate conductor name '{name}' found at center_point {cp_key}.")
             
             cable_systems[cp_key][name] = conductor_data
 
-        # 2. Processar cada sistema de cabo agrupado
+        # 2. Process each grouped cable system
         all_scc_params = {}
         for cp_key, components in cable_systems.items():
-            scc = {} # Dicionário de parâmetros para este cabo específico
+            scc = {} # Parameter dictionary for this specific cable
             core, sheath, armor = components['core'], components['sheath'], components['armor']
             
             # === CORE ===
@@ -843,7 +843,7 @@ class SingleCoreCableWithECCInHDPEStrategy(MTLStrategy):
             
             # === SHEATH ===
             if sheath:
-                # Validação: O 'core' deve existir e ter isolamento para se conectar à 'sheath'
+                # Validation: the 'core' must exist and have insulation to connect to the 'sheath'
                 if scc.get('core_insulation_outer_radius') is not None:
                     assert np.isclose(scc['core_insulation_outer_radius'], sheath['radius'][0]), \
                         (f"Geometric mismatch at {cp_key}: Core's insulation outer radius ({scc['core_insulation_outer_radius']}) "
@@ -862,7 +862,7 @@ class SingleCoreCableWithECCInHDPEStrategy(MTLStrategy):
 
             # === ARMOR ===
             if armor:
-                 # Validação: A 'sheath' deve existir e ter isolamento para se conectar ao 'armor'
+                 # Validation: the 'sheath' must exist and have insulation to connect to the 'armor'
                 if scc.get('sheath_insulation_outer_radius') is not None:
                     assert np.isclose(scc['sheath_insulation_outer_radius'], armor['radius'][0]), \
                         (f"Geometric mismatch at {cp_key}: Sheath's insulation outer radius ({scc['sheath_insulation_outer_radius']}) "
@@ -879,7 +879,7 @@ class SingleCoreCableWithECCInHDPEStrategy(MTLStrategy):
                 scc['armor_permeability'] = armor['relative_permeability'] * sc.mu_0
                 scc['armor_permittivity'] = armor['relative_permittivity'] * sc.epsilon_0
             
-            # Adiciona os parâmetros deste cabo ao dicionário principal
+            # Add this cable's parameters to the main dictionary
             all_scc_params[cp_key] = scc
 
         return all_scc_params
@@ -913,51 +913,51 @@ class SingleCoreCableWithECCInHDPEStrategy(MTLStrategy):
     
     def _cable_distance_matrices(self, mtl: dict) -> dict:
         """
-            Calcula todas as matrizes de distância necessárias para a análise de cabos,
-            incluindo as separações geométricas, de retorno pelo solo, horizontais e verticais.
+            Computes every distance matrix required for the cable analysis,
+            including the geometric, ground-return, horizontal and vertical separations.
 
-            Para cada cabo físico, esta função seleciona o componente com o maior raio externo
-            para representá-lo nos cálculos de distância. O agrupamento dos componentes de um
-            mesmo cabo é feito pela coordenada 'center_point' compartilhada.
+            For each physical cable, this function selects the component with the largest
+            outer radius to represent it in the distance computations. Grouping the
+            components of the same cable is done by the shared 'center_point' coordinate.
         """
-        # 1. Agrupar condutores pela coordenada 'center_point'
+        # 1. Group conductors by the 'center_point' coordinate
         cable_groups = defaultdict(list)
         for key, data in mtl.items():
-            # Ignora o condutor de retorno (solo)
+            # Skip the return conductor (soil)
             if data.get('line_type') == 'return':
                 continue
-            
+
             if data.get('center_point') is None:
                 continue
-            
-            # Armazena a tupla (chave_original, dados) no grupo correspondente à sua posição
+
+            # Store the tuple (original_key, data) in the group matching its position
             cable_groups[tuple(data.get('center_point'))].append((key, data))
 
-        # 2. Para cada grupo (localização), selecionar o condutor com o maior raio externo
+        # 2. For each group (location), select the conductor with the largest outer radius
         selected_cables = []
         for center_point, conductors_in_group in cable_groups.items():
             if not conductors_in_group:
                 continue
 
-            # Função para calcular o raio externo total de um condutor
+            # Function to compute the total outer radius of a conductor
             def get_outer_radius(conductor_tuple):
                 data = conductor_tuple[1]
                 insulation_thickness = (data.get('insulation') or {}).get('thickness', 0)
-                # data['radius'] é uma tupla (raio_interno, raio_externo)
+                # data['radius'] is a tuple (inner_radius, outer_radius)
                 return data['radius'][1] + insulation_thickness
 
-            # Encontra o condutor com o raio externo máximo no grupo
+            # Find the conductor with the maximum outer radius in the group
             representative_conductor = max(conductors_in_group, key=get_outer_radius)
             selected_cables.append(representative_conductor)
 
-        # 3. Ordenar a lista final pela chave original (0, 1, 2...) para garantir consistência
+        # 3. Sort the final list by the original key (0, 1, 2...) to ensure consistency
         cables = sorted(selected_cables, key=lambda item: item[0])
 
-        # 4. Geometria que o retorno pela terra 'enxerga' por cabo: quando há
-        # duto ('enclosure'), é a superfície externa do tubo, centrada no eixo
-        # do tubo -- ver _cable_external_geometry.
+        # 4. Geometry that the earth return 'sees' per cable: when there is a
+        # duct ('enclosure'), it is the outer surface of the tube, centered on the
+        # tube axis -- see _cable_external_geometry.
         cable_pos = []   # (x, y)
-        cable_rext = []  # raio externo representativo
+        cable_rext = []  # representative outer radius
         for _tag, data in cables:
             pos, rext = _cable_external_geometry(data)
             cable_pos.append(pos)
@@ -976,7 +976,7 @@ class SingleCoreCableWithECCInHDPEStrategy(MTLStrategy):
 
                 # Horizontal spacing, s = dnm
                 if n_idx == m_idx:
-                    s = cable_rext[n_idx]          # termo próprio: raio externo (tubo, se houver)
+                    s = cable_rext[n_idx]          # self term: outer radius (tube, if present)
                 else:
                     s = xn - xm
 
@@ -1106,36 +1106,36 @@ class SingleCoreCableWithECCStrategy(MTLStrategy):
                   parameter dictionaries (scc) for each cable.
         """
         
-        # 1. Agrupar condutores (core, sheath, armor, ecc) por seu center_point
+        # 1. Group conductors (core, sheath, armor, ecc) by their center_point
         cable_systems = defaultdict(lambda: {'core': None, 'sheath': None, 'armor': None, 'ecc': None})
         for conductor_data in mtl.values():
             name = conductor_data.get('conductor_name')
             center_point = conductor_data.get('center_point')
 
-            # Ignora componentes não relevantes (ex: solo) ou sem posição
+            # Skip non-relevant components (e.g. soil) or those without a position
             if not center_point or name not in ('core', 'sheath', 'armor', 'ecc'):
                 continue
 
-            # Usa a string da tupla como chave do dicionário
+            # Use the tuple's string as the dictionary key
             cp_key = str(center_point)
 
             if cable_systems[cp_key][name] is not None:
-                # Alerta se encontrarmos, por exemplo, dois 'core' no mesmo center_point
+                # Warn if we find, for example, two 'core' entries at the same center_point
                 print(f"Warning: Duplicate conductor name '{name}' found at center_point {cp_key}.")
 
             cable_systems[cp_key][name] = conductor_data
 
-        # 2. Processar cada sistema de cabo agrupado
+        # 2. Process each grouped cable system
         all_scc_params = {}
         for cp_key, components in cable_systems.items():
-            scc = {} # Dicionário de parâmetros para este cabo específico
+            scc = {} # Parameter dictionary for this specific cable
             core, sheath, armor = components['core'], components['sheath'], components['armor']
 
-            # O ECC é fisicamente um condutor maciço/isolado sozinho (sem
-            # bainha/blindagem) -- a mesma formulação usada para um 'core'
-            # isolado sozinho se aplica a ele. Quando não há 'core' nesta
-            # posição (ou seja, esta é a posição do próprio ECC), reaproveita
-            # o condutor 'ecc' no papel de 'core' para as fórmulas abaixo.
+            # The ECC is physically a solid/individually-insulated conductor (no
+            # sheath/shield) -- the same formulation used for a standalone
+            # insulated 'core' applies to it. When there is no 'core' at this
+            # position (i.e. this is the ECC's own position), reuse the 'ecc'
+            # conductor in the 'core' role for the formulas below.
             if core is None and components['ecc'] is not None:
                 core = components['ecc']
 
@@ -1154,7 +1154,7 @@ class SingleCoreCableWithECCStrategy(MTLStrategy):
             
             # === SHEATH ===
             if sheath:
-                # Validação: O 'core' deve existir e ter isolamento para se conectar à 'sheath'
+                # Validation: the 'core' must exist and have insulation to connect to the 'sheath'
                 if scc.get('core_insulation_outer_radius') is not None:
                     assert np.isclose(scc['core_insulation_outer_radius'], sheath['radius'][0]), \
                         (f"Geometric mismatch at {cp_key}: Core's insulation outer radius ({scc['core_insulation_outer_radius']}) "
@@ -1173,7 +1173,7 @@ class SingleCoreCableWithECCStrategy(MTLStrategy):
 
             # === ARMOR ===
             if armor:
-                 # Validação: A 'sheath' deve existir e ter isolamento para se conectar ao 'armor'
+                 # Validation: the 'sheath' must exist and have insulation to connect to the 'armor'
                 if scc.get('sheath_insulation_outer_radius') is not None:
                     assert np.isclose(scc['sheath_insulation_outer_radius'], armor['radius'][0]), \
                         (f"Geometric mismatch at {cp_key}: Sheath's insulation outer radius ({scc['sheath_insulation_outer_radius']}) "
@@ -1190,7 +1190,7 @@ class SingleCoreCableWithECCStrategy(MTLStrategy):
                 scc['armor_permeability'] = armor['relative_permeability'] * sc.mu_0
                 scc['armor_permittivity'] = armor['relative_permittivity'] * sc.epsilon_0
             
-            # Adiciona os parâmetros deste cabo ao dicionário principal
+            # Add this cable's parameters to the main dictionary
             all_scc_params[cp_key] = scc
 
         return all_scc_params
@@ -1224,51 +1224,51 @@ class SingleCoreCableWithECCStrategy(MTLStrategy):
     
     def _cable_distance_matrices(self, mtl: dict) -> dict:
         """
-            Calcula todas as matrizes de distância necessárias para a análise de cabos,
-            incluindo as separações geométricas, de retorno pelo solo, horizontais e verticais.
+            Computes every distance matrix required for the cable analysis,
+            including the geometric, ground-return, horizontal and vertical separations.
 
-            Para cada cabo físico, esta função seleciona o componente com o maior raio externo
-            para representá-lo nos cálculos de distância. O agrupamento dos componentes de um
-            mesmo cabo é feito pela coordenada 'center_point' compartilhada.
+            For each physical cable, this function selects the component with the largest
+            outer radius to represent it in the distance computations. Grouping the
+            components of the same cable is done by the shared 'center_point' coordinate.
         """
-        # 1. Agrupar condutores pela coordenada 'center_point'
+        # 1. Group conductors by the 'center_point' coordinate
         cable_groups = defaultdict(list)
         for key, data in mtl.items():
-            # Ignora o condutor de retorno (solo)
+            # Skip the return conductor (soil)
             if data.get('line_type') == 'return':
                 continue
-            
+
             if data.get('center_point') is None:
                 continue
-            
-            # Armazena a tupla (chave_original, dados) no grupo correspondente à sua posição
+
+            # Store the tuple (original_key, data) in the group matching its position
             cable_groups[tuple(data.get('center_point'))].append((key, data))
 
-        # 2. Para cada grupo (localização), selecionar o condutor com o maior raio externo
+        # 2. For each group (location), select the conductor with the largest outer radius
         selected_cables = []
         for center_point, conductors_in_group in cable_groups.items():
             if not conductors_in_group:
                 continue
 
-            # Função para calcular o raio externo total de um condutor
+            # Function to compute the total outer radius of a conductor
             def get_outer_radius(conductor_tuple):
                 data = conductor_tuple[1]
                 insulation_thickness = (data.get('insulation') or {}).get('thickness', 0)
-                # data['radius'] é uma tupla (raio_interno, raio_externo)
+                # data['radius'] is a tuple (inner_radius, outer_radius)
                 return data['radius'][1] + insulation_thickness
 
-            # Encontra o condutor com o raio externo máximo no grupo
+            # Find the conductor with the maximum outer radius in the group
             representative_conductor = max(conductors_in_group, key=get_outer_radius)
             selected_cables.append(representative_conductor)
 
-        # 3. Ordenar a lista final pela chave original (0, 1, 2...) para garantir consistência
+        # 3. Sort the final list by the original key (0, 1, 2...) to ensure consistency
         cables = sorted(selected_cables, key=lambda item: item[0])
 
-        # 4. Geometria que o retorno pela terra 'enxerga' por cabo: quando há
-        # duto ('enclosure'), é a superfície externa do tubo, centrada no eixo
-        # do tubo -- ver _cable_external_geometry.
+        # 4. Geometry that the earth return 'sees' per cable: when there is a
+        # duct ('enclosure'), it is the outer surface of the tube, centered on the
+        # tube axis -- see _cable_external_geometry.
         cable_pos = []   # (x, y)
-        cable_rext = []  # raio externo representativo
+        cable_rext = []  # representative outer radius
         for _tag, data in cables:
             pos, rext = _cable_external_geometry(data)
             cable_pos.append(pos)
@@ -1287,7 +1287,7 @@ class SingleCoreCableWithECCStrategy(MTLStrategy):
 
                 # Horizontal spacing, s = dnm
                 if n_idx == m_idx:
-                    s = cable_rext[n_idx]          # termo próprio: raio externo (tubo, se houver)
+                    s = cable_rext[n_idx]          # self term: outer radius (tube, if present)
                 else:
                     s = xn - xm
 

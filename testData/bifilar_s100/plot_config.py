@@ -117,7 +117,7 @@ PLOT_CONFIG = {
         'suptitle': r'P.u.l. Partial Impedance Matrix of a bifilar transmission line',
         
         'data_series': [
-            # --- Série MoM-SO ---
+            # --- MoM-SO series ---
             {
                 'source': 'mom_so',
                 'scenario_key': '1',
@@ -129,7 +129,7 @@ PLOT_CONFIG = {
                 }
             },
             
-            # --- Série COMSOL ---
+            # --- COMSOL series ---
             {
                 'source': 'comsol',
                 'scenario_key': '1',

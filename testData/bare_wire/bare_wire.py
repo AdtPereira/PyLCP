@@ -32,11 +32,11 @@ except ImportError as e:
 # --- Read and process COMSOL data ---
 COMSOL_DATA = {}
 try:
-    # 1. Definir o sufixo do arquivo
+    # 1. Define the file suffix
     txt_name = 'cmsl_surface_charge_density'
     file_to_read = Path(__file__).parent.parent / case_name / 'Results' / f"{txt_name}.txt"
 
-    # 3. Criar uma instância da classe com o caminho construído
+    # 3. Create an instance of the class with the constructed path
     print(f"--- Testing MergedComsolDataReader ---")
     print(f"Attempting to read file: {file_to_read}")
     reader = MergedComsolDataReader(str(file_to_read))

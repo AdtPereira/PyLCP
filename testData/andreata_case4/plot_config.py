@@ -4,12 +4,12 @@ from ..andreata_common.plot_templates import (
     PLOT_TPL_CONDUCTANCE, PLOT_TPL_CAPACITANCE,
 )
 
-# Não há dado COMSOL de retorno à terra para este caso -- nenhum arquivo
-# 'cmsl_ground_return_impedance.txt' existe em Results/ (impedância e
-# admitância internas, essas sim, já têm dado próprio -- ver
-# INTERNAL_COMSOL_TEMPLATE abaixo). Template mantido guardado (mesmo perfil
-# de solo único do andreata_case2), pronto para quando/se o dado chegar;
-# hoje nenhuma config abaixo o referencia ativamente.
+# There is no COMSOL earth-return data for this case -- no file
+# 'cmsl_ground_return_impedance.txt' exists in Results/ (the internal
+# impedance and admittance, on the other hand, do have their own data -- see
+# INTERNAL_COMSOL_TEMPLATE below). Template kept on hold (same single-soil
+# profile as andreata_case2), ready for when/if the data arrives; today no
+# config below references it actively.
 COMSOL_TEMPLATE = [
     {
         'key': 'rho_g_100_epsr1_1_mf',
@@ -18,12 +18,12 @@ COMSOL_TEMPLATE = [
     },
 ]
 
-# Os três modelos analíticos de duto comparados neste caso (Configuração 4 /
-# Figura 5.4): ignorar o duto por completo (mesma física heterogênea do
-# andreata_case3), substituí-lo por uma isolação equivalente ponderada por
-# área (ERS), ou pelo método GMD (Lafaia, 2015) -- aplicados às 3 bainhas
-# SCC apenas; o ECC nunca é afetado por esses três cenários (ver
-# andreata_case4.py / README.md, seção Limitações).
+# The three analytical duct models compared in this case (Configuration 4 /
+# Figure 5.4): ignore the duct entirely (same heterogeneous physics as
+# andreata_case3), replace it with an area-weighted equivalent insulation
+# (ERS), or with the GMD method (Lafaia, 2015) -- applied to the 3 SCC
+# sheaths only; the ECC is never affected by these three scenarios (see
+# andreata_case4.py / README.md, Limitations section).
 DUCT_MODEL_TEMPLATE = [
     {
         'key': '1',
@@ -46,9 +46,9 @@ DUCT_MODEL_TEMPLATE = [
 ]
 
 
-# COMSOL de impedância interna (3 condutores núcleo/blindagem/ECC, própria do
-# case4, método Js -- ver README.md). Uma cor por componente (cc/cs/ss/ecc)
-# para diferenciá-los visualmente.
+# COMSOL internal impedance (3 conductors core/sheath/ECC, specific to
+# case4, Js method -- see README.md). One color per component (cc/cs/ss/ecc)
+# to tell them apart visually.
 INTERNAL_COMSOL_TEMPLATE = {
     'cc': {'key': 'measured', 'marker': 'o', 's': 20, 'facecolors': 'none', 'edgecolors': 'black',
            'zorder': 10, 'label': r'COMSOL ($J_s$ method)'},
@@ -60,10 +60,10 @@ INTERNAL_COMSOL_TEMPLATE = {
            'zorder': 10, 'label': ''},
 }
 
-# Mesmo estilo/cores do INTERNAL_COMSOL_TEMPLATE (impedância, método Js),
-# reaproveitado para a admitância interna -- mas com rótulo de legenda
-# próprio, já que a admitância vem do método direto de carga
-# (cmsl_internal_admittance_charge_method.txt), não do método Js.
+# Same style/colors as INTERNAL_COMSOL_TEMPLATE (impedance, Js method),
+# reused for the internal admittance -- but with its own legend label, since
+# the admittance comes from the direct charge method
+# (cmsl_internal_admittance_charge_method.txt), not the Js method.
 ADMITTANCE_COMSOL_TEMPLATE = {
     key: {**style, 'label': r'COMSOL (charge method)'} if key == 'cc' else style
     for key, style in INTERNAL_COMSOL_TEMPLATE.items()
@@ -72,11 +72,11 @@ ADMITTANCE_COMSOL_TEMPLATE = {
 
 PLOT_CONFIG = {
 
-    # --- Parâmetros internos combinados (núcleo + blindagem da fase A + ECC),
-    # um só modelo de duto (GMD case 3.1, o mais completo dos três) contra a
-    # referência MATLAB -- mesmo padrão de andreata_case3, estendido com o
-    # componente 6,6 (ECC). Para a comparação por modelo de duto
-    # (Underground/ERS/GMD), ver 'core_self_impedance' etc. abaixo. ---
+    # --- Combined internal parameters (phase A core + sheath + ECC),
+    # a single duct model (GMD case 3.1, the most complete of the three)
+    # against the MATLAB reference -- same pattern as andreata_case3, extended
+    # with the 6,6 component (ECC). For the per-duct-model comparison
+    # (Underground/ERS/GMD), see 'core_self_impedance' etc. below. ---
 
     'internal_impedance_matrix': {
         'suptitle': 'P.u.l. Internal Impedance Matrix, phase A + ECC — GMD case 3.1 [Lafaia, 2015] vs. MATLAB',
@@ -178,11 +178,11 @@ PLOT_CONFIG = {
         }
     },
 
-    # --- Parâmetros internos (núcleo + blindagem, fase A): sensíveis ao
-    # modelo de duto (bare/ERS/GMD) porque ERS/GMD alteram a espessura e/ou
-    # permissividade da isolação externa da blindagem. Mesmo eixo de
-    # comparação do andreata_case2, aqui sobre o modelo heterogêneo (3 SCC +
-    # ECC) do andreata_case4. ---
+    # --- Internal parameters (core + sheath, phase A): sensitive to the duct
+    # model (bare/ERS/GMD) because ERS/GMD change the thickness and/or
+    # permittivity of the sheath's outer insulation. Same comparison axis as
+    # andreata_case2, here on the heterogeneous model (3 SCC + ECC) of
+    # andreata_case4. ---
 
     'core_self_impedance': {
         'suptitle': 'P.u.l. Core Self-Impedance, phase A ($Z_{cc}$) — HDPE duct modeling comparison',
@@ -238,11 +238,11 @@ PLOT_CONFIG = {
         }
     },
 
-    # --- Retorno à terra (acoplamento entre cabos), fase A: aproximação em
-    # todos os três cenários -- a formulação de Zg/Yg não enxerga o duto,
-    # apenas a posição/raio externo de cada cabo (ver Decisão de
-    # arquitetura, README.md). A comparação contra MATLAB é a validação de
-    # fato disponível aqui. ---
+    # --- Earth return (inter-cable coupling), phase A: an approximation in
+    # all three scenarios -- the Zg/Yg formulation does not see the duct,
+    # only the position / outer radius of each cable (see the Architecture
+    # Decision, README.md). The comparison against MATLAB is the actual
+    # validation available here. ---
 
     'earth_return_impedance_phase_a': {
         'suptitle': 'P.u.l. Self earth-return impedance of phase-a [Xue, 2018] — duct ignored by the formulation',
@@ -264,10 +264,10 @@ PLOT_CONFIG = {
         }
     },
 
-    # --- Condutor ECC: as três curvas analíticas (Underground/ERS/GMD)
-    # tendem a coincidir aqui, já que nenhum dos três cenários altera o ECC
-    # em si (só as bainhas SCC) -- ver nota em andreata_case4.py. A
-    # referência real do efeito do duto sobre o ECC é a comparação com
+    # --- ECC conductor: the three analytical curves (Underground/ERS/GMD)
+    # tend to coincide here, since none of the three scenarios changes the ECC
+    # itself (only the SCC sheaths) -- see the note in andreata_case4.py. The
+    # actual reference for the duct's effect on the ECC is the comparison with
     # MATLAB. ---
 
     'self_impedance_ecc': {

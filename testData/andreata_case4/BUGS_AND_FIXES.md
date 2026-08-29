@@ -1,185 +1,183 @@
-# Diagnósticos e correções — `andreata_case4` (Configuração 4, Figura 5.4)
+# Diagnostics and fixes — `andreata_case4` (Configuration 4, Figure 5.4)
 
-**Contexto:** `andreata_case4` combina o duto HDPE do `andreata_case2` com o
-ECC heterogêneo do `andreata_case3`. Sua criação exigiu um novo método
-gerador (`flat_hdpe_enclosed_with_shared_ecc_model`) e um novo `mtl_type`
-(`scc-flat-hdpe-ecc`), feitos junto com a padronização do campo `"type"` dos
-quatro JSONs andreata (`"scc-flat"`, `"scc-flat-hdpe"`, `"scc-flat-ecc"`,
-`"scc-flat-hdpe-ecc"`). Três problemas reais surgiram nesse trabalho, todos
-descobertos e corrigidos ainda na primeira implementação.
+**Context:** `andreata_case4` combines the HDPE duct of `andreata_case2` with the
+heterogeneous ECC of `andreata_case3`. Creating it required a new generator
+method (`flat_hdpe_enclosed_with_shared_ecc_model`) and a new `mtl_type`
+(`scc-flat-hdpe-ecc`), done together with the standardization of the `"type"` field of
+the four andreata JSONs (`"scc-flat"`, `"scc-flat-hdpe"`, `"scc-flat-ecc"`,
+`"scc-flat-hdpe-ecc"`). Three real problems arose in that work, all
+discovered and fixed within the first implementation.
 
 ---
 
-## Item 1 — `'HDPE'` (maiúsculo) não registrado após tornar `"type"` funcional
+## Item 1 — `'HDPE'` (uppercase) not registered after making `"type"` functional
 
-**Onde:** `mtl_main/strategy.py` (`mtl_strategy_factory`), `mtl_main/graphics.py`.
+**Where:** `mtl_main/strategy.py` (`mtl_strategy_factory`), `mtl_main/graphics.py`.
 
-**Contexto:** ao tornar `underground_flat_model()`/`flat_hdpe_enclosed_model()`
-sensíveis ao campo `"type"` do JSON (antes hardcodavam `'scc'`/`'hdpe'`,
-ignorando o JSON por completo), confirmou-se por grep que nenhum dos 8 casos
-irmãos que compartilham esses dois métodos tinha campo `"type"` no nível
-raiz do JSON — **exceto** `hdpe_300mm2.json`/`hdpe_2000mm2.json`, que já
-tinham `"type": "HDPE"` (maiúsculo, não `"hdpe"`) havia tempo, sem que isso
-importasse (o hardcode anterior o ignorava). Ao tornar o campo funcional,
-esse valor passou a vazar para `model['type']`, e `'HDPE'` não estava
-registrado em nenhum lugar — `mtl_strategy_factory` lançava
+**Context:** when making `underground_flat_model()`/`flat_hdpe_enclosed_model()`
+sensitive to the JSON `"type"` field (previously they hardcoded `'scc'`/`'hdpe'`,
+ignoring the JSON entirely), it was confirmed by grep that none of the 8 sibling
+cases that share those two methods had a `"type"` field at the JSON root
+level — **except** `hdpe_300mm2.json`/`hdpe_2000mm2.json`, which already
+had `"type": "HDPE"` (uppercase, not `"hdpe"`) for a long time, without it
+mattering (the previous hardcode ignored it). Once the field was made functional,
+that value started leaking into `model['type']`, and `'HDPE'` was not
+registered anywhere — `mtl_strategy_factory` raised
 `ValueError: Unknown or unsupported MTL type: HDPE`.
 
-**Causa raiz:** a verificação inicial de segurança (grep pela string
-literal `"type"` nos 8 JSONs, usando um glob com chaves `{a,b,c}/*.json`)
-retornou "nenhum resultado" incorretamente — o glob com chaves não expandiu
-como esperado na ferramenta de busca usada, mascarando a presença de
-`hdpe_300mm2.json`/`hdpe_2000mm2.json` na lista. Uma segunda verificação,
-usando o parser JSON do Python diretamente arquivo a arquivo (mais lenta,
-porém confiável), revelou o valor `"HDPE"` nos dois arquivos.
+**Root cause:** the initial safety check (grep for the literal string
+`"type"` in the 8 JSONs, using a glob with braces `{a,b,c}/*.json`)
+returned "no result" incorrectly — the brace glob did not expand
+as expected in the search tool used, masking the presence of
+`hdpe_300mm2.json`/`hdpe_2000mm2.json` in the list. A second check,
+using Python's JSON parser directly file by file (slower,
+but reliable), revealed the `"HDPE"` value in the two files.
 
-**Correção:** `'HDPE'` registrado como alias explícito em
-`mtl_strategy_factory` (→ `SingleCoreCableInHDPEStrategy`, mesma classe de
-`'hdpe'`) e nos mesmos pontos de `mtl_main/graphics.py` onde `'hdpe'` já
-aparecia (branch de título/`h_factor` e tupla de exceção de
-`depth_ref_conductor`).
+**Fix:** `'HDPE'` registered as an explicit alias in
+`mtl_strategy_factory` (-> `SingleCoreCableInHDPEStrategy`, same class as
+`'hdpe'`) and in the same points of `mtl_main/graphics.py` where `'hdpe'` already
+appeared (title/`h_factor` branch and `depth_ref_conductor` exception tuple).
 
-**Validado:** `hdpe_300mm2.py`/`hdpe_2000mm2.py` voltaram a rodar até o fim
-sem erro, com os mesmos gráficos/esquemáticos de antes.
+**Validated:** `hdpe_300mm2.py`/`hdpe_2000mm2.py` ran to completion again
+without error, with the same plots/schematics as before.
 
-**Lição:** ao verificar "nenhum outro caso usa X" via busca textual antes de
-uma mudança que depende disso, preferir um parser real (ex.: `json.load`)
-a um grep com glob complexo — um falso negativo aqui quase chegou a
-implementação sem essa rede de segurança.
+**Lesson:** when checking "no other case uses X" via textual search before
+a change that depends on it, prefer a real parser (e.g. `json.load`)
+over a grep with a complex glob — a false negative here almost reached
+implementation without that safety net.
 
 ---
 
-## Item 2 — Dispatch heterogêneo restrito à string exata `'scc-flat-ecc'`
+## Item 2 — Heterogeneous dispatch restricted to the exact string `'scc-flat-ecc'`
 
-**Onde:** `analytical_forms/single_core_cable.py:944`
+**Where:** `analytical_forms/single_core_cable.py:944`
 (`InternalPerUnitParameters.matrices`).
 
-**Sintoma original:** ao rodar `andreata_case4.py` pela primeira vez (após
-corrigir o Item 1), o script chegava a `EquivalentRadiiSystems(mtl_ers_base)`
-e quebrava com `KeyError: 'hdpe'` em
-`analytical_forms/single_core_cable.py:265` — mas o erro real não estava
-nessa linha, e sim numa causa anterior:
+**Original symptom:** when running `andreata_case4.py` for the first time (after
+fixing Item 1), the script reached `EquivalentRadiiSystems(mtl_ers_base)`
+and broke with `KeyError: 'hdpe'` in
+`analytical_forms/single_core_cable.py:265` — but the real error was not on
+that line, but in a prior cause:
 
-**Causa raiz (duas camadas):**
-1. **`model_ers_base`** é construído via `flat_hdpe_enclosed_model()` sobre
-   o `SingleCoreCableModelGenerator` de `andreata_case4.json` — cujo `"type"`
-   de nível raiz é `"scc-flat-hdpe-ecc"` (descreve o caso como um todo, para
-   o modelo heterogêneo). Como `flat_hdpe_enclosed_model()` agora lê
-   `self.input_data.get('type', 'hdpe')` (Item 0 da padronização), e o JSON
-   *tem* um `"type"`, o modelo homogêneo resultante herdou `type =
-   'scc-flat-hdpe-ecc'` em vez de `'hdpe'` — mapeando para
-   `SingleCoreCableWithECCStrategy` (heterogênea) em vez de
-   `SingleCoreCableInHDPEStrategy`. O `context.scc` heterogêneo (agrupado
-   por cabo) não tem chave `'hdpe'`, daí o `KeyError`.
-   **Corrigido** forçando `model_ers_base['type'] = 'hdpe'` explicitamente
-   em `andreata_case4.py`, logo após a geração — este modelo é sempre
-   homogêneo por construção (nunca tem ECC), então o `"type"` do JSON (que
-   descreve o caso heterogêneo como um todo) não se aplica a ele.
-2. **Consequência mais séria, só percebida ao investigar a primeira:** pelo
-   mesmo motivo, `model_1`/`model_2`/`model_3` (construídos via
-   `flat_scc_with_ecc_cable_model()`, usada para os 3 cenários analíticos)
-   *também* herdam `type = 'scc-flat-hdpe-ecc'` do JSON, em vez do
-   `'scc-flat-ecc'` que esse método usa como default. Isso não quebra o
-   registro de estratégia (ambos os tipos mapeiam para
-   `SingleCoreCableWithECCStrategy` em `mtl_strategy_factory` — deliberado,
-   ver Item 2 de "Mudanças" no plano), mas quebraria silenciosamente
-   `InternalPerUnitParameters.matrices()`: o dispatch para o caminho
-   heterogêneo (`_matrices_heterogeneous`, que sabe montar blocos
-   `[2,2,2,1]`) checava a string exata `mtl_type == 'scc-flat-ecc'` — com
-   `mtl_type == 'scc-flat-hdpe-ecc'`, cairia no ramo genérico/homogêneo,
-   incompatível com o `context.scc` agrupado por cabo (mesma classe de erro
-   do Item 4 de `andreata_case3/BUGS_AND_FIXES.md`, agora por um caminho
-   diferente).
+**Root cause (two layers):**
+1. **`model_ers_base`** is built via `flat_hdpe_enclosed_model()` on top of
+   the `SingleCoreCableModelGenerator` of `andreata_case4.json` — whose root-level
+   `"type"` is `"scc-flat-hdpe-ecc"` (describes the case as a whole, for
+   the heterogeneous model). Since `flat_hdpe_enclosed_model()` now reads
+   `self.input_data.get('type', 'hdpe')` (Item 0 of the standardization), and the JSON
+   *has* a `"type"`, the resulting homogeneous model inherited `type =
+   'scc-flat-hdpe-ecc'` instead of `'hdpe'` — mapping to
+   `SingleCoreCableWithECCStrategy` (heterogeneous) instead of
+   `SingleCoreCableInHDPEStrategy`. The heterogeneous `context.scc` (grouped
+   by cable) has no `'hdpe'` key, hence the `KeyError`.
+   **Fixed** by forcing `model_ers_base['type'] = 'hdpe'` explicitly
+   in `andreata_case4.py`, right after the generation — this model is always
+   homogeneous by construction (never has an ECC), so the JSON `"type"` (which
+   describes the heterogeneous case as a whole) does not apply to it.
+2. **More serious consequence, only noticed while investigating the first:** for the
+   same reason, `model_1`/`model_2`/`model_3` (built via
+   `flat_scc_with_ecc_cable_model()`, used for the 3 analytical scenarios)
+   *also* inherit `type = 'scc-flat-hdpe-ecc'` from the JSON, instead of the
+   `'scc-flat-ecc'` that this method uses as a default. This does not break the
+   strategy registration (both types map to
+   `SingleCoreCableWithECCStrategy` in `mtl_strategy_factory` — deliberate,
+   see Item 2 of "Changes" in the plan), but it would silently break
+   `InternalPerUnitParameters.matrices()`: the dispatch to the
+   heterogeneous path (`_matrices_heterogeneous`, which knows how to assemble
+   `[2,2,2,1]` blocks) checked the exact string `mtl_type == 'scc-flat-ecc'` — with
+   `mtl_type == 'scc-flat-hdpe-ecc'`, it would fall into the generic/homogeneous
+   branch, incompatible with the per-cable grouped `context.scc` (same class of error
+   as Item 4 of `andreata_case3/BUGS_AND_FIXES.md`, now via a different path).
 
-**Correção:** generalizado o dispatch em
-`analytical_forms/single_core_cable.py:944` para
-`if self.model.mtl_type in ('scc-flat-ecc', 'scc-flat-hdpe-ecc'):` — a
-verificação correta é "este `mtl_type` mapeia para
-`SingleCoreCableWithECCStrategy`?", não uma string específica; qualquer
-`mtl_type` futuro que reaproveite essa mesma estratégia herda o dispatch
-correto automaticamente. Corrigido também na mesma função que a
-`ComsolPostProcessor.load_scc_earth_return_and_internal_scenarios` chama
-internamente (mesmo `InternalPerUnitParameters.matrices`), sem precisar de
-correção separada em `utils/comsol_data.py` (que já lê `block_sizes` do
-resultado, sem checar `mtl_type` — Item 5 de `andreata_case3/BUGS_AND_FIXES.md`).
+**Fix:** generalized the dispatch in
+`analytical_forms/single_core_cable.py:944` to
+`if self.model.mtl_type in ('scc-flat-ecc', 'scc-flat-hdpe-ecc'):` — the correct
+check is "does this `mtl_type` map to
+`SingleCoreCableWithECCStrategy`?", not a specific string; any future
+`mtl_type` that reuses this same strategy inherits the correct dispatch
+automatically. Also fixed in the same function that
+`ComsolPostProcessor.load_scc_earth_return_and_internal_scenarios` calls
+internally (same `InternalPerUnitParameters.matrices`), without needing a
+separate fix in `utils/comsol_data.py` (which already reads `block_sizes` from the
+result, without checking `mtl_type` — Item 5 of `andreata_case3/BUGS_AND_FIXES.md`).
 
-**Validado:** `andreata_case4.py` roda até o fim sem erro; validação cruzada
-contra `andreata_case3` (cenário `'1'`, duto ignorado) com erro relativo
-máx. 0,05% (Zs) / 0,12% (Ysh) — mesma ordem de grandeza da validação
-equivalente do `andreata_case2` contra `andreata_case1` (0,06%/0,15%).
-Regressão limpa em `andreata_case1`, `andreata_case2`, `andreata_case3` e
-nos 8 casos irmãos de `underground_flat_model`/`flat_hdpe_enclosed_model`.
+**Validated:** `andreata_case4.py` runs to completion without error; cross-validation
+against `andreata_case3` (scenario `'1'`, duct ignored) with a max relative
+error of 0.05% (Zs) / 0.12% (Ysh) — same order of magnitude as the equivalent
+`andreata_case2` validation against `andreata_case1` (0.06%/0.15%).
+Clean regression on `andreata_case1`, `andreata_case2`, `andreata_case3` and
+on the 8 sibling cases of `underground_flat_model`/`flat_hdpe_enclosed_model`.
 
-**Lição:** ao registrar um novo `mtl_type` que reaproveita uma estratégia
-existente (`mtl_strategy_factory`), sempre grepar por checagens de string
-exata daquele `mtl_type` em outros módulos (`analytical_forms/`,
-`utils/comsol_data.py`, `mtl_main/graphics.py`) — o registro na factory por
-si só não garante que todo o pipeline reconheça o novo nome.
+**Lesson:** when registering a new `mtl_type` that reuses an existing strategy
+(`mtl_strategy_factory`), always grep for exact-string checks of that `mtl_type` in
+other modules (`analytical_forms/`,
+`utils/comsol_data.py`, `mtl_main/graphics.py`) — registration in the factory by
+itself does not guarantee the whole pipeline recognizes the new name.
 
 ---
 
-## Item 3 — Termo próprio do ECC no COMSOL descartado silenciosamente pelo parser de impedância interna
+## Item 3 — ECC self term in COMSOL silently discarded by the internal-impedance parser
 
-**Onde:** `utils/comsol_data.py` (`ComsolPostProcessor.get_scc_internal_impedance_matrix_combined`).
+**Where:** `utils/comsol_data.py` (`ComsolPostProcessor.get_scc_internal_impedance_matrix_combined`).
 
-**Contexto:** ao adicionar `Results/cmsl_internal_impedance_matrix.txt`
-(dado COMSOL real, específico do `andreata_case4`, simulação de 3
-condutores — núcleo, blindagem, ECC — em vez do arquivo legado de 2
-condutores reaproveitado por `andreata_case2`/`hdpe_300mm2`), o gráfico
-`internal_impedance_matrix.png` continuou sem nenhum marcador COMSOL para o
-elemento próprio do ECC (`p=6, q=6`), mesmo o dado existindo no arquivo.
+**Context:** when adding `Results/cmsl_internal_impedance_matrix.txt`
+(real COMSOL data, specific to `andreata_case4`, 3-conductor simulation —
+core, sheath, ECC — instead of the legacy 2-conductor file reused by
+`andreata_case2`/`hdpe_300mm2`), the plot
+`internal_impedance_matrix.png` still had no COMSOL marker for the
+ECC self element (`p=6, q=6`), even though the data existed in the file.
 
-**Sintoma:** nenhum traceback — só um aviso único no console, `Warning:
+**Symptom:** no traceback — only a single console warning, `Warning:
 COMSOL data not found for 'measured' with key 'impedance_matrix'.`
-(`plotter/scc_plotter.py:189`), referente apenas ao componente do ECC (os
-três de fase A — `cc`/`cs`/`ss` — plotavam normalmente).
+(`plotter/scc_plotter.py:189`), regarding only the ECC component (the
+three phase-A components — `cc`/`cs`/`ss` — plotted normally).
 
-**Causa raiz (duas camadas):**
-1. `get_scc_internal_impedance_matrix_combined()` tinha `N = 2` hardcoded e
-   lia só 3 das 9 colunas de dado do arquivo novo (`data1`, `data1_1`,
-   `data2_1`) — as 6 restantes, incluindo as 3 que envolvem o ECC (mútua
-   núcleo-ECC, mútua blindagem-ECC e o termo próprio do ECC, este último na
-   última coluna do arquivo, `data3(mf.VCoil_ecc_i0)` → coluna limpa
-   `data3_2`), eram descartadas silenciosamente — a matriz retornada
-   permanecia `(freq, 2, 2)` independentemente do arquivo ter 4 ou 9
-   colunas de dado.
-2. Mesmo lendo essas colunas, uma segunda incompatibilidade: o plotter usa
-   um único par `(p, q)` para indexar as três fontes de um mesmo componente
-   (analítica/COMSOL/MATLAB — `plotter/scc_plotter.py:170-202`), e o
-   `plot_config.py` do case4 pede `p=6, q=6` (índice **global** do ECC no
-   espaço de 7 condutores, mesma convenção do MATLAB/analítico). Uma matriz
-   COMSOL "local" de 3 condutores (núcleo=0, blindagem=1, ECC=2) teria
-   `Zi[:, 6, 6]` fora dos limites de qualquer forma — diferente de
-   `cc`/`cs`/`ss`, que só funcionam porque a fase A coincide por acaso com
-   os índices globais 0/1.
+**Root cause (two layers):**
+1. `get_scc_internal_impedance_matrix_combined()` had `N = 2` hardcoded and
+   read only 3 of the 9 data columns of the new file (`data1`, `data1_1`,
+   `data2_1`) — the remaining 6, including the 3 that involve the ECC (core-ECC
+   mutual, sheath-ECC mutual and the ECC self term, the latter in the
+   last column of the file, `data3(mf.VCoil_ecc_i0)` -> cleaned column
+   `data3_2`), were silently discarded — the returned matrix
+   stayed `(freq, 2, 2)` regardless of whether the file had 4 or 9
+   data columns.
+2. Even reading those columns, a second incompatibility: the plotter uses
+   a single `(p, q)` pair to index the three sources of the same component
+   (analytical/COMSOL/MATLAB — `plotter/scc_plotter.py:170-202`), and the
+   case4 `plot_config.py` asks for `p=6, q=6` (**global** index of the ECC in
+   the 7-conductor space, same convention as MATLAB/analytical). A "local"
+   3-conductor COMSOL matrix (core=0, sheath=1, ECC=2) would have
+   `Zi[:, 6, 6]` out of bounds anyway — unlike
+   `cc`/`cs`/`ss`, which only work because phase A coincides by chance with
+   the global indices 0/1.
 
-**Correção:** a função agora detecta o formato do arquivo pela presença da
-coluna `data1_2` (só existe quando há 3 colunas `data1(...)`, ou seja,
-quando o ECC está presente) e, nesse caso, monta a matriz já no espaço
-**global** de 7 condutores (`N = 7`, núcleo=0, blindagem=1, ECC=6 — mesma
-convenção de `MatlabDataReader.conductor_order` e do `p=6, q=6` usado em
-todo `plot_config.py`), preenchendo só os índices 0/1/6 (o resto permanece
-zero) a partir das 9 colunas: `data1_2`/`data2_2` para as mútuas
-núcleo-ECC/blindagem-ECC, `data3_2` para o termo próprio do ECC. Para o
-arquivo legado de 2 condutores (`data1_2` ausente), o comportamento
-permanece **idêntico** ao anterior (`N = 2`, mesmas 3 atribuições).
+**Fix:** the function now detects the file format by the presence of the
+`data1_2` column (only exists when there are 3 `data1(...)` columns, i.e.
+when the ECC is present) and, in that case, assembles the matrix already in the
+**global** 7-conductor space (`N = 7`, core=0, sheath=1, ECC=6 — same
+convention as `MatlabDataReader.conductor_order` and the `p=6, q=6` used in
+all of `plot_config.py`), filling only indices 0/1/6 (the rest stays
+zero) from the 9 columns: `data1_2`/`data2_2` for the core-ECC/sheath-ECC
+mutuals, `data3_2` for the ECC self term. For the legacy 2-conductor
+file (`data1_2` absent), the behavior stays **identical** to before
+(`N = 2`, same 3 assignments).
 
-**Validado:**
-- `andreata_case4.py`: o aviso de dado COMSOL não encontrado desaparece; o
-  gráfico `internal_impedance_matrix.png` passa a mostrar um 4º marcador
-  COMSOL (verde, ECC) em `p=6, q=6`, que acompanha de perto os pontos
-  MATLAB do ECC (também verdes) em ambos os painéis (R e L) — consistente
-  com a mesma ordem de grandeza e formato de curva, mesmo padrão de
-  concordância já observado para `cc`/`cs`/`ss`.
-- Regressão limpa (mesmo arquivo/função, formato de 2 condutores) em
+**Validated:**
+- `andreata_case4.py`: the missing-COMSOL-data warning disappears; the
+  plot `internal_impedance_matrix.png` now shows a 4th COMSOL marker
+  (green, ECC) at `p=6, q=6`, which closely follows the ECC MATLAB
+  points (also green) in both panels (R and L) — consistent
+  with the same order of magnitude and curve shape, same agreement
+  pattern already observed for `cc`/`cs`/`ss`.
+- Clean regression (same file/function, 2-conductor format) on
   `andreata_case1`, `andreata_case2`, `andreata_case3`, `hdpe_300mm2`,
-  `scc_132kV_xue`, `scc_34kV_andreata`, `scc_138kV_prysmian` — todos os
-  outros consumidores de `load_scc_earth_return_and_internal_scenarios`/
-  `get_scc_internal_impedance_matrix_combined` no repositório.
+  `scc_132kV_xue`, `scc_34kV_andreata`, `scc_138kV_prysmian` — all the
+  other consumers of `load_scc_earth_return_and_internal_scenarios`/
+  `get_scc_internal_impedance_matrix_combined` in the repository.
 
-**Lição:** um parser com dimensão de matriz hardcoded (`N = 2`) não avisa
-quando o arquivo de entrada cresce (mais colunas) — ele só lê o que já
-esperava e descarta o resto em silêncio. Vale detectar o formato pelo
-conteúdo (presença/ausência de uma coluna-chave) em vez de assumir um
-tamanho fixo, especialmente em parsers de dados externos (COMSOL/MATLAB)
-que têm mais de um layout de arquivo em uso no repositório.
+**Lesson:** a parser with a hardcoded matrix dimension (`N = 2`) does not warn
+when the input file grows (more columns) — it just reads what it already
+expected and discards the rest silently. It pays to detect the format by
+content (presence/absence of a key column) instead of assuming a fixed
+size, especially in external-data parsers (COMSOL/MATLAB)
+that have more than one file layout in use in the repository.

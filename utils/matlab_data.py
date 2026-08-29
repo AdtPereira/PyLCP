@@ -9,22 +9,22 @@ import scipy.io as sio
 
 class MatlabDataReader:
     """
-    Uma classe dedicada para ler e analisar todos os arquivos .mat do MATLAB
-    do diretório 'Results' de um caso específico, de forma análoga ao
+    A dedicated class to read and parse all MATLAB .mat files
+    from the 'Results' directory of a specific case, analogously to
     ComsolDataReader (utils/comsol_data.py).
 
-    Ela descobre e carrega automaticamente todos os arquivos .mat, retornando-os
-    em um dicionário estruturado.
+    It automatically discovers and loads every .mat file, returning them
+    in a structured dictionary.
     """
 
     def __init__(self, script_file_path: str, autoShow: bool = True):
         """
-        Inicializa o leitor identificando o diretório 'Results' alvo.
+        Initializes the reader by identifying the target 'Results' directory.
 
         Args:
-            script_file_path (str): O __file__ do script que está chamando
-                                     (usado para localizar o diretório do caso).
-            autoShow (bool): Se True, exibe um resumo dos dados carregados.
+            script_file_path (str): The __file__ of the calling script
+                                     (used to locate the case directory).
+            autoShow (bool): If True, displays a summary of the loaded data.
         """
         project_root = Path(script_file_path).resolve().parents[2]
         if str(project_root) not in sys.path:
@@ -37,10 +37,10 @@ class MatlabDataReader:
         self.results_path = project_root / 'testData' / case_name / 'Results'
 
         print(f"Project root configured at: {project_root}")
-        print(f"\nInstanciando MatlabDataReader para o caso '{case_name}' ---")
+        print(f"\nInstantiating MatlabDataReader for case '{case_name}' ---")
 
         if not self.results_path.is_dir():
-            print(f"  Aviso: diretório Results não encontrado para o caso '{case_name}'. Dados MATLAB ignorados.")
+            print(f"  Warning: Results directory not found for case '{case_name}'. MATLAB data ignored.")
 
         self.data = self.load_all_results()
 
@@ -49,14 +49,14 @@ class MatlabDataReader:
 
     def load_all_results(self) -> dict:
         """
-        Verifica o diretório 'Results', carrega todos os arquivos .mat e os retorna
-        como um dicionário.
+        Scans the 'Results' directory, loads every .mat file and returns them
+        as a dictionary.
 
         Returns:
-            Um dicionário onde as chaves são os nomes dos arquivos (sem a extensão
-            .mat). O valor é o array NumPy da variável, caso o arquivo contenha uma
-            única variável de dados (caso comum), ou um dicionário {nome: array}
-            caso contenha mais de uma.
+            A dictionary where the keys are the file names (without the .mat
+            extension). The value is the variable's NumPy array when the file
+            contains a single data variable (the common case), or a dictionary
+            {name: array} when it contains more than one.
         """
         if not self.results_path.is_dir():
             return {}
@@ -65,31 +65,31 @@ class MatlabDataReader:
         data = {}
 
         if not mat_files:
-            print(f"Aviso: Nenhum arquivo .mat encontrado em {self.results_path}")
+            print(f"Warning: No .mat file found in {self.results_path}")
             return {}
 
-        print(f"Encontrado(s) {len(mat_files)} arquivo(s) .mat no diretório Results do caso '{self.case_name}'.")
+        print(f"Found {len(mat_files)} .mat file(s) in the Results directory of case '{self.case_name}'.")
 
         for file_path in mat_files:
             file_stem = file_path.stem
             try:
                 data[file_stem] = self._parse_single_file(file_path)
             except Exception as e:
-                print(f"Erro ao analisar o arquivo {file_path.name}: {e}")
+                print(f"Error while parsing file {file_path.name}: {e}")
 
         return data
 
     def _parse_single_file(self, file_path: Path):
         """
-        Carrega um único arquivo .mat (formato MATLAB level 5, via scipy.io.loadmat)
-        e retorna suas variáveis, ignorando as chaves de metadados do MATLAB
+        Loads a single .mat file (MATLAB level 5 format, via scipy.io.loadmat)
+        and returns its variables, ignoring the MATLAB metadata keys
         ('__header__', '__version__', '__globals__').
 
-        Matrizes 3D quadradas exportadas no formato MATLAB (N, N, num_freq) são
-        reordenadas para (num_freq, N, N), a convenção usada pelas demais matrizes
-        PUL do pyLCP (ver, por ex., InternalPerUnitParameters).
+        Square 3D matrices exported in the MATLAB (N, N, num_freq) format are
+        reordered to (num_freq, N, N), the convention used by the other pyLCP
+        PUL matrices (see, e.g., InternalPerUnitParameters).
         """
-        print(f"  -> Carregando e analisando: {file_path.name}...")
+        print(f"  -> Loading and parsing: {file_path.name}...")
 
         raw = sio.loadmat(file_path)
         variables = {}
@@ -106,17 +106,17 @@ class MatlabDataReader:
 
     def show_summary(self):
         """
-        Exibe um resumo de todos os dados carregados (nomes de variáveis, shapes
-        e dtypes).
+        Displays a summary of every loaded dataset (variable names, shapes
+        and dtypes).
         """
         if not self.data:
-            print("Nenhum dado carregado para exibir o resumo. Execute 'load_all_results()' primeiro.")
+            print("No data loaded to display the summary. Run 'load_all_results()' first.")
             return
 
-        print(f"\n--- Resumo dos Dados Carregados para o Caso '{self.case_name}' ---")
+        print(f"\n--- Summary of the Loaded Data for Case '{self.case_name}' ---")
         for name, value in self.data.items():
             print(f"\n==================================================")
-            print(f"  Arquivo: '{name}.mat'")
+            print(f"  File: '{name}.mat'")
             print(f"==================================================")
 
             variables = value if isinstance(value, dict) else {name: value}
@@ -128,13 +128,13 @@ class MatlabDataReader:
     @staticmethod
     def _reorder_conductor_matrix(matrix, conductor_order: Sequence[int]):
         """
-        O MATLAB exporta os condutores agrupados por tipo: [core_A, core_B, core_C,
-        sheath_A, sheath_B, sheath_C]. O pyLCP monta suas matrizes (interna e
-        quasi-TEM) agrupadas por cabo: [core_A, sheath_A, core_B, sheath_B,
-        core_C, sheath_C] (ver np.kron(np.identity(N), Zij) em
-        InternalPerUnitParameters.matrices()). Sem essa reordenação, M[p,q]
-        (pyLCP) e Z[p,q] (MATLAB) apontam para pares de condutores fisicamente
-        diferentes para os mesmos índices (p, q).
+        MATLAB exports the conductors grouped by type: [core_A, core_B, core_C,
+        sheath_A, sheath_B, sheath_C]. pyLCP assembles its matrices (internal and
+        quasi-TEM) grouped by cable: [core_A, sheath_A, core_B, sheath_B,
+        core_C, sheath_C] (see np.kron(np.identity(N), Zij) in
+        InternalPerUnitParameters.matrices()). Without this reordering, M[p,q]
+        (pyLCP) and Z[p,q] (MATLAB) point to physically different conductor
+        pairs for the same indices (p, q).
         """
         if matrix is None:
             return None
@@ -142,23 +142,22 @@ class MatlabDataReader:
 
     def get_scc_scenario_data(self, prefix: str, conductor_order: Sequence[int]) -> dict:
         """
-        Monta o dicionário de dados de referência do MATLAB (no formato usado por
-        pul_data['matlab']) para um caso SCC (núcleo + bainha), a partir dos
-        arquivos exportados com o prefixo `prefix` (ex.: 'andreata' ->
+        Assembles the MATLAB reference-data dictionary (in the format used by
+        pul_data['matlab']) for an SCC case (core + sheath), from the files
+        exported with the prefix `prefix` (e.g. 'andreata' ->
         'andreata_frequency_range', 'andreata_series_impedance_matrix', ...).
 
-        `conductor_order` reordena os condutores da convenção MATLAB (agrupada
-        por tipo) para a convenção pyLCP (agrupada por cabo); ver
-        `_reorder_conductor_matrix`. As duas matrizes de retorno pelo solo (Zg,
-        Pg) seguem o mesmo layout tipo-agrupado das demais -- núcleo e bainha
-        do mesmo cabo têm entradas redundantes (idênticas), já que o retorno
-        pelo solo só depende da posição do cabo, não de qual condutor dentro
-        dele -- por isso usam a mesma `_reorder_conductor_matrix`, sem recorte
-        especial.
+        `conductor_order` reorders the conductors from the MATLAB convention
+        (grouped by type) to the pyLCP convention (grouped by cable); see
+        `_reorder_conductor_matrix`. The two ground-return matrices (Zg, Pg)
+        follow the same type-grouped layout as the others -- core and sheath of
+        the same cable have redundant (identical) entries, since the ground
+        return only depends on the cable position, not on which conductor inside
+        it -- so they use the same `_reorder_conductor_matrix`, with no special
+        slicing.
 
-        Retorna 'frequencies' como None se o arquivo correspondente não for
-        encontrado -- o fallback (ex.: para pul_data['frequencies']) fica a
-        cargo do chamador.
+        Returns 'frequencies' as None if the corresponding file is not found --
+        the fallback (e.g. to pul_data['frequencies']) is up to the caller.
         """
         frequencies = self.data.get(f'{prefix}_frequency_range')
 

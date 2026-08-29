@@ -1,31 +1,31 @@
 '''
 PRYSMIAN_138kV_CORE_SHEATH Cable Data (in meters):
-1. CONDUTOR: Corda de cobre tipo circular compacta, de acordo com os requisitos da norma NBR NM 280 (classe 2). Seção nominal: 500 mm2
-    Diâmetro nominal: 25,95 mm
-2. ENFAIXAMENTO DO CONDUTOR:  Fita semicondutora contendo pó inchante e fita de nylon, ambas aplicadas helicoidalmente sobre o condutor.
-    Diâmetro nominal: 26,73 mm
-3.BLINDAGEM DO CONDUTOR: Camada extrudada de composto semicondutor à base de XLPE. Espessura nominal: 1,5 mm
-    Diâmetro nominal: 29,73 mm
-4. ISOLAÇÃO: Camada extrudada de polietileno reticulado (XLPE) Espessura nominal: 13,31 mm
-    Diâmetro nominal: 60,35 mm
-    Permitividade relativa nominal: 2.3
-5. BLINDAGEM DA ISOLAÇÃO: Camada extrudada de composto semicondutor à base de XLPE. Espessura nominal: 1,5 mm
-    Diâmetro nominal: 63,35 mm
-6. ENFAIXAMENTO DA ISOLAÇÃO: Fita semicondutora contendo pó inchante, aplicada helicoidalmente sobre a blindagem da isolação.
-    Diâmetro nominal: 64,63 mm
-7. CAPA METÁLICA: Capa extrudada de liga de chumbo. Espessura nominal: 3,00 mm
-    Diâmetro nominal: 70,63 mm
-    Seção nominal: 637,4 mm2
-8. COBERTURA: Camada extrudada de polietileno de alta densidade (HDPE) contendo aditivo de proteção contra térmitas e grafite em pó.
-    Espessura nominal: 4,0 mm
-    Diâmetro nominal: 78,63 mm
+1. CONDUCTOR: Compact circular copper stranded conductor, per the requirements of standard NBR NM 280 (class 2). Nominal cross-section: 500 mm2
+    Nominal diameter: 25.95 mm
+2. CONDUCTOR TAPING: Semiconducting tape containing swelling powder plus a nylon tape, both applied helically over the conductor.
+    Nominal diameter: 26.73 mm
+3. CONDUCTOR SHIELD: Extruded layer of XLPE-based semiconducting compound. Nominal thickness: 1.5 mm
+    Nominal diameter: 29.73 mm
+4. INSULATION: Extruded layer of cross-linked polyethylene (XLPE). Nominal thickness: 13.31 mm
+    Nominal diameter: 60.35 mm
+    Nominal relative permittivity: 2.3
+5. INSULATION SHIELD: Extruded layer of XLPE-based semiconducting compound. Nominal thickness: 1.5 mm
+    Nominal diameter: 63.35 mm
+6. INSULATION TAPING: Semiconducting tape containing swelling powder, applied helically over the insulation shield.
+    Nominal diameter: 64.63 mm
+7. METALLIC SHEATH: Extruded lead-alloy sheath. Nominal thickness: 3.00 mm
+    Nominal diameter: 70.63 mm
+    Nominal cross-section: 637.4 mm2
+8. OUTER JACKET: Extruded layer of high-density polyethylene (HDPE) containing termite-protection additive and graphite powder.
+    Nominal thickness: 4.0 mm
+    Nominal diameter: 78.63 mm
 
-PROPRIEDADES ELÉTRICAS
-1. TENSÃO EFICAZ ENTRE FASE E TERRA (kV): 79,69
-2. TENSÃO EFICAZ ENTRE FASES (kV): 138
-3. NÍVEL BÁSICO DE IMPULSO (NBI) (kV): 650
-4. RESISTÊNCIA CC MÁXIMA DO CONDUTOR A 20º C (ohn/km): 0,0366
-5. CAPACITÂNCIA (mF/km): 0,1805
+ELECTRICAL PROPERTIES
+1. RMS PHASE-TO-EARTH VOLTAGE (kV): 79.69
+2. RMS PHASE-TO-PHASE VOLTAGE (kV): 138
+3. BASIC IMPULSE LEVEL (BIL) (kV): 650
+4. MAXIMUM DC CONDUCTOR RESISTANCE AT 20 deg C (ohm/km): 0.0366
+5. CAPACITANCE (uF/km): 0.1805
 '''
 
 import sys

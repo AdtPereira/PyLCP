@@ -2,14 +2,14 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Debug: Arquivo Atual como Módulo",
+            "name": "Debug: Current File as Module",
             "type": "debugpy",
             "request": "launch",
             "python": "C:\\Users\\adilt\\miniconda3\\envs\\pylcp\\python.exe",
             "console": "integratedTerminal",
-            // Executa o nosso script runner
+            // Runs our runner script
             "program": "${workspaceFolder}/debug_runner.py",
-            // Passa o caminho do arquivo atualmente aberto como um argumento para o script
+            // Passes the path of the currently open file as an argument to the script
             "args": ["${file}"]
         }
     ]

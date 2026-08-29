@@ -32,7 +32,7 @@ def main():
     cmsl_processor = ComsolPostProcessor(__file__)
     series_impedance_terms = cmsl_processor.get_bifilar_data()
     for key, value in pul_data['comsol']['scenarios'].items():
-        print(f"  -> Processando COMSOL para: {key}")
+        print(f"  -> Processing COMSOL for: {key}")
         if series_impedance_terms is not None:
             value['partial_impedance_matrix'] = series_impedance_terms['partial_impedance_matrix']
             value['series_impedance_matrix'] = series_impedance_terms['series_impedance_matrix']

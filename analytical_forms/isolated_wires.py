@@ -92,41 +92,41 @@ class WiresHomogeneousMedia:
 
     def bifilar_series_impedance(self):
         """
-        Calcula a impedância série do laço bifilar, vetorizada por frequência.
-        Assume um sistema com um condutor ativo (tag=1) e um de retorno (tag=0),
-        e que ambos são idênticos (usa parâmetros do condutor 1).
+        Computes the series impedance of the bifilar loop, vectorized over frequency.
+        Assumes a system with one active conductor (tag=1) and one return conductor (tag=0),
+        and that both are identical (uses the parameters of conductor 1).
 
-        O formato de saída foi alterado para (N, 1, 1) para consistência
-        com saídas matriciais.
+        The output shape was changed to (N, 1, 1) for consistency
+        with matrix outputs.
 
         Returns:
-            dict: Dicionário contendo a impedância série total do laço 'Zs_loop'
-                  (matriz 3D complexa, shape=(N, 1, 1)) e a resistência de 
-                  alta frequência 'Rhf_loop' (matriz 3D real, shape=(N, 1, 1)).
+            dict: Dictionary containing the total series loop impedance 'Zs_loop'
+                  (complex 3D matrix, shape=(N, 1, 1)) and the high-frequency
+                  resistance 'Rhf_loop' (real 3D matrix, shape=(N, 1, 1)).
         """
         if self.num_conductors != 2:
-            raise ValueError("Cálculo de impedância bifilar é válido apenas para 2 condutores.")
+            raise ValueError("Bifilar impedance computation is only valid for 2 conductors.")
 
-        # 1. Obter dados dos condutores (assumindo tags 0 e 1)
+        # 1. Get the conductor data (assuming tags 0 and 1)
         conductor = self.mtl[1]
         cond_ref = self.mtl[0]
 
-        # 2. Calcular distância (escalar)
+        # 2. Compute the distance (scalar)
         center_active = np.array(conductor['center_point'])
         center_ref = np.array(cond_ref['center_point'])
         D10 = np.linalg.norm(center_active - center_ref)
 
-        # 3. Extrair parâmetros
+        # 3. Extract parameters
         w = 2 * np.pi * self.f
         ap = conductor['radius'][1]
         sigma = conductor['conductivity']
 
-        # 4. Inicializar vetores de saída (ALTERAÇÃO AQUI)
-        # Formato: (N_freq, 1, 1)
+        # 4. Initialize the output vectors (CHANGE HERE)
+        # Shape: (N_freq, 1, 1)
         Zs = np.zeros((self.num_freq, 1, 1), dtype=complex)
         Rhf = np.zeros((self.num_freq, 1, 1), dtype=float)
 
-        # --- Cálculo AC (f > 0) ---
+        # --- AC computation (f > 0) ---
         ac_idx = (self.f > 0)
         if np.any(ac_idx):
             with np.errstate(divide='ignore', invalid='ignore'):
@@ -135,34 +135,34 @@ class WiresHomogeneousMedia:
                 Xi = np.sqrt(2) * ap / delta
                 constant_term = 1 / (np.sqrt(2) * np.pi * ap * sigma * delta)
 
-            # Resistência HF (Rhf) e Indutância Externa (Lext)
+            # HF resistance (Rhf) and external inductance (Lext)
             s_2rw = D10 / (2 * ap)
-            
-            # ALTERAÇÃO AQUI: Atribui ao slice [ac_indices, 0, 0]
+
+            # CHANGE HERE: assign to the slice [ac_indices, 0, 0]
             Rhf[ac_idx, 0, 0] = Rs / (np.pi * ap) * s_2rw / np.sqrt(s_2rw**2 - 1)
             L_ext = self.mu[0] / np.pi * np.arccosh(s_2rw)
 
-            # Impedância Interna (Zi) com Funções de Bessel
+            # Internal impedance (Zi) with Bessel functions
             ber_bei = self.ber(Xi) + 1j * self.bei(Xi)
             beip_berp = self.bei_prime(Xi) - 1j * self.ber_prime(Xi)
-            
-            # Evita divisão por zero se o denominador for nulo
+
+            # Avoid division by zero if the denominator is null
             Zi_ac = np.full(w[ac_idx].shape, np.nan, dtype=complex) # 1D array
             valid_den = (np.abs(beip_berp) > 1e-12)
             Zi_ac[valid_den] = constant_term[valid_den] * ber_bei[valid_den] / beip_berp[valid_den]
-            
-            # Impedância Série Total (Zs)
+
+            # Total series impedance (Zs)
             Zs[ac_idx, 0, 0] = 2 * Zi_ac + self.jw[ac_idx] * L_ext
 
-        # --- Cálculo DC (f = 0) ---
+        # --- DC computation (f = 0) ---
         dc_idx = (self.f == 0)
         if np.any(dc_idx):
-            # Impedância interna DC é a resistência DC
-            R_dc = 1 / (sigma * np.pi * ap**2) # escalar
-            
-            # Impedância total do laço em DC é 2 * R_dc
+            # The DC internal impedance is the DC resistance
+            R_dc = 1 / (sigma * np.pi * ap**2) # scalar
+
+            # The total loop impedance at DC is 2 * R_dc
             Zs[dc_idx, 0, 0] = 2 * R_dc
-            Rhf[dc_idx, 0, 0] = 0.0            
+            Rhf[dc_idx, 0, 0] = 0.0
             
         return {
             'series_impedance_matrix': Zs,
@@ -171,43 +171,43 @@ class WiresHomogeneousMedia:
 
     def bifilar_static_params(self):
         """
-        Calcula a capacitância e indutância estáticas (PUL) para a
-        linha bifilar, usando as fórmulas exata e aproximada.
-        (Este método é independente da frequência).
+        Computes the static (PUL) capacitance and inductance for the
+        bifilar line, using the exact and approximate formulas.
+        (This method is frequency-independent).
 
         Returns:
-            dict: Um dicionário contendo capacitância e indutância
+            dict: A dictionary containing capacitance and inductance
                   ('exact', 'approximate').
         """
         if self.num_conductors != 2:
-            raise ValueError("Cálculo de parâmetros estáticos bifilares é válido apenas para 2 condutores.")
+            raise ValueError("Bifilar static-parameter computation is only valid for 2 conductors.")
 
-        # 2. Acesso direto aos dados dos condutores (tags 0 e 1)
+        # 2. Direct access to the conductor data (tags 0 and 1)
         c0, c1 = self.mtl[0], self.mtl[1]
         rw0, rw1 = c0['radius'][1], c1['radius'][1]
-        
-        # 3. Cálculo dinâmico da distância 's'
+
+        # 3. Dynamic computation of the distance 's'
         s = np.linalg.norm(np.array(c0['center_point']) - np.array(c1['center_point']))
 
-        # 4. Validação do meio externo e definição de epsilon
+        # 4. Validate the external medium and define epsilon
         eps_out_0, eps_out_1 = self.epsilon_out
         pi2e = 2 * np.pi * eps_out_0
         if not np.isclose(eps_out_0, eps_out_1):
-            print("Aviso: O meio externo deve ser homogêneo. Usando permissividade do condutor 0.")
-        
-        # 5. Cálculo da Capacitância
+            print("Warning: the external medium must be homogeneous. Using the permittivity of conductor 0.")
+
+        # 5. Capacitance computation
         den_approx = np.log((s**2) / (rw0 * rw1))
         capacitance_approx = pi2e / den_approx
         arg_arccosh = (s**2 - rw0**2 - rw1**2) / (2 * rw0 * rw1)
         den_exact = np.arccosh(arg_arccosh)
         capacitance_exact = pi2e / den_exact
 
-        # 6. Cálculo da Indutância (válido para meio não magnético)
+        # 6. Inductance computation (valid for a non-magnetic medium)
         mu_0 = self.mu[0]
         inductance_approx = mu_0 * eps_out_0 / capacitance_approx
         inductance_exact = mu_0 * eps_out_0 / capacitance_exact
 
-        # 7. Retorno dos resultados
+        # 7. Return the results
         return {
             'capacitance': {
                 'exact': capacitance_exact,
@@ -221,26 +221,26 @@ class WiresHomogeneousMedia:
 
     def n_wires_external_inductance(self):
         """
-        Calcula a matriz de indutância externa para N condutores (N-1 ativos
-        + 1 referência (tag=0)). (Independente da frequência).
+        Computes the external inductance matrix for N conductors (N-1 active
+        + 1 reference (tag=0)). (Frequency-independent).
 
         Returns:
-            dict: Dicionário contendo a matriz de indutância 'L_ext' (N-1 x N-1).
+            dict: Dictionary containing the inductance matrix 'L_ext' (N-1 x N-1).
         """
-        # O tamanho da matriz é (N_total - 1)
+        # The matrix size is (N_total - 1)
         n_plus_1 = self.num_conductors
         if n_plus_1 <= 1:
             return {'L_ext': np.array([])}
-            
+
         n_active = n_plus_1 - 1
         Lext = np.zeros((n_active, n_active), dtype=float)
 
-        # Dados do condutor de referência (tag=0)
+        # Data of the reference conductor (tag=0)
         ref_center = np.array(self.mtl[0]['center_point'])
         rw0 = self.mtl[0]['radius'][1]
         mu_2pi = self.mu[0] / (2 * np.pi)
 
-        # Tags ativas vão de 1 a n_active
+        # Active tags go from 1 to n_active
         for i in range(1, n_plus_1):
             center_i = np.array(self.mtl[i]['center_point'])
             rw_i = self.mtl[i]['radius'][1]
@@ -248,15 +248,15 @@ class WiresHomogeneousMedia:
 
             for j in range(1, n_plus_1):
                 center_j = np.array(self.mtl[j]['center_point'])
-                
-                # Mapeia índice da tag (1..N) para índice da matriz (0..N-1)
+
+                # Map the tag index (1..N) to the matrix index (0..N-1)
                 idx_i = i - 1
                 idx_j = j - 1
 
-                if i == j:  # Autoindutância
+                if i == j:  # Self-inductance
                     Lext[idx_i, idx_j] = mu_2pi * np.log(di0 ** 2 / (rw0 * rw_i))
-                
-                else:  # Indutância Mútua
+
+                else:  # Mutual inductance
                     dj0 = np.linalg.norm(center_j - ref_center)
                     dij = np.linalg.norm(center_i - center_j)
                     Lext[idx_i, idx_j] = mu_2pi * np.log(di0 * dj0 / (rw0 * dij))
@@ -265,61 +265,61 @@ class WiresHomogeneousMedia:
 
     def n_wires_capacitance(self, L):
         """
-        Calcula a matriz de capacitância por unidade de comprimento (C) a partir da
-        matriz de indutância (L) para um meio homogêneo, C = μ * ε * L⁻¹.
-        (Independente da frequência).
+        Computes the per-unit-length capacitance matrix (C) from the
+        inductance matrix (L) for a homogeneous medium, C = mu * eps * L^-1.
+        (Frequency-independent).
 
         Args:
-            L (np.ndarray): A matriz de indutância L (n x n).
+            L (np.ndarray): The inductance matrix L (n x n).
 
         Returns:
-            dict: Dicionário contendo a matriz de capacitância 'C_pul' (n x n).
+            dict: Dictionary containing the capacitance matrix 'C_pul' (n x n).
         """
         if L.shape[0] != L.shape[1]:
-            raise ValueError("A matriz de indutância deve ser quadrada.")
+            raise ValueError("The inductance matrix must be square.")
         if L.size == 0:
             return {'C_pul': np.array([])}
-            
+
         I = np.eye(L.shape[0])
-        
-        # Assume meio homogêneo
-        mu = self.mu[0]  
+
+        # Assume a homogeneous medium
+        mu = self.mu[0]
         epsilon = self.epsilon_out[0]
 
-        # Inversão via LU-solve (numericamente estável)
+        # Inversion via LU-solve (numerically stable)
         try:
             C = mu * epsilon * lu_solve(lu_factor(L), I)
             return {'C_pul': C}
         except np.linalg.LinAlgError:
-            print("Aviso: Matriz de indutância é singular. Não foi possível calcular a capacitância.")
+            print("Warning: the inductance matrix is singular. Could not compute the capacitance.")
             return {'C_pul': np.full_like(L, np.nan)}
 
     def get_all_terms(self):
         """
-        Calcula todos os parâmetros relevantes para a configuração MTL fornecida
-        e os retorna em um único dicionário.
-        
-        Este é o método principal a ser chamado de fora.
+        Computes every relevant parameter for the provided MTL configuration
+        and returns them in a single dictionary.
+
+        This is the main method to be called from outside.
         """
         results = {}
 
-        # --- Parâmetros Estáticos (N-fios, L/C Matrizes) ---
-        # Nota: Assume condutor 0 como referência
+        # --- Static Parameters (N-wire, L/C matrices) ---
+        # Note: assumes conductor 0 as the reference
         if self.num_conductors > 1:
             l_ext_dict = self.n_wires_external_inductance()
             results.update(l_ext_dict)
-            
+
             c_pul_dict = self.n_wires_capacitance(L=l_ext_dict['L_ext'])
             results.update(c_pul_dict)
 
-        # --- Parâmetros Específicos (Bifilar / 2-fios) ---
+        # --- Specific Parameters (Bifilar / 2-wire) ---
         if self.num_conductors == 2:
-            # Parâmetros estáticos (exato e aproximado)
+            # Static parameters (exact and approximate)
             static_params = self.bifilar_static_params()
             results['bifilar_static'] = static_params
-            
-            # Parâmetros dinâmicos (impedância de laço vs frequência)
+
+            # Dynamic parameters (loop impedance vs frequency)
             impedance_params = self.bifilar_series_impedance()
             results.update(impedance_params)
-            
+
         return results

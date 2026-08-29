@@ -306,25 +306,25 @@ class EquivalentRadiiSystems:
             self.r7 = scc['armor_insulation_outer_radius']
     
     def concentric_insulators(self):
-        # A fórmula para a capacitância de um cilindro coaxial é C = 2*pi*epsilon / ln(r_externo / r_interno)
+        # The formula for the capacitance of a coaxial cylinder is C = 2*pi*epsilon / ln(r_outer / r_inner)
 
-        # C_S: Capacitância da isolação da bainha do cabo
+        # C_S: Capacitance of the cable sheath insulation
         C_S = (2 * np.pi * self.ei2) / np.log(self.r5 / self.r4) if self.r5 > self.r4 else np.inf
 
-        # C_a: Capacitância do entreferro de ar
+        # C_a: Capacitance of the air gap
         C_a = (2 * np.pi * sc.epsilon_0) / np.log(self.r6 / self.r5) if self.r6 > self.r5 else np.inf
 
-        # C_H: Capacitância do duto de PEAD
+        # C_H: Capacitance of the HDPE duct
         C_H = (2 * np.pi * self.ei3) / np.log(self.r7 / self.r6) if self.r7 > self.r6 else np.inf
 
-        # --- Etapa 3: Calcular a capacitância total C0 para a conexão em série ---
+        # --- Step 3: Compute the total capacitance C0 for the series connection ---
         # C0 = (1/C_S + 1/C_a + 1/C_H)^-1 Eq. 9 [4]
         inv_C_S = 1 / C_S if C_S != np.inf else 0
         inv_C_a = 1 / C_a if C_a != np.inf else 0
         inv_C_H = 1 / C_H if C_H != np.inf else 0
         C0 = 1 / (inv_C_S + inv_C_a + inv_C_H)
 
-        # --- Etapa 4: Calcular a permissividade relativa equivalente eps_a ---
+        # --- Step 4: Compute the equivalent relative permittivity eps_a ---
         eps_a_relative = C0 * np.log(self.r7 / self.r4) / (2 * np.pi * sc.epsilon_0)
 
         print("\n======== Equivalent Radii Systems (ERS) Results ========")
@@ -677,7 +677,7 @@ class InternalPerUnitParameters:
             # --- z11: internal impedance of tubular core outer surface ---
             else:
                 with np.errstate(divide='ignore', invalid='ignore'):
-                    # Fórmula análoga à de z20 (impedância externa da bainha)
+                    # Formula analogous to that of z20 (external sheath impedance)
                     z11 = pm / (two_pi * r2) * coth(m_core * (r2 - r1)) + rho1 / (two_pi * r2 * (r1 + r2))
 
         if 'core_insulation_outer_radius' in scc:

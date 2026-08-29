@@ -143,20 +143,20 @@ class MergedComsolDataReader:
 
 class ComsolDataReader:
     """
-    Uma classe dedicada para ler e analisar todos os arquivos .txt do COMSOL
-    do diretório 'Results' de um caso específico.
+    A dedicated class to read and parse all COMSOL .txt files
+    from the 'Results' directory of a specific case.
 
-    Ela descobre, lê e analisa automaticamente todos os arquivos .txt, retornando-os
-    em um dicionário estruturado.
+    It automatically discovers, reads and parses every .txt file, returning them
+    in a structured dictionary.
     """
 
     def __init__(self, script_file_path: str, autoShow: bool = True):
         """
-        Inicializa o leitor identificando o diretório 'Results' alvo.
+        Initializes the reader by identifying the target 'Results' directory.
 
         Args:
-            project_root (Path): O diretório raiz do projeto pyLCP.
-            case_name (str): O nome do caso de teste específico (ex: 'coated_bifilar_s40').
+            project_root (Path): The root directory of the pyLCP project.
+            case_name (str): The name of the specific test case (e.g. 'coated_bifilar_s40').
         """
         project_root = Path(script_file_path).resolve().parents[2]
         if str(project_root) not in sys.path:
@@ -173,44 +173,44 @@ class ComsolDataReader:
             self.show_summary()
 
         print(f"Project root configured at: {project_root}")
-        print(f"\nInstanciando ComsolDataReader para o caso '{case_name}' ---")
-        
+        print(f"\nInstantiating ComsolDataReader for case '{case_name}' ---")
+
         if not self.results_path.is_dir():
-            print(f"  Aviso: diretório Results não encontrado para o caso '{case_name}'. Dados COMSOL ignorados.")
-        
+            print(f"  Warning: Results directory not found for case '{case_name}'. COMSOL data ignored.")
+
     def load_all_results(self) -> dict[str, pd.DataFrame]:
         """
-        Verifica o diretório 'Results', carrega todos os arquivos .txt e os retorna
-        como um dicionário de DataFrames.
+        Scans the 'Results' directory, loads every .txt file and returns them
+        as a dictionary of DataFrames.
 
         Returns:
-            Um dicionário onde as chaves são os nomes dos arquivos (sem a extensão .txt)
-            e os valores são os DataFrames do pandas analisados.
+            A dictionary where the keys are the file names (without the .txt extension)
+            and the values are the parsed pandas DataFrames.
         """
         txt_files = list(self.results_path.glob('*.txt'))
         data = {}
-        
+
         if not txt_files:
-            print(f"Aviso: Nenhum arquivo .txt encontrado em {self.results_path}")
+            print(f"Warning: No .txt file found in {self.results_path}")
             return {}
 
-        print(f"Encontrado(s) {len(txt_files)} arquivo(s) .txt no diretório Results do caso '{self.case_name}'.")
+        print(f"Found {len(txt_files)} .txt file(s) in the Results directory of case '{self.case_name}'.")
 
         for file_path in txt_files:
             file_stem = file_path.stem
             try:
                 data[file_stem] = self._parse_single_file(file_path)
             except Exception as e:
-                print(f"Erro ao analisar o arquivo {file_path.name}: {e}")
+                print(f"Error while parsing file {file_path.name}: {e}")
 
         return data
 
     def _parse_single_file(self, file_path: Path) -> pd.DataFrame:
         """
-        Método privado para ler e analisar um único arquivo .txt do COMSOL.
-        Contém a lógica de análise principal.
+        Private method to read and parse a single COMSOL .txt file.
+        Contains the main parsing logic.
         """
-        print(f"  -> Carregando e analisando: {file_path.name}...")
+        print(f"  -> Loading and parsing: {file_path.name}...")
         
         header_lines, data_lines = [], []
         with open(file_path, 'r', encoding='utf-8') as f:
@@ -248,9 +248,9 @@ class ComsolDataReader:
                 unique_raw.append(name)
 
         all_values_str = " ".join(data_lines).split()
-        if not all_values_str: raise ValueError("Nenhum dado encontrado no arquivo.")
+        if not all_values_str: raise ValueError("No data found in the file.")
         if len(all_values_str) % num_cols != 0:
-            raise ValueError(f"Incompatibilidade de dados: {len(all_values_str)} valores não é múltiplo de {num_cols} colunas.")
+            raise ValueError(f"Data mismatch: {len(all_values_str)} values is not a multiple of {num_cols} columns.")
 
         data_array = np.array(all_values_str).reshape(-1, num_cols)
         df = pd.DataFrame(data_array, columns=unique_raw)
@@ -279,21 +279,21 @@ class ComsolDataReader:
 
     def show_summary(self, head_rows: int = 5):
         """
-        Exibe um resumo de todos os DataFrames carregados, mostrando o head e info de cada um.
+        Displays a summary of every loaded DataFrame, showing the head and info of each one.
 
         Args:
-            head_rows (int): O número de linhas a serem exibidas do cabeçalho de cada DataFrame.
+            head_rows (int): The number of header rows to display for each DataFrame.
         """
         if not self.data:
-            print("Nenhum dado carregado para exibir o resumo. Execute 'load_all_results()' primeiro.")
+            print("No data loaded to display the summary. Run 'load_all_results()' first.")
             return
 
-        print(f"\n--- Resumo dos Dados Carregados para o Caso '{self.case_name}' ---")
+        print(f"\n--- Summary of the Loaded Data for Case '{self.case_name}' ---")
         for name, df in self.data.items():
             print(f"\n==================================================")
-            print(f"  Arquivo: '{name}.txt'")
+            print(f"  File: '{name}.txt'")
             print(f"==================================================")
-            
+
             print(f"\n--- Head ---")
             print(df.head(head_rows))
             
@@ -303,20 +303,20 @@ class ComsolDataReader:
 
 class ComsolPostProcessor:
     """
-    Classe para processar dados COMSOL específicos para linhas de transmissão
-    com configuração flat de 3 cabos (A, B, C) e construir matrizes de impedância
-    e admitância de retorno à terra.
+    Class to process COMSOL data specific to transmission lines
+    with a 3-cable flat arrangement (A, B, C) and to build the ground-return
+    impedance and admittance matrices.
     """
     def __init__(self, script_file_path: str, autoShow: bool = True):
         self.cmsl_reader = ComsolDataReader(script_file_path, autoShow=autoShow)
-        
+
     def get_general_parameters(self, cmsl_file_name: str = None) -> dict:
         """
-        Retorna os parâmetros gerais extraídos dos dados COMSOL.
+        Returns the general parameters extracted from the COMSOL data.
         """
         data = self.cmsl_reader.data.get(cmsl_file_name, None)
         if data is None:
-            print(f"  Aviso: arquivo COMSOL '{cmsl_file_name}.txt' não encontrado. Dados COMSOL ignorados.")
+            print(f"  Warning: COMSOL file '{cmsl_file_name}.txt' not found. COMSOL data ignored.")
             return None
         freq = np.asarray(data['freq'])
 
@@ -330,47 +330,45 @@ class ComsolPostProcessor:
         earth_return_key: str = 'cmsl_ground_return_impedance',
     ) -> None:
         """
-        Popula pul_data['comsol'] in-place com os dois blocos de dados COMSOL
-        que os casos SCC (andreata_case1/2/3) sempre carregam juntos:
+        Populates pul_data['comsol'] in-place with the two COMSOL data blocks
+        that the SCC cases (andreata_case1/2/3) always load together:
 
-        1. Retorno à terra por cenário (chaves já presentes em
-           pul_data['comsol']['scenarios'], ex. 'rho_g_100_epsr1_1_mf'): para
-           cada uma, monta earth_return_parameters + quasi_tem_matrices a
-           partir de internal_mtl_model (usado só para os parâmetros
-           internos -- o retorno à terra em si vem do COMSOL).
-        2. Impedância interna combinada (núcleo + blindagem), lida de
-           'cmsl_internal_impedance_matrix.txt': data1() = excitação pelo
-           núcleo (self do núcleo + mútua), data2() = excitação pela
-           blindagem (self da blindagem) -- ver
-           get_scc_internal_impedance_matrix_combined(). Não depende do
-           solo/retorno à terra, por isso é carregada incondicionalmente,
-           mesmo que o bloco 1 acima não tenha dados.
-        3. Admitância interna combinada (núcleo + blindagem), lida pelo
-           método direto (carga) de 'cmsl_internal_admittance_charge_method.txt'
-           (formato novo) ou, na ausência deste, do arquivo legado
-           'cmsl_internal_admittance_matrix.txt' (formato antigo, ainda em uso
-           por casos não reexportados) -- mesma convenção do bloco 2 -- ver
-           get_scc_internal_admittance_matrix_combined(). Também carregada
-           incondicionalmente.
+        1. Ground return per scenario (keys already present in
+           pul_data['comsol']['scenarios'], e.g. 'rho_g_100_epsr1_1_mf'): for
+           each one, assembles earth_return_parameters + quasi_tem_matrices
+           from internal_mtl_model (used only for the internal parameters
+           -- the ground return itself comes from COMSOL).
+        2. Combined internal impedance (core + sheath), read from
+           'cmsl_internal_impedance_matrix.txt': data1() = core excitation
+           (core self + mutual), data2() = sheath excitation (sheath self)
+           -- see get_scc_internal_impedance_matrix_combined(). It does not
+           depend on the soil/ground return, so it is loaded unconditionally,
+           even if block 1 above has no data.
+        3. Combined internal admittance (core + sheath), read via the direct
+           (charge) method from 'cmsl_internal_admittance_charge_method.txt'
+           (new format) or, in its absence, from the legacy file
+           'cmsl_internal_admittance_matrix.txt' (old format, still used by
+           cases not reexported) -- same convention as block 2 -- see
+           get_scc_internal_admittance_matrix_combined(). Also loaded
+           unconditionally.
 
-        Os blocos 2 e 3 são mesclados no mesmo cenário 'measured' (cada um
-        contribuindo sua própria chave de matriz -- 'impedance_matrix' e
-        'admittance_matrix' -- sem se sobrescreverem).
+        Blocks 2 and 3 are merged into the same 'measured' scenario (each one
+        contributing its own matrix key -- 'impedance_matrix' and
+        'admittance_matrix' -- without overwriting each other).
 
-        Os três blocos NÃO compartilham uma única grade de frequência: cada
-        um vem de um arquivo .txt do COMSOL independente (retorno à terra,
-        impedância interna, admitância interna), com sua própria varredura
-        paramétrica -- não há garantia de que tenham o mesmo número de
-        pontos (ex.: andreata_case2 tem 46 pontos no arquivo de impedância
-        e 91 no de admitância). Por isso cada matriz interna guarda sua
-        própria frequência em pul_data['comsol']['frequencies_by_key'][chave]
-        (chave = 'impedance_matrix'/'admittance_matrix'), consultada por
-        SCCPlotter._plot_scc_internal_matrix() em vez do
-        pul_data['comsol']['frequencies'] compartilhado (que continua
-        representando só a grade do retorno à terra, usada pelos gráficos
-        baseados em 'path'/_plot_scc_matrix).
+        The three blocks do NOT share a single frequency grid: each one comes
+        from an independent COMSOL .txt file (ground return, internal
+        impedance, internal admittance), with its own parametric sweep -- there
+        is no guarantee that they have the same number of points (e.g.
+        andreata_case2 has 46 points in the impedance file and 91 in the
+        admittance file). For that reason each internal matrix stores its own
+        frequency in pul_data['comsol']['frequencies_by_key'][key]
+        (key = 'impedance_matrix'/'admittance_matrix'), queried by
+        SCCPlotter._plot_scc_internal_matrix() instead of the shared
+        pul_data['comsol']['frequencies'] (which still represents only the
+        ground-return grid, used by the 'path'/_plot_scc_matrix-based plots).
         """
-        print("Construindo matrizes COMSOL...")
+        print("Building COMSOL matrices...")
         cmsl_params = self.get_general_parameters(earth_return_key)
         if cmsl_params is not None:
             pul = InternalPerUnitParameters(internal_mtl_model, cmsl_params['frequencies'])
@@ -379,18 +377,18 @@ class ComsolPostProcessor:
             pul_data['comsol']['internal_matrices'] = internal_matrices
 
             for key, value in pul_data['comsol']['scenarios'].items():
-                print(f"  -> Processando COMSOL para: {key}")
+                print(f"  -> Processing COMSOL for: {key}")
                 earth_return = self.get_earth_return_parameters(key)
                 quasi_tem = self.get_quasi_tem_approx_matrices(internal_matrices, earth_return)
                 value['earth_return_parameters'] = earth_return
                 value['quasi_tem_matrices'] = quasi_tem
         else:
-            print("  Aviso: Processamento COMSOL ignorado (dados não disponíveis).")
+            print("  Warning: COMSOL processing skipped (data not available).")
             pul_data['comsol'] = {}
 
         pul_data['comsol'].setdefault('frequencies_by_key', {})
 
-        print("Carregando dados COMSOL de impedância interna...")
+        print("Loading COMSOL internal impedance data...")
         scc_internal_z_cmsl = self.get_scc_internal_impedance_matrix_combined()
         if scc_internal_z_cmsl is not None:
             pul_data['comsol'].setdefault('scenarios', {})
@@ -398,9 +396,9 @@ class ComsolPostProcessor:
             for key, value in scc_internal_z_cmsl['scenarios'].items():
                 pul_data['comsol']['scenarios'].setdefault(key, {}).update(value)
         else:
-            print("  Aviso: dados COMSOL de impedância interna não disponíveis.")
+            print("  Warning: COMSOL internal impedance data not available.")
 
-        print("Carregando dados COMSOL de admitância interna...")
+        print("Loading COMSOL internal admittance data...")
         scc_internal_y_cmsl = self.get_scc_internal_admittance_matrix_combined()
         if scc_internal_y_cmsl is not None:
             pul_data['comsol'].setdefault('scenarios', {})
@@ -408,7 +406,7 @@ class ComsolPostProcessor:
             for key, value in scc_internal_y_cmsl['scenarios'].items():
                 pul_data['comsol']['scenarios'].setdefault(key, {}).update(value)
         else:
-            print("  Aviso: dados COMSOL de admitância interna não disponíveis.")
+            print("  Warning: COMSOL internal admittance data not available.")
 
     def get_bifilar_data(self, excitation_type: str = 'average'):
         N = 2
@@ -441,20 +439,20 @@ class ComsolPostProcessor:
 
     def get_coaxial_series_impedance_matrix(self):
         """
-        Constrói a matriz de impedância [n, 3, 3] simétrica para uma configuração
-        flat de 3 cabos (A, B, C), a partir dos dados do COMSOL.
+        Builds the symmetric [n, 3, 3] impedance matrix for a 3-cable flat
+        arrangement (A, B, C) from the COMSOL data.
 
-        A montagem assume uma configuração simétrica:
-        - Z_AA = Z_BB = Z_CC (self, de 'vcoil_1')
-        - Z_AB = Z_BA = Z_BC = Z_CB (mutual adjacente, de 'vcoil_2')
-        - Z_AC = Z_CA (mutual externa, de 'vcoil_3')
+        The assembly assumes a symmetric configuration:
+        - Z_AA = Z_BB = Z_CC (self, from 'vcoil_1')
+        - Z_AB = Z_BA = Z_BC = Z_CB (adjacent mutual, from 'vcoil_2')
+        - Z_AC = Z_CA (outer mutual, from 'vcoil_3')
 
-        :param base_key: A chave base do cenário COMSOL 
-                        (ex: 'rho_g_100_epsr1_1_mf').
-        :param model: O modelo de linha de transmissão multiconductor.
-        :return: Uma tupla (Z0, freq), onde Z0 é a matriz [n, 3, 3] e 
-                freq é o vetor de frequências [n]. Retorna (None, None) se 
-                os dados não forem encontrados.
+        :param base_key: The base key of the COMSOL scenario
+                        (e.g. 'rho_g_100_epsr1_1_mf').
+        :param model: The multiconductor transmission line model.
+        :return: A tuple (Z0, freq), where Z0 is the [n, 3, 3] matrix and
+                freq is the frequency vector [n]. Returns (None, None) if
+                the data is not found.
         """
         N = 2
         general_data = self.get_general_parameters('cmsl_coaxial_cable_impedance')
@@ -469,20 +467,20 @@ class ComsolPostProcessor:
     
     def get_coaxial_cable_parameters(self):
         """
-        Constrói a matriz de impedância [n, 3, 3] simétrica para uma configuração
-        flat de 3 cabos (A, B, C), a partir dos dados do COMSOL.
+        Builds the symmetric [n, 3, 3] impedance matrix for a 3-cable flat
+        arrangement (A, B, C) from the COMSOL data.
 
-        A montagem assume uma configuração simétrica:
-        - Z_AA = Z_BB = Z_CC (self, de 'vcoil_1')
-        - Z_AB = Z_BA = Z_BC = Z_CB (mutual adjacente, de 'vcoil_2')
-        - Z_AC = Z_CA (mutual externa, de 'vcoil_3')
+        The assembly assumes a symmetric configuration:
+        - Z_AA = Z_BB = Z_CC (self, from 'vcoil_1')
+        - Z_AB = Z_BA = Z_BC = Z_CB (adjacent mutual, from 'vcoil_2')
+        - Z_AC = Z_CA (outer mutual, from 'vcoil_3')
 
-        :param base_key: A chave base do cenário COMSOL 
-                        (ex: 'rho_g_100_epsr1_1_mf').
-        :param model: O modelo de linha de transmissão multiconductor.
-        :return: Uma tupla (Z0, freq), onde Z0 é a matriz [n, 3, 3] e 
-                freq é o vetor de frequências [n]. Retorna (None, None) se 
-                os dados não forem encontrados.
+        :param base_key: The base key of the COMSOL scenario
+                        (e.g. 'rho_g_100_epsr1_1_mf').
+        :param model: The multiconductor transmission line model.
+        :return: A tuple (Z0, freq), where Z0 is the [n, 3, 3] matrix and
+                freq is the frequency vector [n]. Returns (None, None) if
+                the data is not found.
         """
         general_data = self.get_general_parameters('cmsl_coaxial_cable_impedance')
         data = self.cmsl_reader.data['cmsl_coaxial_cable_impedance']
@@ -506,27 +504,27 @@ class ComsolPostProcessor:
     
     def get_scc_internal_impedance_elements(self, excitation_type: str = 'core'):
         """
-        Constrói a matriz de impedância [n, 3, 3] simétrica para uma configuração
-        flat de 3 cabos (A, B, C), a partir dos dados do COMSOL.
+        Builds the symmetric [n, 3, 3] impedance matrix for a 3-cable flat
+        arrangement (A, B, C) from the COMSOL data.
 
-        A montagem assume uma configuração simétrica:
-        - Z_AA = Z_BB = Z_CC (self, de 'vcoil_1')
-        - Z_AB = Z_BA = Z_BC = Z_CB (mutual adjacente, de 'vcoil_2')
-        - Z_AC = Z_CA (mutual externa, de 'vcoil_3')
+        The assembly assumes a symmetric configuration:
+        - Z_AA = Z_BB = Z_CC (self, from 'vcoil_1')
+        - Z_AB = Z_BA = Z_BC = Z_CB (adjacent mutual, from 'vcoil_2')
+        - Z_AC = Z_CA (outer mutual, from 'vcoil_3')
 
-        :param base_key: A chave base do cenário COMSOL 
-                        (ex: 'rho_g_100_epsr1_1_mf').
-        :param model: O modelo de linha de transmissão multiconductor.
-        :return: Uma tupla (Z0, freq), onde Z0 é a matriz [n, 3, 3] e 
-                freq é o vetor de frequências [n]. Retorna (None, None) se 
-                os dados não forem encontrados.
+        :param base_key: The base key of the COMSOL scenario
+                        (e.g. 'rho_g_100_epsr1_1_mf').
+        :param model: The multiconductor transmission line model.
+        :return: A tuple (Z0, freq), where Z0 is the [n, 3, 3] matrix and
+                freq is the frequency vector [n]. Returns (None, None) if
+                the data is not found.
         """
         N = 2
         general_data = self.get_general_parameters('cmsl_series_impedance_core_excitation')
         if general_data is None:
             return None
         if 'cmsl_series_impedance_sheath_excitation' not in self.cmsl_reader.data:
-            print("  Aviso: arquivo COMSOL 'cmsl_series_impedance_sheath_excitation.txt' não encontrado. Dados COMSOL ignorados.")
+            print("  Warning: COMSOL file 'cmsl_series_impedance_sheath_excitation.txt' not found. COMSOL data ignored.")
             return None
         core = self.cmsl_reader.data['cmsl_series_impedance_core_excitation']
         sheath = self.cmsl_reader.data['cmsl_series_impedance_sheath_excitation']
@@ -591,7 +589,7 @@ class ComsolPostProcessor:
             Zi_energy[:, 1, 0] = mutual_energy
         
         else:
-            raise ValueError("excitation_type deve ser 'core' ou 'sheath'.")
+            raise ValueError("excitation_type must be 'core' or 'sheath'.")
         
         return {
             'js_method': Zi_js,
@@ -606,8 +604,8 @@ class ComsolPostProcessor:
 
     def get_internal_impedance_elements(self) -> dict:
         """
-        Retorna a impedância interna medida (r11 + jwL11) do arquivo
-        'cmsl_internal_impedance.txt' para um condutor sólido único.
+        Returns the measured internal impedance (r11 + jwL11) from the
+        'cmsl_internal_impedance.txt' file for a single solid conductor.
         """
         general_data = self.get_general_parameters('cmsl_internal_impedance')
         if general_data is None:
@@ -624,10 +622,10 @@ class ComsolPostProcessor:
 
     def get_bare_and_hollow_wire_internal_impedance(self) -> dict:
         """
-        Retorna a impedância interna medida via método Js (tensão da bobina de
-        excitação sob corrente unitária) do arquivo
-        'cmsl_bare_and_hollow_wire_internal_impedance.txt', para os condutores
-        sólido (bare wire) e oco (hollow/tubular) de single_deConti.
+        Returns the internal impedance measured via the Js method (excitation
+        coil voltage under unit current) from the
+        'cmsl_bare_and_hollow_wire_internal_impedance.txt' file, for the solid
+        (bare wire) and hollow (hollow/tubular) conductors of single_deConti.
         """
         general_data = self.get_general_parameters('cmsl_bare_and_hollow_wire_internal_impedance')
         if general_data is None:
@@ -894,13 +892,13 @@ class ComsolPostProcessor:
         # reading should be negligible compared to the core self term.
         reciprocity_err = np.max(np.abs(c_cs - c_cs_reciprocal)) / max(np.max(np.abs(c_cs)), 1e-30)
         if reciprocity_err > 1e-2:
-            print(f"  Aviso: divergência de reciprocidade na mútua core-sheath (C_cs vs. C_sc) "
-                  f"de {reciprocity_err:.2%} em 'cmsl_internal_admittance_*'.")
+            print(f"  Warning: reciprocity mismatch in the core-sheath mutual term (C_cs vs. C_sc) "
+                  f"of {reciprocity_err:.2%} in 'cmsl_internal_admittance_*'.")
 
         leak_ratio = np.max(np.abs(c_shield_leak)) / max(np.max(np.abs(c_cc)), 1e-30)
         if leak_ratio > 1e-3:
-            print(f"  Aviso: vazamento de blindagem inesperado (C_shOut_coreExc/Csoc) de "
-                  f"{leak_ratio:.2%} em relação a C_cc em 'cmsl_internal_admittance_*'.")
+            print(f"  Warning: unexpected shield leakage (C_shOut_coreExc/Csoc) of "
+                  f"{leak_ratio:.2%} relative to C_cc in 'cmsl_internal_admittance_*'.")
 
         ECC_GLOBAL_INDEX = 6
         N = ECC_GLOBAL_INDEX + 1 if has_ecc else 2
@@ -920,13 +918,13 @@ class ComsolPostProcessor:
             ce_scale = max(np.max(np.abs(c_ce)), np.max(np.abs(c_ce_reciprocal)), 1e-30)
             ce_err = np.max(np.abs(c_ce - c_ce_reciprocal)) / ce_scale
             if ce_err > 1e-2:
-                print(f"  Aviso: divergência de reciprocidade na mútua core-ECC (C_ce vs. C_ec) "
-                      f"de {ce_err:.2%} em 'cmsl_internal_admittance_charge_method'.")
+                print(f"  Warning: reciprocity mismatch in the core-ECC mutual term (C_ce vs. C_ec) "
+                      f"of {ce_err:.2%} in 'cmsl_internal_admittance_charge_method'.")
 
             se_err = np.max(np.abs(c_se - c_se_reciprocal)) / max(np.max(np.abs(c_se)), 1e-30)
             if se_err > 1e-2:
-                print(f"  Aviso: divergência de reciprocidade na mútua sheath-ECC (C_se vs. C_es) "
-                      f"de {se_err:.2%} em 'cmsl_internal_admittance_charge_method'.")
+                print(f"  Warning: reciprocity mismatch in the sheath-ECC mutual term (C_se vs. C_es) "
+                      f"of {se_err:.2%} in 'cmsl_internal_admittance_charge_method'.")
 
             C[:, 0, ECC_GLOBAL_INDEX] = c_ce
             C[:, ECC_GLOBAL_INDEX, 0] = c_ce
@@ -954,20 +952,20 @@ class ComsolPostProcessor:
 
     def get_earth_return_parameters(self, base_key: str):
         """
-        Constrói a matriz de impedância [n, 3, 3] simétrica para uma configuração
-        flat de 3 cabos (A, B, C), a partir dos dados do COMSOL.
+        Builds the symmetric [n, 3, 3] impedance matrix for a 3-cable flat
+        arrangement (A, B, C) from the COMSOL data.
 
-        A montagem assume uma configuração simétrica:
-        - Z_AA = Z_BB = Z_CC (self, de 'vcoil_1')
-        - Z_AB = Z_BA = Z_BC = Z_CB (mutual adjacente, de 'vcoil_2')
-        - Z_AC = Z_CA (mutual externa, de 'vcoil_3')
+        The assembly assumes a symmetric configuration:
+        - Z_AA = Z_BB = Z_CC (self, from 'vcoil_1')
+        - Z_AB = Z_BA = Z_BC = Z_CB (adjacent mutual, from 'vcoil_2')
+        - Z_AC = Z_CA (outer mutual, from 'vcoil_3')
 
-        :param base_key: A chave base do cenário COMSOL 
-                        (ex: 'rho_g_100_epsr1_1_mf').
-        :param model: O modelo de linha de transmissão multiconductor.
-        :return: Uma tupla (Z0, freq), onde Z0 é a matriz [n, 3, 3] e 
-                freq é o vetor de frequências [n]. Retorna (None, None) se 
-                os dados não forem encontrados.
+        :param base_key: The base key of the COMSOL scenario
+                        (e.g. 'rho_g_100_epsr1_1_mf').
+        :param model: The multiconductor transmission line model.
+        :return: A tuple (Z0, freq), where Z0 is the [n, 3, 3] matrix and
+                freq is the frequency vector [n]. Returns (None, None) if
+                the data is not found.
         """
         N = 3
         general_data = self.get_general_parameters('cmsl_ground_return_impedance')
@@ -980,30 +978,30 @@ class ComsolPostProcessor:
         Yg = np.zeros_like(Zg, dtype=complex)
         Pg = np.zeros_like(Zg, dtype=complex)
 
-        # 3. Parsear a base_key para extrair rho_g e eps_r
+        # 3. Parse base_key to extract rho_g and eps_r
         match = re.search(r"rho_g_(\d+)_epsr1_(\d+)_mf", base_key)
-        
+
         if not match:
-            print(f"Erro: Não foi possível extrair os parâmetros (rho_g, eps_r) da chave '{base_key}'.")
+            print(f"Error: Could not extract the parameters (rho_g, eps_r) from the key '{base_key}'.")
             return None, None
-            
-        sigma1 = 1.0 / float(match.group(1))    # Condutividade do solo (S/m)
-        epsr1 = float(match.group(2))           # Permissividade Relativa do solo
+
+        sigma1 = 1.0 / float(match.group(1))    # Soil conductivity (S/m)
+        epsr1 = float(match.group(2))           # Soil relative permittivity
 
         # Squared Ground propagation constant 
         gamma_earth = np.sqrt(jw * sc.mu_0 * (sigma1 + jw * epsr1 * sc.epsilon_0))
 
-        # 3. Definir as chaves de dados com base no mapeamento fornecido
+        # 3. Define the data keys based on the provided mapping
         key_self = f"{base_key}_vcoil_1" # Z_AA, Z_BB, Z_CC
         key_adj  = f"{base_key}_vcoil_2" # Z_AB, Z_BC
         key_ext  = f"{base_key}_vcoil_3" # Z_AC
         required_keys = [key_self, key_adj, key_ext]
-        
-        # 4. Verificar se todas as chaves de dados necessárias existem
+
+        # 4. Check that every required data key exists
         if not all(key in data for key in required_keys):
-            print(f"Erro: Faltando uma ou mais chaves para a base_key '{base_key}' nos dados COMSOL.")
-            print(f"Chaves necessárias: {required_keys}")
-            print(f"Chaves disponíveis: {list(data.keys())}")
+            print(f"Error: Missing one or more keys for base_key '{base_key}' in the COMSOL data.")
+            print(f"Required keys: {required_keys}")
+            print(f"Available keys: {list(data.keys())}")
             return None, None
 
         # Diagonal (Self-impedances)
@@ -1011,13 +1009,13 @@ class ComsolPostProcessor:
         Zg[:, 1, 1] = data[key_self]  # Z_BB
         Zg[:, 2, 2] = data[key_self]  # Z_CC
 
-        # Termos adjacentes (A-B e B-C)
+        # Adjacent terms (A-B and B-C)
         Zg[:, 0, 1] = data[key_adj]   # Z_AB
         Zg[:, 1, 0] = data[key_adj]   # Z_BA
         Zg[:, 1, 2] = data[key_adj]   # Z_BC
         Zg[:, 2, 1] = data[key_adj]   # Z_CB
-        
-        # Termos externos (A-C)
+
+        # Outer terms (A-C)
         Zg[:, 0, 2] = data[key_ext]   # Z_AC
         Zg[:, 2, 0] = data[key_ext]   # Z_CA
 

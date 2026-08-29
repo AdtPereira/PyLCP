@@ -38,7 +38,7 @@ def main():
     st = time.time()    
     input_json = load_json_parameters(__file__, show_content=True)
     
-    # Modelo Sólido (carregado diretamente do JSON original)
+    # Solid model (loaded directly from the original JSON)
     print("Loading model from JSON...")
     model = overhead_lines.single_phase_model(input_json)
 

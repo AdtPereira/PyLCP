@@ -28,9 +28,9 @@ def parse_pul_file(filename):
                 if not line:
                     continue
                 
-                # CORREÇÃO DEFINITIVA APLICADA AQUI:
-                # Trocado re.match() por re.search() para encontrar o padrão
-                # em qualquer lugar da linha, ignorando espaços no início.
+                # FINAL FIX APPLIED HERE:
+                # Replaced re.match() with re.search() to find the pattern
+                # anywhere in the line, ignoring leading whitespace.
                 match = re.search(r"(\d+)\s+(\d+)\s+([0-9.E+-]+)\s+=\s*([A-Z0-9]+)\(", line)
                 if match:
                     i, j, value, key = match.groups()

@@ -103,7 +103,7 @@ def main():
     pul_data['comsol']['internal_matrices'] = internal_matrices
 
     for key, value in pul_data['comsol']['scenarios'].items():
-        print(f"  -> Processando COMSOL para: {key}")
+        print(f"  -> Processing COMSOL for: {key}")
         earth_return = cmsl_processor.get_earth_return_parameters(key)
         quasi_tem = cmsl_processor.get_quasi_tem_approx_matrices(internal_matrices, earth_return)
         value['earth_return_parameters'] = earth_return

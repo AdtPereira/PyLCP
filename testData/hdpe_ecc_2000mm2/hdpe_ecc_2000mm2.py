@@ -44,7 +44,7 @@ def main():
     if cmsl_params is not None:
         pul_data['comsol'].update(cmsl_params)
         for key, value in pul_data['comsol']['scenarios'].items():
-            print(f"  -> Processando COMSOL para: {key}")
+            print(f"  -> Processing COMSOL for: {key}")
             value['coaxial_cable_impedance'] = cmsl_processor.get_coaxial_cable_parameters()
             scc_elements = cmsl_processor.get_scc_internal_impedance_elements()
             value['internal_impedance_matrix'] = scc_elements

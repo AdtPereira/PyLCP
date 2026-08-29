@@ -264,10 +264,10 @@ class HomogeneousLosslessMedium():
             Ys = ys[i, :, :]
             M = I - jwu0[i] * (Ys @ G)
             
-            # Calcula A = U.T @ (M**-1) @ (Ys @ U)
+            # Compute A = U.T @ (M**-1) @ (Ys @ U)
             A = U.T @ lu_solve(lu_factor(M), Ys @ U)
 
-            # Calcula Z = A**-1
+            # Compute Z = A**-1
             z_partial[i, :, :] = lu_solve(lu_factor(A), np.eye(A.shape[0]))
             
         return z_partial
@@ -275,26 +275,26 @@ class HomogeneousLosslessMedium():
     # Generalized Capacitance Matrix [np.array]
     def generalized_capacitance_matrix(self, green_matrix):
         """
-        Calcula a matriz de capacitância física (n x n) a partir da matriz de
-        capacitância generalizada ((n+1) x (n+1)), seguindo a Eq. 5.21 de Clayton Paul.
+        Computes the physical capacitance matrix (n x n) from the generalized
+        capacitance matrix ((n+1) x (n+1)), following Eq. 5.21 of Clayton Paul.
 
-        A fórmula implementada é:
-        C_ij = c_ij - ( (soma da linha i de c) * (soma da coluna j de c) ) / (soma total de c)
+        The implemented formula is:
+        C_ij = c_ij - ( (sum of row i of c) * (sum of column j of c) ) / (total sum of c)
 
-        Onde 'c' é a matriz generalizada e 'C' é a matriz física resultante.
-        Assume-se que o condutor de índice 0 da matriz generalizada é o de referência
-        e está sendo eliminado.
+        Where 'c' is the generalized matrix and 'C' is the resulting physical matrix.
+        It is assumed that the conductor at index 0 of the generalized matrix is the
+        reference one and is being eliminated.
 
         Args:
-            matriz_generalizada (np.ndarray): A matriz de capacitância generalizada
-                                            simétrica de ordem (n+1) x (n+1).
+            green_matrix (np.ndarray): The symmetric generalized capacitance
+                                            matrix of order (n+1) x (n+1).
 
         Returns:
-            np.ndarray: A matriz de capacitância física de ordem n x n.
-            
+            np.ndarray: The physical capacitance matrix of order n x n.
+
         Raises:
-            ValueError: Se a matriz de entrada não for quadrada ou se a soma de
-                        seus elementos for zero.
+            ValueError: If the input matrix is not square or if the sum of
+                        its elements is zero.
         """
 
         u = self.u_matrix()
@@ -345,10 +345,10 @@ class LosslessPostProcessing():
     def __init__(self, model: MulticonductorTransmissionLine):
         self.model = model
 
-        # Lista de todos os line_id's presentes no sistema.
+        # List of every line_id present in the system.
         self.line_id = [conductor['line_id'] for conductor in self.model.mtl.values()]
 
-        # Lista de dicionários dos condutores que são do tipo 'active'.
+        # List of dictionaries for the conductors of type 'active'.
         self.active_lines = [line for line in self.model.mtl.values() if line['line_type'] == 'active']
 
     # Incident Matrix Q [np.array]
@@ -451,11 +451,11 @@ class LosslessPostProcessing():
 
         return z_total
 
-    # Matriz Rs [np.array]
+    # Rs matrix [np.array]
     def rs_matrix(self, z_total_stack):
         return np.real(z_total_stack)
 
-    # Matriz Ls [np.array]
+    # Ls matrix [np.array]
     def ls_matrix(self, z_total_stack, frequencies):
         w = 2 * np.pi * np.asarray(frequencies)
         # Reshape w to (n_freqs, 1, 1) for broadcasting with (n_freqs, N, N) matrix

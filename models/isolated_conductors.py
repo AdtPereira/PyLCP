@@ -144,8 +144,8 @@ class IsolatedConductorsModelGenerator:
                            conductor_id: int,
                            center_point: Tuple[float, float]) -> int:
         """
-        Adiciona o condutor ECC (Earth Continuity Conductor) ao modelo
-        em seu 'center_point' específico.
+        Adds the ECC (Earth Continuity Conductor) to the model
+        at its specific 'center_point'.
         """
         if self.ecc:
             conductor_id = self._add_single_layer(model, conductor_id, center_point, self.ecc, 'ecc')
@@ -158,48 +158,48 @@ class IsolatedConductorsModelGenerator:
                                    R_ecc: float,
                                    vertical_offset_c: float) -> Tuple[float, float]:
         """
-        Calcula a posição do ECC "entalado" (wedge) entre o SCC e o Duto HDPE
-        usando a Lei dos Cossenos.
+        Computes the position of the ECC "wedged" between the SCC and the HDPE duct
+        using the Law of Cosines.
 
         Args:
-            enclosure_center (P_enc): Ponto central do duto.
-            R_enc: Raio interno do duto.
-            R_scc: Raio externo do cabo SCC.
-            R_ecc: Raio externo do cabo ECC.
-            vertical_offset_c (c): Distância entre P_enc e P_scc.
+            enclosure_center (P_enc): Center point of the duct.
+            R_enc: Inner radius of the duct.
+            R_scc: Outer radius of the SCC cable.
+            R_ecc: Outer radius of the ECC cable.
+            vertical_offset_c (c): Distance between P_enc and P_scc.
         """
-        
-        # Validação de geometria
+
+        # Geometry validation
         if R_enc <= (R_scc + R_ecc):
             raise ValueError(
-                f"Geometria impossível: O ECC (R={R_ecc}) não cabe no espaço "
-                f"entre o SCC (R={R_scc}) e o duto HDPE (R={R_enc}). "
-                f"Condição (R_enc > R_scc + R_ecc) falhou."
+                f"Impossible geometry: the ECC (R={R_ecc}) does not fit in the space "
+                f"between the SCC (R={R_scc}) and the HDPE duct (R={R_enc}). "
+                f"Condition (R_enc > R_scc + R_ecc) failed."
             )
 
-        # Lados do triângulo formado pelos centros (P_enc, P_scc, P_ecc)
+        # Sides of the triangle formed by the centers (P_enc, P_scc, P_ecc)
         a = R_scc + R_ecc  # Dist (P_scc -> P_ecc)
         b = R_enc - R_ecc  # Dist (P_enc -> P_ecc)
         c = vertical_offset_c  # Dist (P_enc -> P_scc)
 
-        # Lei dos Cossenos para encontrar o ângulo 'alpha' no vértice P_enc
-        # a² = b² + c² - 2bc*cos(alpha)
+        # Law of Cosines to find the angle 'alpha' at vertex P_enc
+        # a^2 = b^2 + c^2 - 2bc*cos(alpha)
         numerator = (b**2) + (c**2) - (a**2)
         denominator = 2 * b * c
 
-        # Tratamento de erro de ponto flutuante
+        # Floating-point error handling
         cos_alpha = max(min(numerator / denominator, 1.0), -1.0)
-        
+
         alpha = np.arccos(cos_alpha)
         sin_alpha = np.sin(alpha)
 
-        # Calcular o centro do ECC
-        # (Assumindo que o ECC está no quadrante x+, y-)
-        # O centro do ECC está a uma distância 'b' do 'enclosure_center',
-        # rotacionado pelo ângulo 'alpha' a partir da linha vertical P_enc -> P_scc.
-        
+        # Compute the ECC center
+        # (Assuming the ECC is in the x+, y- quadrant)
+        # The ECC center is at a distance 'b' from 'enclosure_center',
+        # rotated by the angle 'alpha' from the vertical line P_enc -> P_scc.
+
         ecc_center_x = enclosure_center[0] + b * sin_alpha
-        ecc_center_y = enclosure_center[1] - b * cos_alpha # Subtrai pois o eixo é para baixo
+        ecc_center_y = enclosure_center[1] - b * cos_alpha # Subtract because the axis points downward
 
         return (ecc_center_x, ecc_center_y)
     
@@ -343,49 +343,49 @@ class IsolatedConductorsModelGenerator:
 
     def hdpe_shared_enclosed_model(self, host_conductor: str = 'sheath') -> Dict[str, Any]:
         """
-        Gera um modelo para um cabo SCC e um ECC compartilhando um duto HDPE.
-        
-        Geometria:
-        1. 'burial_depth' define o centro do Duto HDPE.
-        2. O SCC (Cabo Principal) repousa no fundo do duto HDPE.
-        3. O ECC (Condutor de Continuidade) é posicionado no espaço "entalado" (wedge)
-           entre a superfície externa do SCC e a parede interna do duto HDPE.
+        Generates a model for an SCC cable and an ECC sharing an HDPE duct.
+
+        Geometry:
+        1. 'burial_depth' defines the center of the HDPE duct.
+        2. The SCC (Main Cable) rests on the bottom of the HDPE duct.
+        3. The ECC (Earth Continuity Conductor) is positioned in the "wedge"
+           space between the outer surface of the SCC and the inner wall of the HDPE duct.
         """
-        
-        # --- 1. Dados do SCC e Duto ---
+
+        # --- 1. SCC and Duct data ---
         host_conductor_data = getattr(self, host_conductor)
         host_insulation = host_conductor_data.get('insulation')
         enclosure_data = host_conductor_data.get('enclosure')
 
-        # --- 2. Dados do ECC ---
+        # --- 2. ECC data ---
         ecc_insulation = self.ecc.get('insulation')
         ecc_outer_radius = self.ecc['outer_radius'] + (ecc_insulation['thickness'] if ecc_insulation else 0)
 
         assert enclosure_data is not None, "Enclosure definition must be provided for shared enclosure model."
         assert self.ecc is not None, "ECC conductor data must be provided for shared enclosure model."
-        
-        # --- 3. Cálculo de Posição (Lógica Corrigida) ---
-        
-        # 3.1. O Duto (Enclosure) é o ponto de referência
-        # 'burial_depth' agora define o centro do duto.
+
+        # --- 3. Position Computation (Corrected Logic) ---
+
+        # 3.1. The Duct (Enclosure) is the reference point
+        # 'burial_depth' now defines the duct center.
         enclosure_center = (0.0, -self.arrangement['burial_depth'])
 
-        # 3.2. Obter raios para cálculo
+        # 3.2. Get the radii for the computation
         cable_outer_radius = host_conductor_data['outer_radius'] + (host_insulation['thickness'] if host_insulation else 0)
         enclosure_inner_radius = enclosure_data['inner_radius']
-        
-        # Validações de geometria
+
+        # Geometry validations
         assert enclosure_inner_radius > cable_outer_radius, "Enclosure inner radius must be larger than cable outer radius."
         total_width_check = cable_outer_radius + 2 * ecc_outer_radius + cable_outer_radius
         assert total_width_check < (2 * enclosure_inner_radius), "The cable and ECC do not fit side by side within the HDPE enclosure."
 
-        # 3.3. O centro do SCC (Cabo) é calculado relativo ao Duto
-        # O cabo repousa no fundo, então é deslocado para baixo.
+        # 3.3. The SCC (Cable) center is computed relative to the Duct
+        # The cable rests on the bottom, so it is displaced downward.
         vertical_offset = enclosure_inner_radius - cable_outer_radius
         cable_center = (enclosure_center[0], enclosure_center[1] - vertical_offset)
 
-        # --- 4. Posição do ECC (Restrição 3) ---
-        # Delega o cálculo trigonométrico para o método privado
+        # --- 4. ECC position (Constraint 3) ---
+        # Delegates the trigonometric computation to the private method
         ecc_center = self._calculate_ecc_center_trig(
             enclosure_center=enclosure_center,
             R_enc=enclosure_inner_radius,
@@ -394,7 +394,7 @@ class IsolatedConductorsModelGenerator:
             vertical_offset_c=vertical_offset
         )
 
-        # --- 5. Geração do Modelo ---
+        # --- 5. Model Generation ---
         model = {
             'name': self.input_data.get('name', 'generic shared HDPE enclosed SCC system'),
             'type': self.input_data.get('type', 'shared-hdpe'),
@@ -412,20 +412,20 @@ class IsolatedConductorsModelGenerator:
             },
         }
 
-        # --- 6. Adicionar Condutores ---
+        # --- 6. Add Conductors ---
         conductor_id = 1
-        
-        # Adiciona o SCC no 'cable_center' (calculado para repousar no fundo)
+
+        # Adds the SCC at 'cable_center' (computed to rest on the bottom)
         conductor_id = self._add_cable_conductors(model, conductor_id, cable_center)
 
-        # Adiciona o ECC no 'ecc_center' (calculado para estar no "canto")
+        # Adds the ECC at 'ecc_center' (computed to be in the "corner")
         conductor_id = self._add_ecc_conductor(model, conductor_id, ecc_center)
 
-        # --- 7. Injetar Dados do Duto (Enclosure) ---
+        # --- 7. Inject Duct (Enclosure) Data ---
         for k, v in model.items():
-            if isinstance(k, int) and k > 0: 
+            if isinstance(k, int) and k > 0:
                 if v.get('conductor_name') == host_conductor:
-                    # Adiciona o dicionário do duto, incluindo seu centro (referência primária).
+                    # Adds the duct dictionary, including its center (primary reference).
                     v['enclosure'] = enclosure_data
                     v['enclosure']['center_point'] = enclosure_center
                 else:
@@ -637,31 +637,31 @@ class IsolatedConductorsModelGenerator:
     
     def simple_trefoil(self) -> Dict[str, Any]:
         """
-        Gera um modelo para um arranjo trifólio (trefoil) de três fases de cabos SCC.
-        Assume-se que 'burial_depth' corresponde à profundidade dos centros dos
-        dois condutores da base (h3 na figura de referência). O 'spacing' é a
-        distância de centro a centro entre cabos adjacentes.
+        Generates a model for a trefoil arrangement of three-phase SCC cables.
+        It is assumed that 'burial_depth' corresponds to the depth of the centers
+        of the two bottom conductors (h3 in the reference figure). 'spacing' is the
+        center-to-center distance between adjacent cables.
         """
-        # Profundidade dos cabos da base (h3)
+        # Depth of the bottom cables (h3)
         depth_bottom = self.arrangement['burial_depth']
         spacing = self.arrangement['spacing']
 
-        # --- Cálculo da Geometria Trifólio ---
-        # A altura do triângulo equilátero formado pelos cabos.
+        # --- Trefoil Geometry Computation ---
+        # The height of the equilateral triangle formed by the cables.
         height = spacing * np.sqrt(3) / 2
-        
-        # As coordenadas dos cabos da base (b e c) são conhecidas.
+
+        # The coordinates of the bottom cables (b and c) are known.
         y_bottom = -depth_bottom
         x_side = spacing / 2
 
-        # A coordenada do cabo superior (a) é calculada a partir da base.
-        # Sua posição vertical é a da base mais a altura do triângulo.
+        # The coordinate of the top cable (a) is computed from the base.
+        # Its vertical position is the base position plus the triangle height.
         y_top = y_bottom + height
-        
+
         center_points = [
-            (0.0, y_top),         # Cabo superior (a)
-            (-x_side, y_bottom),  # Cabo inferior esquerdo (b)
-            (+x_side, y_bottom)   # Cabo inferior direito (c)
+            (0.0, y_top),         # Top cable (a)
+            (-x_side, y_bottom),  # Bottom-left cable (b)
+            (+x_side, y_bottom)   # Bottom-right cable (c)
         ]
         
         model = {

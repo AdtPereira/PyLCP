@@ -1,475 +1,474 @@
-# Diagnósticos e correções — `andreata_case3` (Configuração 3, Figura 5.3)
+# Diagnostics and fixes — `andreata_case3` (Configuration 3, Figure 5.3)
 
-**Contexto:** `andreata_case3` modela a Configuração 3 da referência (Figura 5.3): três
-cabos SCC de potência (núcleo + blindagem) em arranjo plano, diretamente enterrados no
-solo — **sem duto HDPE** —, mais um cabo de aterramento isolado (ECC) próximo ao cabo
-mais à direita, sem encostar nele. É o primeiro caso do repositório com uma mistura
-heterogênea de cabos (3 SCC de 2 condutores cada + 1 ECC de 1 condutor), o que expôs
-uma série de suposições de "N cabos idênticos" implícitas em várias partes do pipeline.
+**Context:** `andreata_case3` models Configuration 3 of the reference (Figure 5.3): three
+power SCC cables (core + sheath) in a flat arrangement, directly buried in the
+soil — **without an HDPE duct** —, plus an isolated earth conductor (ECC) near the
+rightmost cable, without touching it. It is the first case in the repository with a
+heterogeneous mix of cables (3 SCC of 2 conductors each + 1 ECC of 1 conductor), which
+exposed a series of implicit "N identical cables" assumptions in several parts of the pipeline.
 
-Este documento registra, em ordem cronológica de descoberta, os itens tratados:
-1. reformulação do gerador de modelo para refletir a Figura 5.3;
-2. bug no esquema gráfico (`system_schematic.png`);
-3. decisão de design sobre `num_conductors`;
-4. bug dimensional na matriz de impedância interna;
-5. bug dimensional na matriz de retorno pelo solo (quasi-TEM);
-6. `conductor_order` do MATLAB sem o ECC (dados descartados silenciosamente);
-7. índices de ECC errados no `PLOT_CONFIG` para as matrizes de retorno pelo solo;
-8. matrizes de retorno pelo solo do MATLAB recortadas em vez de reordenadas;
-9. *(pendente)* mesmo padrão de bug em `utils/comsol_data.py`;
-10. diagnóstico de instabilidade numérica na matriz de admitância shunt `Y`;
-11. reparametrização da posição do ECC para distâncias centro-a-centro precisas;
-12. cota de profundidade do esquemático presa ao ECC em vez de a um cabo SCC.
-
----
-
-## Item 1 — Reformulação de `flat_scc_with_ecc_cable_model` para a Figura 5.3
-
-**Onde:** `models/single_core_cable.py:436`
-
-**O quê:** o método era uma cópia de `hdpe_shared_enclosed_model` e assumia um duto HDPE
-compartilhado entre o SCC e o ECC (com o ECC "entalado" entre a parede do duto e a
-superfície do SCC via `_calculate_ecc_center_trig`). A Figura 5.3, porém, não tem duto —
-os cabos são diretamente enterrados.
-
-**Correção:** reescrito para posicionar os 3 cabos SCC em arranjo plano (mesma lógica de
-`conventional_three_phase_flat`) e o ECC próximo ao terceiro cabo, **sem encostar nele**,
-controlado por dois parâmetros de `arrangement`:
-- `ecc_alignment`: `'center'` (mesmo eixo horizontal dos centros dos SCC, usado em
-  `andreata_case3.json`) ou `'bottom_tangent'` (linha tangente ao fundo dos cabos SCC,
-  simulando uma vala comum);
-- `ecc_horizontal_gap`: folga entre as superfícies externas do 3º cabo SCC e do ECC
-  (`andreata_case3.json` usa `0.050` m — valor de referência, sem cotação exata na
-  figura original, ajustável).
-
-Toda a lógica de duto/cálculo trigonométrico do "canto" foi removida deste método (ela
-permanece intacta em `hdpe_shared_enclosed_model`, usada por outros casos).
+This document records, in chronological order of discovery, the items addressed:
+1. reformulation of the model generator to reflect Figure 5.3;
+2. bug in the schematic plot (`system_schematic.png`);
+3. design decision about `num_conductors`;
+4. dimensional bug in the internal impedance matrix;
+5. dimensional bug in the ground-return matrix (quasi-TEM);
+6. MATLAB `conductor_order` without the ECC (data silently discarded);
+7. wrong ECC indices in `PLOT_CONFIG` for the ground-return matrices;
+8. MATLAB ground-return matrices sliced instead of reordered;
+9. *(pending)* same bug pattern in `utils/comsol_data.py`;
+10. diagnosis of numerical instability in the shunt admittance matrix `Y`;
+11. reparametrization of the ECC position to precise center-to-center distances;
+12. schematic depth level anchored to the ECC instead of an SCC cable.
 
 ---
 
-## Item 2 — Marcador `'+'` fora de posição em `system_schematic.png`
+## Item 1 — Reformulation of `flat_scc_with_ecc_cable_model` for Figure 5.3
 
-**Onde:** `mtl_main/graphics.py`
+**Where:** `models/single_core_cable.py:436`
 
-**O quê:** o título do gráfico aparecia como o genérico "Multicondutor Transmission
-Line" e o marcador `'+'`/linha de cota de profundidade ficavam colados à superfície do
-solo, acima da posição real dos cabos.
+**What:** the method was a copy of `hdpe_shared_enclosed_model` and assumed an HDPE duct
+shared between the SCC and the ECC (with the ECC "wedged" between the duct wall and the
+SCC surface via `_calculate_ecc_center_trig`). Figure 5.3, however, has no duct —
+the cables are directly buried.
 
-**Causa raiz (duas camadas):**
-1. `_calculate_schematic_parameters` (linha ~93-113) não reconhecia o tipo
-   `'scc-flat-ecc'`, caindo no ramo genérico (`h_factor = 1`, título padrão).
-2. Com `h_factor == 1`, `_plot_conductor_graphic` **pula** o reposicionamento
-   esquemático (mantém os cabos na profundidade real), mas `_schematic_annotations`
-   (linha 330) **sempre** aplicava o reposicionamento — os dois ficavam
-   inconsistentes entre si sempre que um tipo caísse no ramo genérico.
+**Fix:** rewritten to position the 3 SCC cables in a flat arrangement (same logic as
+`conventional_three_phase_flat`) and the ECC near the third cable, **without touching it**,
+controlled by two `arrangement` parameters:
+- `ecc_alignment`: `'center'` (same horizontal axis as the SCC centers, used in
+  `andreata_case3.json`) or `'bottom_tangent'` (line tangent to the bottom of the SCC
+  cables, simulating a common trench);
+- `ecc_horizontal_gap`: gap between the outer surfaces of the 3rd SCC cable and the ECC
+  (`andreata_case3.json` uses `0.050` m — reference value, with no exact dimension in
+  the original figure, adjustable).
 
-**Correção:**
-- `mtl_main/graphics.py:105` — adicionado `'scc-flat-ecc'` como tipo reconhecido
-  (`h_factor = -2.5`, mesma convenção de `'scc'`; título "Flat-Buried SCC Cables with
+All duct/"corner" trigonometric-computation logic was removed from this method (it
+remains intact in `hdpe_shared_enclosed_model`, used by other cases).
+
+---
+
+## Item 2 — `'+'` marker out of position in `system_schematic.png`
+
+**Where:** `mtl_main/graphics.py`
+
+**What:** the plot title appeared as the generic "Multiconductor Transmission
+Line" and the `'+'` marker / depth-level line was stuck to the soil surface,
+above the actual position of the cables.
+
+**Root cause (two layers):**
+1. `_calculate_schematic_parameters` (line ~93-113) did not recognize the type
+   `'scc-flat-ecc'`, falling into the generic branch (`h_factor = 1`, default title).
+2. With `h_factor == 1`, `_plot_conductor_graphic` **skips** the schematic
+   repositioning (keeps the cables at the real depth), but `_schematic_annotations`
+   (line 330) **always** applied the repositioning — the two were
+   inconsistent with each other whenever a type fell into the generic branch.
+
+**Fix:**
+- `mtl_main/graphics.py:105` — added `'scc-flat-ecc'` as a recognized type
+  (`h_factor = -2.5`, same convention as `'scc'`; title "Flat-Buried SCC Cables with
   ECC").
-- `mtl_main/graphics.py:330` (`_schematic_annotations`) — passou a espelhar o mesmo
-  bypass de `h_factor == 1` que `_plot_conductor_graphic` já tinha, para que essa classe
-  de inconsistência não volte a aparecer caso outro tipo futuro caia no ramo genérico.
+- `mtl_main/graphics.py:330` (`_schematic_annotations`) — now mirrors the same
+  `h_factor == 1` bypass that `_plot_conductor_graphic` already had, so that this class
+  of inconsistency does not reappear if another future type falls into the generic branch.
 
-**Validado:** `system_schematic.png` regenerado — cruz alinhada ao centro dos cabos, na
-profundidade correta (h = 1,20 m).
-
----
-
-## Item 3 — Decisão de design: `num_conductors` fixo em 3, fora do JSON
-
-**Onde:** `models/single_core_cable.py:469`
-
-**Discussão:** o método lia `num_scc_conductors = self.arrangement.get('num_conductors',
-3)` do JSON. Ficou em aberto se esse número deveria contar só os cabos SCC (3) ou
-incluir o ECC (4).
-
-**Decisão:** `num_conductors` no JSON foi **removido**; `num_scc_conductors` passou a
-ser um literal `3` no código, já que o método é inerentemente trifásico (mesma
-convenção de `conventional_three_phase_flat`, que também não lê esse campo do JSON — a
-cardinalidade está no próprio método, não em configuração externa). O ECC nunca é
-contado por este campo em nenhum caso do repositório (ver `hdpe_ecc_2000mm2.json` /
-`hdpe_ecc_300mm2.json`, onde `num_conductors: 1` refere-se só ao SCC hospedeiro).
+**Validated:** `system_schematic.png` regenerated — cross aligned to the center of the
+cables, at the correct depth (h = 1.20 m).
 
 ---
 
-## Item 4 — Matriz de impedância interna: `None + None` / dimensão incompatível
+## Item 3 — Design decision: `num_conductors` fixed at 3, out of the JSON
 
-**Onde:** `analytical_forms/single_core_cable.py` (`InternalPerUnitParameters`) e
+**Where:** `models/single_core_cable.py:469`
+
+**Discussion:** the method read `num_scc_conductors = self.arrangement.get('num_conductors',
+3)` from the JSON. It was left open whether that number should count only the SCC cables
+(3) or include the ECC (4).
+
+**Decision:** `num_conductors` in the JSON was **removed**; `num_scc_conductors` became
+a literal `3` in the code, since the method is inherently three-phase (same
+convention as `conventional_three_phase_flat`, which also does not read that field from the
+JSON — the cardinality is in the method itself, not in external configuration). The ECC is
+never counted by this field in any case in the repository (see `hdpe_ecc_2000mm2.json` /
+`hdpe_ecc_300mm2.json`, where `num_conductors: 1` refers only to the host SCC).
+
+---
+
+## Item 4 — Internal impedance matrix: `None + None` / incompatible dimension
+
+**Where:** `analytical_forms/single_core_cable.py` (`InternalPerUnitParameters`) and
 `mtl_main/strategy.py` (`SingleCoreCableWithECCStrategy`)
 
-**Sintoma original:**
+**Original symptom:**
 ```
 TypeError: unsupported operand type(s) for +: 'NoneType' and 'NoneType'
 ```
-em `parameters_approximation`, linha `'Zcs': z11 + z12 + z2i`.
+in `parameters_approximation`, line `'Zcs': z11 + z12 + z2i`.
 
-**Causa raiz (três camadas):**
+**Root cause (three layers):**
 
-1. **Formato errado de `context.scc`.** `SingleCoreCableWithECCStrategy._extract_scc_parameters`
-   (`mtl_main/strategy.py:1056`) agrupa condutores por cabo físico e retorna um dict
-   `{cp_key: {core_..., sheath_...}}` — correto para permitir cabos heterogêneos, mas
-   incompatível com `InternalPerUnitParameters.parameters_by_bessel`/`parameters_approximation`,
-   que esperavam `self.model.scc` como um dict **achatado** de uma única seção
-   transversal (`scc['core_outer_radius']` etc. no nível raiz). Toda checagem
-   `'core_outer_radius' in scc` dava `False` (as chaves eram strings de posição, não
-   nomes de parâmetro) → `z11`, `z12`, `z2i` ficavam `None`.
+1. **Wrong format of `context.scc`.** `SingleCoreCableWithECCStrategy._extract_scc_parameters`
+   (`mtl_main/strategy.py:1056`) groups conductors by physical cable and returns a dict
+   `{cp_key: {core_..., sheath_...}}` — correct to allow heterogeneous cables, but
+   incompatible with `InternalPerUnitParameters.parameters_by_bessel`/`parameters_approximation`,
+   which expected `self.model.scc` as a **flat** dict of a single cross
+   section (`scc['core_outer_radius']` etc. at the root level). Every check
+   `'core_outer_radius' in scc` returned `False` (the keys were position strings, not
+   parameter names) -> `z11`, `z12`, `z2i` stayed `None`.
 
-2. **Montagem da matriz assumia N cabos idênticos.** `matrices()` (antiga versão)
-   calculava um único bloco `Zij` (M×M) e montava a matriz completa via
-   `np.kron(np.identity(N), Zij)` — não há como isso representar 3 cabos com M=2
-   (núcleo+blindagem) e 1 cabo com M=1 (ECC) ao mesmo tempo.
+2. **The matrix assembly assumed N identical cables.** `matrices()` (old version)
+   computed a single block `Zij` (M x M) and assembled the full matrix via
+   `np.kron(np.identity(N), Zij)` — there is no way for this to represent 3 cables with M=2
+   (core+sheath) and 1 cable with M=1 (ECC) at the same time.
 
-3. **O ECC nem era capturado.** O laço de agrupamento de `_extract_scc_parameters`
-   só aceitava `name in ('core', 'sheath', 'armor')` — o condutor `'ecc'` era
-   descartado (`continue`), então seus dados geométricos nunca chegavam a
+3. **The ECC was not even captured.** The grouping loop of `_extract_scc_parameters`
+   only accepted `name in ('core', 'sheath', 'armor')` — the `'ecc'` conductor was
+   discarded (`continue`), so its geometric data never reached
    `context.scc`.
 
-**Correção:**
+**Fix:**
 - `mtl_main/strategy.py:1056-1108` (`SingleCoreCableWithECCStrategy._extract_scc_parameters`)
-  — passou a agrupar também condutores `'ecc'`; quando não há `core` numa posição (ou
-  seja, é a posição do próprio ECC), o condutor ECC assume o papel de `core` nas
-  fórmulas (fisicamente correto: um ECC isolado é só um condutor maciço com sua própria
-  isolação, sem bainha/blindagem — mesma formulação do ramo "SCC com core,
-  core_insulation").
-- `analytical_forms/single_core_cable.py:832` (`_build_cable_block`) — lógica de
-  montagem de `Zij_values`/`Pij` extraída para um método reutilizável por cabo
-  (recebe `scc` explicitamente, em vez de sempre ler `self.model.scc`).
-- `parameters_by_bessel`, `parameters_approximation`, `parameters_hybrid` — passaram a
-  aceitar um parâmetro opcional `scc` (default: `self.model.scc`, preservando o
-  comportamento anterior para os tipos homogêneos).
-- `analytical_forms/single_core_cable.py:944` (`matrices`) — quando
-  `self.model.mtl_type == 'scc-flat-ecc'`, delega para o novo método
-  `_matrices_heterogeneous` (linha 989): itera cada grupo de cabo em `self.model.scc`
-  (3 blocos 2×2 dos SCC + 1 bloco 1×1 do ECC) e monta a matriz final **diagonal em
-  bloco** — sem `np.kron` uniforme —, já que não há acoplamento interno entre
-  condutores de cabos físicos diferentes nesta etapa (o acoplamento entre cabos só
-  entra depois, no retorno pelo solo).
-- `analytical_forms/single_core_cable.py:467` (`_sum_or_none`) — corrigido de
-  passagem um bug latente pré-existente, agora alcançável: o campo de conveniência
-  `'Zcs'` fazia `z11 + z12 + z2i` incondicionalmente, mesmo quando `z2i` (que só existe
-  se houver bainha) é `None` — exatamente o caso do ECC. Esse campo nunca é lido em
-  nenhum lugar do pipeline; a soma agora ignora termos `None` em vez de lançar exceção.
+  — now also groups `'ecc'` conductors; when there is no `core` at a position (i.e.
+  it is the ECC's own position), the ECC conductor takes the role of `core` in the
+  formulas (physically correct: an isolated ECC is just a solid conductor with its own
+  insulation, without a sheath/shield — same formulation as the "SCC with core,
+  core_insulation" branch).
+- `analytical_forms/single_core_cable.py:832` (`_build_cable_block`) — the
+  `Zij_values`/`Pij` assembly logic extracted into a per-cable reusable method
+  (receives `scc` explicitly, instead of always reading `self.model.scc`).
+- `parameters_by_bessel`, `parameters_approximation`, `parameters_hybrid` — now
+  accept an optional `scc` parameter (default: `self.model.scc`, preserving the
+  previous behavior for the homogeneous types).
+- `analytical_forms/single_core_cable.py:944` (`matrices`) — when
+  `self.model.mtl_type == 'scc-flat-ecc'`, it delegates to the new method
+  `_matrices_heterogeneous` (line 989): iterates each cable group in `self.model.scc`
+  (3 SCC 2x2 blocks + 1 ECC 1x1 block) and assembles the final matrix **block-diagonal**
+  — without a uniform `np.kron` —, since there is no internal coupling between
+  conductors of different physical cables at this step (the coupling between cables only
+  enters later, in the ground return).
+- `analytical_forms/single_core_cable.py:467` (`_sum_or_none`) — a pre-existing latent
+  bug was fixed along the way, now reachable: the convenience field
+  `'Zcs'` did `z11 + z12 + z2i` unconditionally, even when `z2i` (which only exists
+  if there is a sheath) is `None` — exactly the ECC case. That field is never read in
+  any part of the pipeline; the sum now ignores `None` terms instead of raising an
+  exception.
 
-**Validado:** matriz interna resultante tem shape `(num_freq, 7, 7)`, sem `NaN`, com os
-blocos fora da diagonal entre cabos diferentes exatamente zero (desacoplamento interno
-confirmado numericamente). Regressão limpa em `andreata_case1`, `scc_34kV_andreata`,
+**Validated:** the resulting internal matrix has shape `(num_freq, 7, 7)`, with no `NaN`,
+with the off-diagonal blocks between different cables exactly zero (internal decoupling
+confirmed numerically). Clean regression on `andreata_case1`, `scc_34kV_andreata`,
 `hdpe_2000mm2`, `hdpe_300mm2`, `hdpe_ecc_2000mm2`, `scc_138kV_prysmian`, `scc_flat_xue`
-(tipos homogêneos `scc`, `hdpe`, `shared-hdpe` não afetados).
+(homogeneous types `scc`, `hdpe`, `shared-hdpe` not affected).
 
 ---
 
-## Item 5 — Matriz de retorno pelo solo (quasi-TEM): erro de broadcast 4×4 → 7×7
+## Item 5 — Ground-return matrix (quasi-TEM): 4x4 -> 7x7 broadcast error
 
-**Onde:** `analytical_forms/single_core_cable.py:1183`
+**Where:** `analytical_forms/single_core_cable.py:1183`
 (`PerUnitParameters.quasi_tem_approx_matrices`)
 
-**Sintoma original:**
+**Original symptom:**
 ```
 ValueError: could not broadcast input array from shape (4,4) into shape (7,7)
 ```
-em `Zg[i, :, :] = np.kron(z0_jk[i, :, :], np.ones((M, M)))`.
+in `Zg[i, :, :] = np.kron(z0_jk[i, :, :], np.ones((M, M)))`.
 
-**Causa raiz:** mesmo padrão do Item 4, uma camada acima. `z0_jk` (impedância de
-retorno pelo solo) já vinha corretamente calculada como 4×4 — uma linha/coluna por
-cabo físico (3 SCC + 1 ECC), pois `earth_return_parameters` usa `num_sc_cables`
-(contagem por posição, sempre correta). O problema era só a expansão: `M =
-self.model.num_conductors_per_scc` é uma média inteira (`total_conductores //
-num_cabos` = 7 // 4 = 1) que assume todo cabo ter o mesmo número de condutores —
-`np.kron(4×4, ones(1,1))` produz 4×4, incompatível com a `Zi` 7×7 do Item 4.
+**Root cause:** same pattern as Item 4, one layer up. `z0_jk` (ground-return
+impedance) already came correctly computed as 4x4 — one row/column per
+physical cable (3 SCC + 1 ECC), since `earth_return_parameters` uses `num_sc_cables`
+(count by position, always correct). The problem was only the expansion: `M =
+self.model.num_conductors_per_scc` is an integer average (`total_conductors //
+num_cables` = 7 // 4 = 1) that assumes every cable has the same number of conductors —
+`np.kron(4x4, ones(1,1))` produces 4x4, incompatible with the 7x7 `Zi` of Item 4.
 
-**Correção:**
-- `analytical_forms/single_core_cable.py:478` — nova função `_expand_by_block_sizes(matrix,
-  block_sizes)`: generaliza `np.kron(matrix, np.ones((M, M)))` para blocos de tamanho
-  variável, via `np.repeat` (linhas e depois colunas) com uma lista de tamanhos por
-  cabo em vez de um M uniforme. Quando todos os tamanhos são iguais a M, o resultado é
-  idêntico ao `kron` original — ou seja, é uma generalização estrita, segura para os
-  tipos homogêneos também.
-- `InternalPerUnitParameters.matrices()` e `_matrices_heterogeneous()` passaram a
-  incluir `'block_sizes'` no dicionário retornado (`[M]*N` no caminho homogêneo,
-  `[2, 2, 2, 1]` no `scc-flat-ecc`) — uma única fonte de verdade sobre quantos
-  condutores cada cabo contribui, na mesma ordem das matrizes de retorno pelo solo.
-- `quasi_tem_approx_matrices` (linha 1193) passou a ler `internal_matrices['block_sizes']`
-  em vez de `self.model.num_conductors_per_scc`, chamando `_expand_by_block_sizes` para
-  montar `Zg`/`Pg` — sem mais laço por frequência, já que `np.repeat` opera direto no
-  array 3D `(freq, N, N)`.
+**Fix:**
+- `analytical_forms/single_core_cable.py:478` — new function `_expand_by_block_sizes(matrix,
+  block_sizes)`: generalizes `np.kron(matrix, np.ones((M, M)))` to blocks of variable
+  size, via `np.repeat` (rows and then columns) with a list of per-cable sizes instead
+  of a uniform M. When all sizes are equal to M, the result is
+  identical to the original `kron` — that is, it is a strict generalization, safe for the
+  homogeneous types too.
+- `InternalPerUnitParameters.matrices()` and `_matrices_heterogeneous()` now
+  include `'block_sizes'` in the returned dictionary (`[M]*N` in the homogeneous path,
+  `[2, 2, 2, 1]` in `scc-flat-ecc`) — a single source of truth about how many
+  conductors each cable contributes, in the same order as the ground-return matrices.
+- `quasi_tem_approx_matrices` (line 1193) now reads `internal_matrices['block_sizes']`
+  instead of `self.model.num_conductors_per_scc`, calling `_expand_by_block_sizes` to
+  assemble `Zg`/`Pg` — no more per-frequency loop, since `np.repeat` operates directly on
+  the 3D array `(freq, N, N)`.
 
-**Validado:** `Zg` resultante tem shape `(num_freq, 7, 7)`; conferido numericamente que
-o bloco (cabo 1 × ECC) reproduz exatamente `z0_jk[:, 0, 3]` e o bloco (cabo 1 × cabo 2)
-reproduz `z0_jk[:, 0, 1]`, ambos com diferença máxima `0.0`. `andreata_case3.py` roda
-até o fim sem erro. Regressão limpa nos mesmos 7 casos homogêneos do Item 4.
+**Validated:** the resulting `Zg` has shape `(num_freq, 7, 7)`; it was checked numerically
+that the (cable 1 x ECC) block reproduces exactly `z0_jk[:, 0, 3]` and the (cable 1 x cable 2)
+block reproduces `z0_jk[:, 0, 1]`, both with maximum difference `0.0`. `andreata_case3.py` runs
+to completion without error. Clean regression on the same 7 homogeneous cases as Item 4.
 
 ---
 
-## Item 6 — `conductor_order` do MATLAB sem o ECC (dados descartados silenciosamente)
+## Item 6 — MATLAB `conductor_order` without the ECC (data silently discarded)
 
-**Onde:** `testData/andreata_case3/andreata_case3.py` (chamada a `MatlabDataReader.get_scc_scenario_data`)
+**Where:** `testData/andreata_case3/andreata_case3.py` (call to `MatlabDataReader.get_scc_scenario_data`)
 
-**Sintoma original:** três warnings ao rodar, sem crash:
+**Original symptom:** three warnings when running, without a crash:
 ```
 Warning: MATLAB data not found for 'measured' with key 'series_impedance_matrix'.
 Warning: MATLAB data not found for 'measured' with key 'internal_impedance_matrix'.
 Warning: MATLAB data not found for 'measured' with key 'internal_admittance_matrix'.
 ```
 
-**Causa raiz:** os arquivos `.mat` de referência já vinham no formato cheio 7×7 (confirmado
-via `scipy.io.loadmat`: shape `(7, 7, 90)`), mas `conductor_order=[0, 3, 1, 4, 2, 5]`
-— herdado do `andreata_case1`, que não tem ECC — só listava 6 índices.
-`MatlabDataReader._reorder_conductor_matrix` (`utils/matlab_data.py`) faz
-`matrix[:, conductor_order, :][:, :, conductor_order]`: com apenas 6 índices, a
-linha/coluna do ECC (índice 6) era silenciosamente descartada, produzindo uma matriz
-`'measured'` 6×6. Os componentes de plotagem que pedem `p=6, q=6` (termo próprio do ECC)
-então não encontravam esse índice (`IndexError`, capturado pelo `except` genérico do
-plotter — `scc_plotter.py:69` — e impresso apenas como "not found").
+**Root cause:** the reference `.mat` files already came in the full 7x7 format (confirmed
+via `scipy.io.loadmat`: shape `(7, 7, 90)`), but `conductor_order=[0, 3, 1, 4, 2, 5]`
+— inherited from `andreata_case1`, which has no ECC — only listed 6 indices.
+`MatlabDataReader._reorder_conductor_matrix` (`utils/matlab_data.py`) does
+`matrix[:, conductor_order, :][:, :, conductor_order]`: with only 6 indices, the
+row/column of the ECC (index 6) was silently discarded, producing a
+`'measured'` 6x6 matrix. The plotting components that ask for `p=6, q=6` (ECC self
+term) then did not find that index (`IndexError`, caught by the generic `except` of
+the plotter — `scc_plotter.py:69` — and printed only as "not found").
 
-**Correção:** `conductor_order=[0, 3, 1, 4, 2, 5, 6]` — o ECC não tem par núcleo/bainha
-para trocar de posição, então permanece no fim (índice 6) tanto na convenção MATLAB
-(tipo-agrupada) quanto na convenção pyLCP (cabo-agrupada).
+**Fix:** `conductor_order=[0, 3, 1, 4, 2, 5, 6]` — the ECC has no core/sheath pair
+to swap position with, so it stays at the end (index 6) in both the MATLAB convention
+(type-grouped) and the pyLCP convention (cable-grouped).
 
-**Validado:** os três warnings desaparecem; `andreata_case3.py` roda sem alterar as
-demais curvas (índices 0-5 inalterados pela mudança).
+**Validated:** the three warnings disappear; `andreata_case3.py` runs without changing the
+other curves (indices 0-5 unaffected by the change).
 
 ---
 
-## Item 7 — Índices de ECC errados no `PLOT_CONFIG` para as matrizes de retorno pelo solo
+## Item 7 — Wrong ECC indices in `PLOT_CONFIG` for the ground-return matrices
 
-**Onde:** `testData/andreata_case3/plot_config.py`
+**Where:** `testData/andreata_case3/plot_config.py`
 
-**Sintoma original:**
+**Original symptom:**
 ```
 IndexError: index 6 is out of bounds for axis 1 with size 4
 ```
-em `scc_plotter.py:32` (`_plot_scc_matrix`), ao plotar `earth_return_impedance_ecc`.
+in `scc_plotter.py:32` (`_plot_scc_matrix`), when plotting `earth_return_impedance_ecc`.
 
-**Causa raiz:** as configs `earth_return_impedance_ecc`, `earth_return_admittance_ecc` e
-`earth_return_potential_coeff_ecc` usavam `path: ['earth_return_parameters', ...]` com
-`p=6, q=6` — mas `PerUnitParameters.earth_return_parameters()`
-(`analytical_forms/single_core_cable.py:1081`) retorna matrizes indexadas **por cabo
-físico** (`N = num_sc_cables = 4`: fase A, fase B, fase C, ECC — ver Item 5), não por
-condutor. Nesse espaço o ECC é o índice 3, não 6. Já as configs
-`mutual_impedance_phase_a_sheath_ecc`, `self_impedance_ecc` e `self_admittance_ecc`, que
-usam `path: ['quasi_tem_matrices', ...]`, já estavam corretas com `p=6, q=6`, pois essas
-matrizes foram expandidas para o espaço por-condutor (N=7) via `_expand_by_block_sizes`
+**Root cause:** the configs `earth_return_impedance_ecc`, `earth_return_admittance_ecc` and
+`earth_return_potential_coeff_ecc` used `path: ['earth_return_parameters', ...]` with
+`p=6, q=6` — but `PerUnitParameters.earth_return_parameters()`
+(`analytical_forms/single_core_cable.py:1081`) returns matrices indexed **by physical
+cable** (`N = num_sc_cables = 4`: phase A, phase B, phase C, ECC — see Item 5), not by
+conductor. In that space the ECC is index 3, not 6. The configs
+`mutual_impedance_phase_a_sheath_ecc`, `self_impedance_ecc` and `self_admittance_ecc`, which
+use `path: ['quasi_tem_matrices', ...]`, were already correct with `p=6, q=6`, since those
+matrices were expanded to the per-conductor space (N=7) via `_expand_by_block_sizes`
 (Item 5).
 
-**Correção:**
-- `earth_return_admittance_ecc`: mantido em `path: ['earth_return_parameters',
-  'admittance_matrix']`, com `p=3, q=3` (índice do ECC no espaço por-cabo). Não há
-  equivalente por-condutor válido para essa matriz — ver observação abaixo.
-- `earth_return_impedance_ecc` / `earth_return_potential_coeff_ecc`: migrados para
+**Fix:**
+- `earth_return_admittance_ecc`: kept at `path: ['earth_return_parameters',
+  'admittance_matrix']`, with `p=3, q=3` (ECC index in the per-cable space). There is no
+  valid per-conductor equivalent for that matrix — see the note below.
+- `earth_return_impedance_ecc` / `earth_return_potential_coeff_ecc`: migrated to
   `path: ['quasi_tem_matrices', 'earth_return_impedance_matrix']` /
-  `['quasi_tem_matrices', 'earth_return_potential_coefficient']`, com `p=6, q=6` — essas
-  chaves já existem em `quasi_tem_approx_matrices` (linha 1219-1226), expandidas para
-  N=7, e batem índice-a-índice com o MATLAB reordenado (ver Item 8).
+  `['quasi_tem_matrices', 'earth_return_potential_coefficient']`, with `p=6, q=6` — those
+  keys already exist in `quasi_tem_approx_matrices` (lines 1219-1226), expanded to
+  N=7, and match index-for-index with the reordered MATLAB (see Item 8).
 
-**Observação (não corrigida):** `quasi_tem_approx_matrices` retorna
-`'earth_return_admittance_matrix': Yg`, mas `Yg` nunca é preenchido (fica
-`np.zeros_like(Zi, dtype=complex)`, dead code pré-existente) — por isso
-`earth_return_admittance_ecc` não pôde ser migrado como as outras duas. Como essa config
-não tem `matlab_series_to_plot`, isso não gera warning nem crash hoje; fica registrado
-para quando alguém for calcular `Yg` de fato.
+**Note (not fixed):** `quasi_tem_approx_matrices` returns
+`'earth_return_admittance_matrix': Yg`, but `Yg` is never filled (it stays
+`np.zeros_like(Zi, dtype=complex)`, pre-existing dead code) — so
+`earth_return_admittance_ecc` could not be migrated like the other two. Since that config
+has no `matlab_series_to_plot`, this generates neither a warning nor a crash today; it is
+recorded for when someone actually computes `Yg`.
 
-**Validado:** `andreata_case3.py` roda até o fim sem `IndexError`.
+**Validated:** `andreata_case3.py` runs to completion without an `IndexError`.
 
 ---
 
-## Item 8 — Matrizes de retorno pelo solo do MATLAB recortadas em vez de reordenadas (ECC descartado)
+## Item 8 — MATLAB ground-return matrices sliced instead of reordered (ECC discarded)
 
-**Onde:** `utils/matlab_data.py` (`MatlabDataReader.get_scc_scenario_data`)
+**Where:** `utils/matlab_data.py` (`MatlabDataReader.get_scc_scenario_data`)
 
-**Sintoma original (após o Item 7):**
+**Original symptom (after Item 7):**
 ```
 Warning: MATLAB data not found for 'measured' with key 'earth_return_impedance_matrix'.
 Warning: MATLAB data not found for 'measured' with key 'earth_return_potential_coefficient_matrix'.
 ```
 
-**Causa raiz:** `earth_return_impedance_matrix` e `earth_return_potential_coefficient_matrix`
-recebiam um tratamento diferente das outras 4 matrizes: em vez de
-`_reorder_conductor_matrix(..., conductor_order)`, o código recortava apenas o bloco
-superior-esquerdo `[:num_phases, :num_phases]` (3×3), sob a suposição — correta para
-`andreata_case1` (sem ECC), mas desatualizada para `andreata_case3` — de que essas
-matrizes só existem "a nível de cabo/fase". Confirmado via `scipy.io.loadmat` que os
-`.mat` de retorno pelo solo já vêm no mesmo formato cheio 7×7, tipo-agrupado-com-redundância,
-das demais 4 matrizes: `M[0,0]==M[3,3]` (core_A==sheath_A), `M[1,1]==M[4,4]`,
-`M[2,2]==M[5,5]`, e `M[6,6]` é o valor próprio do ECC. O recorte a 3×3 descartava esse
-índice 6 por completo, então `'measured'` nunca tinha dado para o ECC.
+**Root cause:** `earth_return_impedance_matrix` and `earth_return_potential_coefficient_matrix`
+received a different treatment from the other 4 matrices: instead of
+`_reorder_conductor_matrix(..., conductor_order)`, the code sliced only the
+top-left block `[:num_phases, :num_phases]` (3x3), under the assumption — correct for
+`andreata_case1` (no ECC), but outdated for `andreata_case3` — that those
+matrices only exist "at the cable/phase level". Confirmed via `scipy.io.loadmat` that the
+ground-return `.mat` already come in the same full 7x7, type-grouped-with-redundancy
+format as the other 4 matrices: `M[0,0]==M[3,3]` (core_A==sheath_A), `M[1,1]==M[4,4]`,
+`M[2,2]==M[5,5]`, and `M[6,6]` is the ECC self value. Slicing to 3x3 discarded that
+index 6 entirely, so `'measured'` never had ECC data.
 
-**Correção:** as duas matrizes passaram a usar `_reorder_conductor_matrix(matrix,
-conductor_order)`, igual às outras 4 — sem recorte especial. O parâmetro `num_phases`
-(que só servia a esse recorte) foi removido de `get_scc_scenario_data`, e as chamadas em
-`andreata_case1.py`/`andreata_case3.py` atualizadas.
+**Fix:** the two matrices now use `_reorder_conductor_matrix(matrix,
+conductor_order)`, like the other 4 — with no special slicing. The `num_phases` parameter
+(which only served that slicing) was removed from `get_scc_scenario_data`, and the calls in
+`andreata_case1.py`/`andreata_case3.py` updated.
 
-**Validado:**
-- Os dois warnings desaparecem; nenhum warning novo surge em `andreata_case1` (os índices
-  `p=0, q=0` de fase-A apontam para o mesmo valor de `core_A` tanto no formato recortado
-  quanto no formato cheio reordenado — confirmado numericamente).
-- Checagem numérica pontual (índice de frequência 45, ≈2,15 kHz): `Zg` pyLCP
-  `[:,6,6] = 3,532e-4 + j4,951e-3` vs. MATLAB `3,531e-4 + j4,952e-3`; `Pg` pyLCP
-  `= 5,580e4 + j5,357e5` vs. MATLAB `5,580e4 + j5,354e5` — mesma ordem de grandeza,
-  consistente com dado medido vs. formulação analítica (mesmo padrão de `Zi_77`/`Yi_77`,
+**Validated:**
+- The two warnings disappear; no new warning arises in `andreata_case1` (the phase-A
+  `p=0, q=0` indices point to the same `core_A` value in both the sliced format
+  and the reordered full format — confirmed numerically).
+- Spot numerical check (frequency index 45, ~2.15 kHz): pyLCP `Zg`
+  `[:,6,6] = 3.532e-4 + j4.951e-3` vs. MATLAB `3.531e-4 + j4.952e-3`; pyLCP `Pg`
+  `= 5.580e4 + j5.357e5` vs. MATLAB `5.580e4 + j5.354e5` — same order of magnitude,
+  consistent with measured data vs. analytical formulation (same pattern as `Zi_77`/`Yi_77`,
   Item 4).
 
 ---
 
-## Item 9 (pendente) — Mesmo padrão de bug em `utils/comsol_data.py`
+## Item 9 (pending) — Same bug pattern in `utils/comsol_data.py`
 
-**Onde:** `utils/comsol_data.py:731` (`ComsolPostProcessor.get_quasi_tem_approx_matrices`)
+**Where:** `utils/comsol_data.py:731` (`ComsolPostProcessor.get_quasi_tem_approx_matrices`)
 
-**O quê:** função irmã de `quasi_tem_approx_matrices` (usada para comparar com dados
-COMSOL), com o mesmo padrão de expansão por `np.kron(z0_jk, np.ones((M, M)))` — porém
-com `M = 2` **hardcoded** (linha 738), nem sequer derivado do modelo.
+**What:** sister function of `quasi_tem_approx_matrices` (used to compare with COMSOL
+data), with the same expansion pattern via `np.kron(z0_jk, np.ones((M, M)))` — but
+with `M = 2` **hardcoded** (line 738), not even derived from the model.
 
-**Por que não quebrou ainda:** `andreata_case3.py` só chama esse método dentro do bloco
-`if cmsl_params is not None:` — e não há arquivo `Results/cmsl_ground_return_impedance.txt`
-para este caso ("Processamento COMSOL ignorado (dados não disponíveis)" no console), então
-o caminho nunca foi exercitado.
+**Why it hasn't broken yet:** `andreata_case3.py` only calls that method inside the block
+`if cmsl_params is not None:` — and there is no `Results/cmsl_ground_return_impedance.txt`
+file for this case ("COMSOL processing skipped (data not available)" in the console), so
+the path has never been exercised.
 
-**Risco:** se um dado COMSOL for adicionado a este caso no futuro, vai quebrar do mesmo
-jeito que os Itens 4 e 5 quebraram — `np.kron(4×4, ones((2,2)))` dá 8×8, incompatível
-com a `Zi` 7×7.
+**Risk:** if COMSOL data is added to this case in the future, it will break the same
+way Items 4 and 5 broke — `np.kron(4x4, ones((2,2)))` gives 8x8, incompatible
+with the 7x7 `Zi`.
 
-**Correção proposta (não aplicada):** como `ComsolPostProcessor` não tem acesso a
-`self.model`, a correção exigiria passar `block_sizes` como parâmetro explícito à
-função (em vez de derivá-lo de `self.model.num_conductors_per_scc` como hoje), reusando
-a mesma `_expand_by_block_sizes` do Item 5. Fica registrado aqui para quando houver dado
-COMSOL disponível para este caso.
+**Proposed fix (not applied):** since `ComsolPostProcessor` does not have access to
+`self.model`, the fix would require passing `block_sizes` as an explicit parameter to
+the function (instead of deriving it from `self.model.num_conductors_per_scc` as today),
+reusing the same `_expand_by_block_sizes` of Item 5. Recorded here for when there is COMSOL
+data available for this case.
 
 ---
 
-## Item 10 — Diagnóstico de instabilidade numérica na matriz de admitância shunt `Y`
+## Item 10 — Diagnosis of numerical instability in the shunt admittance matrix `Y`
 
-**Onde:** `analytical_forms/single_core_cable.py` (`PerUnitParameters.quasi_tem_approx_matrices`,
+**Where:** `analytical_forms/single_core_cable.py` (`PerUnitParameters.quasi_tem_approx_matrices`,
 `sommerfeld_quasi_tem_approx_admittance`).
 
-**Pedido:** investigar se há problema/instabilidade numérica na matriz de admitância `Y`
-de `andreata_case3`.
+**Request:** investigate whether there is a numerical problem/instability in the admittance
+matrix `Y` of `andreata_case3`.
 
-**O que foi checado (sem problema encontrado):**
-- Nenhum `NaN`/`Inf` em `Ysh`, `Yg` (retorno pelo solo) ou `Yi` (interna), em nenhum
-  cenário (`magalhaes_xue`/`deconti`, 3 solos).
-- Número de condição de `Psh` (a matriz invertida para obter `Ysh`) fica baixo
-  (< 55) em toda a varredura de 90 frequências — sem mal-condicionamento explosivo.
-- Não é sub-convergência de quadratura: aumentar os pontos de Gauss-Legendre de
-  `sommerfeld_quasi_tem_approx_admittance` de 150 para 2400 muda o resultado da
-  integral em menos de 0,5%.
+**What was checked (no problem found):**
+- No `NaN`/`Inf` in `Ysh`, `Yg` (ground return) or `Yi` (internal), in any
+  scenario (`magalhaes_xue`/`deconti`, 3 soils).
+- The condition number of `Psh` (the matrix inverted to obtain `Ysh`) stays low
+  (< 55) over the whole sweep of 90 frequencies — no explosive ill-conditioning.
+- It is not quadrature under-convergence: increasing the Gauss-Legendre points of
+  `sommerfeld_quasi_tem_approx_admittance` from 150 to 2400 changes the integral
+  result by less than 0.5%.
 
-**Problema real encontrado (divergência de exatidão, não instabilidade em si):**
-comparando `Ysh` calculado contra `andreata_shunt_admittance_matrix.mat` (MATLAB,
-reordenado corretamente para a convenção pyLCP — Item 6/8), há um desvio que cresce
-suavemente com a frequência e fica concentrado quase exclusivamente nos condutores
-ligados ao ECC (índice 6) e ao cabo SCC mais próximo dele (bainha C, índice 5):
+**Real problem found (accuracy divergence, not instability itself):**
+comparing the computed `Ysh` against `andreata_shunt_admittance_matrix.mat` (MATLAB,
+reordered correctly to the pyLCP convention — Item 6/8), there is a deviation that grows
+smoothly with frequency and is concentrated almost exclusively in the conductors
+connected to the ECC (index 6) and the SCC cable closest to it (sheath C, index 5):
 
-| condutor (índice) | erro relativo máx. (em f = 10 MHz) |
+| conductor (index) | max relative error (at f = 10 MHz) |
 |---|---|
-| núcleos A/B/C (0, 2, 4) | ~2×10⁻⁹ (ruído de ponto flutuante) |
-| bainhas A/B (1, 3) | 0,26% – 0,42% |
-| **bainha C (5)** | **15,9%** |
-| **ECC (6)** | **23,1%** |
+| cores A/B/C (0, 2, 4) | ~2e-9 (floating-point noise) |
+| sheaths A/B (1, 3) | 0.26% – 0.42% |
+| **sheath C (5)** | **15.9%** |
+| **ECC (6)** | **23.1%** |
 
-O padrão é idêntico nas duas formulações testadas (`magalhaes_xue` e `deconti`), o que
-descarta bug específico de uma fórmula — a causa está na parte compartilhada (termo
-geométrico `K0(γ_terra·d)` do retorno pelo solo). O par ECC↔bainha-C é o único com
-espaçamento centro-a-centro pequeno (poucos cm, ver Item 11) frente aos 0,2–0,4 m entre
-os cabos SCC; nessa distância o argumento de `K0` fica perto do regime log-singular
-(derivada `-1/x` grande quando `x→0`), o que torna esse termo específico muito mais
-sensível a erro/aproximação em alta frequência do que os pares mais espaçados —
-hipótese consistente com o padrão observado, mas não uma prova formal.
+The pattern is identical in the two formulations tested (`magalhaes_xue` and `deconti`), which
+rules out a formula-specific bug — the cause is in the shared part (geometric
+term `K0(gamma_earth*d)` of the ground return). The ECC<->sheath-C pair is the only one with
+a small center-to-center spacing (a few cm, see Item 11) against the 0.2–0.4 m between
+the SCC cables; at that distance the argument of `K0` is near the log-singular regime
+(the derivative `-1/x` is large when `x->0`), which makes that specific term much more
+sensitive to error/approximation at high frequency than the more widely spaced pairs —
+a hypothesis consistent with the observed pattern, but not a formal proof.
 
-**Sem correção aplicada** — é um limite de exatidão da aproximação quasi-TEM para
-condutores muito próximos em alta frequência, não um bug de implementação. Registrado
-para referência caso o desvio volte a incomodar após o ajuste de geometria do Item 11
-(que muda a distância ECC↔cabo-C).
+**No fix applied** — it is an accuracy limit of the quasi-TEM approximation for
+conductors very close together at high frequency, not an implementation bug. Recorded
+for reference in case the deviation becomes bothersome again after the Item 11 geometry
+adjustment (which changes the ECC<->cable-C distance).
 
-**Nota lateral (resolvida):** a config `self_admittance_ecc` do `plot_config.py` chegou
-a ficar temporariamente com `p=0, q=0` (índice do núcleo A) durante essa investigação,
-destoando do rótulo `G_77`/`C_77` (ECC = índice 6, ver Item 7). Já foi corrigida de volta
-para `p=6, q=6`.
+**Side note (resolved):** the `self_admittance_ecc` config of `plot_config.py` was
+temporarily set to `p=0, q=0` (core A index) during that investigation,
+diverging from the label `G_77`/`C_77` (ECC = index 6, see Item 7). It was already fixed
+back to `p=6, q=6`.
 
 ---
 
-## Item 11 — Reparametrização da posição do ECC para distâncias centro-a-centro precisas
+## Item 11 — Reparametrization of the ECC position to precise center-to-center distances
 
-**Onde:** `models/single_core_cable.py:436` (`flat_scc_with_ecc_cable_model`),
+**Where:** `models/single_core_cable.py:436` (`flat_scc_with_ecc_cable_model`),
 `testData/andreata_case3/andreata_case3.json`.
 
-**O quê:** a posição do ECC era controlada por `ecc_alignment` (`'center'` ou
-`'bottom_tangent'`) + `ecc_horizontal_gap`, este último medido como folga entre as
-**superfícies externas** do cabo C e do ECC — não permitia posicionar o ECC com um
-deslocamento vertical arbitrário em relação ao cabo, só as duas opções fixas do
+**What:** the ECC position was controlled by `ecc_alignment` (`'center'` or
+`'bottom_tangent'`) + `ecc_horizontal_gap`, the latter measured as a gap between the
+**outer surfaces** of cable C and the ECC — it did not allow positioning the ECC with an
+arbitrary vertical offset relative to the cable, only the two fixed options of
 `ecc_alignment`.
 
-**Correção:** adicionado um modo de posicionamento preciso, ativado quando
-`ecc_vertical_gap` está presente em `arrangement`:
-- `ecc_horizontal_gap` / `ecc_vertical_gap` passam a ser distâncias **centro-a-centro**
-  (não mais folga de superfície) entre o centro do ECC e o centro do terceiro cabo SCC:
+**Fix:** added a precise positioning mode, activated when
+`ecc_vertical_gap` is present in `arrangement`:
+- `ecc_horizontal_gap` / `ecc_vertical_gap` become **center-to-center** distances
+  (no longer a surface gap) between the ECC center and the center of the third SCC cable:
   `ecc_center = (last_cable_center_x + ecc_horizontal_gap, last_cable_center_y -
-  ecc_vertical_gap)`. `ecc_vertical_gap` positivo posiciona o ECC mais fundo que o cabo
-  (mesma convenção de sinal de `burial_depth`).
-- O modo legado (`ecc_alignment` + `ecc_horizontal_gap` como folga de superfície) foi
-  mantido como *fallback* para quando `ecc_vertical_gap` não é fornecido — sem impacto
-  em nenhum outro caso do repositório (`flat_scc_with_ecc_cable_model` só é usado por
+  ecc_vertical_gap)`. A positive `ecc_vertical_gap` places the ECC deeper than the cable
+  (same sign convention as `burial_depth`).
+- The legacy mode (`ecc_alignment` + `ecc_horizontal_gap` as a surface gap) was
+  kept as a *fallback* for when `ecc_vertical_gap` is not provided — with no impact
+  on any other case in the repository (`flat_scc_with_ecc_cable_model` is only used by
   `andreata_case3`).
-- `andreata_case3.json`: `ecc_alignment` removido; `ecc_horizontal_gap` recalculado de
-  `0,001` (folga de superfície, valor que estava em uso no momento da migração) para os
-  valores de referência definitivos `ecc_horizontal_gap = 0,02802` m e
-  `ecc_vertical_gap = 0,00886` m (centro-a-centro).
+- `andreata_case3.json`: `ecc_alignment` removed; `ecc_horizontal_gap` recomputed from
+  `0.001` (surface gap, the value in use at the time of the migration) to the
+  definitive reference values `ecc_horizontal_gap = 0.02802` m and
+  `ecc_vertical_gap = 0.00886` m (center-to-center).
 
-**Validado:** com `ecc_horizontal_gap`/`ecc_vertical_gap` calculados para reproduzir
-exatamente a posição antiga (`0,0303`/`0,0`), o centro resultante do ECC bateu
-numericamente com o modo legado (`(0,4303, -1,2)` nos dois modos). Com os valores de
-referência finais (`0,02802`/`0,00886`), o ECC fica em `(0,42802, -1,20886)` — mais
-fundo que os cabos SCC, o que expôs o Item 12.
-
----
-
-## Item 12 — Cota de profundidade do esquemático presa ao ECC em vez de a um cabo SCC
-
-**Onde:** `mtl_main/graphics.py:71` (`BaseMTLRepresentation._calculate_schematic_parameters`).
-
-**Sintoma:** depois do Item 11, com `ecc_vertical_gap = 0,00886` (ECC mais fundo que os
-cabos SCC), a cota de profundidade (`h = ...`) e a cruz de referência em
-`system_schematic.png` passaram a apontar para o ECC (`(0,42802, -1,20886)`) em vez de
-para um dos cabos de potência.
-
-**Causa raiz:** `_calculate_schematic_parameters` escolhe `depth_ref_conductor` como o
-condutor fisicamente mais fundo (`deepest_conductor`, por `y_min`) para o tipo
-`'scc-flat-ecc'` — exceto para `'hdpe'`/`'shared-hdpe'`, que já tinham uma exceção
-dedicada (fixando a referência no `core` do SCC, não no condutor mais fundo). Antes do
-Item 11 o ECC estava sempre à mesma profundidade dos cabos SCC (`ecc_alignment='center'`
-implícito), então a escolha por "mais fundo" coincidia por acaso com um cabo SCC; ao
-tornar a profundidade do ECC ajustável, essa coincidência deixou de valer.
-
-**Correção:** estendida a mesma exceção de `'hdpe'`/`'shared-hdpe'` para
-`'scc-flat-ecc'` — a cota de profundidade sempre referencia o centro de um `core` de
-cabo SCC (primeiro encontrado, cabo A), independente de onde o ECC estiver posicionado
-verticalmente.
-
-**Validado:** com `ecc_vertical_gap = 0,00886`, `depth_ref_conductor` passou a apontar
-para o núcleo do cabo A (`(0,0, -1,2)`, `conductor_name='core'`) em vez do ECC
-(confirmado que `deepest_conductor` — não usado mais para a cota — de fato ainda é o
-ECC, como esperado). `system_schematic.png` regenerado sem erro.
+**Validated:** with `ecc_horizontal_gap`/`ecc_vertical_gap` computed to reproduce
+exactly the old position (`0.0303`/`0.0`), the resulting ECC center matched
+numerically with the legacy mode (`(0.4303, -1.2)` in both modes). With the final
+reference values (`0.02802`/`0.00886`), the ECC is at `(0.42802, -1.20886)` — deeper
+than the SCC cables, which exposed Item 12.
 
 ---
 
-## Item 13 (nota, não é bug) — Contagem de pontos em `Y` — pyLCP vs. MATLAB
+## Item 12 — Schematic depth level anchored to the ECC instead of an SCC cable
 
-**Onde:** `plotter/scc_plotter.py:32` (linha, pyLCP) vs. `plotter/scc_plotter.py:66`
+**Where:** `mtl_main/graphics.py:71` (`BaseMTLRepresentation._calculate_schematic_parameters`).
+
+**Symptom:** after Item 11, with `ecc_vertical_gap = 0.00886` (ECC deeper than the
+SCC cables), the depth level (`h = ...`) and the reference cross in
+`system_schematic.png` started pointing at the ECC (`(0.42802, -1.20886)`) instead of
+one of the power cables.
+
+**Root cause:** `_calculate_schematic_parameters` chooses `depth_ref_conductor` as the
+physically deepest conductor (`deepest_conductor`, by `y_min`) for the type
+`'scc-flat-ecc'` — except for `'hdpe'`/`'shared-hdpe'`, which already had a dedicated
+exception (fixing the reference on the SCC `core`, not on the deepest conductor). Before
+Item 11 the ECC was always at the same depth as the SCC cables (implicit
+`ecc_alignment='center'`), so the "deepest" choice coincided by chance with an SCC
+cable; when the ECC depth became adjustable, that coincidence stopped holding.
+
+**Fix:** extended the same `'hdpe'`/`'shared-hdpe'` exception to
+`'scc-flat-ecc'` — the depth level always references the center of an SCC cable `core`
+(first found, cable A), regardless of where the ECC is positioned vertically.
+
+**Validated:** with `ecc_vertical_gap = 0.00886`, `depth_ref_conductor` started pointing
+at the core of cable A (`(0.0, -1.2)`, `conductor_name='core'`) instead of the ECC
+(confirmed that `deepest_conductor` — no longer used for the level — is indeed still the
+ECC, as expected). `system_schematic.png` regenerated without error.
+
+---
+
+## Item 13 (note, not a bug) — Point count in `Y` — pyLCP vs. MATLAB
+
+**Where:** `plotter/scc_plotter.py:32` (line, pyLCP) vs. `plotter/scc_plotter.py:66`
 (scatter, MATLAB).
 
-**Percepção reportada:** visualmente, a curva "MATLAB" no gráfico `self_admittance_ecc`
-parecia ter menos pontos que as curvas analíticas.
+**Reported perception:** visually, the "MATLAB" curve in the `self_admittance_ecc` plot
+seemed to have fewer points than the analytical curves.
 
-**Verificado:** as duas matrizes têm exatamente o mesmo número de elementos —
-`Ysh` (pyLCP) e a `shunt_admittance_matrix` medida (MATLAB) são ambas `(90, 7, 7)` =
-4410 elementos, sobre o mesmo array de 90 frequências (`np.allclose` entre os dois
-arrays de frequência = `True`). Dentro do `xlim=(1E4, 1E7)` do gráfico, exatamente 30
-dos 90 pontos caem na janela visível — o mesmo número para as duas fontes.
+**Verified:** the two matrices have exactly the same number of elements —
+`Ysh` (pyLCP) and the measured `shunt_admittance_matrix` (MATLAB) are both `(90, 7, 7)` =
+4410 elements, over the same array of 90 frequencies (`np.allclose` between the two
+frequency arrays = `True`). Within the plot's `xlim=(1E4, 1E7)`, exactly 30
+of the 90 points fall in the visible window — the same number for both sources.
 
-**Causa da percepção:** diferença de estilo de desenho, não de dado. As séries pyLCP
-usam `ax.plot(...)` (linha contínua interpolando os 30 pontos, sem marcas individuais
-visíveis); a série MATLAB usa `ax.scatter(...)` (marcador `'x'` discreto em cada um dos
-30 pontos). Uma linha contínua "esconde" a discretização subjacente; um scatter a
-escancara.
+**Cause of the perception:** a difference in drawing style, not in data. The pyLCP series
+use `ax.plot(...)` (continuous line interpolating the 30 points, with no individual
+markers visible); the MATLAB series uses `ax.scatter(...)` (discrete `'x'` marker on each
+of the 30 points). A continuous line "hides" the underlying discretization; a scatter
+makes it obvious.
 
-**Sem correção necessária** — comportamento esperado, registrado só para referência
-futura.
+**No fix needed** — expected behavior, recorded only for reference.

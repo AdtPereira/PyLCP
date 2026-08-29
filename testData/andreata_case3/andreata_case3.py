@@ -88,7 +88,7 @@ def main():
     cmsl_processor.load_scc_earth_return_and_internal_scenarios(
         pul_data, internal_mtl_model=mtl_model_a, internal_form='approximation')
 
-    print("Carregando dados de referência do MATLAB...")
+    print("Loading MATLAB reference data...")
     matlab_reader = MatlabDataReader(__file__, autoShow=False)
     matlab_data = matlab_reader.get_scc_scenario_data(
         prefix='andreata_case3',

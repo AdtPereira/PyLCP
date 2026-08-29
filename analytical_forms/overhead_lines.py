@@ -146,7 +146,7 @@ def sommerfeld_quasi_tem_approx_adaptive(hnm, dnm, ke2, n2=1.0, limit=100, epsre
     return result
 
 # =============================================================================
-# CLASSE PARA PARÂMETROS INTERNOS
+# CLASS FOR INTERNAL PARAMETERS
 # =============================================================================
 class InternalPerUnitParameters:
     """
@@ -180,7 +180,7 @@ class InternalPerUnitParameters:
         # DC Resistance
         ri_cc_solid = 1.0 / (self.model.sigma * np.pi * self.ro**2)
         
-        # Use np.where para evitar divisão por zero se ro == ri em um tubo defeituoso
+        # Use np.where to avoid division by zero if ro == ri in a defective tube
         ri_cc_tubular_denom = self.model.sigma * np.pi * (self.ro**2 - self.ri**2)
         ri_cc_tubular = np.divide(1.0, ri_cc_tubular_denom, where=ri_cc_tubular_denom!=0)        
         ri_cc_diag = np.where(self.is_tubular_mask, ri_cc_tubular, ri_cc_solid)
@@ -188,22 +188,22 @@ class InternalPerUnitParameters:
         # DC Internal Inductance
         li_cc_solid = self.model.mu / (8 * np.pi)
         
-        # 1. Crie um array de raios internos seguro, substituindo 0 por 1 nos condutores sólidos.
+        # 1. Build a safe inner-radius array, replacing 0 with 1 for solid conductors.
         ri_safe_for_division = np.where(self.is_tubular_mask, self.ri, 1.0)
-        
-        # 2. Calcule a razão com o divisor seguro. Nenhuma divisão por zero ocorre aqui.
+
+        # 2. Compute the ratio with the safe divisor. No division by zero occurs here.
         ratio = self.ro / ri_safe_for_division
-        
-        # 3. Use o 'where' principal para escolher entre a razão (para tubos) e 1 (para sólidos).
+
+        # 3. Use the main 'where' to choose between the ratio (for tubes) and 1 (for solids).
         log_argument = np.where(self.is_tubular_mask, ratio, 1.0)
-        
-        # 4. O log é agora calculado sem nenhum aviso.
+
+        # 4. The log is now computed without any warning.
         log_term = np.log(log_argument)
 
         ro2, ri2 = self.ro**2, self.ri**2
         ro2ri2 = ro2 - ri2
-        
-        # Evita divisão por zero se ro2ri2 for zero (tubo defeituoso)
+
+        # Avoid division by zero if ro2ri2 is zero (defective tube)
         term1_denom = 4 * ro2ri2
         term1 = np.divide((ro2 - 3 * ri2), term1_denom, where=term1_denom!=0)
 
@@ -220,7 +220,7 @@ class InternalPerUnitParameters:
 
     def matrix_impedance_bessel(self):
         """Calculates exact internal impedance using Bessel functions."""
-        # (Este é o método 'impedance_matrix' da versão anterior, renomeado e limpo)
+        # (This is the 'impedance_matrix' method of the previous version, renamed and cleaned up)
         dc_params = self.dc_parameters()
         ri_cc_diag = np.diag(dc_params['Ri_cc'])        
         jw_mu = self.jw[:, np.newaxis] * self.model.mu
@@ -312,7 +312,7 @@ class InternalPerUnitParameters:
         return {**dc_params, **bessel_params, **kelvin_params, **approx_params}
 
 # =============================================================================
-# CLASSE PARA PARÂMETROS EXTERNOS E MONTAGEM FINAL
+# CLASS FOR EXTERNAL PARAMETERS AND FINAL ASSEMBLY
 # =============================================================================
 class PerUnitParameters:
     """ Calculates external and final PUL parameters for overhead lines. """

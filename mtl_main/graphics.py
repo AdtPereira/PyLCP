@@ -185,7 +185,7 @@ class BaseMTLRepresentation:
                 zorder=4)
             ax.add_patch(patch)
             
-        # Wedge do material condutor
+        # Wedge of the conductor material
         patch = Wedge(
             center=conductor_center * self.unit_factor,
             r=conductor_data['radius'][1] * self.unit_factor,
@@ -303,21 +303,21 @@ class GroundReturnMTLRepresentation(BaseMTLRepresentation):
         enclosure_center = np.array(enclosure['center_point']) if 'center_point' in enclosure else np.array([0, 0])
         enclosure_type = enclosure.get('type', 'HDPE')
 
-        # --- INÍCIO DA CORREÇÃO ---
-        # Ajusta a posição y para sistemas com retorno pelo solo (ground-return)
-        # Esta lógica DEVE ser idêntica à de _plot_conductor_graphic
+        # --- START OF FIX ---
+        # Adjusts the y position for ground-return systems
+        # This logic MUST be identical to the one in _plot_conductor_graphic
         if parameters['h_factor'] != 1:
-            # Obter os parâmetros de escala
+            # Get the scaling parameters
             y_real_enclosure = enclosure['center_point'][1]
             y_avg = parameters['y_avg']
             schematic_y_avg = parameters['h_factor'] * parameters['max_radius']
-            
-            # Calcular a nova posição y esquemática para o duto
+
+            # Compute the new schematic y position for the duct
             schematic_y_enclosure = schematic_y_avg + (y_real_enclosure - y_avg)
-            
-            # Aplicar a nova posição
+
+            # Apply the new position
             enclosure_center[1] = schematic_y_enclosure
-        # --- FIM DA CORREÇÃO ---
+        # --- END OF FIX ---
         
         patch = Wedge(
             center=enclosure_center * self.unit_factor,

@@ -1,135 +1,135 @@
 # PyLCP — Python Library for Cable Parameters
 
-Framework de análise eletromagnética para cálculo de parâmetros elétricos por unidade de comprimento (PUL) em **linhas de transmissão multicondutoras** (MTLs). Combina formulações analíticas clássicas, Método dos Momentos (MoM) e validação com simulações COMSOL Multiphysics.
+Electromagnetic analysis framework for computing per-unit-length (PUL) electrical parameters of **multiconductor transmission lines** (MTLs). It combines classical analytical formulations, the Method of Moments (MoM) and validation against COMSOL Multiphysics simulations.
 
-## Domínio de Aplicação
+## Application Domain
 
-| Categoria | Tipos Suportados |
+| Category | Supported Types |
 |-----------|-----------------|
-| **Linhas aéreas (OHTL)** | Mono e multifásica com retorno pelo solo (Carson, Sunde, Nakagawa, Quasi-TEM) |
-| **Cabos subterrâneos (SCC)** | Monopolar core + sheath, configurações plana e trifólio |
-| **Cabos em tubos (HDPE/pipe)** | SCC excêntrico em tubo HDPE, trefoil em conduto condutor |
-| **Sistemas isolados** | Fios nus (bifilar), fios revestidos, coaxiais, ribbon cable |
+| **Overhead lines (OHTL)** | Single- and multi-phase with ground return (Carson, Sunde, Nakagawa, Quasi-TEM) |
+| **Underground cables (SCC)** | Single-core core + sheath, flat and trefoil arrangements |
+| **Cables in pipes (HDPE/pipe)** | Eccentric SCC in an HDPE pipe, trefoil in a conducting conduit |
+| **Isolated systems** | Bare wires (bifilar), coated wires, coaxial, ribbon cable |
 
 ---
 
-## Estrutura do Projeto
+## Project Structure
 
 ```
 PyLCP/
-├── mtl_main/                   # Núcleo — modelagem de MTLs
-│   ├── source.py               # MulticonductorTransmissionLine (classe central)
-│   ├── strategy.py             # Padrão Strategy por tipo de MTL
-│   ├── propagation.py          # γ_v, γ_i, Zc, Yc no domínio de fase (compartilhado)
-│   └── graphics.py             # Esquemáticos de seção transversal
+├── mtl_main/                   # Core — MTL modeling
+│   ├── source.py               # MulticonductorTransmissionLine (central class)
+│   ├── strategy.py             # Strategy pattern per MTL type
+│   ├── propagation.py          # gamma_v, gamma_i, Zc, Yc in the phase domain (shared)
+│   └── graphics.py             # Cross-section schematics
 │
-├── analytical_forms/           # Formulações analíticas
-│   ├── single_core_cable.py    # Cabos monopolares (SCC); InternalParametersFromFEM, build_pul_matrices
-│   ├── overhead_lines.py       # Linhas aéreas (OHTL)
-│   ├── modal_analysis.py       # Decomposição modal (Cap. 5 Andreata): α_m, v_m, Z_cm
-│   └── isolated_wires.py       # Fios em meio homogêneo
+├── analytical_forms/           # Analytical formulations
+│   ├── single_core_cable.py    # Single-core cables (SCC); InternalParametersFromFEM, build_pul_matrices
+│   ├── overhead_lines.py       # Overhead lines (OHTL)
+│   ├── modal_analysis.py       # Modal decomposition (Andreata Ch. 5): alpha_m, v_m, Z_cm
+│   └── isolated_wires.py       # Wires in a homogeneous medium
 │
-├── mom/                        # Método dos Momentos (MoM)
-│   ├── bare_wire_systems.py    # Fios nus — colocação e Galerkin
-│   └── coated_wire_systems.py  # Fios revestidos
+├── mom/                        # Method of Moments (MoM)
+│   ├── bare_wire_systems.py    # Bare wires — collocation and Galerkin
+│   └── coated_wire_systems.py  # Coated wires
 │
-├── mom_so/                     # MoM com funções de Green quasi-estáticas
-│   ├── quasi_static_green.py   # Matriz G quasi-estática (MoM-SO)
-│   └── lossless_medium.py      # Admitância em meio sem perdas
+├── mom_so/                     # MoM with quasi-static Green's functions
+│   ├── quasi_static_green.py   # Quasi-static G matrix (MoM-SO)
+│   └── lossless_medium.py      # Admittance in a lossless medium
 │
-├── models/                     # Geradores de modelos paramétricos
-│   ├── model_generator.py      # Classe base BaseModelGenerator
+├── models/                     # Parametric model generators
+│   ├── model_generator.py      # Base class BaseModelGenerator
 │   ├── single_core_cable.py    # SingleCoreCableModelGenerator
-│   ├── overhead_lines.py       # Modelos de linhas aéreas
-│   ├── isolated_wires.py       # Fios isolados em arranjos planos
-│   ├── hdpe.py                 # Cabos em tubo HDPE
-│   └── pipe_type.py            # Cabos em conduto condutor
+│   ├── overhead_lines.py       # Overhead-line models
+│   ├── isolated_wires.py       # Isolated wires in flat arrangements
+│   ├── hdpe.py                 # Cables in an HDPE pipe
+│   └── pipe_type.py            # Cables in a conducting conduit
 │
-├── plotter/                    # Visualização
-│   ├── models_base.py          # BasePlotter — plotagem config-driven
-│   ├── scc_models.py           # SingleCoreCableModels (cabos subterrâneos)
+├── plotter/                    # Visualization
+│   ├── models_base.py          # BasePlotter — config-driven plotting
+│   ├── scc_models.py           # SingleCoreCableModels (underground cables)
 │   ├── scc_plotter.py          # SCCPlotter(BasePlotter)
-│   ├── ohtl_models.py          # OverheadLineModels (linhas aéreas)
+│   ├── ohtl_models.py          # OverheadLineModels (overhead lines)
 │   ├── ohtl_plotter.py         # OHTLPlotter(BasePlotter)
-│   ├── lima_models.py          # LimaModels — constante de propagação OHTL
-│   ├── deConti_models.py       # DeContiModels — parâmetros matriciais
+│   ├── lima_models.py          # LimaModels — OHTL propagation constant
+│   ├── deConti_models.py       # DeContiModels — matrix parameters
 │   ├── modal_plotter.py        # ModalPropagationPlotter — Figs 5.5/5.6/5.7 (Andreata)
-│   └── xue_models.py           # XueModels — impedância série Xue
+│   └── xue_models.py           # XueModels — Xue series impedance
 │
 ├── utils/
-│   ├── case_utils.py           # Utilitários: load_json_parameters, save_figure, ...
-│   ├── passivity_check.py      # Avaliação de passividade de Z'/Y'/Yc (Gustavsen 2008, eq. 3)
-│   └── comsol_data.py          # Leitura e parsing de dados COMSOL
+│   ├── case_utils.py           # Utilities: load_json_parameters, save_figure, ...
+│   ├── passivity_check.py      # Passivity assessment of Z'/Y'/Yc (Gustavsen 2008, eq. 3)
+│   └── comsol_data.py          # Reading and parsing of COMSOL data
 │
-├── mtl_paul/                   # Integração Fortran (RIBBON.FOR)
-│   └── py_fortran.py           # FortranRunner — wrapper Python/Fortran
+├── mtl_paul/                   # Fortran integration (RIBBON.FOR)
+│   └── py_fortran.py           # FortranRunner — Python/Fortran wrapper
 │
-├── tulip/                      # Integração com malhas Gmsh (opcional)
-│   └── py_tulip.py             # PyTulip — geração de malhas para FEM
+├── tulip/                      # Gmsh mesh integration (optional)
+│   └── py_tulip.py             # PyTulip — mesh generation for FEM
 │
-├── testData/                   # Casos de teste (20 cenários)
-├── run_testData.py             # Runner principal — executa todos os casos
-└── environment.yml             # Ambiente conda
+├── testData/                   # Test cases (20 scenarios)
+├── run_testData.py             # Main runner — runs every case
+└── environment.yml             # conda environment
 ```
 
 ---
 
-## Instalação
+## Installation
 
-### Pré-requisitos
+### Prerequisites
 
-- [Miniconda](https://docs.conda.io/en/latest/miniconda.html) ou Anaconda
+- [Miniconda](https://docs.conda.io/en/latest/miniconda.html) or Anaconda
 - Python 3.11
 
-### Criar Ambiente
+### Create Environment
 
 ```bash
 conda env create -f environment.yml
 conda activate pylcp
 ```
 
-### Dependências Principais
+### Main Dependencies
 
-| Pacote | Versão | Uso |
+| Package | Version | Use |
 |--------|--------|-----|
-| numpy | 1.24.3 | Álgebra linear, arrays |
-| scipy | 1.15.3 | Funções de Bessel, integrais |
-| matplotlib | 3.10.3 | Gráficos |
-| pandas | 2.2.3 | Processamento de dados COMSOL |
-| sympy | 1.14.0 | Derivação simbólica |
-| mpmath | 1.3.0 | Aritmética de precisão arbitrária |
-| scikit-rf | 1.7.0 | Parâmetros de rede (S, Z, Y) |
-| gmsh | 4.13.1 | Geração de malhas FEM *(opcional)* |
-| meshpy | 2022.1.3 | Interface Python para Gmsh *(opcional)* |
+| numpy | 1.24.3 | Linear algebra, arrays |
+| scipy | 1.15.3 | Bessel functions, integrals |
+| matplotlib | 3.10.3 | Plots |
+| pandas | 2.2.3 | COMSOL data processing |
+| sympy | 1.14.0 | Symbolic derivation |
+| mpmath | 1.3.0 | Arbitrary-precision arithmetic |
+| scikit-rf | 1.7.0 | Network parameters (S, Z, Y) |
+| gmsh | 4.13.1 | FEM mesh generation *(optional)* |
+| meshpy | 2022.1.3 | Python interface to Gmsh *(optional)* |
 
-> **Nota:** `gmsh` é necessário apenas para o caso `ribbon_s50` com integração Gmsh/TULIP. Os demais casos funcionam sem ele.
+> **Note:** `gmsh` is required only for the `ribbon_s50` case with Gmsh/TULIP integration. The other cases work without it.
 
 ---
 
-## Execução
+## Running
 
-### Todos os casos de teste
+### All test cases
 
 ```bash
 cd c:\git\PyLCP
 python run_testData.py
 ```
 
-### Caso individual
+### Individual case
 
 ```bash
-# Módulo como pacote Python
+# Module as a Python package
 python -m testData.scc_132kV_xue.scc_132kV_xue
 python -m testData.ohtl_single_lima.ohtl_single_lima
 ```
 
-Os resultados (gráficos `.png` e esquemáticos) são salvos automaticamente em `testData/<case>/Results/`.
+The results (`.png` plots and schematics) are saved automatically to `testData/<case>/Results/`.
 
 ---
 
-## Uso Programático
+## Programmatic Use
 
-### Parâmetros PUL de um cabo monopolar
+### PUL parameters of a single-core cable
 
 ```python
 import numpy as np
@@ -137,27 +137,27 @@ from mtl_main.source import MulticonductorTransmissionLine
 from models.single_core_cable import SingleCoreCableModelGenerator
 from analytical_forms.single_core_cable import InternalPerUnitParameters, PerUnitParameters
 
-# 1. Carregar modelo a partir de JSON
+# 1. Load model from JSON
 gen = SingleCoreCableModelGenerator(__file__)
 model = gen.underground_model()
 
-# 2. Instanciar MTL
+# 2. Instantiate the MTL
 mtl = MulticonductorTransmissionLine(model)
 
-# 3. Calcular parâmetros internos (skin effect)
-f = np.logspace(0, 6, 61)            # 1 Hz a 1 MHz
+# 3. Compute the internal parameters (skin effect)
+f = np.logspace(0, 6, 61)            # 1 Hz to 1 MHz
 internal = InternalPerUnitParameters(mtl, f)
 zi = internal.approximations()['Zi_approx']
 
-# 4. Calcular matrizes PUL completas
+# 4. Compute the full PUL matrices
 pul = PerUnitParameters(mtl, f)
 matrices = pul.pul_matrices(zi)
-# matrices['series_impedance_matrix']   → (61, N, N) Ω/m
-# matrices['shunt_admittance_matrix']   → (61, N, N) S/m
-# matrices['propagation_voltage_matrix'] → (61, N, N) 1/m
+# matrices['series_impedance_matrix']   -> (61, N, N) Ohm/m
+# matrices['shunt_admittance_matrix']   -> (61, N, N) S/m
+# matrices['propagation_voltage_matrix'] -> (61, N, N) 1/m
 ```
 
-### Parâmetros PUL de uma linha aérea
+### PUL parameters of an overhead line
 
 ```python
 import numpy as np
@@ -166,12 +166,12 @@ from models.overhead_lines import single_phase_model
 from analytical_forms.overhead_lines import InternalPerUnitParameters, PerUnitParameters
 from utils.case_utils import load_json_parameters
 
-# 1. Carregar JSON com geometria
+# 1. Load JSON with the geometry
 params = load_json_parameters(__file__)
 model  = single_phase_model(params)
 mtl    = MulticonductorTransmissionLine(model)
 
-# 2. Calcular para múltiplos cenários de solo
+# 2. Compute for multiple soil scenarios
 f   = np.logspace(0, 6, 100)
 pul = PerUnitParameters(mtl, f)
 internal = InternalPerUnitParameters(mtl, f)
@@ -184,53 +184,53 @@ for zg_form in ['nakagawa', 'carson', 'sunde', 'quasi_tem']:
 
 ---
 
-## Casos de Teste
+## Test Cases
 
-### Fios e Cabos Isolados
+### Isolated Wires and Cables
 
-| Caso | Tipo | Descrição | Referência |
+| Case | Type | Description | Reference |
 |------|------|-----------|-----------|
-| `bare_wire` | `bare_wires` | Linha bifilar nua, Ø10 mm, espaçamento 21 mm | Clements (1974) |
-| `bifilar_s21` | `bare_wires` | Idem, análise detalhada frequência-dependente | Clements (1974) |
-| `bifilar_s25` | `bare_wires` | Linha bifilar nua, espaçamento 25 mm | Clements (1974) |
-| `bifilar_s100` | `bare_wires` | Linha bifilar nua, espaçamento 100 mm | Clements (1974) |
-| `coated_bifilar_s40` | `coated_wires` | Fios com revestimento isolante, esp. 40 mm | Paul (2008) |
-| `coaxial` | `coaxial` | Cabo coaxial isolado em ar | Patel (2014) |
-| `ribbon_s50` | `coated_wires` | Ribbon cable 3 condutores, espaçamento 50 mil | Paul (2008) |
+| `bare_wire` | `bare_wires` | Bare bifilar line, 10 mm dia., 21 mm spacing | Clements (1974) |
+| `bifilar_s21` | `bare_wires` | Same, detailed frequency-dependent analysis | Clements (1974) |
+| `bifilar_s25` | `bare_wires` | Bare bifilar line, 25 mm spacing | Clements (1974) |
+| `bifilar_s100` | `bare_wires` | Bare bifilar line, 100 mm spacing | Clements (1974) |
+| `coated_bifilar_s40` | `coated_wires` | Wires with an insulating coating, 40 mm spacing | Paul (2008) |
+| `coaxial` | `coaxial` | Coaxial cable isolated in air | Patel (2014) |
+| `ribbon_s50` | `coated_wires` | 3-conductor ribbon cable, 50 mil spacing | Paul (2008) |
 
-### Linhas Aéreas (OHTL)
+### Overhead Lines (OHTL)
 
-| Caso | Tipo | Descrição | Referência |
+| Case | Type | Description | Reference |
 |------|------|-----------|-----------|
-| `ohtl_single_deConti` | `overhead` | Linha monofásica, formulação De Conti | De Conti et al. |
-| `ohtl_single_deConti_deri` | `overhead` | Idem com método da derivada (Deri) | Deri et al. |
-| `ohtl_single_lima` | `overhead` | Propagação Quasi-TEM, Carson, Sunde, Nakagawa | Lima (2015) |
-| `ohtl_single_xue` | `overhead` | Impedância série, variação de ρ_solo e ε_r | Xue (2018) |
+| `ohtl_single_deConti` | `overhead` | Single-phase line, De Conti formulation | De Conti et al. |
+| `ohtl_single_deConti_deri` | `overhead` | Same with the derivative method (Deri) | Deri et al. |
+| `ohtl_single_lima` | `overhead` | Quasi-TEM propagation, Carson, Sunde, Nakagawa | Lima (2015) |
+| `ohtl_single_xue` | `overhead` | Series impedance, variation of rho_soil and eps_r | Xue (2018) |
 
-### Cabos Subterrâneos (SCC)
+### Underground Cables (SCC)
 
-| Caso | Tipo | Descrição | Referência |
+| Case | Type | Description | Reference |
 |------|------|-----------|-----------|
-| `scc_single_deConti` | `scc` | Monopolar simples, retorno pelo solo | De Conti |
-| `scc_flat_deConti` | `scc` | 3 cabos configuração plana | De Conti |
-| `scc_132kV_xue` | `scc` | Monopolar 132 kV, análise completa | Xue (2018) |
-| `scc_flat_xue` | `scc` | 3 cabos configuração plana | Xue (2018) |
-| `scc_trefoil_xue` | `scc` | 3 cabos configuração trifólio | Xue (2018) |
-| `scc_138kV_prysmian` | `scc` | Cabo real 138 kV Prysmian | Prysmian / Patel (2014) |
+| `scc_single_deConti` | `scc` | Simple single-core, ground return | De Conti |
+| `scc_flat_deConti` | `scc` | 3 cables, flat arrangement | De Conti |
+| `scc_132kV_xue` | `scc` | Single-core 132 kV, full analysis | Xue (2018) |
+| `scc_flat_xue` | `scc` | 3 cables, flat arrangement | Xue (2018) |
+| `scc_trefoil_xue` | `scc` | 3 cables, trefoil arrangement | Xue (2018) |
+| `scc_138kV_prysmian` | `scc` | Real 138 kV Prysmian cable | Prysmian / Patel (2014) |
 
-### Estruturas Especiais
+### Special Structures
 
-| Caso | Tipo | Descrição | Referência |
+| Case | Type | Description | Reference |
 |------|------|-----------|-----------|
-| `hdpe_220kV_2000mm2` | `hdpe` | Monopolar 220 kV, 2000 mm², em tubo HDPE 10" | Lafaia et al. (2015) |
-| `hdpe_225kV_2000mm2` | `hdpe` | Idem 225 kV, com validação COMSOL | Lafaia et al. (2015) |
-| `pipe_trefoil_patel` | `pipe` | 3 cabos trifásicos em conduto condutor | Patel (2014) |
+| `hdpe_220kV_2000mm2` | `hdpe` | Single-core 220 kV, 2000 mm^2, in a 10" HDPE pipe | Lafaia et al. (2015) |
+| `hdpe_225kV_2000mm2` | `hdpe` | Same 225 kV, with COMSOL validation | Lafaia et al. (2015) |
+| `pipe_trefoil_patel` | `pipe` | 3 three-phase cables in a conducting conduit | Patel (2014) |
 
 ---
 
-## Arquitetura
+## Architecture
 
-### Fluxo de Dados
+### Data Flow
 
 ```
 case.json  ──►  ModelGenerator  ──►  model dict
@@ -242,7 +242,7 @@ case.json  ──►  ModelGenerator  ──►  model dict
                               ┌───────────┼───────────┐
                               ▼           ▼           ▼
                         Analytical       MoM       MoM-SO
-                         (Z, Y, γ)    (C, L)     (Z quasi)
+                         (Z, Y, gamma) (C, L)     (Z quasi)
                               │           │           │
                               └───────────┼───────────┘
                                           ▼
@@ -260,27 +260,27 @@ case.json  ──►  ModelGenerator  ──►  model dict
                                    Results/*.png
 ```
 
-### Estratégias por Tipo de MTL
+### Strategies per MTL Type
 
-| Estratégia | Tipo (`mtl_type`) | Geometrias |
+| Strategy | Type (`mtl_type`) | Geometries |
 |-----------|-------------------|-----------|
-| `CableStrategy` | `bare_wires`, `coated_wires`, `coaxial`, `pipe` | Sistemas isolados |
-| `SingleCoreCableStrategy` | `scc` | Core + sheath enterrados |
-| `SingleCoreCableInHDPEStrategy` | `hdpe` | SCC dentro de tubo HDPE |
-| `SingleCoreCableWithECCInHDPEStrategy` | `shared-hdpe` | SCC + ECC em HDPE |
-| `OverheadLineStrategy` | `overhead` | Fios aéreos com retorno pelo solo |
+| `CableStrategy` | `bare_wires`, `coated_wires`, `coaxial`, `pipe` | Isolated systems |
+| `SingleCoreCableStrategy` | `scc` | Buried core + sheath |
+| `SingleCoreCableInHDPEStrategy` | `hdpe` | SCC inside an HDPE pipe |
+| `SingleCoreCableWithECCInHDPEStrategy` | `shared-hdpe` | SCC + ECC in HDPE |
+| `OverheadLineStrategy` | `overhead` | Overhead wires with ground return |
 
-### Formato do Modelo (dict)
+### Model Format (dict)
 
 ```python
 model = {
-    'type': 'scc',                   # tipo de MTL
-    'idx_ref_conductor': 0,          # índice do condutor de referência (solo/retorno)
-    1: {                             # condutor 1 (core)
+    'type': 'scc',                   # MTL type
+    'idx_ref_conductor': 0,          # index of the reference conductor (soil/return)
+    1: {                             # conductor 1 (core)
         'line_id': 1,
         'conductor_name': 'core',
         'center_point': (0.0, 1.0),  # [m]
-        'radius': (0.0, 0.02785),    # [r_in, r_out] em metros
+        'radius': (0.0, 0.02785),    # [r_in, r_out] in meters
         'conductivity': 5.8e7,       # [S/m]
         'insulation': {
             'name': 'primary_insulation',
@@ -293,89 +293,90 @@ model = {
 }
 ```
 
-### Chaves retornadas por `pul_matrices()`
+### Keys returned by `pul_matrices()`
 
-| Chave | Descrição | Unidade |
+| Key | Description | Unit |
 |-------|-----------|--------|
-| `series_impedance_matrix` | Impedância série Z(f) | Ω/m |
-| `shunt_admittance_matrix` | Admitância shunt Y(f) | S/m |
-| `earth-return_impedance_matrix` | Contribuição do solo | Ω/m |
-| `propagation_voltage_matrix` | Constante de propagação γ(f) | 1/m |
-| `propagation_current_matrix` | γ em corrente | 1/m |
-| `characteristic_impedance_matrix` | Impedância característica Zc | Ω |
-| `characteristic_admittance_matrix` | Admitância característica Yc | S |
+| `series_impedance_matrix` | Series impedance Z(f) | Ohm/m |
+| `shunt_admittance_matrix` | Shunt admittance Y(f) | S/m |
+| `earth-return_impedance_matrix` | Soil contribution | Ohm/m |
+| `propagation_voltage_matrix` | Propagation constant gamma(f) | 1/m |
+| `propagation_current_matrix` | gamma in current | 1/m |
+| `characteristic_impedance_matrix` | Characteristic impedance Zc | Ohm |
+| `characteristic_admittance_matrix` | Characteristic admittance Yc | S |
 
-> Para SCC, essas quatro chaves de propagação são obtidas por
-> `PerUnitParameters.propagation_matrices(quasi_tem_matrices)` (anexadas ao
-> dict de `quasi_tem_approx_matrices`).
+> For SCC, these four propagation keys are obtained via
+> `PerUnitParameters.propagation_matrices(quasi_tem_matrices)` (appended to the
+> `quasi_tem_approx_matrices` dict).
 
 ---
 
-## Análise Modal (Cap. 5 de Andreata)
+## Modal Analysis (Andreata Ch. 5)
 
-`analytical_forms/modal_analysis.py::ModalDecomposition` decompõe `Y'Z'` por
-frequência, rastreia os modos ao longo da frequência (*switching-back
-procedure* — Gustavsen 2008 §IV-A / Wedepohl 1996 §6) e devolve, por modo:
-constante de atenuação `α_m`, constante de fase `β_m`, velocidade de fase
-`v_m`, impedância/admitância características modais `Z_cm`/`Y_cm`, e as matrizes
-de transformação `T_I`/`T_V`. Para os sistemas de 6 condutores (3 SCC, com ou
-sem duto HDPE) os modos são rotulados automaticamente em 2 estágios
+`analytical_forms/modal_analysis.py::ModalDecomposition` decomposes `Y'Z'` per
+frequency, tracks the modes across frequency (*switching-back procedure* —
+Gustavsen 2008 sec. IV-A / Wedepohl 1996 sec. 6) and returns, per mode:
+attenuation constant `alpha_m`, phase constant `beta_m`, phase velocity
+`v_m`, modal characteristic impedance/admittance `Z_cm`/`Y_cm`, and the
+transformation matrices `T_I`/`T_V`. For the 6-conductor systems (3 SCC, with or
+without an HDPE duct) the modes are labeled automatically in 2 stages
 (`ground`, `inter_sheath_1/2`, `coaxial_1/2/3`).
-`plotter/modal_plotter.py::ModalPropagationPlotter` gera os gráficos de
-`α_m`, `v_m` e `|Z_cm|`:
+`plotter/modal_plotter.py::ModalPropagationPlotter` generates the plots of
+`alpha_m`, `v_m` and `|Z_cm|`:
 
-| Caso | Figuras de Andreata |
+| Case | Andreata Figures |
 |---|---|
-| `andreata_case1` — 3 SCC diretamente enterrados (Config. 1) | 5.5 / 5.6 / 5.7 |
-| `andreata_case2` — 3 SCC em dutos HDPE individuais (Config. 2), pipeline **FEM-híbrido** | 5.8 / 5.9 / 5.10 |
+| `andreata_case1` — 3 directly buried SCC (Config. 1) | 5.5 / 5.6 / 5.7 |
+| `andreata_case2` — 3 SCC in individual HDPE ducts (Config. 2), **FEM-hybrid** pipeline | 5.8 / 5.9 / 5.10 |
 
 ---
 
-## Pipeline híbrido (interno FEM/COMSOL + retorno pelo solo analítico)
+## Hybrid pipeline (FEM/COMSOL internal + analytical ground return)
 
-Para geometrias sem solução analítica interna (SCC dentro de tubo HDPE —
+For geometries with no internal analytical solution (SCC inside an HDPE pipe —
 Config. 2), `analytical_forms/single_core_cable.py::build_pul_matrices(...,
-internal_source='fem', fem_internal=InternalParametersFromFEM(...))` compõe:
+internal_source='fem', fem_internal=InternalParametersFromFEM(...))` assembles:
 
-- **`Zi` / `Yi`** — do COMSOL (geometria excêntrica exata, ar + tubo HDPE);
-- **`Zg` / `Yg`** — analítico (`magalhaes_xue`/`deconti`), com o termo próprio
-  usando o **raio externo do tubo** (`mtl_main/strategy._cable_external_geometry`
-  reconhece o campo `enclosure` do modelo).
+- **`Zi` / `Yi`** — from COMSOL (exact eccentric geometry, air + HDPE pipe);
+- **`Zg` / `Yg`** — analytical, **closed-form** expressions of De Conti/Duarte/Alipio
+  2023 (`zg_form='deconti'`; eqs. 4.59/4.63 of Andreata sec. 5.4 / 6.1), with the
+  self term using the **pipe outer radius**
+  (`mtl_main/strategy._cable_external_geometry` recognizes the `enclosure` field).
 
-Reproduz `Z'`/`Y'` da referência FEM de Andreata a **< 2 %**, sem o método GMD
-de permissividade equivalente de Lafaia. Detalhes:
-[`testData/andreata_common/PLANO_PIPELINE_HIBRIDO.md`](testData/andreata_common/PLANO_PIPELINE_HIBRIDO.md).
+It reproduces `Z'`/`Y'` of Andreata's FEM reference to within **< 2 %**, without
+Lafaia's equivalent-permittivity GMD method. Details:
+[`testData/andreata_common/HYBRID_PIPELINE_PLAN.md`](testData/andreata_common/HYBRID_PIPELINE_PLAN.md).
 
-Detalhes de projeto, validação e limitações:
-[`testData/andreata_common/DESENVOLVIMENTO_MODAL_CAP5.md`](testData/andreata_common/DESENVOLVIMENTO_MODAL_CAP5.md).
+Design, validation and limitations:
+[`testData/andreata_common/MODAL_CH5_DEVELOPMENT.md`](testData/andreata_common/MODAL_CH5_DEVELOPMENT.md).
 
 ---
 
-## Formulações de Retorno pelo Solo (OHTL)
+## Ground-Return Formulations (OHTL)
 
-| `zg_form` | Método | Referência |
+| `zg_form` | Method | Reference |
 |-----------|--------|-----------|
-| `'carson'` | Integral de Carson (série infinita) | Carson (1926) |
-| `'sunde'` | Integral de Sunde | Sunde (1968) |
-| `'nakagawa'` | Formulação Nakagawa/Wise | Nakagawa (1981) |
-| `'quasi_tem'` | Quasi-TEM (integral exata) | Lima & Paulino (2009) |
-| `'quasi_tem_log'` | Quasi-TEM (aproximação logarítmica) | Lima & Paulino (2009) |
-| `'deri'` | Aproximação de Deri | Deri et al. (1981) |
+| `'carson'` | Carson integral (infinite series) | Carson (1926) |
+| `'sunde'` | Sunde integral | Sunde (1968) |
+| `'nakagawa'` | Nakagawa/Wise formulation | Nakagawa (1981) |
+| `'quasi_tem'` | Quasi-TEM (exact integral) | Lima & Paulino (2009) |
+| `'quasi_tem_log'` | Quasi-TEM (logarithmic approximation) | Lima & Paulino (2009) |
+| `'deri'` | Deri approximation | Deri et al. (1981) |
 
 ---
 
-## Fluxo de Trabalho Git
+## Git Workflow
 
-O desenvolvimento contínuo ocorre na branch `ipst_2027`. A `main` recebe atualizações periódicas via merge.
+Ongoing development happens on the `ipst_2027` branch. `main` receives periodic updates via merge.
 
 ### Branches
 
-| Branch | Papel |
+| Branch | Role |
 |--------|-------|
-| `main` | Versão estável — recebe merges de `ipst_2027` |
-| `ipst_2027` | Desenvolvimento ativo — commits do dia a dia |
+| `main` | Stable version — receives merges from `ipst_2027` |
+| `ipst_2027` | Active development — day-to-day commits |
 
-### Sincronizar `ipst_2027` com `main` (antes de iniciar trabalho novo)
+### Sync `ipst_2027` with `main` (before starting new work)
 
 ```bash
 git checkout ipst_2027
@@ -383,7 +384,7 @@ git merge main
 git push origin ipst_2027
 ```
 
-### Promover trabalho de `ipst_2027` para `main`
+### Promote work from `ipst_2027` to `main`
 
 ```bash
 git checkout main
@@ -394,7 +395,7 @@ git checkout ipst_2027
 
 ---
 
-## Referências Bibliográficas
+## Bibliographic References
 
 1. **Paul, C. R.** (2008). *Analysis of Multiconductor Transmission Lines*, 2nd ed. Wiley-IEEE Press.
 2. **Ametani, A., Nagaoka, N., Baba, Y., Ohno, T.** (2015). *Cable System Transients*. Wiley-IEEE Press.
