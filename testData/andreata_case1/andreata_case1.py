@@ -11,6 +11,7 @@ try:
     from utils.case_utils import *
     from utils.comsol_data import ComsolPostProcessor
     from utils.matlab_data import MatlabDataReader
+    from utils.matlab_data import export_comsol_internal_matrices_to_mat
     from plotter.scc_plotter import SCCPlotter
     from models.single_core_cable import SingleCoreCableModelGenerator
     from mtl_main.graphics import GroundReturnMTLRepresentation
@@ -161,9 +162,16 @@ def main():
     plotter.compare_internal_matrices(
         key_list=['internal_impedance_matrix', 'internal_admittance_matrix'])
 
+    # Export the COMSOL/FEM internal matrices back in the MATLAB reference
+    # format (see testData/andreata_common/COMSOL_TO_MATLAB_EXPORT.md).
+    # strict_reference=False: the reference .mat is still on the off-standard
+    # 90-point grid; the COMSOL sweep is the standard 91 points.
+    export_comsol_internal_matrices_to_mat(
+        __file__, prefix='andreata_case1', strict_reference=False)
+
     # Figs. 5.5 / 5.6 / 5.7 -- modal attenuation, phase velocity, |Z_cm|
     ModalPropagationPlotter(__file__, pul_data['modal'],
-                            config_name='Configuration 1', autoSave=True).plot_all()
+                            config_name='Configuration 1', autoSave=False).plot_all()
 
     GroundReturnMTLRepresentation(__file__, mtl_model_a, units='centimeter').system_schematic()
     plt.show()

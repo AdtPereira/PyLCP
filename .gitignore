@@ -11,5 +11,6 @@ Results/
 !testData/*/Results/
 testData/*/Results/*
 !testData/*/Results/*.txt
+!testData/*/Results/*.mat
 logs/
 Comsol/
