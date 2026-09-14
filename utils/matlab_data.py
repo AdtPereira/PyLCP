@@ -6,6 +6,19 @@ from typing import Sequence
 
 import scipy.io as sio
 
+# Mode order used by the external MATLAB developer for the modal-domain
+# propagation parameters (attenuation, phase, velocity, characteristic
+# impedance/admittance -- see MatlabDataReader.get_modal_scenario_data).
+# Confirmed (not merely assumed) by matching the per-mode |Z_cm|/alpha_m
+# magnitudes against the validation table in
+# testData/andreata_common/MODAL_CH5_DEVELOPMENT.md: it is Andreata's own
+# thesis order (eqs. 5.34-5.36 / Figs. 5.5-5.7 legend), identical to
+# analytical_forms.modal_analysis.MODE_LABELS_6C.
+MODAL_MODE_ORDER_6C = (
+    "ground", "inter_sheath_1", "inter_sheath_2",
+    "coaxial_1", "coaxial_2", "coaxial_3",
+)
+
 
 class MatlabDataReader:
     """
@@ -181,6 +194,106 @@ class MatlabDataReader:
                 },
             },
         }
+
+    def get_modal_scenario_data(self, prefix: str, config_index: int = 1) -> dict:
+        """
+        Assembles the MATLAB reference for the modal-domain propagation
+        parameters of Andreata Ch. 5 (attenuation, phase constant, phase
+        velocity, characteristic impedance/admittance -- one value per mode),
+        from the files exported by the external developer:
+
+            <prefix>_alpham.mat, _betam.mat, _velocm.mat, _Zcm.mat, _Ycm.mat
+
+        Each file holds one variable per mode, named
+        ``<var><mode>_<config_index>`` with ``mode`` = 1..N (e.g.
+        ``alpham1_1`` .. ``alpham6_1`` for Configuration 1's 6 conductors,
+        ``..._3`` for Configuration 3's 7 -- 6 + the ECC). ``N`` is inferred
+        per file from the variables actually present (not hardcoded), so this
+        also serves the 7-conductor ECC cases (3, 4) once their .mat files
+        arrive, without silently dropping the 7th mode.
+
+        Mode *labels* are only assigned when ``N == 6``: that is the one case
+        confirmed (by matching magnitudes against
+        ``MODAL_CH5_DEVELOPMENT.md``) to follow Andreata's thesis order
+        ``MODAL_MODE_ORDER_6C``. For any other ``N`` (the ECC configs) mode
+        classification is not implemented yet on the pyLCP side either (see
+        ``analytical_forms.modal_analysis.ModalDecomposition._classify``, which
+        bails out for ``n != 6``) -- there is no reference-pattern scheme to
+        assign real labels to, and no thesis equations for a 7th "ECC mode" in
+        the codebase yet. Labelling as ``None`` (rather than guessing e.g.
+        raw index order) is deliberate: it makes downstream consumers
+        (``ModalPropagationPlotter``, ``print_modal_comparison_report``) skip
+        the mode-matching overlay/report instead of silently pairing up two
+        arbitrarily-ordered eigenmode sets that have no verified correspondence.
+
+        Frequencies are not stored inside these files -- the developer used
+        the "standard" 91-point log grid (10 pts/decade, 1E-2..1E7 Hz), the
+        same one used for the COMSOL FEM export
+        (``<prefix>_frequency_range_fem.mat``), reused here if present, else
+        regenerated with ``np.logspace(-2, 7, 91)``.
+
+        Returns ``None`` if none of the 5 files are present -- the caller
+        (e.g. ``ModalPropagationPlotter``) should treat that as "no MATLAB
+        overlay available" rather than an error.
+        """
+        import re
+
+        var_prefixes = {
+            'alpha': 'alpham', 'beta': 'betam', 'vphase': 'velocm',
+            'Zcm': 'Zcm', 'Ycm': 'Ycm',
+        }
+
+        out = {}
+        n_modes = None
+        for out_key, var_prefix in var_prefixes.items():
+            raw = self.data.get(f'{prefix}_{var_prefix}')
+            if not isinstance(raw, dict):
+                continue
+
+            suffix = f'_{config_index}'
+            pattern = re.compile(rf'^{re.escape(var_prefix)}(\d+){re.escape(suffix)}$')
+            modes_found = sorted(
+                int(m.group(1)) for k in raw if (m := pattern.match(k)) is not None)
+            if not modes_found or modes_found != list(range(1, len(modes_found) + 1)):
+                print(f"  Warning: '{prefix}_{var_prefix}.mat' has no contiguous "
+                      f"1..N '{var_prefix}<mode>{suffix}' variables -- skipping '{out_key}'.")
+                continue
+            n = len(modes_found)
+            if n_modes is None:
+                n_modes = n
+            elif n != n_modes:
+                print(f"  Warning: '{prefix}_{var_prefix}.mat' has {n} modes, "
+                      f"but a previous file in this scenario had {n_modes} -- "
+                      f"skipping '{out_key}'.")
+                continue
+
+            cols = [np.ravel(raw[f'{var_prefix}{m}{suffix}']) for m in modes_found]
+            out[out_key] = np.stack(cols, axis=1)  # (Nf, n)
+
+        if not out:
+            return None
+
+        if n_modes == len(MODAL_MODE_ORDER_6C):
+            mode_labels = MODAL_MODE_ORDER_6C
+        else:
+            print(f"  Note: '{prefix}' modal reference has {n_modes} modes (config_index="
+                  f"{config_index}); mode classification is only implemented for the "
+                  f"6-conductor configs, so these modes are left unlabelled -- overlay "
+                  f"plots/reports will skip them until a labelling scheme is added.")
+            mode_labels = None
+
+        freq = self.data.get(f'{prefix}_frequency_range_fem')
+        if freq is not None:
+            frequencies = np.ravel(freq)
+        else:
+            print(f"  Warning: '{prefix}_frequency_range_fem.mat' not found; assuming "
+                  f"the standard grid np.logspace(-2, 7, 91) for the modal reference "
+                  f"of '{prefix}' (config_index={config_index}).")
+            frequencies = np.logspace(-2, 7, num=91)
+
+        out['frequencies'] = frequencies
+        out['mode_labels'] = mode_labels
+        return out
 
 
 # --------------------------------------------------------------------------- #

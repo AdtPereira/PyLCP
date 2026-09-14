@@ -21,7 +21,7 @@ try:
         InternalParametersFromFEM, build_pul_matrices,
     )
     from analytical_forms.modal_analysis import ModalDecomposition, default_scc_roles
-    from plotter.modal_plotter import ModalPropagationPlotter
+    from plotter.modal_plotter import ModalPropagationPlotter, print_modal_comparison_report
     from utils.passivity_check import check_pul_passivity, print_passivity_report
     from .plot_config import PLOT_CONFIG
     print("Modules imported successfully.")
@@ -227,6 +227,13 @@ def main():
         pul_data['frequencies'])
     pul_data['matlab'] = matlab_data
 
+    # MATLAB reference for the modal-domain parameters (Andreata Ch. 5),
+    # Configuration 2 (config_index=2 -> the '..._2' variable suffix in the
+    # exported .mat files) -- see MODAL_CH5_DEVELOPMENT.md. `None` if the
+    # andreata_case2_{alpham,betam,velocm,Zcm,Ycm}.mat files are not present;
+    # the modal plots/report below just skip the overlay then.
+    matlab_modal = matlab_reader.get_modal_scenario_data(prefix='andreata_case2', config_index=2)
+
     # The internal parameters used to assemble the COMSOL quasi-TEM matrix
     # come from the GMD case 3.1 model (the most complete of the three) -- only
     # the earth return is actually measured in COMSOL. The combined internal
@@ -310,6 +317,7 @@ def main():
     print(f"  classification similarity  : "
           f"{min(_diag['classification_similarity'].values()):.3f} (min over modes)")
     print(f"  passive (Z', Y')           : {_diag['passivity']['passive']}")
+    print_modal_comparison_report(modal_data, matlab_modal)
 
     # Canonical internal matrix for 'internal_impedance_matrix' (see
     # plot_config.py): now comes from the FEM-hybrid.
@@ -322,21 +330,24 @@ def main():
     validate_against_case1_reference(pul_data)
 
     print(f"\nEnd of the routine! Time spent on simulation: {(time.time() - st):.1f} seconds.\n")
-    plotter = SCCPlotter(__file__, pul_data, PLOT_CONFIG, autoSave=True)
-    plotter.compare_internal_matrices(
-            key_list=['internal_impedance_matrix', 'internal_admittance_matrix'])
+    
+    # plotter = SCCPlotter(__file__, pul_data, PLOT_CONFIG, autoSave=True)
+    # plotter.compare_internal_matrices(
+    #         key_list=['internal_impedance_matrix', 'internal_admittance_matrix'])
 
     # FEM-hybrid (pyLCP) vs. MATLAB (Andreata's FEM) comparison -- equivalent
     # to the andreata_case1 plots, now with the HDPE duct actually modeled.
-    plotter.compare_complete_matrices(
-        key_list=['self_impedance_phase_a_sheath',
-                  'self_admittance_phase_a_sheath',
-                  'earth_return_impedance_phase_a',
-                  'earth_return_potential_coeff_phase_a'])
+    # plotter.compare_complete_matrices(
+    #     key_list=['self_impedance_phase_a_sheath',
+    #               'self_admittance_phase_a_sheath',
+    #               'earth_return_impedance_phase_a',
+    #               'earth_return_potential_coeff_phase_a'])
 
-    # Figs. 5.8 / 5.9 / 5.10 -- modal attenuation, phase velocity, |Z_cm|
+    # Figs. 5.8 / 5.9 / 5.10 -- modal attenuation, phase velocity, |Z_cm| --
+    # overlaid with the MATLAB reference (open circles) when available.
     ModalPropagationPlotter(__file__, pul_data['modal'],
-                            config_name='Configuration 2', autoSave=True).plot_all()
+                            config_name='Configuration 2', autoSave=True,
+                            matlab_modal=matlab_modal).plot_all()
 
     GroundReturnMTLRepresentation(__file__, mtl_0, units='centimeter').system_schematic()
     plt.show()

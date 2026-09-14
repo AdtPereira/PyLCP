@@ -37,12 +37,29 @@ much larger than in Config. 1 — comes from the air + HDPE pipe inside the inte
 term (`Zi`/`Yi` from COMSOL) + ground return with the pipe outer radius.
 `Z'`/`Y'` of the `fem` scenario match Andreata's FEM reference to **< 2 %**.
 
-**Pending / next steps**
-- **Hybrid pipeline** ([`HYBRID_PIPELINE_PLAN.md`](HYBRID_PIPELINE_PLAN.md)): replace Lafaia's GMD Case 3.1 trick in Config. 2 with (A) analytical ground return with the **HDPE pipe** outer radius + (B) `Zi`/`Yi` from COMSOL. A pluggable internal-source architecture, which also serves Configs 4–5.
-- Configs 3–5: ECC + 7th mode (sheath<->additional conductor), shared duct (FEM), sec. 5.4.2 "per mode across configurations" family (Figs 5.20–5.31).
-- Phase 3 (optional): frequency-dependent soil — closes the ~10–20 % gap at high f.
-- Cosmetic: oscillation of the 3 coaxial modes (nearly coincident) in the last half-decade due to degeneracy — more visible in Config. 2 (grid up to 10 MHz).
-- `f_c` (eq. 5.33) as an annotation; modal MATLAB reference overlay.
+**Update (2026-09)** — see `MODAL_CH5_DEVELOPMENT.md` sec. 7 for full detail:
+- ~~modal MATLAB reference overlay~~ **Done** for Configs 1/2: `MatlabDataReader.
+  get_modal_scenario_data` + `ModalPropagationPlotter(matlab_modal=...)` +
+  `print_modal_comparison_report` — mode order verified (not assumed) against
+  this doc's own validation table. Agreement excellent for `alpha_m`/`v_m`
+  everywhere; `|Z_cm|` diverges above ~1 MHz on the 3 coaxial modes **in
+  MATLAB's own curves too** (Config. 1), confirming the "cosmetic oscillation"
+  below is a shared, not tracking-specific, phenomenon.
+- ~~Hybrid pipeline~~ **Config. 2 done** (as below); **Config. 4 done**
+  (`InternalParametersFromFEM.from_component_blocks` — heterogeneous
+  block-diagonal FEM assembly: phase A/B reuse Config. 2's own FEM data,
+  phase C+ECC use Config. 4's own 3-conductor COMSOL file). `Y'`/`Zg`/`Pg`
+  agree to <3%; `Z'` has an isolated ~50% outlier on the ECC self-term,
+  root-caused to the ground-return radius not accounting for the ECC sharing
+  phase C's duct — see `GROUND_RETURN_ALLOCATION_STUDY.md` (fix pending a
+  team decision, deliberately not applied yet).
+- Configs 3/4: modal decomposition **wired and running** (7 conductors, 7
+  modes) — `alpha_m`/`v_m`/`|Z_cm|` computed, passivity OK. Mode
+  *classification* (the 7th "ECC mode") is **not** implemented — no
+  reference-pattern equations for it exist yet, so modes stay unlabelled
+  (`mode_0`..`mode_6`) rather than guessed. **Config 5 remains untouched.**
+- `f_c` (eq. 5.33) annotation: still pending, low priority.
+- Frequency-dependent soil (Phase 3, ~10–20% gap at high f): still pending.
 
 ---
 

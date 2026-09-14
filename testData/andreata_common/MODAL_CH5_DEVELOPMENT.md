@@ -1,13 +1,17 @@
 # Development — Modal-Domain Propagation Characteristics (Andreata Ch. 5)
 
-**Date:** 2026-08.
-**Scope:** Configurations **1 and 2** of Andreata's thesis — three
-single-core cables (core + sheath), flat arrangement, 34.5 kV; **directly
-buried** (Config. 1) or **in individual HDPE ducts** (Config. 2).
-6 conductors => 6 modes in both. Goal: from `Z'(f)` and `Y'(f)` (already
-produced by `andreata_case1` / `andreata_case2`), compute and plot
-**`alpha_m`, `v_m`, `|Z_cm|`** per mode, reproducing **Figures 5.5–5.7**
-(Config. 1) and **5.8–5.10** (Config. 2).
+**Date:** 2026-08 (core); updated 2026-09 (MATLAB comparison, Configs 3/4 — see sec. 7).
+**Scope:** all four Andreata cases. Core work (secs. 1–6) covers
+Configurations **1 and 2** — three single-core cables (core + sheath), flat
+arrangement, 34.5 kV; **directly buried** (Config. 1) or **in individual
+HDPE ducts** (Config. 2), 6 conductors => 6 modes in both. Sec. 7 extends
+this to the MATLAB numerical comparison (Configs 1/2) and to preparing
+Configurations **3 and 4** (3 SCC + ECC, 7 conductors => 7 modes;
+directly buried / in individual HDPE ducts respectively). Goal: from
+`Z'(f)` and `Y'(f)` (already produced by `andreata_case1` / `andreata_case2`
+/ `andreata_case3` / `andreata_case4`), compute and plot **`alpha_m`, `v_m`,
+`|Z_cm|`** per mode, reproducing **Figures 5.5–5.7** (Config. 1) and
+**5.8–5.10** (Config. 2).
 
 The full plan (incl. future phases: Configs 2–5, frequency-dependent
 soil) is in [`CH5_PROPAGATION_PLAN.md`](CH5_PROPAGATION_PLAN.md).
@@ -33,6 +37,12 @@ soil) is in [`CH5_PROPAGATION_PLAN.md`](CH5_PROPAGATION_PLAN.md).
 | `analytical_forms/single_core_cable.py` | New `PerUnitParameters.propagation_matrices(quasi_tem_matrices)` — appends `propagation_voltage_matrix`, `propagation_current_matrix`, `characteristic_impedance_matrix`, `characteristic_admittance_matrix` to the `quasi_tem_approx_matrices` dict (backward compatible). |
 | `testData/andreata_case1/andreata_case1.py` | Calls `propagation_matrices`, runs `check_pul_passivity` + report, `ModalDecomposition` on the **`p100_er1_deconti`** scenario (ground return via closed-form De Conti/Duarte/Alipio 2023 — eqs. 4.59/4.63, sec. 5.4 / 6.1), and `ModalPropagationPlotter.plot_all()` — Figs 5.5 / 5.6 / 5.7. |
 | `testData/andreata_case2/andreata_case2.py` | Same on the **`fem`** scenario (FEM-hybrid pipeline — see [`HYBRID_PIPELINE_PLAN.md`](HYBRID_PIPELINE_PLAN.md); `Zi`/`Yi` from COMSOL + analytical ground return with the pipe radius, **without** Lafaia's GMD). Figs 5.8 / 5.9 / 5.10 + 4 comparison plots vs. MATLAB (`self_impedance_phase_a_sheath`, `self_admittance_phase_a_sheath`, `earth_return_impedance_phase_a`, `earth_return_potential_coeff_phase_a`). |
+| *(2026-09, sec. 7)* `utils/matlab_data.py` | `get_modal_scenario_data` (MATLAB modal reference reader, mode count auto-detected). |
+| *(2026-09, sec. 7)* `plotter/modal_plotter.py` | `matlab_modal` overlay on `ModalPropagationPlotter`; `print_modal_comparison_report`. |
+| *(2026-09, sec. 7)* `analytical_forms/modal_analysis.py` | `default_scc_roles(..., num_ecc=0)`. |
+| *(2026-09, sec. 7)* `analytical_forms/single_core_cable.py` | `InternalParametersFromFEM.from_component_blocks` (heterogeneous FEM assembly). |
+| *(2026-09, sec. 7)* `testData/andreata_case3/andreata_case3.py`, `testData/andreata_case4/andreata_case4.py` | Modal decomposition wired (7 conductors); case4 additionally gets the `'fem'` FEM-hybrid scenario. |
+| *(2026-09, sec. 7)* `testData/andreata_common/GROUND_RETURN_ALLOCATION_STUDY.md` | New — ground-return radius allocation study (Case 4 ECC gap). |
 
 ---
 
@@ -288,14 +298,111 @@ ground/inter-sheath modes **much larger** than in Config. 1 because of the air
    asymptotic limit matrices of Wedepohl (1996) sec. 7.
 3. **~2 % offset in `C_22`** of Config. 2: difference between the COMSOL FEM
    (used by pyLCP) and Andreata's own FEM — it is not a pipeline error.
-4. **Configs 3–5 not implemented** (ECC, 7th mode, shared duct, sec. 5.4.2
-   family). In the plan; Part A of the hybrid pipeline already covers the geometry of 4–5.
-5. `ModalPropagationPlotter` is standalone (does not use `PLOT_CONFIG`); a modal
-   MATLAB reference overlay is not yet implemented.
+4. **Configs 3/4 wired but not classified**: `ModalDecomposition` runs on both
+   (7 conductors / 7 modes) and produces `alpha_m`/`v_m`/`|Z_cm|`, but
+   `_classify` still bails out for `n != 6` -- modes are unlabelled
+   (`mode_0`..`mode_6`). No thesis equations for a 7th "ECC mode" are in the
+   codebase yet. See sec. 7.2. **Config 5 remains unimplemented.**
+5. ~~`ModalPropagationPlotter` is standalone...~~ **Done (sec. 7.1)**: it now
+   accepts a `matlab_modal` overlay (Configs 1/2, validated); `print_modal_
+   comparison_report` gives the numeric per-mode comparison. Still standalone
+   from `PLOT_CONFIG` by design (its own axis/legend logic).
+6. **FEM-hybrid Case 4 `Z'` ECC self-term ~50% off** at high frequency (`Y'`,
+   `Zg`, `Pg` all agree to <3%): the ground-return radius assigned to the ECC
+   object does not account for it sharing phase C's duct. Root-caused, not
+   yet fixed pending team confirmation -- see sec. 7.3 and
+   [`GROUND_RETURN_ALLOCATION_STUDY.md`](GROUND_RETURN_ALLOCATION_STUDY.md).
 
 ---
 
-## 7. References
+## 7. Update (2026-09) — MATLAB comparison, Configs 3/4 prepared, FEM-hybrid Case 4
+
+### 7.1 Numerical MATLAB overlay for the modal parameters (Configs 1/2)
+
+The external MATLAB developer sent `alpha_m`, `beta_m`, `v_m`, `Z_cm`, `Y_cm`
+per mode (6 modes, standard 91-point grid) for Configs 1 and 2 -- previously
+only `Z'`/`Y'` had been cross-checked, never the modal-domain output itself.
+
+| Delivered | File |
+|---|---|
+| `MatlabDataReader.get_modal_scenario_data(prefix, config_index)` -- reads `<prefix>_{alpham,betam,velocm,Zcm,Ycm}.mat`, auto-detects the mode count per file (not hardcoded to 6), assigns semantic labels (`MODAL_MODE_ORDER_6C`) only when that count is 6 | `utils/matlab_data.py` |
+| `ModalPropagationPlotter(..., matlab_modal=...)` -- overlays the matching mode (joined **by label**, never by column index -- the two eigendecompositions do not share a frequency grid or eigenvector order) as open-circle markers on Figs 5.5–5.7/5.8–5.10 | `plotter/modal_plotter.py` |
+| `print_modal_comparison_report(modal, matlab_modal)` -- per-mode relative error at 1e2/1e4/1e6 Hz for `alpha_m`, `v_m`, `|Z_cm|` | `plotter/modal_plotter.py` |
+| Wired into `andreata_case1.py` / `andreata_case2.py` | `testData/andreata_case1/`, `testData/andreata_case2/` |
+
+**Mode-order correspondence was verified, not assumed**: matched the
+per-mode `|Z_cm|`/`alpha_m` magnitudes at 1 MHz against this document's own
+sec. 5 validation table, confirming the MATLAB developer's `mode1..mode6`
+follows the same thesis order used by `MODE_LABELS_6C` (ground,
+inter_sheath_1/2, coaxial_1/2/3).
+
+**Results** (pyLCP vs. MATLAB, both configs): excellent agreement for
+`alpha_m`/`v_m` across the full 1e-2–1e7 Hz sweep (mostly <5%, often <1%
+above 1 kHz). `|Z_cm|` agrees well up to ~1 MHz; above that the 3 coaxial
+modes diverge sharply in MATLAB's own Config. 1 curve (up to ~380% at 1 MHz)
+-- **the same near-degenerate-eigenvalue instability already documented in
+sec. 6, limitation 2, now confirmed independently on the MATLAB side.**
+Interestingly, in **Config. 2** the pyLCP coaxial `|Z_cm|` curves stay smooth
+through 1e7 Hz (as sec. 6 already noted -- the FEM `Zi` removes the
+oscillation) while **MATLAB's own Config. 2 reference still shows it**,
+suggesting the instability tracks the *ground-truth internal impedance
+model* (GMD-analytical vs. FEM) rather than being purely a tracking-algorithm
+artifact -- worth raising with Alberto alongside the original question.
+
+### 7.2 Configurations 3 and 4 prepared for modal calculation
+
+Neither case had the modal-decomposition wiring at all before this update;
+both are now 7-conductor (3 SCC + ECC) systems reusing the same
+`ModalDecomposition`/`ModalPropagationPlotter` machinery as Configs 1/2.
+
+| Delivered | File |
+|---|---|
+| `default_scc_roles(num_cables, conductors_per_cable, num_ecc=0)` -- appends `("ecc", i)` roles after the SCC block | `analytical_forms/modal_analysis.py` |
+| `andreata_case3.py`: `propagation_matrices` + passivity check + `ModalDecomposition` on `p100_er1_deconti` (same De Conti ground return as Config 1) + `ModalPropagationPlotter`/`print_modal_comparison_report` wired (MATLAB reference not sent yet -- both no-op gracefully) | `testData/andreata_case3/andreata_case3.py` |
+| `andreata_case4.py`: new `'3_deconti'` analytical scenario (De Conti ground return on the GMD case-3.1 duct model -- case4 had no `deconti` scenario at all before) + same modal wiring as case3 | `testData/andreata_case4/andreata_case4.py` |
+| `MatlabDataReader.get_modal_scenario_data` generalized to auto-detect the per-file mode count (needed since Configs 3/4 will send 7 modes, not 6) | `utils/matlab_data.py` |
+
+**Deliberately left undone**: `ModalDecomposition._classify` still only
+handles `n == 6` -- there is no confirmed reference-pattern scheme for a 7th
+"ECC mode," so Configs 3/4 modes come back as `mode_0`..`mode_6` (no
+semantic label). This was a conscious choice over guessing: labelling by
+raw index order would pair up two independently-computed, arbitrarily
+ordered eigenmode sets with no verified correspondence -- exactly the
+mistake sec. 7.1's mode-order verification was there to avoid for Configs
+1/2. The reader/plotter/report machinery is otherwise fully ready: once
+Config 3/4 MATLAB data and a 7-mode classification scheme both exist, the
+overlay activates with no further code changes.
+
+Both cases run end-to-end (passive, 7 real modes with physically sensible
+`alpha_m`/`v_m`/`|Z_cm`| shapes -- see `Results/modal_*.png` in each case
+folder).
+
+### 7.3 FEM-hybrid pipeline extended to Configuration 4
+
+Per `HYBRID_PIPELINE_PLAN.md` sec. 9 ("Config. 4: internal = FEM, 3x3 block
+of the shared pipe + 2x2 for the others"), previously unimplemented.
+
+| Delivered | File |
+|---|---|
+| `InternalParametersFromFEM.from_component_blocks(frequencies, component_blocks, block_sizes=None)` -- heterogeneous constructor: assembles a dense `(Nf, Ntot, Ntot)` `Zi`/`Pi` from arbitrarily-sized FEM blocks placed block-diagonally (no coupling *between* blocks); `block_sizes` (for the ground-return expansion) is accepted separately since it can group differently than the internal blocks (Case 4: 3 internal blocks vs. 4 ground-return objects). Homogeneous constructor (Config 2) untouched -- verified byte-identical regression. | `analytical_forms/single_core_cable.py` |
+| `'fem'` scenario in `andreata_case4.py`: phases A/B reuse `andreata_case2`'s own FEM `Zi`/`C` (bare duct, no ECC); phase C + ECC use `andreata_case4`'s own 3-conductor COMSOL file (dense core/sheath/ECC coupling, sliced from its global 7x7 layout at indices `[0, 1, 6]`) | `testData/andreata_case4/andreata_case4.py` |
+| `_validate_fem_hybrid_vs_matlab` (case4) -- same pattern as case2's function of the same name | `testData/andreata_case4/andreata_case4.py` |
+| Modal decomposition switched to run on `'fem'` (falls back to `'3_deconti'` if the COMSOL data is missing) | `testData/andreata_case4/andreata_case4.py` |
+
+**Validation**: `Y'` 2.56%, `Zg`/`Pg` (full matrix) 0.13%/0.34% -- all in the
+same range as Config 2's own FEM-hybrid validation. `Z'` shows a ~50% outlier
+isolated entirely to the `(ECC, ECC)` self-term above ~1 MHz (reactive part
+only); root-caused to the ground-return radius assigned to the ECC object
+not accounting for it sharing phase C's duct -- **not a defect in this FEM
+work** (confirmed scenario-independent: identical in the purely-analytical
+`'3_deconti'` path; Case 3, which has no duct, matches its own MATLAB
+reference to ~1e-10). Full analysis, code citations and two candidate fixes
+in [`GROUND_RETURN_ALLOCATION_STUDY.md`](GROUND_RETURN_ALLOCATION_STUDY.md)
+-- intentionally left unfixed pending a team decision.
+
+---
+
+## 8. References
 
 - **Andreata, L. E. B.** (2025). *Análise das Características de Propagação e de
   Transitórios Eletromagnéticos em Cabos Subterrâneos Instalados em Tubos Não

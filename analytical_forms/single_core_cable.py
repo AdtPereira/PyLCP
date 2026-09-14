@@ -1054,6 +1054,20 @@ class InternalParametersFromFEM:
     with the analytical earth return (whose self-term radius is the **duct**
     outer radius, see ``mtl_main/strategy._cable_external_geometry``).
 
+    Two construction modes:
+
+    - **Homogeneous** (the plain constructor, Config. 2): ``N`` identical
+      copies of *one* cable's ``M x M`` block, tiled via ``kron(I_N, .)`` --
+      no coupling between cables (correct: they sit in separate ducts).
+    - **Heterogeneous** (:meth:`from_component_blocks`, Config. 4): a list of
+      per-object FEM blocks of possibly different sizes, placed
+      block-diagonally in order -- e.g. two bare-duct phases (``2x2`` each,
+      reusing Config. 2's own FEM data) plus one duct that also hosts the
+      ECC (a single dense ``3x3`` block, core/sheath/ECC all mutually
+      coupled in the one COMSOL model that has all three). Unlike the
+      homogeneous mode, the block layout here need not match the
+      ground-return object count one-for-one -- see ``block_sizes`` below.
+
     Parameters
     ----------
     frequencies : (Nf,) array
@@ -1068,9 +1082,13 @@ class InternalParametersFromFEM:
         Number of identical cables (tiled via ``kron(I_N, .)``).
     """
 
-    def __init__(self, frequencies, *, zi, zi_frequencies, capacitance, num_cables):
+    def __init__(self, frequencies, *, zi=None, zi_frequencies=None, capacitance=None, num_cables=None):
         self.f = np.asarray(frequencies, dtype=float)
         self.w = 2.0 * np.pi * self.f
+        self._component_blocks = None
+        self._block_sizes = None
+        if zi is None:
+            return  # populated by from_component_blocks instead
         self.zi_fem = np.asarray(zi, dtype=complex)
         self.zi_f = np.asarray(zi_frequencies, dtype=float)
         cap = np.asarray(capacitance, dtype=float)
@@ -1082,22 +1100,75 @@ class InternalParametersFromFEM:
                 f"zi block {self.zi_fem.shape[1:]} inconsistent with capacitance {self.C_cable.shape}"
             )
 
-    def _interp_zi(self):
-        """Interpolate each ``Zi`` element onto ``self.f`` in log-frequency,
-        real and imaginary parts separately. Uses shape-preserving monotone
-        cubic (PCHIP) -- no overshoot, and smoother than piecewise-linear on
-        the coarse FEM grid (~5 pts/decade). Held constant outside the FEM
-        range."""
+    @classmethod
+    def from_component_blocks(cls, frequencies, component_blocks, block_sizes=None):
+        """Heterogeneous constructor -- see the class docstring.
+
+        Parameters
+        ----------
+        component_blocks : list of dict
+            One entry per internal-coupling block, each
+            ``{'zi': (Nf_b, M, M) complex, 'zi_frequencies': (Nf_b,),
+            'capacitance': (M, M) or (Nf_b, M, M) real}``. Placed
+            block-diagonally, in order, into the assembled ``(Nf, Ntot,
+            Ntot)`` ``Zi``/``(Ntot, Ntot)`` ``Pi``/``Ci`` (``Ntot = sum`` of
+            each block's ``M``) -- there is no coupling *between* blocks
+            here (that is what the ground-return term adds downstream).
+        block_sizes : list of int, optional
+            The list :meth:`PerUnitParameters.quasi_tem_approx_matrices`
+            uses to expand the **ground-return** matrix. It is about
+            physical ground-return objects (position + outer radius, one
+            row/column of ``earth_return_parameters``'s ``(N_obj, N_obj)``
+            matrices), which do not have to line up with
+            ``component_blocks``' own grouping -- e.g. Config. 4's
+            ground-return sees 4 objects (phase A, B, C, ECC --
+            ``SingleCoreCableWithECCStrategy`` groups by ``center_point``)
+            while ``component_blocks`` has only 3 entries (the C+ECC FEM
+            measurement is *one* physically-coupled internal block, but
+            still 2 separate ground-return objects) -- pass
+            ``block_sizes=[2, 2, 2, 1]`` explicitly in that case. Defaults to
+            one entry per ``component_blocks`` element (only correct when
+            the object count equals the block count).
+        """
+        obj = cls(frequencies)
+        blocks = []
+        for b in component_blocks:
+            cap = np.asarray(b['capacitance'], dtype=float)
+            blocks.append({
+                'zi': np.asarray(b['zi'], dtype=complex),
+                'zi_f': np.asarray(b['zi_frequencies'], dtype=float),
+                'C': cap[0] if cap.ndim == 3 else cap,
+            })
+        obj._component_blocks = blocks
+        obj._block_sizes = (
+            list(block_sizes) if block_sizes is not None
+            else [blk['C'].shape[0] for blk in blocks]
+        )
+        if sum(blk['C'].shape[0] for blk in blocks) != sum(obj._block_sizes):
+            raise ValueError(
+                f"block_sizes {obj._block_sizes} (sum={sum(obj._block_sizes)}) must sum to "
+                f"the same total conductor count as component_blocks "
+                f"(sum={sum(blk['C'].shape[0] for blk in blocks)})."
+            )
+        return obj
+
+    def _interp_zi_block(self, zi_block, zi_f):
+        """Interpolate one ``Zi`` block ``(Nf_b, M, M)`` onto ``self.f`` in
+        log-frequency, real and imaginary parts separately. Uses
+        shape-preserving monotone cubic (PCHIP) -- no overshoot, and
+        smoother than piecewise-linear on the coarse FEM grid (~5
+        pts/decade). Held constant outside the FEM range."""
         from scipy.interpolate import PchipInterpolator
 
+        m = zi_block.shape[1]
         log_target = np.log(self.f)
-        log_fem = np.log(self.zi_f)
+        log_fem = np.log(zi_f)
         order = np.argsort(log_fem)
         log_fem = log_fem[order]
-        out = np.zeros((self.f.size, self.M, self.M), dtype=complex)
-        for i in range(self.M):
-            for j in range(self.M):
-                col = self.zi_fem[order, i, j]
+        out = np.zeros((self.f.size, m, m), dtype=complex)
+        for i in range(m):
+            for j in range(m):
+                col = zi_block[order, i, j]
                 re = PchipInterpolator(log_fem, col.real, extrapolate=False)(log_target)
                 im = PchipInterpolator(log_fem, col.imag, extrapolate=False)(log_target)
                 re = np.where(np.isnan(re), np.interp(log_target, log_fem, col.real), re)
@@ -1105,7 +1176,13 @@ class InternalParametersFromFEM:
                 out[:, i, j] = re + 1j * im
         return out
 
+    def _interp_zi(self):
+        return self._interp_zi_block(self.zi_fem, self.zi_f)
+
     def matrices(self):
+        if self._component_blocks is not None:
+            return self._matrices_from_component_blocks()
+
         eye = np.identity(self.N)
         zi_cable = self._interp_zi()                       # (Nf, M, M)
         Zi = np.stack([np.kron(eye, zi_cable[k]) for k in range(self.f.size)])
@@ -1126,6 +1203,36 @@ class InternalParametersFromFEM:
             'potential_coefficient_matrix': Pi,
             'capacitance_matrix': Ci,
             'block_sizes': [self.M] * self.N,
+        }
+
+    def _matrices_from_component_blocks(self):
+        sizes = [blk['C'].shape[0] for blk in self._component_blocks]
+        n_tot = sum(sizes)
+        nf = self.f.size
+
+        Zi = np.zeros((nf, n_tot, n_tot), dtype=complex)
+        Ci = np.zeros((n_tot, n_tot))
+        offset = 0
+        for blk, m in zip(self._component_blocks, sizes):
+            sl = slice(offset, offset + m)
+            Zi[:, sl, sl] = self._interp_zi_block(blk['zi'], blk['zi_f'])
+            Ci[sl, sl] = blk['C']
+            offset += m
+
+        Pi = np.linalg.inv(Ci)
+        Ye = 1j * self.w[:, np.newaxis, np.newaxis] * np.linalg.inv(Pi)[np.newaxis, :, :]
+
+        with np.errstate(divide='ignore', invalid='ignore'):
+            Li = Zi.imag / self.w[:, np.newaxis, np.newaxis]
+
+        return {
+            'impedance_matrix': Zi,
+            'resistance_matrix': Zi.real,
+            'inductance_matrix': Li,
+            'shunt_admittance_matrix': Ye,
+            'potential_coefficient_matrix': Pi,
+            'capacitance_matrix': Ci,
+            'block_sizes': self._block_sizes,
         }
 
 

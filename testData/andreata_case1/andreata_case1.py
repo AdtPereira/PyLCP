@@ -20,7 +20,7 @@ try:
         InternalPerUnitParameters, PerUnitParameters, apply_semiconducting_layer_correction,
     )
     from analytical_forms.modal_analysis import ModalDecomposition, default_scc_roles
-    from plotter.modal_plotter import ModalPropagationPlotter
+    from plotter.modal_plotter import ModalPropagationPlotter, print_modal_comparison_report
     from utils.passivity_check import check_pul_passivity, print_passivity_report
     from .plot_config import PLOT_CONFIG
     print("Modules imported successfully.")
@@ -102,6 +102,12 @@ def main():
         matlab_data['frequencies'] if matlab_data['frequencies'] is not None else pul_data['frequencies'])
     pul_data['matlab'] = matlab_data
 
+    # MATLAB reference for the modal-domain parameters (Andreata Ch. 5), sent
+    # separately from the Z'/Y' dump above -- see MODAL_CH5_DEVELOPMENT.md.
+    # `None` if the andreata_case1_{alpham,betam,velocm,Zcm,Ycm}.mat files are
+    # not present; the modal plots/report below just skip the overlay then.
+    matlab_modal = matlab_reader.get_modal_scenario_data(prefix='andreata_case1', config_index=1)
+
     print("\nCalculating internal parameters for all frequencies...")
     pul = InternalPerUnitParameters(mtl_model_a, pul_data['frequencies'])
     # internal_matrices = pul.matrices(internal_form='approximation')
@@ -150,17 +156,20 @@ def main():
     print(f"  classification similarity  : "
           f"{min(_diag['classification_similarity'].values()):.3f} (min over modes)")
     print(f"  passive (Z', Y')           : {_diag['passivity']['passive']}")
+    print_modal_comparison_report(modal_data, matlab_modal)
 
     print(f"\nEnd of the routine! Time spent on simulation: {(time.time() - st):.1f} seconds.\n")
-    plotter = SCCPlotter(__file__, pul_data, PLOT_CONFIG, autoSave=False)
-    plotter.compare_complete_matrices(
-        key_list=['self_impedance_phase_a_sheath',
-                  'self_admittance_phase_a_sheath',
-                  'earth_return_impedance_phase_a',
-                  'earth_return_admittance_phase_a',
-                  'earth_return_potential_coeff_phase_a'])
-    plotter.compare_internal_matrices(
-        key_list=['internal_impedance_matrix', 'internal_admittance_matrix'])
+
+    # plotter = SCCPlotter(__file__, pul_data, PLOT_CONFIG, autoSave=False)
+    # plotter.compare_complete_matrices(
+    #     key_list=['self_impedance_phase_a_sheath',
+    #               'self_admittance_phase_a_sheath',
+    #               'earth_return_impedance_phase_a',
+    #               'earth_return_admittance_phase_a',
+    #               'earth_return_potential_coeff_phase_a'])
+    
+    # plotter.compare_internal_matrices(
+    #     key_list=['internal_impedance_matrix', 'internal_admittance_matrix'])
 
     # Export the COMSOL/FEM internal matrices back in the MATLAB reference
     # format (see testData/andreata_common/COMSOL_TO_MATLAB_EXPORT.md).
@@ -169,11 +178,13 @@ def main():
     export_comsol_internal_matrices_to_mat(
         __file__, prefix='andreata_case1', strict_reference=False)
 
-    # Figs. 5.5 / 5.6 / 5.7 -- modal attenuation, phase velocity, |Z_cm|
+    # Figs. 5.5 / 5.6 / 5.7 -- modal attenuation, phase velocity, |Z_cm| --
+    # overlaid with the MATLAB reference (open circles) when available.
     ModalPropagationPlotter(__file__, pul_data['modal'],
-                            config_name='Configuration 1', autoSave=False).plot_all()
+                            config_name='Configuration 1', autoSave=True,
+                            matlab_modal=matlab_modal).plot_all()
 
-    GroundReturnMTLRepresentation(__file__, mtl_model_a, units='centimeter').system_schematic()
+    # GroundReturnMTLRepresentation(__file__, mtl_model_a, units='centimeter').system_schematic()
     plt.show()
 
 if __name__ == "__main__":

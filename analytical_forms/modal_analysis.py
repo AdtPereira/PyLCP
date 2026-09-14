@@ -88,17 +88,36 @@ REFERENCE_PATTERNS_6C = {
 }
 
 
-def default_scc_roles(num_cables, conductors_per_cable=2):
+def default_scc_roles(num_cables, conductors_per_cable=2, num_ecc=0):
     """Conductor roles for a homogeneous SCC system in pyLCP's native order.
 
     Returns a list of ``(role, cable_index)`` tuples aligned with the rows of
     ``Z'`` / ``Y'`` as assembled by
     ``InternalPerUnitParameters.matrices`` (``np.kron(I_N, Z_ij)`` with the
-    per-cable block ordered core, sheath[, armor]).
+    per-cable block ordered core, sheath[, armor]), followed by ``num_ecc``
+    ``("ecc", i)`` entries for the earth continuity conductor(s) appended
+    after the SCC block (Configs 3/4 -- see ``flat_scc_with_ecc_cable_model``
+    in ``models/single_core_cable.py``, which places the ECC as the last
+    conductor). ``canonical_permutation`` sorts ``"ecc"`` after
+    ``"core"``/``"sheath"``/``"armor"`` regardless (``_ROLE_RANK``), matching
+    the "by-type" conductor order the external MATLAB developer also uses for
+    the ECC (see ``andreata_case3/andreata_case3.py``'s
+    ``conductor_order=[0, 3, 1, 4, 2, 5, 6]`` -- the ECC stays at index 6 in
+    both orderings).
+
+    NB: for the ECC cases, do **not** derive ``num_cables``/
+    ``conductors_per_cable`` from ``MulticonductorTransmissionLine.
+    num_sc_cables``/``num_conductors_per_scc`` -- the strategy branch that
+    builds the heterogeneous SCC+ECC model counts those attributes
+    differently (one "cable" per physical conductor). Pass the known
+    physical layout explicitly instead (``num_cables=3,
+    conductors_per_cable=2, num_ecc=1``).
     """
     names = ["core", "sheath", "armor"][:conductors_per_cable]
-    return [(names[k % conductors_per_cable], k // conductors_per_cable)
-            for k in range(num_cables * conductors_per_cable)]
+    roles = [(names[k % conductors_per_cable], k // conductors_per_cable)
+             for k in range(num_cables * conductors_per_cable)]
+    roles += [("ecc", i) for i in range(num_ecc)]
+    return roles
 
 
 def canonical_permutation(conductor_roles):
