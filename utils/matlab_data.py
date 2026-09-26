@@ -19,6 +19,26 @@ MODAL_MODE_ORDER_6C = (
     "coaxial_1", "coaxial_2", "coaxial_3",
 )
 
+# Mode order of the MATLAB files per Andreata configuration (config_index ->
+# labels of mode1..modeN). Configs 3/4 (7 modes, 3 SCC + ECC) do NOT share an
+# order with each other nor with the thesis 6-mode order, so this is a
+# per-config table, never an index-based guess. Verified (2026-09) by the
+# optimal assignment of the MATLAB alpha_m/v_m/|Z_cm| curves (1 Hz..1 MHz)
+# against pyLCP's modes labelled by ModalDecomposition._classify_7c:
+#   Config 3 -- sheath/ECC modes match to ~0 cost (identical curves);
+#               coaxial trio near-degenerate, matched by |Z_cm|.
+#   Config 4 -- re-verified after the ECC joined phase C's duct ground-
+#               return object (Ametani eqs. 2.32/2.40): all 7 modes match
+#               (cost <= 0.09); the coaxial trio comes in reverse order.
+MODAL_MODE_ORDER = {
+    1: MODAL_MODE_ORDER_6C,
+    2: MODAL_MODE_ORDER_6C,
+    3: ("coaxial_1", "coaxial_2", "coaxial_3", "ecc",
+        "ground", "inter_sheath_1", "inter_sheath_2"),
+    4: ("ground", "inter_sheath_1", "inter_sheath_2", "ecc",
+        "coaxial_3", "coaxial_2", "coaxial_1"),
+}
+
 
 class MatlabDataReader:
     """
@@ -212,25 +232,19 @@ class MatlabDataReader:
         also serves the 7-conductor ECC cases (3, 4) once their .mat files
         arrive, without silently dropping the 7th mode.
 
-        Mode *labels* are only assigned when ``N == 6``: that is the one case
-        confirmed (by matching magnitudes against
-        ``MODAL_CH5_DEVELOPMENT.md``) to follow Andreata's thesis order
-        ``MODAL_MODE_ORDER_6C``. For any other ``N`` (the ECC configs) mode
-        classification is not implemented yet on the pyLCP side either (see
-        ``analytical_forms.modal_analysis.ModalDecomposition._classify``, which
-        bails out for ``n != 6``) -- there is no reference-pattern scheme to
-        assign real labels to, and no thesis equations for a 7th "ECC mode" in
-        the codebase yet. Labelling as ``None`` (rather than guessing e.g.
-        raw index order) is deliberate: it makes downstream consumers
-        (``ModalPropagationPlotter``, ``print_modal_comparison_report``) skip
-        the mode-matching overlay/report instead of silently pairing up two
-        arbitrarily-ordered eigenmode sets that have no verified correspondence.
+        Mode *labels* come from the verified per-config table
+        ``MODAL_MODE_ORDER`` (Configs 1/2: thesis order; Configs 3/4: their
+        own 7-mode orders, which differ from each other). A config without an
+        entry, or with a mode count that does not match it, gets
+        ``mode_labels=None`` rather than a guessed index order: downstream
+        consumers (``ModalPropagationPlotter``, ``print_modal_comparison_report``)
+        then skip the overlay/report instead of pairing up two arbitrarily-
+        ordered eigenmode sets.
 
-        Frequencies are not stored inside these files -- the developer used
-        the "standard" 91-point log grid (10 pts/decade, 1E-2..1E7 Hz), the
-        same one used for the COMSOL FEM export
-        (``<prefix>_frequency_range_fem.mat``), reused here if present, else
-        regenerated with ``np.logspace(-2, 7, 91)``.
+        Frequencies are not stored inside these files. The grid is picked by
+        length: ``<prefix>_frequency_range_fem.mat`` (91 points, Configs 1/2)
+        or ``<prefix>_frequency_range.mat`` (90 points, Configs 3/4), else
+        ``np.logspace(-2, 7, Nf)``.
 
         Returns ``None`` if none of the 5 files are present -- the caller
         (e.g. ``ModalPropagationPlotter``) should treat that as "no MATLAB
@@ -273,23 +287,29 @@ class MatlabDataReader:
         if not out:
             return None
 
-        if n_modes == len(MODAL_MODE_ORDER_6C):
-            mode_labels = MODAL_MODE_ORDER_6C
-        else:
+        mode_labels = MODAL_MODE_ORDER.get(config_index)
+        if mode_labels is None or len(mode_labels) != n_modes:
             print(f"  Note: '{prefix}' modal reference has {n_modes} modes (config_index="
-                  f"{config_index}); mode classification is only implemented for the "
-                  f"6-conductor configs, so these modes are left unlabelled -- overlay "
-                  f"plots/reports will skip them until a labelling scheme is added.")
+                  f"{config_index}), with no verified mode order in MODAL_MODE_ORDER -- "
+                  f"left unlabelled; overlay plots/reports will skip them.")
             mode_labels = None
 
-        freq = self.data.get(f'{prefix}_frequency_range_fem')
-        if freq is not None:
-            frequencies = np.ravel(freq)
-        else:
-            print(f"  Warning: '{prefix}_frequency_range_fem.mat' not found; assuming "
-                  f"the standard grid np.logspace(-2, 7, 91) for the modal reference "
+        # The grid is chosen by *length*, never assumed: Configs 1/2 were sent
+        # on the 91-point grid (= <prefix>_frequency_range_fem.mat), Configs 3/4
+        # on the 90-point grid (= <prefix>_frequency_range.mat). Pairing the
+        # arrays with the wrong-length grid would shift every sample silently.
+        nf = next(iter(out.values())).shape[0]
+        frequencies = None
+        for grid_name in (f'{prefix}_frequency_range_fem', f'{prefix}_frequency_range'):
+            grid = self.data.get(grid_name)
+            if grid is not None and np.size(grid) == nf:
+                frequencies = np.ravel(grid)
+                break
+        if frequencies is None:
+            print(f"  Warning: no '{prefix}_frequency_range[_fem].mat' with {nf} points; "
+                  f"assuming np.logspace(-2, 7, {nf}) for the modal reference "
                   f"of '{prefix}' (config_index={config_index}).")
-            frequencies = np.logspace(-2, 7, num=91)
+            frequencies = np.logspace(-2, 7, num=nf)
 
         out['frequencies'] = frequencies
         out['mode_labels'] = mode_labels

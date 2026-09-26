@@ -29,6 +29,7 @@ MODE_STYLE = {
     "coaxial_1":      {"color": "tab:red",    "linestyle": "--", "label": "Coaxial mode 1"},
     "coaxial_2":      {"color": "tab:green",  "linestyle": "-",  "label": "Coaxial mode 2"},
     "coaxial_3":      {"color": "tab:orange", "linestyle": "-.", "label": "Coaxial mode 3"},
+    "ecc":            {"color": "tab:purple", "linestyle": ":",  "label": "ECC mode"},
 }
 
 
@@ -70,6 +71,10 @@ class ModalPropagationPlotter:
         self.xlim = (self.f.min(), self.f.max())
         self.n = modal["alpha"].shape[1]
         self.labels = modal.get("mode_labels") or tuple(f"mode_{j}" for j in range(self.n))
+        # plotting (and legend) order follows MODE_STYLE, not the tracked column order
+        style_order = list(MODE_STYLE)
+        self.order = sorted(range(self.n), key=lambda j: (
+            style_order.index(self.labels[j]) if self.labels[j] in style_order else len(style_order), j))
 
         self.results_dir = os.path.join("testData", self.script_path.stem, "Results")
         os.makedirs(self.results_dir, exist_ok=True)
@@ -134,7 +139,7 @@ class ModalPropagationPlotter:
         unit_scale = 1e3 if self.alpha_unit == "Np/km" else 1.0
         alpha *= unit_scale
         fig, ax = self._new_axis(r"Modal attenuation constant $\alpha_m$")
-        for j in range(self.n):
+        for j in self.order:
             ax.plot(self.f, alpha[:, j], **self._style(self.labels[j], j))
             self._overlay_matlab(ax, self.labels[j], j, "alpha",
                                  transform=lambda v: v * unit_scale)
@@ -146,18 +151,21 @@ class ModalPropagationPlotter:
         """Fig. 5.6 -- v_m(f)."""
         v = np.abs(np.asarray(self.modal["vphase"], dtype=float))
         fig, ax = self._new_axis(r"Modal phase velocity $v_m$")
-        for j in range(self.n):
+        for j in self.order:
             ax.plot(self.f, v[:, j], **self._style(self.labels[j], j))
             self._overlay_matlab(ax, self.labels[j], j, "vphase", transform=np.abs)
         ax.set_ylabel(r"$v_m$ (m/s)")
-        ax.set_ylim(0, min(3.2e8, np.nanpercentile(v, 99) * 1.1))
+        v_top = np.nanpercentile(v, 99)
+        if self.matlab_modal is not None and "vphase" in self.matlab_modal:
+            v_top = max(v_top, np.nanpercentile(np.abs(self.matlab_modal["vphase"]), 99))
+        ax.set_ylim(0, min(3.2e8, v_top * 1.1))
         return self._finish(fig, ax, "modal_phase_velocity")
 
     def modal_char_impedance(self):
         """Fig. 5.7 -- |Z_cm(f)|."""
         zc = np.abs(np.asarray(self.modal["Zcm"], dtype=complex))
         fig, ax = self._new_axis(r"Modal characteristic impedance $|Z_{cm}|$")
-        for j in range(self.n):
+        for j in self.order:
             ax.plot(self.f, zc[:, j], **self._style(self.labels[j], j))
             self._overlay_matlab(ax, self.labels[j], j, "Zcm", transform=np.abs)
         ax.set_yscale("log")

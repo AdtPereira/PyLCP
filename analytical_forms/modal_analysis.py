@@ -54,6 +54,8 @@ __all__ = [
     "default_scc_roles",
     "REFERENCE_PATTERNS_6C",
     "MODE_LABELS_6C",
+    "REFERENCE_PATTERNS_7C_SHEATH",
+    "MODE_LABELS_7C",
 ]
 
 # --- Role ordering used to bring Z'/Y' to Andreata's canonical layout ---------
@@ -85,6 +87,25 @@ REFERENCE_PATTERNS_6C = {
     "coaxial_1":      np.array([1,  1,  1, 0, 0, 0], dtype=float),
     "coaxial_2":      np.array([1,  0, -1, 0, 0, 0], dtype=float),
     "coaxial_3":      np.array([-1, 2, -1, 0, 0, 0], dtype=float),
+}
+
+# Configs 3/4 (3 SCC + ECC -> 7 conductors): the 6 modes above plus one mode
+# carried by the earth continuity conductor. Andreata gives no reference
+# pattern for it; the label is assigned by ECC participation (see
+# ``ModalDecomposition._classify_7c``).
+MODE_LABELS_7C = MODE_LABELS_6C + ("ecc",)
+
+# Non-coaxial reference columns over the rows [s1, s2, s3, ecc] (7-conductor
+# canonical order [c1, c2, c3, s1, s2, s3, ecc]). The sheath patterns are
+# those of REFERENCE_PATTERNS_6C with no ECC participation; the "ecc" pattern
+# only asks for ECC current, so it makes no assumption about which phase the
+# ECC sits next to (Config. 3: bare, beside phase C; Config. 4: inside phase
+# C's duct).
+REFERENCE_PATTERNS_7C_SHEATH = {
+    "ground":         np.array([ 1,  1,  1, 0], dtype=float),
+    "inter_sheath_1": np.array([ 1,  0, -1, 0], dtype=float),
+    "inter_sheath_2": np.array([-1,  2, -1, 0], dtype=float),
+    "ecc":            np.array([ 0,  0,  0, 1], dtype=float),
 }
 
 
@@ -439,6 +460,8 @@ class ModalDecomposition:
     def _classify(self, TI):
         """Label each tracked mode by projecting its low-frequency T_I column
         onto the reference patterns (eqs. 5.34-5.36)."""
+        if self.n == 7 and [r for r, _ in self.roles] == ["core"] * 3 + ["sheath"] * 3 + ["ecc"]:
+            return self._classify_7c(TI)
         if self.n != 6:
             warnings.warn(
                 f"mode classification implemented for 6 conductors only; got {self.n}."
@@ -495,6 +518,69 @@ class ModalDecomposition:
         self.diagnostics["classification_ref_freq_hz"] = float(self.f[k_ref])
         self.diagnostics["classification_core_fraction"] = {
             int(i): float(core_frac[i]) for i in range(self.n)
+        }
+        return tuple(labels)
+
+    def _classify_7c(self, TI):
+        """Labels the 7 modes of Configs 3/4 (3 SCC + ECC, canonical order
+        [c1, c2, c3, s1, s2, s3, ecc]) with ``MODE_LABELS_7C``.
+
+        Stage 1 -- coaxial modes: the 3 modes whose core current returns
+        through its own sheath, i.e. the smallest ``|c_k + s_k|^2`` residual
+        (as a fraction of the column energy), averaged over the 100 Hz --
+        100 kHz band. The 6-conductor criterion (core-energy fraction) is not
+        used here: in Config. 4 the ECC mode also carries core-C current,
+        which narrows that margin; the coaxial residual separates the groups
+        by an order of magnitude in both configs (< 0.05 vs. > 0.5).
+
+        Stage 2 -- the remaining 4 modes are assigned jointly (Hungarian) to
+        ``REFERENCE_PATTERNS_7C_SHEATH`` over the rows [s1, s2, s3, ecc]; the
+        coaxial trio is sub-labelled by the core rows as in the 6-conductor
+        case.
+        """
+        lo, hi = float(self.f.min()), float(self.f.max())
+        band = (self.f >= max(lo, 1e2)) & (self.f <= min(hi, 1e5))
+        if band.sum() < 3:
+            band = np.ones_like(self.f, dtype=bool)
+        kk = np.where(band)[0]
+
+        coax_residual = np.zeros(self.n)
+        for k in kk:
+            e = np.abs(TI[k]) ** 2
+            coax_residual += (np.abs(TI[k][0:3] + TI[k][3:6]) ** 2).sum(axis=0) / (e.sum(axis=0) + 1e-300)
+        coax_residual /= len(kk)
+
+        order = np.argsort(coax_residual)
+        core_modes = sorted(order[:3].tolist())
+        other_modes = sorted(order[3:].tolist())
+
+        k_ref = int(kk[len(kk) // 2])
+        cols = np.real(_normalise_columns(TI[k_ref]))     # (7, 7)
+
+        labels = [None] * self.n
+        quality = {}
+
+        def _sublabel(modes, patterns, rows):
+            names = list(patterns)
+            ref = np.stack([patterns[nm] for nm in names], axis=1)
+            ref = ref / np.linalg.norm(ref, axis=0, keepdims=True)
+            block = cols[rows][:, modes]
+            block = block / (np.linalg.norm(block, axis=0, keepdims=True) + 1e-30)
+            sim = np.abs(ref.T @ block)
+            r_idx, c_idx = linear_sum_assignment(-sim)
+            for r, c in zip(r_idx, c_idx):
+                labels[modes[c]] = names[r]
+                quality[names[r]] = float(sim[r, c])
+
+        _sublabel(other_modes, REFERENCE_PATTERNS_7C_SHEATH, slice(3, 7))
+        _sublabel(core_modes,
+                  {nm: REFERENCE_PATTERNS_6C[nm][0:3] for nm in ("coaxial_1", "coaxial_2", "coaxial_3")},
+                  slice(0, 3))
+
+        self.diagnostics["classification_similarity"] = quality
+        self.diagnostics["classification_ref_freq_hz"] = float(self.f[k_ref])
+        self.diagnostics["classification_coaxial_residual"] = {
+            int(i): float(coax_residual[i]) for i in range(self.n)
         }
         return tuple(labels)
 

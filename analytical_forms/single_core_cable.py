@@ -492,6 +492,17 @@ def _expand_by_block_sizes(matrix, block_sizes):
     expanded = np.repeat(expanded, block_sizes, axis=-1)
     return expanded
 
+
+def _internal_capacitance(Pi):
+    """Internal capacitance ``Pi^-1``. Undefined (NaN) when a conductor has no
+    insulation of its own (bare core/ECC/sheath -> zero row in ``Pi``,
+    Ametani eqs. 2.23/2.24): its shunt admittance then only exists in the
+    composed ``jw (Pi + Pg)^-1`` of ``quasi_tem_approx_matrices``."""
+    try:
+        return np.linalg.inv(Pi)
+    except np.linalg.LinAlgError:
+        return np.full_like(Pi, np.nan, dtype=float)
+
 class InternalPerUnitParameters:
     """
     This class calculates vector-frequency PUL parameters using an MTL geometry model.
@@ -906,8 +917,10 @@ class InternalPerUnitParameters:
             Zij_values = np.array([[Zcc_j, Zcs_j],
                                    [Zcs_j, Zss_j]])
 
-            # cable internal potential coefficient matrix. Eq. (2.19) [2]
-            Pij = np.array([[zij['potentials']['pcj']]])
+            # cable internal potential coefficient matrix. Eq. (2.23) [2] with
+            # psj = 0 (no sheath insulation): the sheath row is all zero
+            pcj = zij['potentials']['pcj']
+            Pij = np.array([[pcj, 0.0], [0.0, 0.0]])
 
         # 5. SCC with core, core_insulation (also used for a bare/insulated ECC
         # conductor, whose geometry is exposed under the same 'core_*' keys)
@@ -925,6 +938,10 @@ class InternalPerUnitParameters:
         elif 'core_outer_radius' in scc:
             # impedance matrix of the j-th phase of SCC cable.
             Zij_values = np.array([[zij['zcs']['z11']]])
+
+            # Eq. (2.24) [2] with pcj = 0: a bare conductor has no internal
+            # potential coefficient -- its shunt admittance comes from Pg alone
+            Pij = np.array([[0.0]])
 
         else:
             raise ValueError("Invalid SCC configuration. Please check the conductor layers.")
@@ -969,7 +986,7 @@ class InternalPerUnitParameters:
 
         # --- Shunt Admittance Matrix, Ye = jw * Pi^-1 ---
         # inv_Pi = lu_solve(lu_factor(Pi), np.identity(Pi.shape[0]))
-        inv_Pi = np.linalg.inv(Pi)
+        inv_Pi = _internal_capacitance(Pi)
 
         # The result is multiplied by the jw vector using broadcasting.
         # jw[:, np.newaxis, np.newaxis] reshapes the 1D jw vector to (num_freq, 1, 1)
@@ -1025,7 +1042,7 @@ class InternalPerUnitParameters:
         Ri = Zi.real
         Li = Zi.imag / (2 * np.pi * self.f)[:, np.newaxis, np.newaxis]
 
-        inv_Pi = np.linalg.inv(Pi)
+        inv_Pi = _internal_capacitance(Pi)
         Ye = self.jw[:, np.newaxis, np.newaxis] * inv_Pi
 
         return {
@@ -1115,20 +1132,14 @@ class InternalParametersFromFEM:
             each block's ``M``) -- there is no coupling *between* blocks
             here (that is what the ground-return term adds downstream).
         block_sizes : list of int, optional
-            The list :meth:`PerUnitParameters.quasi_tem_approx_matrices`
-            uses to expand the **ground-return** matrix. It is about
-            physical ground-return objects (position + outer radius, one
-            row/column of ``earth_return_parameters``'s ``(N_obj, N_obj)``
-            matrices), which do not have to line up with
-            ``component_blocks``' own grouping -- e.g. Config. 4's
-            ground-return sees 4 objects (phase A, B, C, ECC --
-            ``SingleCoreCableWithECCStrategy`` groups by ``center_point``)
-            while ``component_blocks`` has only 3 entries (the C+ECC FEM
-            measurement is *one* physically-coupled internal block, but
-            still 2 separate ground-return objects) -- pass
-            ``block_sizes=[2, 2, 2, 1]`` explicitly in that case. Defaults to
-            one entry per ``component_blocks`` element (only correct when
-            the object count equals the block count).
+            Conductors per **ground-return** object (one row/column of
+            ``earth_return_parameters``'s ``(N_obj, N_obj)`` matrices).
+            Defaults to one entry per ``component_blocks`` element -- e.g.
+            Config. 4: ``[2, 2, 3]``, the C+ECC duct being one object
+            (Ametani eqs. 2.32/2.40). Note that
+            :meth:`PerUnitParameters.quasi_tem_approx_matrices` gives
+            precedence to the model's own ``ground_return_block_sizes``
+            when the strategy provides it.
         """
         obj = cls(frequencies)
         blocks = []
@@ -1278,7 +1289,9 @@ class PerUnitParameters:
 
     def earth_return_parameters(self, zg_form='magalhaes_xue', yg_form='magalhaes_xue'):
         """ Calculates Earth-return parameters over a vector of frequencies. """
-        N = self.model.num_sc_cables
+        # One row/column per ground-return object (a cable, or a duct with
+        # everything inside it) -- not necessarily num_sc_cables.
+        N = self.model.d_matrix_ground_return.shape[0]
         d_matrix = self.model.d_matrix_ground_return
         D_matrix = self.model.D_matrix_ground_return
         hnm = self.model.images_vertical_distance_matrix
@@ -1388,7 +1401,14 @@ class PerUnitParameters:
         # ground-return coupling (which only depends on cable position, not on
         # which/how many conductors that cable has) must be tiled block-by-block
         # with each cable's own size rather than a single uniform M.
-        block_sizes = internal_matrices['block_sizes']
+        # When the strategy groups several conductors under one ground-return
+        # object (Config. 4: ECC inside phase C's duct, Ametani eqs. 2.32/2.40),
+        # that grouping takes precedence over the internal block layout.
+        block_sizes = getattr(self.model, 'ground_return_block_sizes', None) or internal_matrices['block_sizes']
+        if sum(block_sizes) != internal_matrices['impedance_matrix'].shape[-1]:
+            raise ValueError(
+                f"ground-return block_sizes {block_sizes} do not add up to the "
+                f"{internal_matrices['impedance_matrix'].shape[-1]} internal conductors.")
 
         z0_jk = earth_return_params['impedance_matrix']         # Shape (num_freq, N, N)
         pg_jk = earth_return_params['potential_coefficient']    # Shape (num_freq, N, N)

@@ -48,16 +48,14 @@ term (`Zi`/`Yi` from COMSOL) + ground return with the pipe outer radius.
 - ~~Hybrid pipeline~~ **Config. 2 done** (as below); **Config. 4 done**
   (`InternalParametersFromFEM.from_component_blocks` — heterogeneous
   block-diagonal FEM assembly: phase A/B reuse Config. 2's own FEM data,
-  phase C+ECC use Config. 4's own 3-conductor COMSOL file). `Y'`/`Zg`/`Pg`
-  agree to <3%; `Z'` has an isolated ~50% outlier on the ECC self-term,
-  root-caused to the ground-return radius not accounting for the ECC sharing
-  phase C's duct — see `GROUND_RETURN_ALLOCATION_STUDY.md` (fix pending a
-  team decision, deliberately not applied yet).
-- Configs 3/4: modal decomposition **wired and running** (7 conductors, 7
-  modes) — `alpha_m`/`v_m`/`|Z_cm|` computed, passivity OK. Mode
-  *classification* (the 7th "ECC mode") is **not** implemented — no
-  reference-pattern equations for it exist yet, so modes stay unlabelled
-  (`mode_0`..`mode_6`) rather than guessed. **Config 5 remains untouched.**
+  phase C+ECC use Config. 4's own 3-conductor COMSOL file). With the ECC in
+  the phase-C duct ground-return object (Ametani eqs. 2.32/2.40 — see
+  `AMETANI_FORMULATION_COMPARISON.md`), `Z'` 0.27%, `Y'` 1.84%, `Zg`/`Pg`
+  0.13%/0.34% vs. MATLAB.
+- Configs 3/4: 7-mode classification (6 thesis modes + `ecc`) and the MATLAB
+  modal overlay are active — `MODAL_CH5_DEVELOPMENT.md` secs. 7.4/7.5.
+  **Config 5 remains untouched** (the bare-conductor internal branch it needs
+  is now fixed).
 - `f_c` (eq. 5.33) annotation: still pending, low priority.
 - Frequency-dependent soil (Phase 3, ~10–20% gap at high f): still pending.
 

@@ -298,20 +298,17 @@ ground/inter-sheath modes **much larger** than in Config. 1 because of the air
    asymptotic limit matrices of Wedepohl (1996) sec. 7.
 3. **~2 % offset in `C_22`** of Config. 2: difference between the COMSOL FEM
    (used by pyLCP) and Andreata's own FEM — it is not a pipeline error.
-4. **Configs 3/4 wired but not classified**: `ModalDecomposition` runs on both
-   (7 conductors / 7 modes) and produces `alpha_m`/`v_m`/`|Z_cm|`, but
-   `_classify` still bails out for `n != 6` -- modes are unlabelled
-   (`mode_0`..`mode_6`). No thesis equations for a 7th "ECC mode" are in the
-   codebase yet. See sec. 7.2. **Config 5 remains unimplemented.**
+4. ~~Configs 3/4 wired but not classified~~ **Done (sec. 7.4)**: 7-mode
+   classifier (`_classify_7c`, 6 thesis modes + `ecc`) and MATLAB overlay
+   active for both. **Config 5 remains unimplemented.**
 5. ~~`ModalPropagationPlotter` is standalone...~~ **Done (sec. 7.1)**: it now
    accepts a `matlab_modal` overlay (Configs 1/2, validated); `print_modal_
    comparison_report` gives the numeric per-mode comparison. Still standalone
    from `PLOT_CONFIG` by design (its own axis/legend logic).
-6. **FEM-hybrid Case 4 `Z'` ECC self-term ~50% off** at high frequency (`Y'`,
-   `Zg`, `Pg` all agree to <3%): the ground-return radius assigned to the ECC
-   object does not account for it sharing phase C's duct. Root-caused, not
-   yet fixed pending team confirmation -- see sec. 7.3 and
-   [`GROUND_RETURN_ALLOCATION_STUDY.md`](GROUND_RETURN_ALLOCATION_STUDY.md).
+6. ~~FEM-hybrid Case 4 `Z'` ECC self-term ~50% off~~ **Fixed (sec. 7.5)**:
+   the ECC now belongs to the phase-C duct ground-return object (Ametani eqs.
+   2.32/2.40); `Z'` 0.27% vs. MATLAB -- see
+   [`AMETANI_FORMULATION_COMPARISON.md`](AMETANI_FORMULATION_COMPARISON.md).
 
 ---
 
@@ -398,7 +395,53 @@ work** (confirmed scenario-independent: identical in the purely-analytical
 `'3_deconti'` path; Case 3, which has no duct, matches its own MATLAB
 reference to ~1e-10). Full analysis, code citations and two candidate fixes
 in [`GROUND_RETURN_ALLOCATION_STUDY.md`](GROUND_RETURN_ALLOCATION_STUDY.md)
--- intentionally left unfixed pending a team decision.
+-- intentionally left unfixed pending a team decision. **Update: fixed in
+sec. 7.5** (`Z'` 0.27%).
+
+### 7.4 Configs 3/4 — 7-mode classification + MATLAB overlay (2026-09)
+
+The MATLAB modal files for Configs 3/4 arrived (`andreata_case{3,4}_{alpham,
+betam,velocm,Zcm,Ycm}.mat`, 7 modes, suffixes `_3`/`_4`).
+
+| Delivered | File |
+|---|---|
+| `_classify_7c` (canonical order `[c1 c2 c3 s1 s2 s3 ecc]`): stage 1 picks the 3 coaxial modes by the smallest core-returns-via-own-sheath residual `\|c_k + s_k\|^2` (100 Hz–100 kHz average; < 0.05 vs. > 0.5 in both configs -- the 6C core-fraction criterion has a thin margin in Config 4, where the ECC mode carries core-C current); stage 2 assigns the other 4 jointly (Hungarian) to `REFERENCE_PATTERNS_7C_SHEATH` over rows `[s1 s2 s3 ecc]` (`ecc` pattern = ECC current only, no assumption on which phase it sits next to). 6-conductor path untouched. | `analytical_forms/modal_analysis.py` |
+| `MODAL_MODE_ORDER[config_index]` -- verified per-config MATLAB mode order (Configs 3 and 4 differ from each other and from the thesis 6-mode order) | `utils/matlab_data.py` |
+| **Grid bug fixed**: Configs 3/4 were sent on the **90-point** grid (`<prefix>_frequency_range.mat`), not 91; the reader now picks the grid by length instead of assuming 91 | `utils/matlab_data.py` |
+| `ecc` style in `MODE_STYLE`; curves/legend drawn in `MODE_STYLE` order; `v_m` y-limit includes the MATLAB data | `plotter/modal_plotter.py` |
+
+MATLAB order (verified by optimal assignment of the `alpha_m`/`v_m`/`|Z_cm|`
+curves, 1 Hz–1 MHz, against the pyLCP labels):
+
+| | mode1 | mode2 | mode3 | mode4 | mode5 | mode6 | mode7 |
+|---|---|---|---|---|---|---|---|
+| Config 3 | coaxial_1 | coaxial_2 | coaxial_3 | ecc | ground | inter_sheath_1 | inter_sheath_2 |
+| Config 4 | ground | inter_sheath_1 | inter_sheath_2 | ecc | coaxial_3 | coaxial_2 | coaxial_1 |
+
+(Config 4 order re-verified after the fix of sec. 7.5; before it, the ECC
+mode was the worst match and the coaxial trio came out in another order.)
+
+**Results**:
+- **Config 3**: `alpha_m`/`v_m`/`|Z_cm|` identical to MATLAB (0.00%) for all 7
+  modes, except coaxial `|Z_cm|` above ~1 MHz (18–52%) -- the same
+  near-degenerate coaxial instability as Config 1 (sec. 7.1).
+- **Config 4** (after sec. 7.5, at 1e2/1e4/1e6 Hz): `v_m` 0.02–3% for all 7
+  modes; `|Z_cm|` ≤ 8%; `alpha_m` ≤ 5% (ground, coaxial) and 8–24% (inter-sheath,
+  ECC) -- the same range as Config 2's inter-sheath modes (sec. 7.1). Before
+  sec. 7.5 the ECC mode diverged (MATLAB `v_m` ~2.28e8 vs. pyLCP ~1.64e8 m/s at
+  1 MHz).
+
+### 7.5 ECC ground-return object in Config. 4 (Ametani PT, eqs. 2.32/2.40)
+
+A comparison with Ametani (2015) secs. 2.1/2.2 (full record in
+[`AMETANI_FORMULATION_COMPARISON.md`](AMETANI_FORMULATION_COMPARISON.md))
+showed that all conductors inside a pipe share the pipe's self earth-return
+term. `SingleCoreCableWithECCStrategy` now merges any duct-less conductor
+that fits geometrically inside another cable's duct into that cable's
+ground-return object (`ground_return_block_sizes = [2, 2, 3]` for Config. 4),
+and `quasi_tem_approx_matrices` tiles `Zg`/`Pg` with it. Config. 4 `'fem'` vs.
+MATLAB: `Z'` 50% → **0.27%**, `Y'` 2.56% → 1.84%, `Zg`/`Pg` unchanged
+(0.13%/0.34%). Configs 1–3 unchanged.
 
 ---
 

@@ -56,6 +56,7 @@ class MulticonductorTransmissionLine:
         self.D_matrix_ground_return = None
         self.images_vertical_distance_matrix = None
         self.horizontal_separation_matrix = None
+        self.ground_return_block_sizes = None   # conductors per ground-return object (ECC strategies)
 
         # Delegate preprocessing and validation to the strategy
         strategy = mtl_strategy_factory(self.mtl_type)

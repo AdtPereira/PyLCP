@@ -102,14 +102,10 @@ def main():
     pul_data['matlab'] = matlab_data
 
     # MATLAB reference for the modal-domain parameters (Andreata Ch. 5),
-    # Configuration 3 (3 SCC + ECC -> 7 conductors -> 7 modes). Not sent yet
-    # by the external developer as of this writing -- returns None until the
-    # andreata_case3_{alpham,betam,velocm,Zcm,Ycm}.mat files show up (see
-    # utils/matlab_data.py::get_modal_scenario_data), at which point the
-    # report/overlay below start comparing automatically. Mode *labels* stay
-    # unset either way (None) for this 7-conductor case: mode classification
-    # (ModalDecomposition._classify) only covers the 6-conductor configs so
-    # far -- see MODAL_CH5_DEVELOPMENT.md, known limitation 4.
+    # Configuration 3 (3 SCC + ECC -> 7 conductors -> 7 modes), 90-point
+    # grid. MATLAB mode1..7 follow the verified Config. 3 order in
+    # utils/matlab_data.py::MODAL_MODE_ORDER -- joined by label with the
+    # pyLCP modes below (MODAL_CH5_DEVELOPMENT.md sec. 7.4).
     matlab_modal = matlab_reader.get_modal_scenario_data(prefix='andreata_case3', config_index=3)
 
     print("\nCalculating internal parameters for all frequencies...")
@@ -131,12 +127,8 @@ def main():
     # Modal-domain propagation characteristics -- Chapter 5 of Andreata  #
     # (Config. 3: 3 buried SCC + 1 ECC -> 7 conductors -> 7 modes).      #
     # Same earth-return formulation as Config. 1 (De Conti closed-form,  #
-    # secs. 5.4/6.1). Mode classification/labelling for this 7-conductor  #
-    # (ECC) layout is not implemented yet (see MODAL_CH5_DEVELOPMENT.md,  #
-    # known limitation 4) -- ModalDecomposition still runs and produces   #
-    # alpha_m/v_m/|Z_cm| per mode, just without semantic names; the       #
-    # MATLAB overlay/report activate automatically once both the         #
-    # reference data and a 7-mode classifier are in place.                #
+    # secs. 5.4/6.1). The 7 modes are labelled by                         #
+    # ModalDecomposition._classify_7c (6 thesis modes + 'ecc').           #
     # ------------------------------------------------------------------ #
     base = pul_data['scenarios']['p100_er1_deconti']
 
@@ -173,8 +165,8 @@ def main():
     # plotter.compare_internal_matrices(
     #     key_list=['internal_impedance_matrix', 'internal_admittance_matrix'])
 
-    # Modal attenuation, phase velocity, |Z_cm| (7 modes, unlabelled -- see
-    # note above) -- overlaid with the MATLAB reference once it is available.
+    # Modal attenuation, phase velocity, |Z_cm| (7 modes) with the MATLAB
+    # reference overlaid.
     ModalPropagationPlotter(__file__, pul_data['modal'],
                             config_name='Configuration 3', autoSave=True,
                             matlab_modal=matlab_modal).plot_all()

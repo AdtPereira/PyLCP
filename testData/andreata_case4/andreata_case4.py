@@ -233,13 +233,9 @@ def main():
 
     # MATLAB reference for the modal-domain parameters (Andreata Ch. 5),
     # Configuration 4 (3 SCC + ECC, individual HDPE ducts -> 7 conductors ->
-    # 7 modes). Not sent yet by the external developer as of this writing --
-    # returns None until the andreata_case4_{alpham,betam,velocm,Zcm,Ycm}.mat
-    # files show up (see utils/matlab_data.py::get_modal_scenario_data), at
-    # which point the report/overlay below start comparing automatically.
-    # Mode *labels* stay unset either way (None): classification
-    # (ModalDecomposition._classify) only covers the 6-conductor configs so
-    # far -- see MODAL_CH5_DEVELOPMENT.md, known limitation 4.
+    # 7 modes), 90-point grid. MATLAB mode1..7 follow the verified Config. 4
+    # order in utils/matlab_data.py::MODAL_MODE_ORDER -- joined by label with
+    # the pyLCP modes below (MODAL_CH5_DEVELOPMENT.md sec. 7.4).
     matlab_modal = matlab_reader.get_modal_scenario_data(prefix='andreata_case4', config_index=4)
 
     # COMSOL internal impedance data already available (Results/cmsl_internal_
@@ -299,9 +295,9 @@ def main():
                 {'zi': zi_ab, 'zi_frequencies': freq_ab, 'capacitance': cap_ab},          # phase B (identical duct, no ECC)
                 {'zi': zi_c_ecc, 'zi_frequencies': freq_c_ecc, 'capacitance': cap_c_ecc}, # phase C + ECC
             ],
-            # Ground-return sees 4 objects (A, B, C, ECC), not 3 -- see
-            # InternalParametersFromFEM.from_component_blocks's docstring.
-            block_sizes=[2, 2, 2, 1],
+            # Ground return sees 3 objects: duct A, duct B, and duct C with
+            # core C, sheath C and the ECC inside it (Ametani eqs. 2.32/2.40;
+            # mtl_schematic.ground_return_block_sizes == [2, 2, 3]).
         )
         pul_data['scenarios']['fem'] = {
             'mtl': mtl_schematic, 'internal_source': 'fem', 'fem_internal': fem_internal,
@@ -356,12 +352,8 @@ def main():
     # -> 7 modes). Runs on the 'fem' scenario (FEM-hybrid, no Lafaia GMD  #
     # -- same choice as andreata_case2), falling back to '3_deconti' (GMD #
     # case 3.1 + De Conti ground return) if the COMSOL data needed for    #
-    # 'fem' is unavailable. Mode classification/labelling for this        #
-    # 7-conductor (ECC) layout is not implemented yet (see                #
-    # MODAL_CH5_DEVELOPMENT.md, known limitation 4) -- ModalDecomposition #
-    # still runs and produces alpha_m/v_m/|Z_cm| per mode, just without   #
-    # semantic names; the MATLAB overlay/report activate automatically    #
-    # once both the reference data and a 7-mode classifier are in place.  #
+    # 'fem' is unavailable. The 7 modes are labelled by                   #
+    # ModalDecomposition._classify_7c (6 thesis modes + 'ecc').           #
     # ------------------------------------------------------------------ #
     base_key = 'fem' if 'fem' in pul_data['scenarios'] else '3_deconti'
     base = pul_data['scenarios'][base_key]
@@ -401,8 +393,8 @@ def main():
     # plotter.compare_internal_matrices(
     #     key_list=['internal_impedance_matrix', 'internal_admittance_matrix'])
 
-    # Modal attenuation, phase velocity, |Z_cm| (7 modes, unlabelled -- see
-    # note above) -- overlaid with the MATLAB reference once it is available.
+    # Modal attenuation, phase velocity, |Z_cm| (7 modes) with the MATLAB
+    # reference overlaid.
     ModalPropagationPlotter(__file__, pul_data['modal'],
                             config_name='Configuration 4', autoSave=True,
                             matlab_modal=matlab_modal).plot_all()

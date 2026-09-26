@@ -1,5 +1,14 @@
 # Study — Ground-Return (Zg/Yg) Treatment Across the 4 Andreata Cases
 
+> **RESOLVED (2026-09)** by Ametani (2015) eqs. 2.32/2.40: every conductor
+> inside a duct shares the duct's self earth-return term, so the ECC of
+> Config. 4 now belongs to the phase-C duct object (3 objects,
+> `ground_return_block_sizes = [2, 2, 3]`). Neither candidate fix of sec. 5
+> was adopted as written: fix 1 alone corrects the ECC self term but breaks
+> the C–ECC mutual (18.9%). `Z'` vs. MATLAB went from 50% to 0.27%. See
+> [`AMETANI_FORMULATION_COMPARISON.md`](AMETANI_FORMULATION_COMPARISON.md).
+> The analysis below is kept as the record of the diagnosis.
+
 **Date:** 2026-09.
 **Trigger:** implementing the FEM-hybrid pipeline for `andreata_case4`
 (see [`HYBRID_PIPELINE_PLAN.md`](HYBRID_PIPELINE_PLAN.md)) surfaced a

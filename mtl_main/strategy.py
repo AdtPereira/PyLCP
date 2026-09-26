@@ -23,6 +23,50 @@ def _cable_external_geometry(conductor_data: dict):
     return tuple(conductor_data['center_point']), conductor_data['radius'][1] + insul
 
 
+def _group_enclosure(group):
+    """(enclosure, host conductor data) of a conductor group, or (None, None)."""
+    for _key, data in group:
+        enclosure = data.get('enclosure')
+        if enclosure and enclosure.get('outer_radius'):
+            return enclosure, data
+    return None, None
+
+
+def _merge_groups_inside_enclosures(groups):
+    """Merges every duct-less conductor group lying inside another group's
+    duct into that group.
+
+    Ametani, Cable System Transients (2015), eqs. 2.32/2.40: all conductors
+    inside a pipe share the pipe's *self* earth-return impedance (self and
+    mutual entries alike) -- the soil only sees the pipe. Config. 4 of
+    Andreata: the ECC sharing phase C's HDPE duct is therefore part of the
+    phase-C ground-return object, not an object of its own. Containment is
+    geometric: the conductor's full cross-section (radius + insulation) must
+    fit inside the duct's inner radius.
+    """
+    hosts = []
+    for i, group in enumerate(groups):
+        enclosure, host = _group_enclosure(group)
+        if enclosure is not None:
+            center = enclosure.get('center_point') or host['center_point']
+            r_in = enclosure.get('inner_radius', enclosure['outer_radius'])
+            hosts.append((i, center, r_in))
+
+    merged = [list(group) for group in groups]
+    absorbed = set()
+    for j, group in enumerate(groups):
+        if _group_enclosure(group)[0] is not None:
+            continue
+        for i, (cx, cy), r_in in hosts:
+            if all(np.hypot(d['center_point'][0] - cx, d['center_point'][1] - cy)
+                   + d['radius'][1] + ((d.get('insulation') or {}).get('thickness', 0) or 0.0)
+                   <= r_in * (1 + 1e-9) for _key, d in group):
+                merged[i].extend(group)
+                absorbed.add(j)
+                break
+    return [group for j, group in enumerate(merged) if j not in absorbed]
+
+
 class MTLStrategy(ABC):
     """ Abstract Base Class defining the interface for MTL type-specific logic."""
 
@@ -1244,25 +1288,39 @@ class SingleCoreCableWithECCStrategy(MTLStrategy):
             # Store the tuple (original_key, data) in the group matching its position
             cable_groups[tuple(data.get('center_point'))].append((key, data))
 
-        # 2. For each group (location), select the conductor with the largest outer radius
+        # 1b. A conductor inside another cable's duct (Config. 4: ECC sharing
+        # phase C's duct) belongs to that cable's ground-return object --
+        # Ametani (2015) eqs. 2.32/2.40, see _merge_groups_inside_enclosures.
+        groups = _merge_groups_inside_enclosures(list(cable_groups.values()))
+
+        # 2. For each group, select the representative conductor: the one
+        # carrying the duct, else the one with the largest outer radius
+        def get_outer_radius(conductor_tuple):
+            data = conductor_tuple[1]
+            insulation_thickness = (data.get('insulation') or {}).get('thickness', 0)
+            # data['radius'] is a tuple (inner_radius, outer_radius)
+            return data['radius'][1] + insulation_thickness
+
         selected_cables = []
-        for center_point, conductors_in_group in cable_groups.items():
-            if not conductors_in_group:
-                continue
+        for conductors_in_group in groups:
+            enclosure, host = _group_enclosure(conductors_in_group)
+            if enclosure is not None:
+                selected_cables.append(next(c for c in conductors_in_group if c[1] is host))
+            else:
+                selected_cables.append(max(conductors_in_group, key=get_outer_radius))
 
-            # Function to compute the total outer radius of a conductor
-            def get_outer_radius(conductor_tuple):
-                data = conductor_tuple[1]
-                insulation_thickness = (data.get('insulation') or {}).get('thickness', 0)
-                # data['radius'] is a tuple (inner_radius, outer_radius)
-                return data['radius'][1] + insulation_thickness
-
-            # Find the conductor with the maximum outer radius in the group
-            representative_conductor = max(conductors_in_group, key=get_outer_radius)
-            selected_cables.append(representative_conductor)
-
-        # 3. Sort the final list by the original key (0, 1, 2...) to ensure consistency
-        cables = sorted(selected_cables, key=lambda item: item[0])
+        # 3. Sort by the original key (0, 1, 2...) to ensure consistency. The
+        # conductors of each object must be contiguous in key order, since the
+        # ground-return matrix is tiled over Zi's rows by `block_sizes`.
+        order = sorted(range(len(groups)), key=lambda g: selected_cables[g][0])
+        cables = [selected_cables[g] for g in order]
+        keys_by_object = [sorted(k for k, _ in groups[g]) for g in order]
+        flat_keys = [k for keys in keys_by_object for k in keys]
+        if flat_keys != sorted(flat_keys):
+            raise ValueError(
+                f"Ground-return objects {keys_by_object} are not contiguous in conductor order; "
+                f"the ground-return matrix cannot be tiled over the conductor matrix.")
+        ground_return_block_sizes = [len(keys) for keys in keys_by_object]
 
         # 4. Geometry that the earth return 'sees' per cable: when there is a
         # duct ('enclosure'), it is the outer surface of the tube, centered on the
@@ -1300,7 +1358,8 @@ class SingleCoreCableWithECCStrategy(MTLStrategy):
             'd_matrix_ground_return': d_matrix,
             'D_matrix_ground_return': D_matrix,
             'images_vertical_distance_matrix': images_vertical_distance_matrix,
-            'horizontal_separation_matrix': horizontal_separation_matrix
+            'horizontal_separation_matrix': horizontal_separation_matrix,
+            'ground_return_block_sizes': ground_return_block_sizes,
         }
     
     def apply_mtl_ref_properties(self, context, mtl_input: dict) -> None:
@@ -1318,6 +1377,9 @@ class SingleCoreCableWithECCStrategy(MTLStrategy):
         context.D_matrix_ground_return = properties['D_matrix_ground_return']
         context.images_vertical_distance_matrix = properties['images_vertical_distance_matrix']
         context.horizontal_separation_matrix = properties['horizontal_separation_matrix']
+        # Conductors per ground-return object, in conductor order (Config. 4:
+        # [2, 2, 3] -- the ECC shares phase C's duct object)
+        context.ground_return_block_sizes = properties['ground_return_block_sizes']
 
         # Extract and apply SCC geometric parameters
         context.scc = self._extract_scc_parameters(mtl)
